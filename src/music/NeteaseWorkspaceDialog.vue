@@ -46,10 +46,11 @@
             type="button"
             class="ms-netease-logout-btn"
             style="color: #f43f5e; border-color: rgba(244, 63, 94, 0.4); font-weight: 600;"
-            @click="handleOpenQrModal"
+            @click="openOfficialWebsite"
           >
-            📱 扫码登录
+            官网登录
           </button>
+          <button type="button" class="ms-netease-logout-btn" :disabled="websiteConnecting" @click="connectWebsite">{{ websiteConnecting ? "正在连接…" : "连接官网账户" }}</button>
           <button
             v-if="workspaceState.neteaseUser?.nickname"
             type="button"
@@ -61,42 +62,7 @@
         </div>
       </div>
 
-      <!-- 官方扫码登录独立浮层 (模态窗口) -->
-      <div v-if="showQrModal" class="ms-netease-qr-modal-overlay" @click.self="showQrModal = false">
-        <div class="ms-netease-qr-card">
-          <header class="ms-qr-card-header">
-            <div class="ms-qr-card-title">
-              <span class="ms-qr-logo">📱</span>
-              <strong>网易云音乐 · 扫码登录</strong>
-            </div>
-            <button type="button" class="ms-qr-close-btn" title="关闭扫码" @click="showQrModal = false">✕</button>
-          </header>
-
-          <div class="ms-qr-card-body">
-            <div class="ms-netease-qr-wrap">
-              <img v-if="workspaceState.neteaseQrImg" class="ms-netease-qr-img" :src="workspaceState.neteaseQrImg" alt="网易云扫码" />
-              <div v-else class="ms-qr-loading-placeholder">
-                <div class="ms-netease-spinner"></div>
-                <small>正在获取官方二维码…</small>
-              </div>
-            </div>
-
-            <div class="ms-qr-instruction">
-              <strong class="ms-qr-status-pill">{{ workspaceState.neteaseQrStatus || "请使用网易云音乐 App 扫码登录" }}</strong>
-              <small>打开手机网易云音乐 App 首页顶部 <strong>[ 扫一扫 ]</strong> 授权</small>
-            </div>
-
-            <div class="ms-qr-actions">
-              <button type="button" class="ms-page-btn" @click="handleRefreshQr">
-                🔄 刷新二维码
-              </button>
-              <button type="button" class="ms-page-btn" style="color: var(--muted);" @click="showQrModal = false">
-                关闭
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
+      <p class="ms-netease-status-text" style="padding: 0 16px;" role="status">{{ websiteStatus }}</p>
 
       <!-- 歌单与歌曲双栏布局 -->
       <div class="ms-netease-body">
@@ -343,39 +309,36 @@ const active = computed(() => musicModuleState.visible && pageVisible.value);
 const workspace = createMusicWorkspaceData(() => active.value);
 const workspaceState = workspace.state;
 
-const showQrModal = ref(false);
+const websiteConnecting = ref(false);
+const websiteStatus = ref("先在同一浏览器的网易云官网登录，再点击「连接官网账户」。无需音乐节点；插件断开不会退出官网。");
 
-function handleOpenQrModal() {
-  showQrModal.value = true;
-  void workspace.startQr();
-}
-
-function handleRefreshQr() {
-  void workspace.startQr();
-}
-
-async function logoutNetease() {
-  if (typeof localStorage !== "undefined") {
-    localStorage.setItem("netease_explicit_logout", "true");
-    removePlaylistCache(CACHED_FAVORITES_KEY);
-    removePlaylistCache(CACHED_PLAYLISTS_KEY);
+function openOfficialWebsite() {
+  if (typeof chrome !== "undefined" && chrome.tabs?.create) {
+    void chrome.tabs.create({ url: "https://music.163.com/" });
+  } else {
+    window.open("https://music.163.com/", "_blank", "noopener,noreferrer");
   }
+}
+async function connectWebsite() {
+  if (websiteConnecting.value) return;
+  websiteConnecting.value = true;
+  websiteStatus.value = "正在使用浏览器官网会话读取账户…";
+  try {
+    await workspace.connectWebsite();
+    websiteStatus.value = "官网账户已连接。若歌单读取失败，请查看列表提示。";
+  } catch (error: any) {
+    websiteStatus.value = error?.message || "官网账户连接失败，请确认已登录。";
+  } finally {
+    websiteConnecting.value = false;
+  }
+}
+async function logoutNetease() {
   await workspace.logout();
   homeMusicState.neteaseUser = null;
   homeMusicState.neteaseSongs = [];
   homeMusicState.neteasePlaylists = [];
-  showQrModal.value = true;
-  void workspace.startQr();
+  websiteStatus.value = "已断开插件账户，官网仍保持登录。";
 }
-
-watch(
-  () => workspaceState.neteaseUser?.nickname,
-  (name) => {
-    if (name) {
-      showQrModal.value = false;
-    }
-  }
-);
 import AppWindowFrame from "../core/AppWindowFrame.vue";
 import {
   homeMusicState,

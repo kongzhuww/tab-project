@@ -4,7 +4,7 @@
  * 扫码登录、Cookie 自动嗅探、用户信息解析、歌单/榜单获取、歌曲搜索、无损音源提取与歌词同步
  */
 
-import { loadEndpoint, validateEndpoint } from "../music/settings";
+import { requestOfficialNetease } from "../music/official-api";
 
 declare const chrome: any;
 export const NETEASE_COOKIE_KEY = "neteaseCookie";
@@ -59,16 +59,9 @@ export interface NeteasePlaylist {
   [key: string]: any;
 }
 
-export interface NeteaseQrStatus {
-  code: number;
-  message: string;
-  cookie?: string;
-}
-
 export class NeteaseService {
   private static instance: NeteaseService;
 
-  private cookie: string = "";
   private user: NeteaseUser | null = null;
   private likedSongIds: Set<number> = new Set();
   private recentSongs: NeteaseSong[] = [];
@@ -90,12 +83,10 @@ export class NeteaseService {
     if (typeof chrome !== "undefined" && chrome.storage?.local) {
       try {
         const res = await chrome.storage.local.get([
-          NETEASE_COOKIE_KEY,
           NETEASE_USER_KEY,
           NETEASE_LIKES_KEY,
           NETEASE_RECENT_KEY
         ]);
-        if (res[NETEASE_COOKIE_KEY]) this.cookie = res[NETEASE_COOKIE_KEY];
         if (res[NETEASE_USER_KEY]) this.user = res[NETEASE_USER_KEY];
         if (Array.isArray(res[NETEASE_LIKES_KEY])) {
           this.likedSongIds = new Set(res[NETEASE_LIKES_KEY]);
@@ -130,38 +121,8 @@ export class NeteaseService {
   // HTTP 底层通用请求封装 (带时间戳、Cookie、超时防抖)
   // ==========================================================================
   public async request<T = any>(endpoint: string, params: Record<string, any> = {}, signal?: AbortSignal): Promise<T> {
-    signal?.throwIfAborted();
-    const base = validateEndpoint(await loadEndpoint());
-    if (!base) throw new Error("尚未配置网易云音乐节点，请在音乐工作区右上角节点设置中填写");
-    signal?.throwIfAborted();
-    const url = new URL(endpoint.startsWith("http") ? endpoint : `${base}${endpoint}`);
-    if (url.origin !== new URL(base).origin || url.username || url.password) throw new Error("网易云请求必须使用已配置节点");
-
-    Object.entries(params).forEach(([k, v]) => {
-      if (v !== undefined && v !== null) {
-        url.searchParams.set(k, String(v));
-      }
-    });
-
-    if (this.cookie && !url.searchParams.has("cookie")) {
-      url.searchParams.set("cookie", this.cookie);
-    }
-    url.searchParams.set("timestamp", String(Date.now()));
-
-    const res = await fetch(url.toString(), {
-      headers: { Accept: "application/json" }, credentials: "omit", redirect: "error",
-      signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(15000)]) : AbortSignal.timeout(15000)
-    });
-
-    if (!res.ok) {
-      throw new Error(`[NeteaseAPI] HTTP ${res.status}: ${res.statusText}`);
-    }
-
-    const data = await res.json();
-    signal?.throwIfAborted();
-    return data as T;
+    return requestOfficialNetease<T>(endpoint, params, signal);
   }
-
   // ==========================================================================
   // 用户鉴权与状态
   // ==========================================================================
@@ -169,8 +130,27 @@ export class NeteaseService {
     return this.user;
   }
 
-  public getCookie(): string {
-    return this.cookie;
+  public async connectWebsiteAccount(): Promise<NeteaseUser> {
+    await this.whenReady();
+    const data = await requestOfficialNetease<any>("/user/account");
+    const profile = data.profile || data.data?.profile;
+    const uid = profile?.userId;
+    if (!uid || typeof profile?.nickname !== "string") {
+      throw new Error("未读到官网账户，请先在同一浏览器、同一资料的网易云官网登录，再点击连接；无痕窗口的登录不会自动共用。");
+    }
+    const user: NeteaseUser = {
+      uid, nickname: profile.nickname, avatarUrl: profile.avatarUrl || "",
+      vipType: Number(profile.vipType) || 0, isVip: Number(profile.vipType) > 0, loggedIn: true
+    };
+    if (typeof chrome !== "undefined" && chrome.storage?.local) {
+      await chrome.storage.local.set({ [NETEASE_USER_KEY]: user });
+    }
+    this.user = user;
+    this.playlistCache.clear();
+    this.likedSongIds.clear();
+    if (typeof localStorage !== "undefined") localStorage.removeItem("netease_explicit_logout");
+    window.dispatchEvent(new Event("netease:account-updated"));
+    return user;
   }
 
   public async fetchUserProfile(): Promise<NeteaseUser | null> {
@@ -244,200 +224,8 @@ export class NeteaseService {
   // ==========================================================================
   // Cookie 自动嗅探与应用登录
   // ==========================================================================
-  public async detectBrowserCookie(): Promise<string | null> {
-    const map = new Map<string, string>();
-
-    // 1. 从扩展 cookies API 获取
-    try {
-      if (typeof chrome !== "undefined" && chrome.cookies?.getAll) {
-        const queryPromises = [
-          chrome.cookies.getAll({ url: "https://music.163.com" }).catch(() => []),
-          chrome.cookies.getAll({ url: "https://music.163.com/" }).catch(() => []),
-          chrome.cookies.getAll({ domain: "163.com" }).catch(() => []),
-          chrome.cookies.getAll({ domain: ".163.com" }).catch(() => []),
-          chrome.cookies.getAll({ domain: "music.163.com" }).catch(() => []),
-          chrome.cookies.getAll({ domain: ".music.163.com" }).catch(() => []),
-          chrome.cookies.getAll({ domain: "126.net" }).catch(() => []),
-          chrome.cookies.getAll({ domain: ".126.net" }).catch(() => [])
-        ];
-        const resultsArray = await Promise.all(queryPromises);
-        for (const list of resultsArray) {
-          if (Array.isArray(list)) {
-            list.forEach((c: any) => {
-              if (c?.name && c?.value) map.set(c.name, c.value);
-            });
-          }
-        }
-
-        if (!map.has("MUSIC_U") && chrome.cookies.get) {
-          const directU = await chrome.cookies.get({ url: "https://music.163.com", name: "MUSIC_U" }).catch(() => null);
-          if (directU?.value) map.set("MUSIC_U", directU.value);
-        }
-      }
-    } catch (e) {
-      console.warn("[NeteaseService] Detect browser cookie from Cookies API failed:", e);
-    }
-
-    if (map.has("MUSIC_U")) {
-      const pairs: string[] = [];
-      map.forEach((val, name) => pairs.push(`${name}=${val}`));
-      return pairs.join("; ");
-    }
-
-    // 2. 从已打开标签页探测
-    try {
-      if (typeof chrome !== "undefined" && chrome.tabs?.query && chrome.scripting?.executeScript) {
-        const tabs = await chrome.tabs.query({});
-        const neteaseTabs = (tabs || []).filter((t: any) => {
-          const u = (t.url || "").toLowerCase();
-          return u.includes("163.com") || u.includes("music.163.com");
-        });
-        for (const t of neteaseTabs) {
-          if (!t.id) continue;
-          try {
-            const results = await chrome.scripting.executeScript({
-              target: { tabId: t.id, allFrames: true },
-              func: () => document.cookie || ""
-            });
-            for (const r of results || []) {
-              const docCookie: string = r?.result || "";
-              if (docCookie && docCookie.includes("MUSIC_U")) {
-                return docCookie;
-              }
-            }
-          } catch {}
-        }
-      }
-    } catch (e) {
-      console.warn("[NeteaseService] Detect browser cookie from tabs failed:", e);
-    }
-
-    if (map.size > 0 && (map.has("__csrf") || map.has("MUSIC_A") || map.has("NMTID"))) {
-      const pairs: string[] = [];
-      map.forEach((val, name) => pairs.push(`${name}=${val}`));
-      return pairs.join("; ");
-    }
-
-    return null;
-  }
-
-  public async applyCookieAndLogin(cookie: string): Promise<NeteaseUser | null> {
-    if (!cookie) return null;
-    let cleanCookie = cookie.trim();
-    if (!cleanCookie.includes("=") && cleanCookie.length > 20) {
-      cleanCookie = `MUSIC_U=${cleanCookie}`;
-    }
-    this.cookie = cleanCookie;
-    if (typeof chrome !== "undefined" && chrome.storage?.local) {
-      await chrome.storage.local.set({ [NETEASE_COOKIE_KEY]: cleanCookie });
-    }
-    const user = await this.fetchUserProfile();
-    return user;
-  }
-
-  // ==========================================================================
-  // 二维码扫码登录
-  // ==========================================================================
-  public async generateQrKey(signal?: AbortSignal): Promise<string> {
-    // 1. 优先尝试本地自建节点
-    try {
-      const res = await this.request<any>("/login/qr/key", {}, signal);
-      const unikey = res?.data?.unikey;
-      if (unikey) return unikey;
-    } catch {}
-
-    // 2. 备用：直连网易云官方接口 (无需启动本地服务，直接可用)
-    try {
-      const res = await fetch("https://music.163.com/api/login/qrcode/unikey?type=1", {
-        method: "POST",
-        headers: { "Referer": "https://music.163.com" },
-        signal
-      });
-      const data = await res.json();
-      if (data?.unikey) return data.unikey;
-    } catch (e) {
-      console.warn("[NeteaseService] official generateQrKey error:", e);
-    }
-
-    throw new Error("获取网易云扫码凭据失败，请检查网络连接");
-  }
-
-  public async createQrImage(unikey: string, signal?: AbortSignal): Promise<string> {
-    // 1. 优先尝试本地自建节点
-    try {
-      const res = await this.request<any>("/login/qr/create", { key: unikey, qrimg: "true" }, signal);
-      const qrimg = res?.data?.qrimg;
-      if (qrimg) return qrimg;
-    } catch {}
-
-    // 2. 备用：生成标准网易云 App 扫码登录链接二维码图片
-    const targetUrl = `https://music.163.com/login?codekey=${encodeURIComponent(unikey)}`;
-    return `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(targetUrl)}`;
-  }
-
-  public async checkQrStatus(unikey: string): Promise<NeteaseQrStatus> {
-    // 1. 优先尝试本地自建节点
-    try {
-      const res = await this.request<any>("/login/qr/check", { key: unikey, noCookie: "true" });
-      if (res && typeof res.code !== "undefined") {
-        return await this.handleQrStatusResult(Number(res.code), res.cookie);
-      }
-    } catch {}
-
-    // 2. 备用：官方直接接口
-    try {
-      const res = await fetch(`https://music.163.com/api/login/qrcode/client/login?type=1&key=${encodeURIComponent(unikey)}`, {
-        method: "POST",
-        headers: { "Referer": "https://music.163.com" }
-      });
-      const data = await res.json();
-      if (data && typeof data.code !== "undefined") {
-        const code = Number(data.code);
-        let cookie = data.cookie || "";
-        if (code === 803 && !cookie) {
-          cookie = (await this.detectBrowserCookie()) || "";
-        }
-        return await this.handleQrStatusResult(code, cookie);
-      }
-    } catch (e) {
-      console.warn("[NeteaseService] official checkQrStatus error:", e);
-    }
-
-    return { code: 800, message: "二维码已过期，请刷新" };
-  }
-
-  private async handleQrStatusResult(code: number, cookie?: string): Promise<NeteaseQrStatus> {
-    let message = "等待扫码…";
-    if (code === 800) message = "二维码已过期，请刷新";
-    else if (code === 801) message = "等待扫码…";
-    else if (code === 802) message = "已扫码，请在手机上点击确认登录…";
-    else if (code === 803) {
-      message = "扫码登录成功！";
-      if (typeof localStorage !== "undefined") {
-        try { localStorage.removeItem("netease_explicit_logout"); } catch {}
-      }
-      if (cookie) {
-        this.cookie = cookie;
-        this.user = null;
-        this.likedSongIds.clear();
-        this.playlistCache.clear();
-        if (typeof chrome !== "undefined" && chrome.storage?.local) {
-          await chrome.storage.local.remove([NETEASE_USER_KEY, NETEASE_LIKES_KEY]);
-          await chrome.storage.local.set({ [NETEASE_COOKIE_KEY]: cookie });
-        }
-        try { await this.fetchUserProfile(); } catch {}
-      }
-      window.dispatchEvent(new Event("netease:account-updated"));
-    }
-
-    return { code, message, cookie };
-  }
-
   public async logout(): Promise<void> {
-    try {
-      await this.request("/logout");
-    } catch {}
-    this.cookie = "";
+    // Disconnect the extension only; never log the user out of the official site.
     this.user = null;
     this.playlistCache.clear();
     this.pendingRequests.clear();
@@ -553,10 +341,7 @@ export class NeteaseService {
       return null;
     }
     try {
-      const detectedCookie = await this.detectBrowserCookie();
-      if (detectedCookie) {
-        return await this.applyCookieAndLogin(detectedCookie);
-      }
+      return await this.connectWebsiteAccount();
     } catch (e) {
       console.warn("[NeteaseService] autoDetectAndLogin failed:", e);
     }

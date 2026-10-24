@@ -463,35 +463,14 @@ export const homeMusicController: HomeMusicController = {
     }
   },
   async startNeteaseQrLogin() {
+    // Legacy controller entry now uses the official browser session.
     this.stopNeteaseQrLogin();
-    homeMusicState.neteaseQrStatus = "正在获取二维码…";
     try {
-      const unikey = await neteaseService.generateQrKey();
-      if (!unikey) throw new Error("获取密钥失败");
-      const img = await neteaseService.createQrImage(unikey);
-      homeMusicState.neteaseQrImg = img;
-      homeMusicState.neteaseQrStatus = "请使用网易云音乐 App 扫码登录";
-
-      neteaseQrPollTimer = setInterval(async () => {
-        try {
-          const res = await neteaseService.checkQrStatus(unikey);
-          if (res.code === 800) {
-            homeMusicController.stopNeteaseQrLogin();
-            homeMusicState.neteaseQrStatus = "二维码已过期，请刷新重试";
-          } else if (res.code === 802) {
-            homeMusicState.neteaseQrStatus = "扫码成功，请在手机上点击确认…";
-          } else if (res.code === 803) {
-            homeMusicController.stopNeteaseQrLogin();
-            homeMusicState.neteaseQrStatus = "登录成功！正在读取资料…";
-            homeMusicState.neteaseQrImg = "";
-            await this.loadNeteaseData();
-          }
-        } catch {
-          homeMusicController.stopNeteaseQrLogin();
-        }
-      }, 2500);
-    } catch (e: any) {
-      homeMusicState.neteaseQrStatus = e.message || "生成二维码失败";
+      await neteaseService.connectWebsiteAccount();
+      homeMusicState.neteaseQrStatus = "官网账户已连接";
+      await this.loadNeteaseData();
+    } catch (error: any) {
+      homeMusicState.neteaseQrStatus = error?.message || "请先在网易云官网登录。";
     }
   },
   async logoutNetease() {

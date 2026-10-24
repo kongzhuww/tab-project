@@ -4,31 +4,18 @@ import { musicModuleState, withMusicWrite } from "./module-state";
 
 import { CACHED_PLAYLISTS_KEY, CACHED_FAVORITES_KEY, readPlaylistCache, writePlaylistCache, removePlaylistCache } from "./playlist-cache";
 
-// This view owns browsing and QR scheduling, never the shared player or home QR timer.
+// This view owns browsing and explicit website-session connection, not the shared player.
 export function createMusicWorkspaceData(canRead: () => boolean) {
   const state = reactive({
     neteaseUser: null as NeteaseUser | null,
     neteasePlaylists: [] as NeteasePlaylist[], neteaseActivePlaylist: null as NeteasePlaylist | null,
     neteaseSongs: [] as NeteaseSong[], neteaseSearchResults: [] as NeteaseSong[],
-    neteaseRecentSongs: [] as NeteaseSong[], neteaseQrImg: "", neteaseQrStatus: "",
+    neteaseRecentSongs: [] as NeteaseSong[],
     neteaseLoading: false, message: ""
   });
   let disposed = false, version = 0;
   let request: AbortController | undefined;
   let pollTimer: ReturnType<typeof setTimeout> | undefined;
-  let qrPollTimer: ReturnType<typeof setTimeout> | undefined;
-  let qrAbortController: AbortController | null = null;
-
-  function stopQr() {
-    if (qrPollTimer !== undefined) {
-      clearTimeout(qrPollTimer);
-      qrPollTimer = undefined;
-    }
-    if (qrAbortController) {
-      qrAbortController.abort();
-      qrAbortController = null;
-    }
-  }
   function syncLocal() {
     if (disposed) return;
     state.neteaseUser = neteaseService.getUser();
@@ -60,8 +47,7 @@ export function createMusicWorkspaceData(canRead: () => boolean) {
     version++; request?.abort(); request = undefined; state.neteaseLoading = false;
     if (pollTimer !== undefined) clearTimeout(pollTimer);
     pollTimer = undefined;
-    stopQr();
-    if (state.neteaseQrImg) state.neteaseQrStatus = "轮询已暂停，需要时重新扫码；已提交登录确认不会撤回。";
+
   }
   async function read(operation: (signal: AbortSignal, current: () => boolean) => Promise<void>) {
     if (disposed || !canRead()) return;
@@ -99,7 +85,8 @@ export function createMusicWorkspaceData(canRead: () => boolean) {
           const res = await neteaseService.request("/user/playlist", { uid, limit: 100 }, signal);
           lists = res.playlist || [];
         } catch (e: any) {
-          console.warn("[Netease] Fetch user playlist failed:", e);
+          if (current()) state.message = e?.message || "官网歌单读取失败，请重新连接账户。";
+          return;
         }
       }
       if (!lists.length) {
@@ -187,57 +174,15 @@ export function createMusicWorkspaceData(canRead: () => boolean) {
     try { await withMusicWrite(operation); }
     catch { if (!disposed) state.message = "操作未完整完成，部分变更可能已保存，请重读核对；未自动重试。"; }
   }
-  async function startQr() {
-    if (musicModuleState.pendingWrites) return;
-    stopQr();
-
-    qrAbortController = new AbortController();
-    const signal = qrAbortController.signal;
-    state.neteaseQrImg = "";
-    state.neteaseQrStatus = "正在生成网易云官方二维码…";
-
-    try {
-      await neteaseService.whenReady();
-      const key = await neteaseService.generateQrKey(signal);
-      if (signal.aborted || disposed) return;
-      const image = await neteaseService.createQrImage(key, signal);
-      if (signal.aborted || disposed) return;
-
-      state.neteaseQrImg = image;
-      state.neteaseQrStatus = "请使用网易云音乐 App 扫码登录";
-
-      const poll = async () => {
-        if (signal.aborted || disposed || !canRead()) return;
-        try {
-          const result = await neteaseService.checkQrStatus(key);
-          if (signal.aborted || disposed) return;
-          syncLocal();
-          if (result.code === 803) {
-            state.neteaseQrImg = "";
-            state.neteaseQrStatus = "扫码登录成功！正在读取个人歌单…";
-            stopQr();
-            if (typeof localStorage !== "undefined") {
-              try { localStorage.removeItem("netease_explicit_logout"); } catch {}
-            }
-            void refresh();
-            return;
-          }
-          state.neteaseQrStatus = result.message;
-          if (result.code !== 800) {
-            qrPollTimer = setTimeout(poll, 2500);
-          }
-        } catch {
-          if (!signal.aborted && !disposed) {
-            qrPollTimer = setTimeout(poll, 3000);
-          }
-        }
-      };
-      qrPollTimer = setTimeout(poll, 2500);
-    } catch (err: any) {
-      if (!signal.aborted && !disposed) {
-        state.neteaseQrStatus = err?.message || "二维码生成失败，请点击刷新重试";
-      }
-    }
+  async function connectWebsite() {
+    if (disposed || !canRead()) throw new Error("请先打开网易云模块。");
+    pause();
+    await neteaseService.connectWebsiteAccount();
+    removePlaylistCache(CACHED_PLAYLISTS_KEY);
+    removePlaylistCache(CACHED_FAVORITES_KEY);
+    if (disposed || !canRead()) return;
+    syncLocal();
+    await refresh();
   }
   async function logout() {
     pause();
@@ -255,17 +200,13 @@ export function createMusicWorkspaceData(canRead: () => boolean) {
       state.neteaseActivePlaylist = null;
       state.neteaseSongs = [];
       state.neteaseSearchResults = [];
-      state.neteaseQrImg = "";
-      state.message = "已退出当前网易云账号，可随时点击上方「扫码登录」重新扫码绑定。";
+      state.message = "已断开插件账户；可点击「连接官网账户」重新连接，不影响官网登录。";
     });
   }
   async function syncHistory() {
     await mutate(async () => {
-      // 1. 尝试从浏览器嗅探最新 Cookie 续期
-      try {
-        const cookie = await neteaseService.detectBrowserCookie();
-        if (cookie) await neteaseService.applyCookieAndLogin(cookie);
-      } catch {}
+      // Revalidate using the website session, without extracting cookies.
+      await neteaseService.connectWebsiteAccount();
       // 2. 拉取最近播放
       await neteaseService.fetchAccountRecentSongs(60);
       syncLocal();
@@ -279,9 +220,10 @@ export function createMusicWorkspaceData(canRead: () => boolean) {
     if (disposed) return;
     pause(); syncLocal();
     state.neteasePlaylists = []; state.neteaseSongs = []; state.neteaseSearchResults = [];
-    state.neteaseActivePlaylist = null; state.neteaseQrImg = "";
+    state.neteaseActivePlaylist = null;
     state.message = "账号资料发生变化，请核对；需要时手动刷新歌单。";
+
   }
   function dispose() { disposed = true; pause(); }
-  return { state, refresh, selectPlaylist, search, startQr, logout, clearRecent, syncLocal, pause, dispose, accountChanged, syncHistory };
+  return { state, refresh, selectPlaylist, search, connectWebsite, logout, clearRecent, syncLocal, pause, dispose, accountChanged, syncHistory };
 }
