@@ -5,7 +5,14 @@ import { appDialog } from "../core/app-dialog.store";
 export function promptLauncherFolderDelete(group: string): void {
   if (!group) return;
   const links = launcherService.getState().links.filter((link) => (link.group || "常用网站") === group);
+  const folders = (launcherService.getState() as any).folders || {};
+  const hasSubfolders = Object.values(folders).some((f: any) => f?.parent === group);
   const count = links.length;
+  // 空文件夹（既无直属网站也无子文件夹）：直接静默删除，不弹窗打扰用户
+  if (count === 0 && !hasSubfolders) {
+    void launcherService.deleteGroup(group, "purge");
+    return;
+  }
   const names = links.slice(0, 4).map((link) => link.title || "未命名").join("、");
   launcherDialogsController.openFolderDeleteDialog({
     groupName: group,

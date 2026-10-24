@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from "vue";
+import { ref, computed, watch } from "vue";
 import { fullscreenCardState } from "../core/fullscreen-card-state";
 import LauncherTileContent from "../launchers/LauncherTileContent.vue";
 import {
@@ -17,6 +17,16 @@ import {
 
 const isVisible = computed(() => fullscreenCardState.activeId === "workbench");
 const newTaskText = ref("");
+// Playback intent belongs to this visible page, never persisted workspace focus.
+const requestedVideo = ref("");
+watch(isVisible, visible => { if (!visible) requestedVideo.value = ""; }, { flush: "sync" });
+watch(() => [workbenchState.focus.type, workbenchState.focus.id, workbenchState.focus.data?.bvid], () => {
+  requestedVideo.value = "";
+}, { flush: "sync" });
+function startFocusedVideo() {
+  const bvid = workbenchState.focus.data?.bvid;
+  if (isVisible.value && typeof bvid === "string") requestedVideo.value = bvid;
+}
 
 function handleClose() {
   fullscreenCardState.activeId = null;
@@ -36,6 +46,7 @@ function playVideo(video: WorkbenchVideoItem) {
     title: video.title,
     data: { bvid: video.bvid }
   });
+  startFocusedVideo();
 }
 
 function focusRepo(repo: WorkbenchRepoItem) {
@@ -219,18 +230,24 @@ function focusNotes() {
           class="stage-view stage-video"
         >
           <div class="stage-header">
-            <span class="stage-badge">正在播放</span>
+            <span class="stage-badge">{{ requestedVideo === workbenchState.focus.data?.bvid ? "正在播放" : "视频待播放" }}</span>
             <span class="stage-title">{{ workbenchState.focus.title }}</span>
           </div>
           <div class="video-player-frame">
             <iframe
-              :src="`https://player.bilibili.com/player.html?bvid=${workbenchState.focus.data.bvid}&page=1&high_quality=1&as_wide=1&danmaku=0`"
+              v-if="isVisible && requestedVideo && requestedVideo === workbenchState.focus.data.bvid"
+              :src="`https://player.bilibili.com/player.html?bvid=${encodeURIComponent(requestedVideo)}&page=1&high_quality=1&as_wide=1&danmaku=0&autoplay=1`"
+              allow="autoplay; fullscreen"
               scrolling="no"
               border="0"
               frameborder="no"
               framespacing="0"
               allowfullscreen="true"
             ></iframe>
+            <div v-else class="video-play-placeholder">
+              <p>视频仅在主动点击后加载，切走工作台即停止。</p>
+              <button type="button" @click="startFocusedVideo">播放此视频</button>
+            </div>
           </div>
         </div>
 
@@ -878,6 +895,9 @@ function focusNotes() {
 }
 
 /* 播放器区域 */
+.video-play-placeholder { min-height: 220px; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; background: var(--surface); color: var(--muted); }
+.video-play-placeholder button { padding: 8px 16px; border: 1px solid var(--border); border-radius: 8px; background: var(--panel); color: var(--text); font: inherit; cursor: pointer; }
+
 .video-player-frame {
   flex: 1;
   background: #000000;

@@ -409,42 +409,34 @@
           <header class="panel-head">
             <span class="panel-index">02</span>
             <div>
-              <h2>快捷键与工具触发</h2>
-              <p>点击右侧按键槽后，直接在键盘上按下你期望的快捷键组合，即可自动录入。</p>
+              <h2>快捷键</h2>
+              <p>按用途管理，仅显示可用功能。点击按键槽录入，Esc 取消；× 取消绑定，↺ 恢复默认。</p>
             </div>
           </header>
 
-          <div class="shortcuts-grid">
-            <div v-for="tool in shortcutTools" :key="tool.id" class="shortcut-row">
-              <span class="shortcut-label">{{ tool.label }}</span>
-              <div class="shortcut-actions">
-                <button
-                  type="button"
-                  class="shortcut-key-btn"
-                  :class="{ recording: recordingToolId === tool.id }"
-                  @click="startRecordShortcut(tool.id)"
-                >
-                  {{ recordingToolId === tool.id ? '请按下按键...' : (customShortcuts[tool.id] || tool.defaultKey || '未分配') }}
-                </button>
-                <button
-                  v-if="customShortcuts[tool.id] || tool.defaultKey"
-                  type="button"
-                  class="shortcut-clear-btn"
-                  title="清除此按键"
-                  @click="clearShortcut(tool.id)"
-                >✕</button>
+          <div v-for="group in shortcutGroups" :key="group.id" class="shortcut-group">
+            <h3 class="shortcut-group-title">{{ group.title }}</h3>
+            <div class="shortcuts-grid">
+              <div v-for="tool in group.tools" :key="tool.id" class="shortcut-row">
+                <span class="shortcut-label">{{ tool.label }}</span>
+                <div class="shortcut-actions">
+                  <button type="button" class="shortcut-key-btn" :class="{ recording: recordingToolId === tool.id }" @click="startRecordShortcut(tool.id)">
+                    {{ recordingToolId === tool.id ? '请按下按键…' : (effectiveShortcut(customShortcuts, tool) || '未分配') }}
+                  </button>
+                  <button v-if="effectiveShortcut(customShortcuts, tool)" type="button" class="shortcut-clear-btn" :title="`取消${tool.label}的快捷键`" :aria-label="`取消${tool.label}的快捷键`" @click="clearShortcut(tool.id)">×</button>
+                  <button v-if="Object.prototype.hasOwnProperty.call(customShortcuts, tool.id)" type="button" class="shortcut-clear-btn" :title="`恢复${tool.label}的默认键`" :aria-label="`恢复${tool.label}的默认键`" @click="resetShortcut(tool.id)">↺</button>
+                </div>
               </div>
             </div>
           </div>
+          <p class="hint">组件停用后，不显示也不触发对应快捷键；原绑定保留，重新启用后恢复。导航轮盘与工具轮盘同样只列出已启用组件。</p>
 
           <div class="fixed-shortcuts-card" style="margin-top: 18px;">
-            <div class="fixed-shortcuts-head">⚡ 系统内置快捷键速查</div>
+            <div class="fixed-shortcuts-head">固定操作（不在上方重复配置）</div>
             <div class="fixed-shortcuts-grid">
-              <div class="fixed-row"><span class="fs-desc">🔍 快速聚焦搜索框</span><span class="fs-keys"><kbd>Ctrl</kbd> + <kbd>E</kbd> / <kbd>K</kbd> / <kbd>/</kbd></span></div>
-              <div class="fixed-row"><span class="fs-desc">➕ Todoist 快速新建任务</span><span class="fs-keys"><kbd>Alt</kbd> + <kbd>A</kbd></span></div>
-              <div class="fixed-row"><span class="fs-desc">✕ 关闭当前活动的多窗口</span><span class="fs-keys"><kbd>Alt</kbd> + <kbd>W</kbd></span></div>
-              <div class="fixed-row"><span class="fs-desc">⚡ 极速搜索页进入主标签页</span><span class="fs-keys"><kbd>Alt</kbd> + <kbd>H</kbd></span></div>
-              <div class="fixed-row"><span class="fs-desc">⎋ 清除搜索 / 退出弹窗</span><span class="fs-keys"><kbd>Esc</kbd></span></div>
+              <div class="fixed-row"><span class="fs-desc">关闭当前工作区 / 窗口</span><span class="fs-keys"><kbd>Alt</kbd> + <kbd>W</kbd></span></div>
+              <div class="fixed-row"><span class="fs-desc">回到新标签页</span><span class="fs-keys"><kbd>Alt</kbd> + <kbd>H</kbd></span></div>
+              <div class="fixed-row"><span class="fs-desc">取消录制 / 退出当前浮层</span><span class="fs-keys"><kbd>Esc</kbd></span></div>
             </div>
           </div>
         </section>
@@ -955,6 +947,7 @@ import {
 import { settingsController } from "./store";
 import { sameSettingValue, cloneSettingValue, SettingsSaveUnconfirmedError } from "./draft-values";
 import { ignoredFolderId } from "./entry-preferences";
+import { effectiveShortcut, isShortcutToolAvailable, parseShortcutEvent, shortcutCaptureState } from "../services/shortcut-catalog";
 import { WallpaperService, DEFAULT_MOUNTAIN_VALUE, type WallpaperHistoryItem } from "../services/wallpaper.service";
 import { macDockController, macDockState, isValidDockPosition, type DockPosition } from "../dock/store";
 import { appDialog } from "../core/app-dialog.store";
@@ -1301,10 +1294,7 @@ const defaultForm: SettingsConfig = {
   singleNewTab: false,
   showHomeMusicVisualizer: true,
   showLimbusLyricEffect: true,
-  dockPosition: "bottom",
-  deepseekApiKey: "",
-  deepseekBaseUrl: "https://api.deepseek.com",
-  deepseekModel: "deepseek-chat"
+  dockPosition: "bottom"
 };
 const form = reactive<SettingsConfig>({ ...defaultForm });
 
@@ -1314,9 +1304,16 @@ const limbusExplicitFields = new Set<string>();
 let limbusIntentVersion = 0;
 
 // 快捷键状态
-const shortcutTools = AVAILABLE_SHORTCUT_TOOLS;
+const shortcutTools = computed(() => AVAILABLE_SHORTCUT_TOOLS.filter(tool => isShortcutToolAvailable(tool.id)));
+const shortcutGroups = computed(() => [
+  { id: "navigation", title: "导航与界面", tools: shortcutTools.value.filter(tool => tool.group === "navigation") },
+  { id: "components", title: "已启用组件", tools: shortcutTools.value.filter(tool => tool.group === "components") }
+].filter(group => group.tools.length));
 const customShortcuts = ref<Record<string, string>>({});
 const recordingToolId = ref<string | null>(null);
+watch(() => [props.active, currentTab.value], () => {
+  if (!props.active || currentTab.value !== "shortcuts") cancelShortcutRecording();
+});
 
 // 书签排除状态
 const availableFolders = ref<IgnoredBookmarkFolder[]>([]);
@@ -1661,41 +1658,45 @@ function handleResetSlots() {
 }
 
 // 快捷键录制
-function startRecordShortcut(toolId: string) {
-  recordingToolId.value = toolId;
+function cancelShortcutRecording() {
+  recordingToolId.value = null;
+  shortcutCaptureState.active = false;
 }
-
+function startRecordShortcut(toolId: string) {
+  if (!settingsReady.value || settingsSaving.value || !isShortcutToolAvailable(toolId)) return;
+  recordingToolId.value = toolId;
+  shortcutCaptureState.active = true;
+}
 function clearShortcut(toolId: string) {
+  cancelShortcutRecording();
+  customShortcuts.value = { ...customShortcuts.value, [toolId]: "" };
+  void saveShortcuts();
+}
+function resetShortcut(toolId: string) {
+  cancelShortcutRecording();
   const map = { ...customShortcuts.value };
   delete map[toolId];
   customShortcuts.value = map;
-  saveShortcuts();
+  void saveShortcuts();
 }
-
 function handleGlobalKeyDown(e: KeyboardEvent) {
-  if (!settingsReady.value || settingsSaving.value || !recordingToolId.value) return;
+  if (!settingsReady.value || settingsSaving.value || !recordingToolId.value || !props.active) return;
   e.preventDefault();
-  e.stopPropagation();
-
-  if (["Control", "Alt", "Shift", "Meta"].includes(e.key)) return;
-
-  const parts: string[] = [];
-  if (e.ctrlKey) parts.push("Ctrl");
-  if (e.altKey) parts.push("Alt");
-  if (e.shiftKey) parts.push("Shift");
-  if (e.metaKey) parts.push("Cmd");
-
-  let keyName = e.key.toUpperCase();
-  if (keyName === " ") keyName = "Space";
-  parts.push(keyName);
-
-  const shortcut = parts.join("+");
-  customShortcuts.value = {
-    ...customShortcuts.value,
-    [recordingToolId.value]: shortcut
-  };
-  recordingToolId.value = null;
-  saveShortcuts();
+  e.stopImmediatePropagation();
+  if (e.key === "Escape") { cancelShortcutRecording(); return; }
+  if (e.isComposing || e.repeat) return;
+  if (!isShortcutToolAvailable(recordingToolId.value)) { cancelShortcutRecording(); return; }
+  const shortcut = parseShortcutEvent(e);
+  if (!shortcut) return;
+  if (["Alt+W", "Alt+H", "Alt+Space", "Ctrl+K", "Meta+K", "Ctrl+W", "Meta+W"].includes(shortcut)) {
+    notify("该组合由系统固定操作使用，请选择其他按键。", true);
+    return;
+  }
+  const conflict = shortcutTools.value.find(tool => tool.id !== recordingToolId.value && effectiveShortcut(customShortcuts.value, tool).toLowerCase().replace(/^cmd\+/, "meta+") === shortcut.toLowerCase());
+  if (conflict) { notify(`该组合已用于${conflict.label}，请先取消原绑定或换一个组合。`, true); return; }
+  customShortcuts.value = { ...customShortcuts.value, [recordingToolId.value]: shortcut };
+  cancelShortcutRecording();
+  void saveShortcuts();
 }
 
 async function saveShortcuts() {
@@ -1921,6 +1922,7 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
+  cancelShortcutRecording();
   stopSettingsDrag();
   alive = false;
   window.removeEventListener("keydown", handleGlobalKeyDown, true);

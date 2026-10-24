@@ -39,17 +39,10 @@ export interface GlobalSettingsConfig {
   showHomeMusicVisualizer: boolean;
   showLimbusLyricEffect: boolean;
   dockPosition?: "bottom" | "left" | "right" | "top";
-  deepseekApiKey?: string;
-  deepseekBaseUrl?: string;
-  deepseekModel?: string;
   customAvatarUrl?: string;
 }
 
-export interface ShortcutTool {
-  id: string;
-  label: string;
-  defaultKey: string;
-}
+export type { ShortcutTool } from "./shortcut-catalog";
 
 export interface IgnoredBookmarkFolder {
   id: string;
@@ -80,8 +73,7 @@ export const GLOBAL_SETTINGS_KEYS: (keyof GlobalSettingsConfig)[] = [
   "displaySize", "city", "showWeather", "showSites", "showBili", "showYouTube", "showTodo",
   "showLeftNavigation", "showNavBall", "showBookmarkPanel", "showBookmarkFoldersTop",
   "showStartupAnimation", "startupAnimationStyle", "searchEngine", "singleNewTab",
-  "showHomeMusicVisualizer", "showLimbusLyricEffect", "dockPosition",
-  "deepseekApiKey", "deepseekBaseUrl", "deepseekModel"
+  "showHomeMusicVisualizer", "showLimbusLyricEffect", "dockPosition"
 ];
 
 export const SETTINGS_TOGGLE_KEYS: (keyof GlobalSettingsConfig)[] = [
@@ -128,18 +120,7 @@ export const LIMBUS_PRESETS: Record<string, Partial<LimbusConfig>> = {
   }
 };
 
-export const AVAILABLE_SHORTCUT_TOOLS: ShortcutTool[] = [
-  { id: "nav-wheel", label: "🎯 轮盘快捷导航 (Fortnite风格)", defaultKey: "Alt+E" },
-  { id: "toolbox", label: "🧰 常用工具轮盘", defaultKey: "Alt+Q" },
-  { id: "todoist", label: "✅ Todoist 任务看板", defaultKey: "Alt+D" },
-  { id: "bookmarks", label: "🔖 浏览器书签侧栏", defaultKey: "Alt+K" },
-  { id: "wallpaper", label: "🖼 壁纸库", defaultKey: "" },
-  { id: "stickers", label: "😺 本地表情包", defaultKey: "" },
-  { id: "pricing", label: "💠 模型价格与排行", defaultKey: "" },
-  { id: "settings", label: "⚙️ 新标签页设置", defaultKey: "Alt+," },
-  { id: "search", label: "🔍 聚焦主搜索框", defaultKey: "/" },
-  { id: "todoist-new-task", label: "➕ Todoist 快速新建任务", defaultKey: "Alt+A" }
-];
+export { AVAILABLE_SHORTCUT_TOOLS } from "./shortcut-catalog";
 
 export class OptionsService {
   private static instance: OptionsService;

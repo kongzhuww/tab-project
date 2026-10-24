@@ -1,6 +1,7 @@
 import { reactive, readonly, type DeepReadonly } from "vue";
 import { toolModalsState, toolModalsController, isToolModalId, type ToolModalId } from "./tool-modals.store";
 import { getDockModule, listDockModules, touchDockModuleTransition } from "../modules/registry";
+import { shortcutCaptureState } from "../services/shortcut-catalog";
 
 export interface RegisteredWindowActions {
   open?: () => void;
@@ -642,6 +643,7 @@ if (typeof document !== "undefined" && typeof window !== "undefined") {
   }, true);
 
   window.addEventListener("keydown", (event) => {
+    if (shortcutCaptureState.active || event.defaultPrevented || event.isComposing) return;
     const key = String(event.key || "").toLowerCase();
     const isEsc = key === "escape";
     const isAltW = event.altKey && key === "w";

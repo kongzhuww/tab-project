@@ -156,7 +156,8 @@ function handleKeydown(e: KeyboardEvent) {
               </div>
 
               <p class="pm-card-desc">{{ item.desc }}</p>
-              <details v-if="item.id === 'chat'"><summary>配置私有服务器 / 加入受邀房间</summary><ChatPrivateSetup /></details>
+              <p v-if="item.devNotice" class="pm-core-tip">{{ item.devNotice }}</p>
+              <details v-if="item.id === 'chat' && pluginMarketController.isInstalled(item.id)"><summary>配置私有服务器 / 加入受邀房间</summary><ChatPrivateSetup /></details>
 
               <div class="pm-card-tags">
                 <span v-for="tag in item.tags" :key="tag" class="pm-card-tag">
@@ -165,9 +166,8 @@ function handleKeydown(e: KeyboardEvent) {
               </div>
 
               <footer class="pm-card-footer">
-                <!-- 6 大核心全屏插件：系统常驻（Todoist、B站、GitHub、YouTube、AI Hot、模型算力） -->
-                <template v-if="item.id === 'chat'"><span class="pm-core-tip">未配置服务器时不显示 dock 入口</span></template>
-                <template v-else-if="pluginMarketController.isCorePlugin(item.id)">
+                <!-- Core entries are available by default; experimental components require opt-in. -->
+                <template v-if="pluginMarketController.isCorePlugin(item.id)">
                   <span class="pm-installed-pill core">✓ 核心入口默认可用</span>
                   <span class="pm-core-tip">核心预设</span>
                 </template>
@@ -191,10 +191,10 @@ function handleKeydown(e: KeyboardEvent) {
                       type="button"
                       class="pm-btn-uninstall"
                       :disabled="state.isSaving"
-                      title="从 Dock 隐藏入口；保留数据，不停止正在运行的窗口或服务"
+                      :title="item.id === 'chat' ? '停用聊天室并停止后续同步；保留配置和历史，已提交的请求不假称撤回' : '从 Dock 隐藏入口；保留数据，不停止正在运行的窗口或服务'"
                       @click="handleUninstall(item.id)"
                     >
-                      停用入口
+                      {{ item.id === "chat" ? "停用组件" : "停用入口" }}
                     </button>
                   </div>
                 </template>

@@ -2,6 +2,8 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch, type CSSProperties } from "vue";
 import { useContextMenu } from "../sdk/interactions";
 import { privateChatConfig } from "./private-chat-config";
+import { pluginMarketController } from "../modules/market-store";
+const chatEnabled = computed(() => pluginMarketController.isInstalled("chat"));
 import { loadChatShareTargets, type ChatShareTarget } from "./private-chat-client";
 const props = withDefaults(defineProps<{ visible?: boolean; disabled?: boolean; label?: string; compact?: boolean; matchMenuItem?: boolean }>(), { visible: true, disabled: false, label: "发送到", compact: false, matchMenuItem: false });
 const emit = defineEmits<{ select: [target: ChatShareTarget]; open: [] }>();
@@ -43,7 +45,7 @@ function close() { clearTimer(); opened.value = false; generation++; }
 const { menuRef, style } = useContextMenu({ visible: () => opened.value && props.visible, anchor: () => anchor.value, dismiss: close });
 async function openMenu() {
   clearTimer();
-  if (props.disabled || !props.visible || opened.value) return;
+  if (!chatEnabled.value || props.disabled || !props.visible || opened.value) return;
   matchReferenceFont();
   const bounds = trigger.value?.getBoundingClientRect(); if (!bounds) return;
   anchor.value = { x: bounds.right + 240 > window.innerWidth ? bounds.left - 240 : bounds.right + 4, y: bounds.top - 4 };
@@ -55,12 +57,12 @@ async function openMenu() {
   finally { if (version === generation) loading.value = false; }
 }
 function delayClose() { clearTimer(); timer = setTimeout(close, 280); }
-function select(target: ChatShareTarget) { const frozen = { ...target }; close(); emit("select", frozen); }
-watch(() => [props.visible, props.disabled, JSON.stringify(privateChatConfig.room)], () => { close(); });
+function select(target: ChatShareTarget) { if (!chatEnabled.value) { close(); return; } const frozen = { ...target }; close(); emit("select", frozen); }
+watch(() => [chatEnabled.value, props.visible, props.disabled, JSON.stringify(privateChatConfig.room)], () => { close(); });
 onBeforeUnmount(close);
 </script>
 <template>
-  <div class="chat-share-menu" :class="{ compact }" :style="{ fontFamily: referenceFont.fontFamily }" @mouseenter="openMenu" @mouseleave="delayClose" @keydown.esc.stop.prevent="close">
+  <div v-if="chatEnabled && visible" class="chat-share-menu" :class="{ compact }" :style="{ fontFamily: referenceFont.fontFamily }" @mouseenter="openMenu" @mouseleave="delayClose" @keydown.esc.stop.prevent="close">
     <button ref="trigger" type="button" class="chat-share-trigger" :style="referenceFont" :disabled="disabled" aria-haspopup="menu" :aria-expanded="opened" @click.stop="openMenu" @keydown.right.stop.prevent="openMenu" @keydown.down.stop.prevent="openMenu"><span class="chat-share-label-wrap"><span class="chat-share-icon" aria-hidden="true">{{ labelIcon }}</span><span>{{ labelText }}</span></span><span class="share-arrow" aria-hidden="true">›</span></button>
     <div v-if="opened && visible" ref="menuRef" class="share-room-flyout" :style="[style, { maxHeight: 'min(360px, calc(100vh - 16px))' }]" role="menu" aria-label="选择目标聊天室房间" @mouseenter="clearTimer" @mouseleave="delayClose" @click.stop @wheel.stop>
       <p v-if="loading" class="share-hint" role="status">正在读取房间…</p>

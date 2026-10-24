@@ -145,7 +145,7 @@ async function clearCache() {
       >
         AI 研读
       </button>
-      <button type="button" class="gh-popover-tab" :class="{ active: activeTab === 'workflow' }" @click="activeTab = 'workflow'">流水线</button>
+
       <button
         type="button"
         class="gh-popover-tab"
@@ -268,14 +268,7 @@ async function clearCache() {
         <textarea v-if="form.ai.useCustomPrompt" v-model="form.ai.customPrompt" class="gh-input" rows="4" aria-label="自定义提示词"></textarea>
       </section>
 
-      <section v-show="activeTab === 'workflow'" class="gh-field-list">
-        <div class="gh-field-item">
-          <label for="gh-archify-webhook" class="gh-field-label">Archify → n8n Webhook（可选）</label>
-          <input id="gh-archify-webhook" v-model="form.archifyWebhookUrl" type="text" class="gh-input" placeholder="完整 HTTP(S) Webhook 地址；留空关闭" autocomplete="off" spellcheck="false" />
-        </div>
-        <p class="gh-cache-desc">保存不连接、不触发流水线。分析窗口点击“发往 n8n”并确认后，才提交仓库名和架构数据到此节点，不携带 GitHub Token 或 AI 密钥。</p>
-        <p class="gh-cache-desc">不使用私人默认服务器，不纳入普通备份。请使用可信节点，优先 HTTPS；这里不保存 Webhook 认证凭据。</p>
-      </section>
+
 
       <!-- Tab 3: 缓存 -->
       <section v-show="activeTab === 'cache'" class="gh-field-list">

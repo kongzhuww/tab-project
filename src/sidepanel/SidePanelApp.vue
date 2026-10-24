@@ -334,8 +334,12 @@ async function submitQuickTodo(): Promise<void> {
 // ============================================================================
 // 1. 侧边栏基础状态与通知
 // ============================================================================
-const launcherPages = ref<string[]>(["常用网站", "游戏区", "办公区", "实验组", "就业区", "工具箱", "办公桌"]);
+const launcherPages = ref<string[]>(["常用网站"]);
+const launcherPageLabels = ref<Record<string, string>>({});
 const targetPage = ref<string>("常用网站");
+function getPageDisplayName(pageId: string): string {
+  return launcherPageLabels.value[pageId] || (pageId === "常用网站" ? "常用网站" : pageId);
+}
 const pagePickerOpen = ref(false);
 const notice = ref("");
 const noticeBad = ref(false);
@@ -375,7 +379,7 @@ function selectTargetPage(page: string): void {
   targetPage.value = page;
   pagePickerOpen.value = false;
   try { localStorage.setItem("lw_target_bookmark_page", page); } catch {}
-  showNotice(`已选择目标分区「${page}」`);
+  showNotice(`已选择目标分区「${getPageDisplayName(page)}」`);
 }
 
 async function saveCurrentPage(): Promise<void> {
@@ -469,11 +473,16 @@ onMounted(() => {
   void refreshActiveTabInfo();
   void loadTodoistMountData();
   void loadOpenTabs();
-  loadLauncherPages().then((pages) => {
-    if (pages && pages.length) launcherPages.value = pages;
-    const saved = localStorage.getItem("lw_target_bookmark_page");
-    if (saved && launcherPages.value.includes(saved)) targetPage.value = saved;
-  });
+  const refreshPages = () => {
+    loadLauncherPages().then(({ pages, labels }) => {
+      if (pages && pages.length) launcherPages.value = pages;
+      launcherPageLabels.value = labels || {};
+      const saved = localStorage.getItem("lw_target_bookmark_page");
+      if (saved && launcherPages.value.includes(saved)) targetPage.value = saved;
+      else if (!launcherPages.value.includes(targetPage.value)) targetPage.value = launcherPages.value[0] || "常用网站";
+    });
+  };
+  refreshPages();
   if (typeof chrome !== "undefined" && chrome?.tabs) {
     chrome.tabs.onActivated?.addListener(onTabsChanged);
     chrome.tabs.onUpdated?.addListener(onTabsChanged);
@@ -481,9 +490,13 @@ onMounted(() => {
     chrome.tabs.onRemoved?.addListener(loadOpenTabs);
   }
   if (typeof chrome !== "undefined" && chrome?.storage?.onChanged) {
-    chrome.storage.onChanged.addListener((changes: any) => {
+    chrome.storage.onChanged.addListener((changes: any, areaName: string) => {
+      if (areaName !== "local") return;
       if (changes?.theme?.newValue) {
         document.documentElement.dataset.theme = changes.theme.newValue;
+      }
+      if (changes?.launcherPages || changes?.pages || changes?.launcherPageLabels || changes?.quickLinks) {
+        refreshPages();
       }
     });
   }
@@ -543,10 +556,10 @@ onUnmounted(() => {
             class="sp-target-picker-btn"
             type="button"
             :class="{ active: pagePickerOpen }"
-            :title="`点击切换保存分区（当前：${targetPage}）`"
+            :title="`点击切换保存分区（当前：${getPageDisplayName(targetPage)}）`"
             @click="pagePickerOpen = !pagePickerOpen"
           >
-            <span class="picker-label">{{ targetPage }}</span>
+            <span class="picker-label">{{ getPageDisplayName(targetPage) }}</span>
             <span class="picker-arrow">{{ pagePickerOpen ? '▲' : '▼' }}</span>
           </button>
         </div>
@@ -567,8 +580,8 @@ onUnmounted(() => {
             :class="{ selected: p === targetPage }"
             @click="selectTargetPage(p)"
           >
-            <span class="item-icon">{{ p === '常用网站' ? '⭐' : p.includes('游戏') ? '🎮' : p.includes('办公') ? '💼' : p.includes('实验') ? '🧪' : p.includes('就业') ? '🎯' : p.includes('工具') ? '🛠️' : '📁' }}</span>
-            <span class="item-text">{{ p }}</span>
+            <span class="item-icon">{{ p === '常用网站' ? '⭐' : getPageDisplayName(p).includes('游戏') ? '🎮' : getPageDisplayName(p).includes('办公') ? '💼' : getPageDisplayName(p).includes('实验') ? '🧪' : getPageDisplayName(p).includes('就业') ? '🎯' : getPageDisplayName(p).includes('工具') ? '🛠️' : '📁' }}</span>
+            <span class="item-text">{{ getPageDisplayName(p) }}</span>
             <span v-if="p === targetPage" class="item-check">✓</span>
           </button>
         </div>

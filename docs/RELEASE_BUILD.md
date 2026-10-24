@@ -10,7 +10,7 @@ The command copies current working-tree source (including non-ignored new source
 - `dist-extension/v<version>-*/build-info.json`: version and file counts.
 - The temporary `work/` is removed only on success; failure preserves it for diagnosis.
 
-The output does not include source, native-host binaries, backend, mobile, tests, `.local.*`, account credentials, or personal schedule configuration. Users must configure their own integrations. Runtime assets under `assets/`, `mascot_pack/`, and `vendor/` are included only when known to Git or non-ignored. This allowlist is not a secret scanner: inspect new assets and sources before publishing.
+The output does not include source, native-host binaries, backend, mobile, tests, `.local.*`, account credentials, or personal schedule configuration. Users must configure their own integrations. Runtime assets under `assets/` and license files under `third_party/` are included only when known to Git or non-ignored. Removed mascot/mobile trees are not release inputs. This allowlist is not a secret scanner: inspect new assets and sources before publishing.
 
 The two root compatibility workers remain alongside `generated/` workers until their CLI references are retired. Old hash chunks in the live development directory are deliberately preserved for already-open pages.
 

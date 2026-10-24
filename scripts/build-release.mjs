@@ -26,7 +26,7 @@ const runtimeFiles = safe.filter(file => /^(?:assets|third_party)\//.test(file) 
 const sourceFiles = safe.filter(file => file.startsWith("src/") ||
   // Public compile-time contract only: never copy the whole server/config tree.
   ["package.json", "tsconfig.ui.json", "vite.ui.config.ts", "vite.sandbox.config.ts", "vite.localizer.config.ts",
-    "server/private-chat/protocol.json"].includes(file));
+    "server/private-chat/protocol.json", "server/private-chat/README.md"].includes(file));
 
 const distExtDir = path.join(root, "dist-extension");
 await mkdir(distExtDir, { recursive: true });

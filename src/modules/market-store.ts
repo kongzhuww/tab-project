@@ -26,7 +26,7 @@ export interface PluginMarketItem {
   builtIn: boolean;
   docUrl?: string;
   downloadUrl?: string;
-  isDev?: boolean; // 内部实验/开发中，普通用户不可见
+  isDev?: boolean; // 实验性组件需显式逐项启用；不纳入批量启用
   devNotice?: string;
 }
 
@@ -54,10 +54,12 @@ export const PLUGIN_CATALOG: readonly PluginMarketItem[] = [
     category: "communication",
     categoryLabel: "独立模块 · 实时交流",
     emoji: "💬",
-    desc: "自托管私有聊天室。配置自己的 VPS 或导入成员邀请后使用；支持文字、歌单与资讯仓库卡片，不连接公共服务。",
+    desc: "实验性自托管私有聊天室，默认关闭。需先手动启用，再配置自己的服务器和专属邀请；支持文字、受限图片与分享卡片。",
     author: "LogicWeaver Lab",
-    tags: ["实时聊天", "音乐分享", "探索交流"],
-    builtIn: true
+    tags: ["实验性", "默认关闭", "自托管"],
+    builtIn: true,
+    isDev: true,
+    devNotice: "实验性组件，仍需人工与双端验收；未启用时不自动连接，不读取房间或补发消息。"
   },
   {
     id: "music",
@@ -150,7 +152,7 @@ export const PLUGIN_CATALOG: readonly PluginMarketItem[] = [
 ];
 
 export const CORE_PLUGIN_IDS: readonly string[] = [
-  "todoist", "daily-bilibili", "card-github", "daily-youtube", "daily-aihot", "chat"
+  "todoist", "daily-bilibili", "card-github", "daily-youtube", "daily-aihot"
 ];
 
 const STORAGE_KEY = "logicweaver_installed_dock_modules";
@@ -362,10 +364,7 @@ export const pluginMarketController = {
     if (!item || CORE_PLUGIN_IDS.includes(id)) return Promise.resolve(false);
     return commitInstalledIds(latest => {
       if (latest.includes(id)) return latest.filter(entry => entry !== id);
-      if (item.isDev && !loadDevMode()) {
-        state.errorMessage = "实验室已关闭，未启用开发中组件。";
-        return null;
-      }
+      // This per-item action is explicit opt-in; installAll still excludes isDev.
       return [...latest, id];
     });
   },

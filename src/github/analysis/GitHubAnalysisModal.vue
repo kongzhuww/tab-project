@@ -194,16 +194,7 @@ onUnmounted(() => {
           <!-- 工具栏动作 -->
           <div class="analysis-actions">
             <button type="button" class="analysis-tool-btn" :disabled="submissionBusy || state[state.activeTab].loading" @click="controller.refreshCurrent">重新读取 / 生成</button>
-            <button
-              v-if="state.activeTab === 'archify'"
-              type="button"
-              class="analysis-tool-btn n8n"
-              title="确认后提交到 GitHub 设置中的 n8n Webhook"
-              :disabled="submissionBusy || !!state.n8nConfirmation || !!state.n8nResult?.uncertain || state.archify.loading || !state.archify.data"
-              @click="controller.triggerN8nWorkflow"
-            >
-              发往 n8n
-            </button>
+
             <button
               type="button"
               class="analysis-tool-btn"
@@ -231,24 +222,7 @@ onUnmounted(() => {
           <p class="analysis-source-notice" v-else>本地目录关键词与固定模板示意。节点、连接、协议未经源码验证，不是 GitDiagram / Archify 在线分析，也不提供源码证据。</p>
           <p v-if="state.actionMessage" class="analysis-source-notice" role="status">{{ state.actionMessage }}</p>
           <p v-if="state.actionBusy" class="analysis-source-notice" role="status">{{ state.actionBusy === "save" ? "原目标笔记保存仍在进行；切换或关闭窗口不撤回写入。" : "正在等待剪贴板确认；不会自动重试。" }}</p>
-          <section v-if="state.n8nResult" class="n8n-confirm-inline" aria-label="上次提交记录">
-            <p>提交记录：{{ state.n8nResult.repo }} → {{ state.n8nResult.origin }}。{{ state.n8nResult.message }}</p>
-            <template v-if="state.n8nResult.uncertain">
-              <p>这是本页内存记录，整页关闭或重载会丢失；扩展没有自动核对节点任务的接口。</p>
-              <button v-if="!state.n8nUnlockConfirmation" type="button" class="analysis-tool-btn" :disabled="submissionBusy" @click="controller.requestN8nUnlock">我已在节点侧核对</button>
-              <template v-else>
-                <p>确认已人工核对上述原仓库任务？此操作仅解除本页限制，不证明远端成功，也不会重新发送请求。</p>
-                <button type="button" class="analysis-tool-btn" :disabled="submissionBusy" @click="controller.acknowledgeN8nChecked">确认解除本页限制</button>
-                <button type="button" class="analysis-tool-btn" @click="controller.cancelN8nUnlock">保持锁定</button>
-              </template>
-            </template>
-          </section>
-          <section v-if="state.n8nConfirmation" class="n8n-confirm-inline" aria-label="确认提交 n8n">
-            <p>将 {{ state.n8nConfirmation.repo }} 的仓库名与架构数据发送到已配置节点 {{ state.n8nConfirmation.origin }}。内容是本地规则示意，不是已验证架构；可能含仓库路径，请确认节点可信，不发送 GitHub Token 或 AI 密钥。</p>
-            <button type="button" class="analysis-tool-btn primary" :disabled="state.n8nSubmitting" @click="controller.confirmN8nWorkflow">确认提交</button>
-            <button type="button" class="analysis-tool-btn" :disabled="state.n8nSubmitting" @click="controller.cancelN8nWorkflow">取消</button>
-          </section>
-          <p v-if="state.n8nSubmitting" role="status">正在准备或等待节点响应。关闭窗口不撤回已提交请求；请求发出后等待最长15秒，结果记录在原任务名下。</p>
+
           <!-- 1. GitIngest 板块 -->
           <div v-if="state.activeTab === 'gitingest'" class="analysis-pane">
             <div class="analysis-stat-bar">

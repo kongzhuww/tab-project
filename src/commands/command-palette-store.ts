@@ -1,6 +1,7 @@
 import { reactive, ref, computed } from "vue";
 import { commandRegistry, type CommandMetadata } from "../core/commands";
 import { windowManagerController } from "../core/window-manager.store";
+import { shortcutCaptureState } from "../services/shortcut-catalog";
 
 export interface CommandPaletteState {
   isOpen: boolean;
@@ -82,6 +83,7 @@ export const commandPaletteController = {
 // 全局监听快捷键 Ctrl+K / Cmd+K 与 Alt+Space
 if (typeof window !== "undefined") {
   window.addEventListener("keydown", (e: KeyboardEvent) => {
+    if (shortcutCaptureState.active || e.defaultPrevented || e.isComposing || e.repeat) return;
     const key = (e.key || "").toLowerCase();
     const isCtrlK = (e.ctrlKey || e.metaKey) && key === "k";
     const isAltSpace = e.altKey && (e.code === "Space" || key === " ");

@@ -54,7 +54,7 @@ const APP_DEFAULTS: Record<string, { name: string; icon: string; action: string 
   qq: { name: "QQ", icon: "assets/qq.png", action: "查看消息" },
   bili: { name: "哔哩哔哩", icon: "assets/bilibili.svg", action: "查看消息" },
   phone: { name: "手机文件", icon: "assets/nav-traffic.svg", action: "复制文件" },
-  fetch: { name: "LogicWeaver", icon: "assets/logo.png", action: "" }
+  fetch: { name: "LogicWeaver", icon: "assets/icon-48.png", action: "" }
 };
 
 function close(id: string): void {

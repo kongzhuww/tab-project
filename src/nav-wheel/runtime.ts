@@ -1,6 +1,8 @@
 import { navWheelController, navWheelState, type NavWheelSector } from "./store";
 import { fullscreenCardsController } from "../core/fullscreen-cards.store";
 import { launcherService } from "../services/launcher.service";
+import { PLUGIN_CATALOG } from "../modules/market-store";
+import { isEnabledDockEntry, shortcutCaptureState } from "../services/shortcut-catalog";
 
 type WheelMode = "main" | "tools" | "shortcuts";
 type WheelItem = { id: string; title: string; desc: string; icon: string; url?: string; tool?: string; mode?: WheelMode };
@@ -12,14 +14,15 @@ const MAIN: WheelItem[] = [
   { id: "card-github", title: "github插件", desc: "GitHub 趋势与星标项目", icon: "assets/nav-github.svg" },
   { id: "launcher", title: "首页", desc: "返回主屏常用应用台", icon: "assets/nav-home.svg" }
 ];
-const TOOLS: WheelItem[] = [
-  { id: "todoist", title: "Todoist", desc: "任务看板", icon: "✅", tool: "todoist" },
-  { id: "task-shelf", title: "任务架子", desc: "任务与资料组合", icon: "🧺", tool: "task-shelf" },
-  { id: "wallpaper", title: "壁纸库", desc: "管理桌面背景", icon: "🖼️", tool: "wallpaper" },
-  { id: "calcom", title: "预约", desc: "Cal.com 日程预约", icon: "📆", tool: "calcom" },
-  { id: "alist", title: "云盘", desc: "网盘文件", icon: "☁️", tool: "alist" },
-  { id: "monitor", title: "监控", desc: "系统与多服务监控", icon: "📊", tool: "monitor" }
-];
+function enabledMainItems(): WheelItem[] {
+  return MAIN.filter(item => item.mode || item.id === "launcher" || isEnabledDockEntry(item.id));
+}
+function enabledToolItems(): WheelItem[] {
+  return PLUGIN_CATALOG.filter(item => item.kind === "module" && isEnabledDockEntry(item.id))
+    .map(item => ({ id: item.id, title: item.title, desc: item.isDev ? "已启用的实验性组件" : item.categoryLabel,
+      icon: item.icon || item.emoji || "🧩", tool: item.id }));
+}
+function onModulesChanged(): void { if (navWheelState.isExpanded) publish(); }
 let links: WheelItem[] = [];
 let items: WheelItem[] = MAIN;
 let lastMouse = { x: 400, y: 300 };
@@ -37,9 +40,9 @@ function setBall(x: number, y: number): void {
 }
 function publish(): void {
   const mode = navWheelState.mode as WheelMode;
-  items = mode === "tools" ? TOOLS : mode === "shortcuts" ?
+  items = mode === "tools" ? enabledToolItems() : mode === "shortcuts" ?
     [...(links.length ? links : [{ id: "shortcut-empty", title: "暂无快捷项", desc: "常用网站可放入快捷轮盘", icon: "📭" }]),
-      { id: "back-to-main", title: "返回主轮盘", desc: "返回页面电梯导航", icon: "🔙", mode: "main" }] : MAIN;
+      { id: "back-to-main", title: "返回主轮盘", desc: "返回页面电梯导航", icon: "🔙", mode: "main" }] : enabledMainItems();
   const count = items.length;
   const orbit = count > 12 ? 118 : count > 9 ? 114 : 110;
   const size = count > 12 ? 46 : count > 9 ? 50 : 56;
@@ -51,6 +54,7 @@ function publish(): void {
       size, isShortcut: Boolean(item.url) };
   }));
   navWheelController.setWheelMode(mode);
+  navWheelController.setActiveSector(null);
   navWheelController.setBeam(null, 0);
   navWheelController.setHub(mode === "shortcuts" ? { icon: "🔙", title: "快捷方式" } :
     mode === "tools" ? { icon: "🧰", title: "常用工具" } : null);
@@ -72,6 +76,7 @@ function open(x = navWheelState.ballPosition.x, y = navWheelState.ballPosition.y
   navWheelController.setVisibility(true);
 }
 function perform(item: WheelItem): void {
+  if ((item.tool && !isEnabledDockEntry(item.tool)) || (!item.url && !item.mode && item.id !== "launcher" && !isEnabledDockEntry(item.id))) return;
   if (item.mode) { setMode(item.mode); return; }
   close();
   if (item.url) { window.open(item.url, "_blank"); return; }
@@ -96,7 +101,7 @@ function onMouseDown(event: MouseEvent): void {
 }
 function onAuxClick(event: MouseEvent): void { if (event.button === 1) event.preventDefault(); }
 function onKeyDown(event: KeyboardEvent): void {
-  if (!navWheelState.isExpanded) return;
+  if (!navWheelState.isExpanded || shortcutCaptureState.active) return;
   if (event.key === "Escape" || (event.altKey && event.key.toLowerCase() === "w")) {
     event.preventDefault(); event.stopPropagation();
     if (navWheelState.mode === "shortcuts") setMode("main");
@@ -158,6 +163,7 @@ export const navWheelRuntime = {
           navWheelState.mode === "tools" ? { icon: "🧰", title: "常用工具" } : null);
       }
     });
+    window.addEventListener("logicweaver:dock-modules-changed", onModulesChanged);
     window.addEventListener("pointermove", onPointerMove, { passive: true });
     window.addEventListener("mousedown", onMouseDown, true);
     window.addEventListener("auxclick", onAuxClick, true);
@@ -186,6 +192,7 @@ export const navWheelRuntime = {
   stop(): void {
     initialized = false;
     navWheelController.setActionHandler(null);
+    window.removeEventListener("logicweaver:dock-modules-changed", onModulesChanged);
     window.removeEventListener("pointermove", onPointerMove);
     window.removeEventListener("mousedown", onMouseDown, true);
     window.removeEventListener("auxclick", onAuxClick, true);

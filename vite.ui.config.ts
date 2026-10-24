@@ -1,28 +1,12 @@
-import { defineConfig, type Plugin } from "vite";
+import { defineConfig } from "vite";
 import vue from "@vitejs/plugin-vue";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import fs from "node:fs";
 
 const projectRoot = dirname(fileURLToPath(import.meta.url));
 
-// Keep content-hashed chunks while unpacked-extension pages may still reference them.
-// Clean release artifacts only in a separate, offline packaging directory.
-function syncLegacyCssPlugin(): Plugin {
-  return {
-    name: "sync-legacy-css",
-    closeBundle() {
-      const vueUiCss = resolve(projectRoot, "generated/vue-ui.css");
-      const legacyCss = resolve(projectRoot, "generated/logicweaver-mobile.css");
-      if (fs.existsSync(vueUiCss)) {
-        fs.copyFileSync(vueUiCss, legacyCss);
-      }
-    }
-  };
-}
-
 export default defineConfig({
-  plugins: [vue(), syncLegacyCssPlugin()],
+  plugins: [vue()],
   experimental: {
     // Extension pages live above generated/. Resolve this worker beside its bundle,
     // not at the extension's /assets root; leave existing asset URLs unchanged.

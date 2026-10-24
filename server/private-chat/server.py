@@ -14,8 +14,11 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlparse, parse_qs
 
+# Keep the database, WAL and newly created side files private on POSIX hosts.
+os.umask(0o077)
 DATA = Path(os.environ.get("CHAT_DATA", "./data")).resolve()
 DATA.mkdir(mode=0o700, parents=True, exist_ok=True)
+os.chmod(DATA, 0o700)
 OWNER_TOKEN = os.environ.get("CHAT_OWNER_TOKEN", "")
 OWNER_UID = os.environ.get("CHAT_OWNER_UID", "")
 if not re.fullmatch(r"[A-Za-z0-9_-]{43}", OWNER_TOKEN) or not re.fullmatch(r"[A-Za-z0-9_-]{1,160}", OWNER_UID):
@@ -24,6 +27,7 @@ LIMIT = MAX_MESSAGE_BYTES
 MAX_DB = int(os.environ.get("CHAT_MAX_DB_BYTES", str(1024 * 1024 * 1024)))
 LOCK = threading.RLock()
 DB = sqlite3.connect(DATA / "chat.sqlite3", check_same_thread=False)
+os.chmod(DATA / "chat.sqlite3", 0o600)
 DB.execute("PRAGMA journal_mode=WAL")
 DB.execute("PRAGMA synchronous=FULL")
 DB.executescript("""
@@ -45,10 +49,11 @@ except sqlite3.OperationalError:
 if 'space' not in {r[1] for r in DB.execute('PRAGMA table_info(rooms)')}:
     DB.execute("ALTER TABLE rooms ADD COLUMN space TEXT DEFAULT 'hub_main'")
 DB.commit()
-os.chmod(DATA / "chat.sqlite3", 0o600)
 WINDOWS = {}
 PRESENCE = {}
-SYNC_COND = threading.Condition()
+# Condition.wait releases the SAME RLock used by all database handlers, including
+# recursive acquisitions, then reacquires it before any further SQLite access.
+SYNC_COND = threading.Condition(LOCK)
 
 def notify_sync():
     with SYNC_COND:
@@ -136,7 +141,7 @@ class Handler(BaseHTTPRequestHandler):
             name = row[0] if row else "群主"
             return {"id": "owner", "uid": OWNER_UID, "name": name, "role": "owner"}
         row = DB.execute("SELECT id,uid,name,room,expires,revoked,COALESCE(avatar,'🦫') FROM members WHERE digest=?", (digest(credential),)).fetchone()
-        if not row or row[3] != room or row[5] or row[4] < int(time.time()):
+        if not row or row[3] != room or row[5] or row[4] <= int(time.time()):
             return None
         return {"id": row[0], "uid": row[1], "name": row[2], "role": "member", "avatar": row[6]}
 
@@ -172,6 +177,13 @@ class Handler(BaseHTTPRequestHandler):
                     self.reply(401, {"error": "unauthorized"}); return
                 if self.limited(actor["id"]):
                     self.reply(429, {"error": "rate_limit"}); return
+                # Enforce management permissions on the server, before any writes.
+                management_write = method in ("POST", "DELETE") and any(
+                    parsed.path == root or parsed.path.startswith(root + "/")
+                    for root in ("/api/v1/members", "/api/v1/spaces", "/api/v1/rooms")
+                )
+                if management_write and actor["role"] != "owner":
+                    self.reply(403, {"error": "owner_required"}); return
                 # Invitations authorize the parent room only. Children inherit that exact membership.
                 with DB:
                     DB.execute("INSERT OR IGNORE INTO rooms(parent,id,name,icon) VALUES(?,'main','综合讨论','💬')", (room,))
@@ -199,11 +211,13 @@ class Handler(BaseHTTPRequestHandler):
                                 updated = DB.execute("UPDATE spaces SET name=?,icon=? WHERE parent=? AND id=? AND archived=0", (name.strip(),icon,room,sid))
                             if not updated.rowcount:
                                 self.reply(404, {"error": "space_not_found"}); return
+                        notify_sync()
                         self.reply(200, {"id": sid}); return
                     if method == "DELETE" and valid_id(sid) and sid != 'hub_main':
                         with DB:
                             updated = DB.execute("UPDATE spaces SET archived=1 WHERE parent=? AND id=? AND archived=0", (room,sid))
                             DB.execute("UPDATE rooms SET archived=1 WHERE parent=? AND space=?", (room,sid))
+                        notify_sync()
                         self.reply(200 if updated.rowcount else 404, {"archived": bool(updated.rowcount)}); return
                     self.reply(400, {"error": "invalid_space_operation"}); return
                 if parsed.path == "/api/v1/rooms" and method == "GET":
@@ -228,10 +242,12 @@ class Handler(BaseHTTPRequestHandler):
                                 updated = DB.execute("UPDATE rooms SET name=?,icon=?,description=? WHERE parent=? AND id=? AND archived=0", (name.strip(), icon, description, room, rid))
                             if not updated.rowcount:
                                 self.reply(404, {"error": "room_not_found"}); return
+                        notify_sync()
                         self.reply(200, {"id": rid}); return
                     if method == "DELETE" and valid_id(rid) and rid != "main":
                         with DB:
                             updated = DB.execute("UPDATE rooms SET archived=1 WHERE parent=? AND id=? AND archived=0", (room, rid))
+                        notify_sync()
                         self.reply(200 if updated.rowcount else 404, {"archived": bool(updated.rowcount)}); return
                     self.reply(400, {"error": "invalid_room_operation"}); return
                 if channel.startswith("dm_"):
@@ -315,6 +331,15 @@ class Handler(BaseHTTPRequestHandler):
                     if not rows and wait_seconds > 0:
                         with SYNC_COND:
                             SYNC_COND.wait(timeout=wait_seconds)
+                        # A revocation, expiry or room archive can happen while the
+                        # condition has released LOCK. Never return a stale grant.
+                        actor = self.auth(room)
+                        if not actor:
+                            self.reply(401, {"error": "unauthorized"}); return
+                        if not channel.startswith("dm_") and not DB.execute(
+                            "SELECT 1 FROM rooms WHERE parent=? AND id=? AND archived=0", (room, channel)
+                        ).fetchone():
+                            self.reply(404, {"error": "room_not_found"}); return
                         rows = DB.execute("SELECT seq,body FROM messages WHERE room=? AND seq>? ORDER BY seq LIMIT 50", (message_room, after)).fetchall()
                     messages, size = [], 0
                     for seq, raw in rows:
@@ -391,14 +416,16 @@ class Handler(BaseHTTPRequestHandler):
                         uid, name = body.get("uid"), body.get("name")
                         if not valid_id(uid) or uid == OWNER_UID or not isinstance(name, str) or not 1 <= len(name.strip()) <= 80:
                             self.reply(400, {"error": "invalid_member"}); return
-                        if DB.execute("SELECT count(*) FROM members WHERE revoked=0 AND expires>?", (int(time.time()),)).fetchone()[0] >= 64:
+                        if DB.execute("SELECT count(*) FROM members WHERE revoked=0 AND expires>? AND NOT (room=? AND uid=?)", (int(time.time()), room, uid)).fetchone()[0] >= 64:
                             self.reply(409, {"error": "capacity"}); return
-                        with DB:
-                            DB.execute("UPDATE members SET revoked=1 WHERE room=? AND uid=?", (room, uid))
                         credential = secrets.token_urlsafe(32)
                         mid = secrets.token_hex(16)
+                        # Reissue atomically: a failed insert must not strand the
+                        # member with a revoked old credential and no replacement.
                         with DB:
+                            DB.execute("UPDATE members SET revoked=1 WHERE room=? AND uid=?", (room, uid))
                             DB.execute("INSERT INTO members(id,digest,uid,name,room,expires) VALUES(?,?,?,?,?,?)", (mid, digest(credential), uid, name.strip(), room, int(time.time()) + 30 * 86400))
+                        notify_sync()
                         self.reply(201, {"id": mid, "token": credential}); return
                     if method == "DELETE":
                         if actor["role"] != "owner":
@@ -408,6 +435,7 @@ class Handler(BaseHTTPRequestHandler):
                             raise ValueError("member")
                         with DB:
                             DB.execute("UPDATE members SET revoked=1 WHERE id=? AND room=?", (mid, room))
+                        notify_sync()
                         self.reply(200, {"ok": True}); return
                 self.reply(404, {"error": "not_found"})
         except (ValueError, TypeError, KeyError, json.JSONDecodeError):
@@ -435,4 +463,4 @@ class Server(ThreadingHTTPServer):
         finally: self.slots.release()
 
 if __name__ == "__main__":
-    Server(("127.0.0.1", int(os.environ.get("CHAT_PORT", "19828"))), Handler).serve_forever()
+    Server(("127.0.0.1", int(os.environ.get("CHAT_PORT", "8788"))), Handler).serve_forever()

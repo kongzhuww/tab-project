@@ -1,4 +1,5 @@
 import { reactive, watch } from "vue";
+import { pluginMarketController } from "../modules/market-store";
 import { topProfileState } from "../profile/store";
 import { relayAvatar } from "./chat-avatar";
 import { chatModuleState as state, joinChatEndpoint, type ChatMessage } from "./chat-state";
@@ -90,6 +91,15 @@ const credentials = new PrivateChatCredentialRepository(() => {
 const http = new PrivateChatHttpClient({
   credential: (destination, signal) => credentials.read(destination, signal),
   beforeSend: ({ destination, path, method, body }) => {
+    if (!pluginMarketController.isInstalled("chat")) throw new ChatCapabilityError("聊天室实验组件已停用，未发起请求");
+    const memberAdmin = path === "/api/v1/members" || path.startsWith("/api/v1/members/");
+    const catalogWrite = method !== "GET" && ["/api/v1/spaces", "/api/v1/rooms"]
+      .some(root => path === root || path.startsWith(root + "/"));
+    if ((memberAdmin || catalogWrite) && (!state.connected || privateChatState.role !== "owner" ||
+        authenticatedKey !== key(destination) || !privateChatConfig.room ||
+        key(privateChatConfig.room) !== key(destination) || state.currentUser.uid !== destination.uid)) {
+      throw new HttpError(403);
+    }
     if (method === "POST" && path === "/api/v1/messages") {
       const problem = outgoingChatError(capabilitiesFor(destination), (body as { message: ChatMessage }).message);
       if (problem) throw new ChatCapabilityError(problem);
@@ -107,6 +117,7 @@ export function previewPrivateInvite(raw: string): PrivateRoom & { token: string
 }
 let invitationActivationVersion = 0;
 export async function joinPrivateInvite(raw: string): Promise<void> {
+  if (!pluginMarketController.isInstalled("chat")) throw new ChatCapabilityError("请先在商店手动启用聊天室实验组件");
   const c = previewPrivateInvite(raw);
   if (c.uid !== state.currentUser.uid) throw new Error("此邀请不属于当前 UID，请让服主为当前账号重新创建");
   const publicConfig = validatePrivateRoom(c);
@@ -127,6 +138,7 @@ export async function joinPrivateInvite(raw: string): Promise<void> {
   restartPrivateChat();
 }
 function request(c: PrivateRoom, path: string, method = "GET", body?: unknown, signal?: AbortSignal): Promise<any> {
+  if (!pluginMarketController.isInstalled("chat")) return Promise.reject(new ChatCapabilityError("请先在商店手动启用聊天室实验组件"));
   return http.request({ destination: c, path, method, body, signal });
 }
 async function admin(path: string, method: string, body?: unknown): Promise<any> {
@@ -204,7 +216,7 @@ function sessionEndpoint(c: PrivateRoom): string {
   return u.href;
 }
 function scope(c: PrivateRoom): string { return historyScope(c.uid, sessionEndpoint(c), c.room); }
-function active(c: PrivateRoom): boolean { return state.currentUser.uid === c.uid && state.serverUrl === sessionEndpoint(c) && ((c as SessionRoom).channel || "main") === privateChatState.channel && state.currentRoomId === c.room && privateChatConfig.room !== null && key(privateChatConfig.room) === key(c); }
+function active(c: PrivateRoom): boolean { return pluginMarketController.isInstalled("chat") && state.currentUser.uid === c.uid && state.serverUrl === sessionEndpoint(c) && ((c as SessionRoom).channel || "main") === privateChatState.channel && state.currentRoomId === c.room && privateChatConfig.room !== null && key(privateChatConfig.room) === key(c); }
 /** Public event identity only; never exposes credentials or starts a connection. */
 export function currentPrivateChatMessageSession(): { scope: string; channel: string } | null {
   const c = privateChatConfig.room && session(privateChatConfig.room);
@@ -332,6 +344,13 @@ export function stopPrivateChat(): void {
   state.connected = false; state.connecting = false; privateChatState.role = "";
 }
 export function restartPrivateChat(): void {
+  if (!pluginMarketController.isInstalled("chat")) {
+    stopPrivateChat();
+    state.visible = false;
+    state.error = "";
+    privateChatState.status = "实验性组件默认关闭，请先在商店手动启用";
+    return;
+  }
   const c = privateChatConfig.room && session(privateChatConfig.room);
   const sameIdentity = !!c && authenticatedKey === key(c) && state.currentUser.uid === c.uid;
   if (sameIdentity) cancelRoomSync(); else stopPrivateChat();
@@ -418,7 +437,7 @@ export async function sendPrivateMessage(value: ChatMessage): Promise<boolean> {
 let installed = false;
 export function installPrivateChat(): void {
   if (installed) return; installed = true;
-  watch(() => JSON.stringify(privateChatConfig.room), () => {
+  watch(() => [pluginMarketController.isInstalled("chat"), JSON.stringify(privateChatConfig.room)], () => {
     const c = privateChatConfig.room;
     privateChatState.members = [];
     privateChatState.rooms = [];
@@ -427,12 +446,12 @@ export function installPrivateChat(): void {
     privateChatState.spacesSupported = false;
     clearCapabilities();
     privateChatState.channel = "main";
-    if (!c) {
+    if (!c || !pluginMarketController.isInstalled("chat")) {
       state.visible = false; privateChatState.members = [];
     }
     restartPrivateChat();
-  }, { immediate: true });
+  }, { immediate: true, flush: "sync" });
   watch(() => state.visible, visible => { if (visible) ensurePrivateChat(); });
   watch(() => state.currentUser.uid, () => restartPrivateChat());
-  if (privateChatConfig.room) void refreshDeliveries(scope(privateChatConfig.room)).catch(() => { deliveryError.value = "待发队列读取失败，请关闭旧标签页后重试"; });
+  if (pluginMarketController.isInstalled("chat") && privateChatConfig.room) void refreshDeliveries(scope(privateChatConfig.room)).catch(() => { deliveryError.value = "待发队列读取失败，请关闭旧标签页后重试"; });
 }

@@ -34,15 +34,21 @@ function normalizeUrl(value: string): string {
   try { return new URL(value).href; } catch { return value; }
 }
 
-export async function loadLauncherPages(): Promise<string[]> {
+export async function loadLauncherPages(): Promise<{ pages: string[]; labels: Record<string, string> }> {
   try {
-    const stored = await chrome.storage.local.get(["launcherPages", "pages"]);
-    const list = stored.launcherPages || stored.pages;
-    if (Array.isArray(list) && list.length) {
-      return list.filter((p: any) => typeof p === "string" && p.trim().length > 0);
-    }
+    const stored = await chrome.storage.local.get(["launcherPages", "pages", "launcherPageLabels", "quickLinks"]);
+    const rawList = Array.isArray(stored.launcherPages) && stored.launcherPages.length ? stored.launcherPages
+      : Array.isArray(stored.pages) && stored.pages.length ? stored.pages : [];
+    const labels: Record<string, string> = stored.launcherPageLabels && typeof stored.launcherPageLabels === "object"
+      ? { ...stored.launcherPageLabels } : {};
+    const linkPages = Array.isArray(stored.quickLinks)
+      ? stored.quickLinks.map((l: any) => typeof l?.page === "string" ? l.page.trim() : "").filter(Boolean)
+      : [];
+    const set = new Set<string>(["常用网站", ...rawList, ...linkPages]);
+    const pages = Array.from(set).map(p => String(p).trim()).filter(Boolean);
+    return { pages: pages.length ? pages : ["常用网站"], labels };
   } catch {}
-  return ["常用网站", "游戏区", "办公区", "实验组", "就业区", "工具箱", "办公桌"];
+  return { pages: ["常用网站"], labels: {} };
 }
 
 async function directSaveBookmark(tab: PopupTab, targetPage: string = "常用网站"): Promise<SaveResult> {

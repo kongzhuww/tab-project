@@ -15,7 +15,7 @@
 
 tab-project-next 是基于 **Vue 3、TypeScript 和 Chromium Manifest V3** 的浏览器新标签页工作台，面向 Edge / Chrome。仓库原名为 `my-newtab`；部分 SDK 与历史版本仍沿用 LogicWeaver 名称。
 
-> **版本说明**：当前源码版本为 **2.3.0**，使用全新 Git 历史从旧项目迁移；新仓库不包含 ArkPets、Neuro / Evil 桌宠、Spine 运行时或个人预览截图。本次源码提交不创建发行标签或下载附件。已有 [v2.2.2 发行包](https://github.com/kongzhuww/tab-project/releases/tag/v2.2.2) 与当前源码、单独部署的聊天服务不是同一份发布物，详见 [更新日志](CHANGELOG.md)。
+> **版本说明**：当前版本为 **1.0.0** 开源正式版。基于纯净的 Chromium Manifest V3 浏览器扩展架构，已彻底拔除旧实验链路与外部桌面依赖。详见 [更新日志](CHANGELOG.md)。
 
 ## 功能概览
 
@@ -27,7 +27,7 @@ tab-project-next 是基于 **Vue 3、TypeScript 和 Chromium Manifest V3** 的�
 | github插件 | Star 仓库分类、搜索与阅读 | 按功能配置 GitHub 账号或 Token |
 | todoist | 任务看板、收件箱、日历与任务编辑 | 需要 Todoist Token |
 | 音乐 | 网易云歌单、扫码登录、塞壬唱片、播放器 | 按音源配置账号或服务 |
-| 海狸聊天室 | 私有聊天室、共享房间、文字/分享卡片、一起听入口 | 需要自托管服务和对应邀请 |
+| 海狸聊天室 | 私有聊天室、共享房间、文字/分享卡片、一起听入口 | 实验性，默认关闭；需在商店手动启用，再配置自托管服务和对应邀请 |
 | 我的表情包 / 表情库 | 聊天室内选图、本地目录或内置图片库与分类管理 | 目录访问需浏览器授权；不再展示独立商店或 dock 入口 |
 | ai hot插件、模型插件 | 资讯聚合、模型价格信息 | 数据更新能力以实际模块为准 |
 
@@ -69,7 +69,7 @@ npm run check
 
 ## 最近更新
 
-### v2.3.0 · 当前源码版本
+### v1.0.0 · 开源首发版本
 
 - 新仓库使用全新历史，旧仓库与本地数据不迁移、不覆盖。
 - 删除 ArkPets、Neuro / Evil、Spine、角色素材、独立设置页和相关控制命令。
@@ -118,6 +118,8 @@ npm run check
 npm run release:build
 ```
 
+当前仅维护桌面 Chromium 浏览器扩展。独立 Android / Capacitor 应用及移动端工具链已移除；桌面窗口的响应式布局保留。
+
 主要目录：
 
 ```text
@@ -132,7 +134,7 @@ manifest.json        扩展清单
 - [模块索引与历史台账](docs/MODULE_INDEX.md)
 - [SDK 说明](src/sdk/README.md)
 - [CI / 发布说明](docs/CI_CD.md)
-- [移动端说明](MOBILE_APP.md)
+- [最终验收记录与人工清单](docs/FINAL_ACCEPTANCE.md)
 
 文档中的历史记录用于解释演进，不替代当前源码、版本标签和实际验收。
 

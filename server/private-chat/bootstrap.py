@@ -14,12 +14,21 @@ p.add_argument("--uid", required=True)
 p.add_argument("--output-dir", required=True)
 a = p.parse_args()
 u = urlparse(a.origin)
-if u.scheme not in ("http", "https") or not u.netloc or u.username or u.password or u.query or u.fragment or u.path not in ("", "/"):
-    raise SystemExit("Use an HTTP or HTTPS origin without credentials or query")
+if u.scheme not in ("http", "https") or not u.hostname or u.username or u.password or u.params or u.query or u.fragment or u.path not in ("", "/"):
+    raise SystemExit("Use an HTTPS origin without credentials, path, query or fragment")
+try:
+    u.port  # Reject malformed ports before creating any credential files.
+except ValueError:
+    raise SystemExit("Invalid origin port") from None
+if u.scheme == "http" and u.hostname not in ("localhost", "127.0.0.1", "::1"):
+    raise SystemExit("Public origins require HTTPS; HTTP is allowed only on localhost, 127.0.0.1 or ::1")
 if not re.fullmatch(r"[A-Za-z0-9_-]{1,160}", a.uid):
     raise SystemExit("Invalid owner UID")
 out = Path(a.output_dir)
 out.mkdir(parents=True, exist_ok=True, mode=0o700)
+# Never chmod an arbitrary pre-existing path supplied by an administrator.
+if os.name == "posix" and out.stat().st_mode & 0o077:
+    raise SystemExit("Use a dedicated private output directory with mode 0700")
 env = out / "private-chat.env"
 invite = out / "owner-invite.txt"
 if env.exists() or invite.exists():

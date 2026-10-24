@@ -1,9 +1,9 @@
 {
   "name": "tab-project",
-  "version": "2.3.0",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "LogicWeaver browser extension, Vue UI islands, and Android runtime",
+  "description": "LogicWeaver desktop Chromium browser extension with Vue UI",
   "scripts": {
     "build": "npm run ui:build",
     "clean:chunks": "node scripts/clean-chunks.mjs",
@@ -14,22 +14,12 @@
     "ui:build": "vite build --config vite.ui.config.ts && vite build --config vite.sandbox.config.ts && vite build --config vite.localizer.config.ts && npm run build:bg",
     "ui:watch": "node scripts/watch-ui.mjs",
     "ui:typecheck": "vue-tsc --noEmit -p tsconfig.ui.json",
-    "ui:check": "npm run ui:typecheck && npm run ui:build",
-    "mobile:prepare": "node scripts/prepare-mobile-app.mjs",
-    "android:add": "npm run mobile:prepare && cap add android",
-    "android:sync": "npm run mobile:prepare && cap sync android",
-    "android:open": "npm run android:sync && cap open android",
-    "android:debug": "npm run android:sync && cd android && gradlew.bat assembleDebug"
+    "ui:check": "npm run ui:typecheck && npm run ui:build"
   },
   "dependencies": {
-    "@capacitor/android": "8.5.1",
-    "@capacitor/app": "8.0.1",
-    "@capacitor/core": "8.5.1",
-    "@capacitor/preferences": "8.0.1",
     "vue": "^3.5.42"
   },
   "devDependencies": {
-    "@capacitor/cli": "8.5.1",
     "@types/node": "^24.13.5",
     "@vitejs/plugin-vue": "^6.0.9",
     "typescript": "^5.9.3",

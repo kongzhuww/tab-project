@@ -1869,6 +1869,7 @@ function formatMsgTime(ts: number): string {
               <span class="chat-context-icon">➕</span> 添加为好友
             </button>
             <button
+              v-if="state.connected && privateChatState.role === 'owner'"
               type="button"
               class="chat-context-item"
               @click="handleInviteServer(memberContextMenu.member)"

@@ -9,48 +9,11 @@ import { settingsController } from "../settings/store";
 import { navWheelRuntime } from "../nav-wheel/runtime";
 import { fullscreenCardsController } from "../core/fullscreen-cards.store";
 
+import { getDockModule } from "../modules/registry";
+import { DEFAULT_TOOL_SHORTCUTS, isShortcutToolAvailable, parseShortcutEvent, shortcutCaptureState } from "./shortcut-catalog";
+export { DEFAULT_TOOL_SHORTCUTS, parseShortcutEvent } from "./shortcut-catalog";
+
 declare const chrome: any;
-
-export const DEFAULT_TOOL_SHORTCUTS: Record<string, string> = {
-  "nav-wheel": "Alt+E",
-  toolbox: "Alt+Q",
-  todoist: "Alt+D",
-  "task-shelf": "Alt+S",
-  calendar: "Alt+C",
-  bookmarks: "Alt+K",
-  wallpaper: "",
-  calcom: "",
-  alist: "",
-  monitor: "Alt+M",
-  settings: "Alt+,",
-  search: "/",
-  "todoist-new-task": "Alt+A"
-};
-
-/**
- * 将键盘事件解析为规范化字符串 (如 "Alt+K", "Ctrl+Shift+P")
- */
-export function parseShortcutEvent(event: KeyboardEvent): string | null {
-  const parts: string[] = [];
-  if (event.ctrlKey) parts.push("Ctrl");
-  if (event.altKey) parts.push("Alt");
-  if (event.shiftKey) parts.push("Shift");
-  if (event.metaKey) parts.push("Meta");
-
-  const key = event.key;
-  if (["Control", "Alt", "Shift", "Meta"].includes(key)) return null;
-
-  let mainKey = key.toUpperCase();
-  if (event.code.startsWith("Key")) mainKey = event.code.slice(3);
-  else if (event.code.startsWith("Digit")) mainKey = event.code.slice(5);
-  else if (key === " ") mainKey = "Space";
-  else if (key === ",") mainKey = ",";
-  else if (key === ".") mainKey = ".";
-  else if (key === "/") mainKey = "/";
-
-  parts.push(mainKey);
-  return parts.join("+");
-}
 
 export class ShortcutService {
   private static instance: ShortcutService;
@@ -100,7 +63,7 @@ export class ShortcutService {
   private applyShortcutOverrides(value: unknown): void {
     const entries = value && typeof value === "object" && !Array.isArray(value)
       ? Object.entries(value).filter((entry): entry is [string, string] =>
-        entry[0] !== "channels" && typeof entry[1] === "string") : [];
+        Object.prototype.hasOwnProperty.call(DEFAULT_TOOL_SHORTCUTS, entry[0]) && typeof entry[1] === "string") : [];
     this.activeShortcuts = { ...DEFAULT_TOOL_SHORTCUTS, ...Object.fromEntries(entries) };
   }
 
@@ -128,19 +91,10 @@ export class ShortcutService {
    * 分发触发指定工具的快捷动作
    */
   public triggerToolShortcut(toolId: string): boolean {
-    if (!toolId) return false;
+    if (!toolId || !isShortcutToolAvailable(toolId)) return false;
 
-    // 1. 优先通过纯血 windowManagerController 处理注册的窗口
-    const workspaceTools = [
-      "todoist",
-      "stickers",
-      "monitor",
-      "wallpaper",
-      "alist",
-      "calcom"
-    ];
-
-    if (workspaceTools.includes(toolId)) {
+    // Only registered, enabled modules can be dispatched as module shortcuts.
+    if (getDockModule(toolId)) {
       windowManagerController.handleToolClick(toolId);
       return true;
     }
@@ -212,6 +166,7 @@ export class ShortcutService {
     window.addEventListener(
       "keydown",
       (event: KeyboardEvent) => {
+        if (shortcutCaptureState.active || event.defaultPrevented || event.isComposing || event.repeat) return;
         if (fullscreenCardsController.activeId && event.altKey && event.key.toLowerCase() === "w") {
           event.preventDefault();
           event.stopPropagation();
@@ -233,8 +188,8 @@ export class ShortcutService {
 
         const pressedLower = pressed.toLowerCase();
         for (const [toolId, shortcut] of Object.entries(this.activeShortcuts)) {
-          if (!shortcut) continue;
-          if (shortcut.toLowerCase() === pressedLower) {
+          if (!shortcut || !isShortcutToolAvailable(toolId)) continue;
+          if (shortcut.toLowerCase().replace(/^cmd\+/, "meta+") === pressedLower) {
             event.preventDefault();
             event.stopPropagation();
             this.triggerToolShortcut(toolId);

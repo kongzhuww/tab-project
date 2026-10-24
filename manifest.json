@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "minimum_chrome_version": "120",
   "name": "tab-project 新标签页",
-  "version": "2.3.0",
+  "version": "1.0.0",
   "description": "tab-project 现代化浏览器新标签页与生产力工作台看板：聚合搜索、B站收藏夹、Todoist、模型价格与 GitHub。",
   "chrome_url_overrides": {
     "newtab": "newtab-bootstrap.html"
@@ -125,7 +125,9 @@
         "assets/icon-128.png",
         "assets/nav-home.svg"
       ],
-      "matches": ["<all_urls>"]
+      "matches": [
+        "<all_urls>"
+      ]
     }
   ]
 }

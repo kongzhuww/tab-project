@@ -1,0 +1,450 @@
+import { f as $e, w as z, a as Ae, g as p, h as D, i as v, x as l, l as S, K as de, k as a, u as R, I as ue, M as Ve, t as K, N as Oe, F as ce, z as fe, s as pe, B as ge, T as qe, b as _, c as me } from "./vendor-vue-BUkfvXUI.js";
+import { u as Ge, _ as Ue, I as ze } from "./useInlineTitleEdit-B07QlU7T.js";
+import { l as g, w as ve, Q as Re } from "./search.service-CipPV7Bz.js";
+import { f as H, a as h, b as w } from "./store-BDmF35tO.js";
+import { L as Ke, a as he } from "./LauncherTileContent-jEQmIfi6.js";
+import { L as Je } from "./LauncherFolderSurface-B3S2FK5j.js";
+import { _ as Qe } from "./_plugin-vue_export-helper-CHgC5LLL.js";
+const We = { class: "launcher-folder-island" }, je = ["hidden"], Ze = ["title"], et = { class: "launcher-folder-title-box" }, tt = { class: "folder-title-text" }, nt = ["disabled"], ot = ["disabled"], rt = ["data-child-folder", "title", "onClick", "onContextmenu", "onDragstart", "onDrop"], lt = ["href", "title", "data-launcher-id", "onPointerdown", "onClick", "onContextmenu"], at = { class: "launcher-label" }, it = { class: "launcher-label" }, st = /* @__PURE__ */ $e({
+  __name: "LauncherFolderDialog",
+  setup(dt) {
+    const r = H, $ = _(!1), y = _(!1);
+    function X(e) {
+      ve.show({ appName: "常用网站", title: "文件夹操作未完成", message: e instanceof Error ? e.message : "请刷新核对，未自动重试。" });
+    }
+    function J(e) {
+      I || y.value || Date.now() < M || w.dispatch("folder:open", e);
+    }
+    async function we() {
+      const e = r.activeFolder;
+      if (!(!e || y.value)) {
+        y.value = !0;
+        try {
+          await g.createFolder("small", void 0, void 0, e);
+        } catch (t) {
+          X(t);
+        } finally {
+          y.value = !1;
+        }
+      }
+    }
+    async function ye() {
+      const e = r.activeFolder, t = r.parentFolder;
+      if (!(!e || !t || y.value)) {
+        y.value = !0;
+        try {
+          await g.moveFolderInto(e, g.getFolderParent(t));
+        } catch (n) {
+          X(n);
+        } finally {
+          y.value = !1;
+        }
+      }
+    }
+    function be(e, t) {
+      t.dataTransfer?.setData("application/x-newtab-launcher-folder", e), t.dataTransfer && (t.dataTransfer.effectAllowed = "move");
+    }
+    function De() {
+      r.dropHoverValid = !1;
+    }
+    z(() => r.isOpen, (e) => {
+      e ? requestAnimationFrame(() => {
+        $.value = !0;
+      }) : $.value = !1;
+    });
+    let Y = !1, Q = 0, W = 0, j = 0, Z = 0;
+    const ke = me(() => {
+      const e = r.position;
+      if (!e)
+        return {
+          left: "50%",
+          top: "46%",
+          transform: "translate(-50%, -50%)",
+          margin: "0"
+        };
+      const t = {
+        transform: "none",
+        margin: "0"
+      };
+      return e.left !== void 0 && (t.left = typeof e.left == "number" ? `${e.left}px` : String(e.left)), e.top !== void 0 && (t.top = typeof e.top == "number" ? `${e.top}px` : String(e.top)), e.bottom !== void 0 && (t.bottom = typeof e.bottom == "number" ? `${e.bottom}px` : String(e.bottom)), e.right !== void 0 && (t.right = typeof e.right == "number" ? `${e.right}px` : String(e.right)), e.maxHeight !== void 0 && (t.maxHeight = typeof e.maxHeight == "number" ? `${e.maxHeight}px` : String(e.maxHeight)), t;
+    });
+    function xe(e) {
+      if (e.target.closest("button")) return;
+      const t = document.getElementById("launcher-folder-dialog");
+      if (!t) return;
+      Y = !0, r.isDragging = !0;
+      const n = t.getBoundingClientRect();
+      j = n.left, Z = n.top, Q = e.clientX, W = e.clientY;
+      try {
+        e.currentTarget.setPointerCapture(e.pointerId);
+      } catch {
+      }
+    }
+    function Le(e) {
+      if (!Y) return;
+      const t = e.clientX - Q, n = e.clientY - W, o = Math.max(12, Math.min(window.innerWidth - 300, j + t)), i = Math.max(12, Math.min(window.innerHeight - 200, Z + n));
+      w.setPosition({ left: o, top: i });
+    }
+    function ee(e) {
+      if (Y) {
+        Y = !1, r.isDragging = !1;
+        try {
+          e.currentTarget.releasePointerCapture(e.pointerId);
+        } catch {
+        }
+      }
+    }
+    function Fe() {
+      w.setPosition(null);
+    }
+    const L = Ge({
+      save: async (e, t) => {
+        const n = Re(t);
+        return await g.renameGroup(e, n), n;
+      },
+      apply: (e, t) => {
+        w.dispatch("folder:open", t), oe.value = "已保存";
+      },
+      detachedError: (e) => {
+        ve.show({ appName: "常用网站", title: "文件夹标题保存未完成", message: e, duration: 12e3 });
+      }
+    }), {
+      editing: te,
+      draft: A,
+      busy: ne,
+      message: oe,
+      failed: V,
+      revision: Ce
+    } = L;
+    z(() => [r.isOpen, r.activeFolder], L.reset, { flush: "sync" });
+    function Ee() {
+      r.activeFolder && L.start(r.activeFolder, r.activeFolder);
+    }
+    const Pe = L.commit, Te = L.cancel;
+    function Se() {
+      L.reset(), w.closeFolder(), w.dispatch("close");
+    }
+    function He() {
+      ne.value || te.value && V.value || (L.reset(), w.closeFolder(), w.dispatch("close"));
+    }
+    let b = null, re = 0, le = 0, ae = 0, ie = 0, E = null, k = !1, I = !1, M = 0, m = null, B = "", O = 0;
+    const s = _(null), Ie = me(() => s.value || r.links), d = _(null);
+    let P = null;
+    function F() {
+      window.removeEventListener("pointermove", G), window.removeEventListener("pointerup", T), window.removeEventListener("pointercancel", T), window.removeEventListener("blur", F), window.removeEventListener("keydown", q), k && (M = Date.now() + 400);
+      try {
+        m && b !== null && m.releasePointerCapture(b);
+      } catch {
+      }
+      m = null, P = null, d.value = null, s.value = null, b = null, E = null, k = !1, B = "", h.handleExternalDragHover(null), document.querySelectorAll(".launcher-page-tab.drop-target, #launcher-folder-dialog [data-child-folder].drop-target").forEach((e) => e.classList.remove("drop-target"));
+    }
+    function q(e) {
+      e.key === "Escape" && (e.preventDefault(), F());
+    }
+    z(() => [r.isOpen, r.activeFolder], F), Ae(F);
+    function Be(e, t) {
+      if (t.button !== 0 || !t.isPrimary || I) return;
+      F(), t.preventDefault(), t.stopPropagation(), m = t.currentTarget, m.blur();
+      const n = m.getBoundingClientRect();
+      ae = t.clientX - n.left, ie = t.clientY - n.top, P = { link: e, x: n.left, y: n.top, width: n.width, height: n.height }, b = t.pointerId, re = t.clientX, le = t.clientY, E = String(e.id), B = "", O = 0, s.value = [...r.links];
+      try {
+        m.setPointerCapture(t.pointerId);
+      } catch {
+      }
+      window.addEventListener("pointermove", G, { passive: !1 }), window.addEventListener("pointerup", T), window.addEventListener("pointercancel", T), window.addEventListener("blur", F), window.addEventListener("keydown", q);
+    }
+    function G(e) {
+      if (e.pointerId !== b || !P || !k && Math.hypot(e.clientX - re, e.clientY - le) <= 5) return;
+      e.preventDefault(), k = !0, d.value = { ...P, x: e.clientX - ae, y: e.clientY - ie }, document.querySelectorAll(".launcher-page-tab.drop-target").forEach((o) => o.classList.remove("drop-target"));
+      const t = document.elementsFromPoint(e.clientX, e.clientY);
+      if (t.find((o) => o.classList.contains("launcher-page-tab"))?.classList.add("drop-target"), t.some(
+        (o) => o.id === "launcher-folder-dialog" || !!o.closest?.("#launcher-folder-dialog")
+      )) {
+        h.handleExternalDragHover(null), document.querySelectorAll("#launcher-folder-dialog [data-child-folder].drop-target").forEach((c) => c.classList.remove("drop-target"));
+        const o = t.find((c) => c.hasAttribute("data-child-folder"));
+        if (o) {
+          o.classList.add("drop-target");
+          return;
+        }
+        if (!s.value) return;
+        const i = t.find((c) => {
+          if (c.classList.contains("launcher-link") && c.closest("#launcher-folder-dialog-items")) {
+            const f = c.getAttribute("data-launcher-id");
+            return f && String(f) !== E;
+          }
+          return !1;
+        });
+        if (i) {
+          const c = i.getAttribute("data-launcher-id") || "", f = i.getBoundingClientRect(), u = Math.hypot(
+            e.clientX - (f.left + f.width / 2),
+            e.clientY - (f.top + f.height / 2)
+          ), x = Date.now();
+          if (u < Math.max(f.width, f.height) * 0.48 && (c !== B || x - O > 180)) {
+            const N = s.value.findIndex((C) => String(C.id) === c), U = s.value.findIndex((C) => String(C.id) === E);
+            if (U >= 0 && N >= 0 && U !== N) {
+              const C = [...s.value], _e = C.splice(U, 1)[0];
+              C.splice(N, 0, _e), s.value = C, B = c, O = x;
+            }
+          }
+        }
+      } else
+        h.handleExternalDragHover({
+          link: P.link,
+          clientX: e.clientX,
+          clientY: e.clientY
+        });
+    }
+    async function T(e) {
+      if (e.pointerId !== b) return;
+      const t = E, n = k, o = s.value, i = document.elementsFromPoint(e.clientX, e.clientY).find((u) => u.id !== "launcher-folder-backdrop");
+      window.removeEventListener("pointermove", G), window.removeEventListener("pointerup", T), window.removeEventListener("pointercancel", T), window.removeEventListener("blur", F), window.removeEventListener("keydown", q), k && (M = Date.now() + 400);
+      try {
+        m && b !== null && m.releasePointerCapture(b);
+      } catch {
+      }
+      if (m = null, P = null, d.value = null, b = null, E = null, k = !1, B = "", document.querySelectorAll(".launcher-page-tab.drop-target").forEach((u) => u.classList.remove("drop-target")), e.type === "pointercancel" || !n || !t || I) {
+        h.handleExternalDragHover(null), s.value = null;
+        return;
+      }
+      if (!i) {
+        h.handleExternalDragHover(null), s.value = null;
+        return;
+      }
+      const c = i.closest("#launcher-folder-dialog"), f = i.closest("#launcher-folder-dialog-items");
+      I = !0;
+      try {
+        if (c) {
+          h.handleExternalDragHover(null);
+          const u = i.closest("[data-child-folder]")?.dataset.childFolder;
+          u ? await g.moveLinkTo(t, void 0, u) : f && o && await g.reorderFolderLinks(r.activeFolder, o.map((x) => String(x.id))), s.value = null;
+        } else {
+          const u = await h.handleExternalDrop({ id: t });
+          if (h.handleExternalDragHover(null), u)
+            H.links = H.links.filter((x) => String(x.id) !== t), s.value = null;
+          else {
+            const x = i.closest(".launcher-page-tab"), N = i.closest("[data-launcher-folder]");
+            s.value = null, await g.moveLinkTo(t, x?.dataset.page || g.getState().activePage, N?.dataset.launcherFolder || "常用网站");
+          }
+        }
+      } catch (u) {
+        X(u), s.value = null, h.handleExternalDragHover(null);
+      } finally {
+        document.querySelectorAll("#launcher-folder-dialog [data-child-folder].drop-target").forEach((u) => u.classList.remove("drop-target")), I = !1;
+      }
+    }
+    function Ne(e, t) {
+      if (k || Date.now() < M) {
+        t.preventDefault(), t.stopPropagation();
+        return;
+      }
+      w.dispatch("link:click", { link: e, event: t });
+    }
+    function Xe(e, t) {
+      t.preventDefault(), w.dispatch("link:contextmenu", { link: e, clientX: t.clientX, clientY: t.clientY });
+    }
+    function Ye(e) {
+      e.preventDefault(), e.dataTransfer && (e.dataTransfer.dropEffect = "move"), H.dropHoverValid = !0;
+    }
+    function Me() {
+      H.dropHoverValid = !1;
+    }
+    async function se(e, t = r.activeFolder) {
+      if (H.dropHoverValid = !1, e.preventDefault(), e.stopPropagation(), !t) return;
+      const n = e.dataTransfer?.getData("application/x-newtab-launcher-folder"), o = e.dataTransfer?.getData("application/x-newtab-launcher");
+      try {
+        if (n) await g.moveFolderInto(n, t);
+        else if (o) {
+          const i = JSON.parse(o);
+          i.id && await g.moveLinkTo(i.id, void 0, t);
+        }
+      } catch (i) {
+        X(i);
+      }
+    }
+    return (e, t) => (p(), D("div", We, [
+      v("div", {
+        id: "launcher-folder-backdrop",
+        class: "launcher-folder-backdrop",
+        hidden: !l(r).isOpen,
+        onClick: He
+      }, null, 8, je),
+      S(Je, {
+        id: "launcher-folder-dialog",
+        class: pe(["launcher-dialog launcher-folder-dialog", {
+          "drop-hover-valid": l(r).dropHoverValid,
+          dragging: l(r).isDragging
+        }]),
+        open: l(r).isOpen,
+        "data-opened": $.value ? "active" : void 0,
+        style: ge(ke.value)
+      }, {
+        default: de(() => [
+          v("header", {
+            title: "按住鼠标可自由拖动；双击恢复屏幕居中",
+            style: { cursor: "grab", "user-select": "none" },
+            onPointerdown: xe,
+            onPointermove: Le,
+            onPointerup: ee,
+            onPointercancel: ee,
+            onDblclick: Fe
+          }, [
+            l(r).parentFolder ? (p(), D("button", {
+              key: 0,
+              type: "button",
+              class: "folder-nav-action",
+              title: `返回 ${l(r).parentFolder}`,
+              "aria-label": "返回上一级",
+              onPointerdown: t[0] || (t[0] = a(() => {
+              }, ["stop"])),
+              onClick: t[1] || (t[1] = a((n) => J(l(r).parentFolder), ["stop"]))
+            }, "‹", 40, Ze)) : R("", !0),
+            v("div", et, [
+              l(te) ? (p(), ue(l(Ue), {
+                key: 0,
+                modelValue: l(A),
+                "onUpdate:modelValue": t[2] || (t[2] = (n) => Ve(A) ? A.value = n : null),
+                busy: l(ne),
+                revision: l(Ce),
+                "aria-invalid": l(V) || void 0,
+                class: "launcher-folder-title-input",
+                maxlength: "20",
+                placeholder: "输入文件夹名称",
+                onPointerdown: t[3] || (t[3] = a(() => {
+                }, ["stop"])),
+                onDblclick: t[4] || (t[4] = a(() => {
+                }, ["stop"])),
+                onCommit: l(Pe),
+                onCancel: l(Te)
+              }, null, 8, ["modelValue", "busy", "revision", "aria-invalid", "onCommit", "onCancel"])) : (p(), D("h2", {
+                key: 1,
+                id: "launcher-folder-dialog-title",
+                title: "点击修改名称",
+                style: { cursor: "pointer", "user-select": "none" },
+                onPointerdown: t[5] || (t[5] = a(() => {
+                }, ["stop"])),
+                onDblclick: t[6] || (t[6] = a(() => {
+                }, ["stop"])),
+                onClick: a(Ee, ["stop"])
+              }, [
+                v("span", tt, K(l(r).activeFolder), 1),
+                t[13] || (t[13] = v("span", {
+                  class: "folder-title-edit-hint",
+                  "aria-hidden": "true"
+                }, "✎", -1))
+              ], 32))
+            ]),
+            t[14] || (t[14] = v("div", {
+              class: "launcher-folder-drag-spacer",
+              "aria-hidden": "true"
+            }, null, -1)),
+            l(r).parentFolder ? (p(), D("button", {
+              key: 1,
+              type: "button",
+              class: "folder-nav-action",
+              title: "将当前文件夹移到上一级",
+              disabled: y.value,
+              onPointerdown: t[7] || (t[7] = a(() => {
+              }, ["stop"])),
+              onClick: a(ye, ["stop"])
+            }, "↥", 40, nt)) : R("", !0),
+            v("button", {
+              type: "button",
+              class: "folder-nav-action",
+              title: "新建子文件夹",
+              "aria-label": "新建子文件夹",
+              disabled: y.value,
+              onPointerdown: t[8] || (t[8] = a(() => {
+              }, ["stop"])),
+              onClick: a(we, ["stop"])
+            }, "＋", 40, ot),
+            v("button", {
+              id: "launcher-folder-close",
+              type: "button",
+              title: "关闭",
+              onPointerdown: t[9] || (t[9] = a(() => {
+              }, ["stop"])),
+              onClick: a(Se, ["stop"])
+            }, "✕", 32)
+          ], 32),
+          S(l(ze), {
+            message: l(oe),
+            failed: l(V)
+          }, null, 8, ["message", "failed"]),
+          S(Oe, {
+            tag: "div",
+            id: "launcher-folder-dialog-items",
+            class: "launcher-folder-dialog-items",
+            name: d.value ? "folder-items-grid" : void 0,
+            css: !!d.value,
+            onDragover: Ye,
+            onDragleave: Me,
+            onDrop: se
+          }, {
+            default: de(() => [
+              (p(!0), D(ce, null, fe(l(r).folders, (n) => (p(), D("button", {
+                key: "folder:" + n.groupName,
+                type: "button",
+                class: "launcher-folder size-small child-folder-tile",
+                "data-child-folder": n.groupName,
+                title: `${n.groupName}（点击打开；可拖入其他文件夹）`,
+                draggable: "true",
+                onPointerdown: t[10] || (t[10] = a(() => {
+                }, ["stop"])),
+                onClick: a((o) => J(n.groupName), ["stop"]),
+                onContextmenu: a((o) => l(h).openFolderMenu(n.groupName, l(g).getFolderPage(n.groupName), o), ["prevent"]),
+                onDragstart: a((o) => be(n.groupName, o), ["stop"]),
+                onDragend: De,
+                onDragover: t[11] || (t[11] = a(() => {
+                }, ["prevent", "stop"])),
+                onDrop: (o) => se(o, n.groupName)
+              }, [
+                S(Ke, {
+                  folder: { title: n.groupName, preview: n.links, count: n.count },
+                  size: "small"
+                }, null, 8, ["folder"])
+              ], 40, rt))), 128)),
+              (p(!0), D(ce, null, fe(Ie.value, (n) => (p(), D("a", {
+                key: n.id,
+                class: pe(["launcher-link", { "is-pointer-dragging": d.value && String(d.value.link.id) === String(n.id) }]),
+                href: n.url,
+                target: "_blank",
+                rel: "noreferrer",
+                title: `${n.title}${n.note ? `
+📝 ` + n.note : ""}
+🔗 ${n.url}`,
+                "data-launcher-id": n.id,
+                draggable: "false",
+                onPointerdown: (o) => Be(n, o),
+                onDragstart: t[12] || (t[12] = a(() => {
+                }, ["prevent"])),
+                onClick: (o) => Ne(n, o),
+                onContextmenu: (o) => Xe(n, o)
+              }, [
+                S(he, { link: n }, null, 8, ["link"]),
+                v("span", at, K(n.title), 1)
+              ], 42, lt))), 128))
+            ]),
+            _: 1
+          }, 8, ["name", "css"])
+        ]),
+        _: 1
+      }, 8, ["class", "open", "data-opened", "style"]),
+      (p(), ue(qe, { to: "body" }, [
+        d.value ? (p(), D("div", {
+          key: 0,
+          class: "launcher-drag-ghost folder-link-ghost",
+          style: ge({ left: "0", top: "0", width: d.value.width + "px", height: d.value.height + "px", transform: "translate3d(" + d.value.x + "px," + d.value.y + "px,0)" }),
+          "aria-hidden": "true"
+        }, [
+          S(he, {
+            link: d.value.link
+          }, null, 8, ["link"]),
+          v("span", it, K(d.value.link.title), 1)
+        ], 4)) : R("", !0)
+      ]))
+    ]));
+  }
+}), ht = /* @__PURE__ */ Qe(st, [["__scopeId", "data-v-6fe15385"]]);
+export {
+  ht as default
+};

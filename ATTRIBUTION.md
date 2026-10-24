@@ -9,8 +9,13 @@
 ## 软件依赖
 
 - **Vue 3 / @vue**：MIT。来源：<https://github.com/vuejs/core>。运行时版权和完整许可保留于 `third_party/vue/LICENSE`。
-- **Capacitor / @capacitor**：MIT。来源：<https://github.com/ionic-team/capacitor>。完整许可保留于 `third_party/capacitor/LICENSE`。Android 相关依赖仍以各自发行包中的许可证为准。
 - 其余 npm 依赖与开发工具版本见 `package-lock.json`。本仓库不分发 `node_modules`；其许可证不能被本项目的 MIT 替代。
+
+## 维护者原创素材声明
+
+2026-10-24 验收时，维护者确认 `assets/newtab-mountains.png` 与 `assets/icon-16.png`、`icon-32.png`、`icon-48.png`、`icon-128.png` 为本人原创，拥有相应权利并允许随本项目开源分发。根目录与 assets 中的 `favicon.ico` 与 `icon-32.png` 文件内容相同，属于同一图标副本；补齐的 `assets/logo.png` 与 `icon-48.png` 内容相同。`default-avatar.svg`、`default-favicon.svg` 与 `error.svg` 是本次为缺失资源绘制的简单几何占位图，按项目 MIT 许可提供。
+
+此处记录维护者提供的来源与权利声明，不代表独立的著作权登记或法律鉴定，也不把第三方平台标识、用户导入资源或在线媒体一并认定为原创。
 
 ## 图标、壁纸与媒体
 

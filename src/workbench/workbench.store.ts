@@ -63,15 +63,7 @@ const STORAGE_KEY = "lw_workbench_data_v1";
 function loadInitialData(): WorkbenchData {
   const fallback: WorkbenchData = {
     title: "海狸聚集工作台",
-    videos: [
-      {
-        id: "demo-bili-1",
-        bvid: "BV1GJ411x7h7",
-        title: "【官方双语】深度学习之梯度下降法到底是什么？",
-        owner: { name: "3Blue1Brown" },
-        addedAt: Date.now()
-      }
-    ],
+    videos: [],
     websites: [
       {
         id: "demo-web-1",
@@ -113,12 +105,7 @@ function loadInitialData(): WorkbenchData {
       }
     ],
     scratchpad: "# 项目速记 / 灵感草稿\n\n- 聚集当前项目关联的所有视频、文档、任务和代码库\n- 点击左侧视频在中央大舞台聚焦播放\n- 随手写草稿，随时沉浸思考",
-    focus: {
-      type: "video",
-      id: "demo-bili-1",
-      title: "【官方双语】深度学习之梯度下降法到底是什么？",
-      data: { bvid: "BV1GJ411x7h7" }
-    }
+    focus: { type: "none", id: "" }
   };
 
   try {

@@ -92,12 +92,13 @@ watch(
   z-index: 999999;
   display: grid;
   place-items: center;
-  background: rgba(0, 0, 0, 0.45);
-  backdrop-filter: blur(8px);
+  background: transparent;
+  pointer-events: none;
   padding: 16px;
 }
 
 .app-dialog-card {
+  pointer-events: auto;
   width: 100%;
   max-width: 400px;
   background: var(--panel, #ffffff);

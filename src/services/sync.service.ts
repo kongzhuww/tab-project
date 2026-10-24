@@ -29,7 +29,7 @@ export const SYNC_WHITELIST_KEYS: readonly string[] = [
   "wereadSortIds", "foGroups",
   "foTree", "foCollapsedGroupsV1", "biliFollowingGroupsV1", "biliSubCustomChannelsV1",
   "ghCats", "ghMap", "ghUsed", "ghRepoRemarksV1",
-  "todoistActiveProjectIdV1",
+  "ghUser", "ghToken", "todoistToken", "todoistActiveProjectIdV1", "lw_private_chat_v1", "googleCalendarSessionTokenV1", "lw_webdav_config",
   "launcherGroups", "launcherFolders", "quickLinks", "quickLinkGroupSizes",
   "launcherPages", "launcherPageLabels", "launcherActivePage", "launcherFolderPositionV1",
   CUSTOM_AVATAR_KEY, LEGACY_AVATAR_KEY
@@ -65,8 +65,17 @@ export async function readSyncSettings(): Promise<Record<string, unknown>> {
         else resolve(res || {});
       });
     });
-    // 若 localStorage 镜像中存有最新的常用网站数据而 chrome.storage.local 尚未落盘，自动合并补齐
+    // Include localStorage items (e.g. private chat config) if not present in chrome.storage.local
     if (typeof localStorage !== "undefined") {
+      const extraKeys = ["lw_private_chat_v1", "ghUser", "ghToken", "todoistToken", "googleCalendarSessionTokenV1", "lw_webdav_config"];
+      for (const k of extraKeys) {
+        if (data[k] === undefined) {
+          const val = localStorage.getItem(k);
+          if (val !== null) {
+            try { data[k] = JSON.parse(val); } catch { data[k] = val; }
+          }
+        }
+      }
       for (const key of launcherMirrorKeys) {
         if (!SYNC_WHITELIST_KEYS.includes(key)) continue;
         const current = data[key];

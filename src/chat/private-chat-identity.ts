@@ -11,6 +11,7 @@ export function validatePrivateRoom(value: unknown): PrivateRoom {
     if (typeof v.origin !== "string" || typeof v.room !== "string" || typeof v.uid !== "string") throw new Error();
     const url = new URL(v.origin);
     if (!["http:", "https:"].includes(url.protocol) || url.username || url.password || url.pathname !== "/" || url.search || url.hash || !/^[A-Za-z0-9_-]{1,160}$/.test(v.room) || !/^[A-Za-z0-9_-]{1,160}$/.test(v.uid)) throw new Error();
+    if (url.protocol === "http:" && !["localhost", "127.0.0.1", "[::1]"].includes(url.hostname)) throw new Error();
     return { origin: url.origin, room: v.room, uid: v.uid };
-  } catch { throw new Error("私有聊天室配置无效"); }
+  } catch { throw new Error("聊天室配置无效：公网必须使用 HTTPS；HTTP 仅允许 localhost、127.0.0.1 或 ::1"); }
 }

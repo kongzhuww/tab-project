@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { ref, watch } from "vue";
+import { HttpError } from "./private-chat-errors";
+import deploymentGuide from "../../server/private-chat/README.md?raw";
 import { chatModuleState as state } from "./chat-state";
 import { privateChatConfig, disablePrivateChat, reloadPrivatePublicConfig } from "./private-chat-config";
 import { privateChatState, previewPrivateInvite, joinPrivateInvite, listPrivateMembers, invitePrivateMember, revokePrivateMember } from "./private-chat-client";
@@ -17,6 +19,28 @@ const membersLoaded = ref(false);
 const uidCopied = ref(false);
 const joinOpen = ref(!privateChatConfig.room);
 const confirmDisable = ref(false);
+
+function downloadDeploymentGuide() {
+  let url: string | undefined;
+  let link: HTMLAnchorElement | undefined;
+  try {
+    url = URL.createObjectURL(new Blob([deploymentGuide], { type: "text/markdown;charset=utf-8" }));
+    link = document.createElement("a");
+    link.href = url;
+    link.download = "beaver-private-chat-deployment.md";
+    document.body.appendChild(link);
+    link.click();
+    notice.value = "已请求保存本版本部署指南；其中只有公开说明，不包含你的邀请或凭据。";
+  } catch {
+    notice.value = "无法保存指南，请打开源码中的 server/private-chat/README.md。";
+  } finally {
+    link?.remove();
+    if (url) {
+      const temporaryUrl = url;
+      window.setTimeout(() => URL.revokeObjectURL(temporaryUrl), 1000);
+    }
+  }
+}
 
 async function copyUid() {
   try {
@@ -46,8 +70,19 @@ async function run(action: () => Promise<void>) {
   notice.value = "";
   try {
     await action();
-  } catch {
-    notice.value = "操作未确认，请检查连接。生成邀请超时后，先刷新成员列表，不要重复生成。";
+  } catch (error) {
+    if (error instanceof HttpError) {
+      const messages: Record<number, string> = {
+        401: "服务器未接受当前凭证，可能已过期或被撤销。请核对邀请与服务状态。",
+        403: "只有当前已认证的服主可以管理成员、空间和房间。",
+        409: "服务器拒绝了本次操作，请检查成员或房间容量及当前状态。",
+        429: "请求过于频繁，请稍后重试。",
+        507: "服务端存储达到限制，请由服主检查容量与备份。"
+      };
+      notice.value = messages[error.status] || `服务器响应 ${error.status}，请按部署指南检查服务与反向代理。`;
+    } else {
+      notice.value = "操作未确认，请检查网络与服务。若刚才在创建邀请，先刷新成员列表再判断，不要立即重复生成。";
+    }
   } finally {
     busy.value = false;
   }
@@ -64,7 +99,7 @@ function inspect() {
     }
     preview.value = `${new URL(c.origin).host} · 房间 ${c.room}。邀请与你的聊天 ID 完全匹配，请确认信任这台服务器。`;
   } catch {
-    notice.value = "邀请不完整或格式不正确，请复制以 BEAVER-PRIVATE1: 开头的整段内容。";
+    notice.value = "邀请无效或使用了公网 HTTP。请复制完整的 BEAVER-PRIVATE1: 邀请；公网服务必须使用 HTTPS，本机开发才允许回环 HTTP。";
   }
 }
 
@@ -286,33 +321,36 @@ function disconnect() {
           <span class="accordion-icon">🛠️</span>
           <div class="summary-text-wrap">
             <strong class="summary-title">我想自建聊天室</strong>
-            <small class="summary-sub">基于轻量 Python / SQLite 的自建服务指南</small>
+            <small class="summary-sub">手动部署 Python / SQLite 服务 · 公网需要 HTTPS</small>
           </div>
         </div>
         <span class="chevron-arrow">›</span>
       </summary>
       <div class="accordion-body">
-        <p class="body-tip">创建聊天室仅需一台普通的 Linux VPS 或低配云服务器，轻量级 Python 标准库即可跑通，数据完全由你自主掌管。</p>
+        <p class="body-tip">这是手动部署说明，不会替你购买服务器或自动开服。请先准备 Linux 服务器、域名和 HTTPS，按完整指南完成检查后再导入服主邀请。</p>
+        <button type="button" class="btn-modern-secondary setup-guide-link" @click="downloadDeploymentGuide">下载本版本部署、备份与排错指南（离线）</button>
+        <a class="setup-guide-link" href="https://github.com/kongzhuww/tab-project-next/tree/main/server/private-chat" target="_blank" rel="noopener noreferrer">查看远端服务端源码（需仓库访问权限）</a>
+        <p class="body-tip">离线指南随当前版本打包，无需登录；打开或保存指南不会部署服务器。扩展安装包不含完整服务端程序；源码仓库若为私有，需要有访问权限的账号。</p>
         <ol class="setup-steps-modern">
           <li>
             <div class="step-num">1</div>
             <div class="step-content">
               <strong>准备云服务器环境</strong>
-              <span>需要 Python 3.12+ 与 SQLite 环境，对外开放端口并通过 Nginx 配置 HTTPS 证书保障安全传输。</span>
+              <span>确认 Python 3.12+ 可导入 SQLite；域名解析到服务器，仅向公网开放反向代理需要的 80 / 443，聊天进程保持监听 127.0.0.1:8788。</span>
             </div>
           </li>
           <li>
             <div class="step-num">2</div>
             <div class="step-content">
               <strong>部署聊天服务程序</strong>
-              <span>参考项目源码 <code>server/private-chat/README.md</code>，主程序为 <code>server.py</code>，零重量依赖，开箱即用。</span>
+              <span>服务端需要 <code>server.py</code>、<code>image_policy.py</code>、<code>protocol_contract.py</code>、<code>protocol.json</code> 和 <code>bootstrap.py</code>，只依赖 Python 标准库。扩展安装包不包含完整服务端目录。</span>
             </div>
           </li>
           <li>
             <div class="step-num">3</div>
             <div class="step-content">
               <strong>初始化服主专属身份</strong>
-              <span>复制你上方的“我的聊天 ID”，运行 <code>python bootstrap.py</code> 生成服主私钥与专属连接邀请。</span>
+              <span>复制“我的聊天 ID”，按指南运行 <code>python3 bootstrap.py --origin https://chat.example.com --uid "你的聊天ID" --output-dir ./secrets</code>。替换示例域名和 ID；生成的是服主 Token 与邀请，不是加密私钥。已有服务不要重新初始化。</span>
               <button type="button" class="btn-modern-secondary btn-step-copy" @click="copyUid">
                 {{ uidCopied ? '✅ ID 已复制' : '📋 复制我的聊天 ID' }}
               </button>
@@ -321,8 +359,8 @@ function disconnect() {
           <li>
             <div class="step-num">4</div>
             <div class="step-content">
-              <strong>服主导入邀请开服</strong>
-              <span>把服务器生成的 <code>owner-invite.txt</code> 粘贴至上方“使用另一份邀请”中，连接后即获得全权服主控制台！</span>
+              <strong>先检查服务，再导入服主邀请</strong>
+              <span>按指南启动服务并确认 HTTPS 的 <code>/health</code> 可访问。把 <code>owner-invite.txt</code> 中的完整一行私下粘贴到上方加入邀请区域；只有服务器鉴权为服主后才出现管理功能。不要分享服主邀请。</span>
             </div>
           </li>
         </ol>
@@ -814,6 +852,8 @@ function disconnect() {
 }
 
 /* 自建步骤 */
+.setup-guide-link { align-self: flex-start; text-decoration: none; }
+.step-content code { overflow-wrap: anywhere; }
 .setup-steps-modern {
   margin: 0;
   padding: 0;

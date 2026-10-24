@@ -2,6 +2,7 @@ import type { DockModuleDefinition } from "../modules/registry";
 import { chatModuleState } from "./chat-state";
 import { chatService } from "./chat.service";
 import { privateChatConfigured } from "./private-chat-config";
+import { pluginMarketController } from "../modules/market-store";
 
 export const chatDockModule = {
   schemaVersion: 1,
@@ -15,7 +16,9 @@ export const chatDockModule = {
   loadView: () => import("./ChatDialog.vue").then((m) => m.default),
   lifecycle: {
     isVisible: () => chatModuleState.visible,
+    canOpen: () => pluginMarketController.isInstalled("chat"),
     open: () => {
+      if (!pluginMarketController.isInstalled("chat")) return;
       chatModuleState.visible = true;
       chatModuleState.unreadCount = 0;
       if (privateChatConfigured.value) chatService.connect();
@@ -27,7 +30,5 @@ export const chatDockModule = {
   }
 } satisfies DockModuleDefinition;
 
-// No default endpoint; only explicitly configured private rooms synchronize.
-setTimeout(() => {
-  if (privateChatConfigured.value) chatService.connect();
-}, 1200);
+// The transport watches explicit module enablement and private configuration.
+// Registration alone must not start a background connection.

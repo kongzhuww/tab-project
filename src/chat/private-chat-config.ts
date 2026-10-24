@@ -12,7 +12,7 @@ export function reloadPrivatePublicConfig(): void {
     if (raw === null) diagnostic = "当前浏览器配置中没有保存聊天室连接。请确认使用的是原来的浏览器用户和插件，或重新导入自己的邀请。";
     else {
       try { room = validatePrivateRoom(JSON.parse(raw)); }
-      catch { diagnostic = "已保存的聊天室配置格式无效，原记录未删除。请重新导入自己的邀请。"; }
+      catch { diagnostic = "已保存的聊天室配置无效或使用了公网 HTTP，原记录和凭证未删除。请先配置 HTTPS，再按部署指南重新导入匹配当前聊天 ID 的邀请。"; }
     }
   } catch { diagnostic = "无法读取本机存储，请检查浏览器是否限制存储访问。"; }
   privateChatConfig.diagnostic = diagnostic;

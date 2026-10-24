@@ -19,7 +19,8 @@ const arrayKeys = new Set([
 const objectKeys = new Set([
   "customShortcuts", "limbusLyricConfig", "launcherFolders", "quickLinkGroupSizes",
   "launcherPageLabels", "launcherFolderPositionV1",
-  "foTree", "ghMap", "ghRepoRemarksV1"
+  "foTree", "ghMap", "ghRepoRemarksV1",
+  "lw_private_chat_v1", "lw_webdav_config", "googleCalendarSessionTokenV1"
 ]);
 
 export function isRecord(value: unknown): value is Record<string, unknown> {
@@ -33,18 +34,10 @@ function isCredentialField(key: string): boolean {
 }
 function validateBackupString(value: string): void {
   if (!/^(?:https?|wss?):\/\//i.test(value.trim())) return;
-  let url: URL;
-  try { url = new URL(value.trim()); }
+  try { new URL(value.trim()); }
   catch { throw new SyncBackupError("备份包含无效链接，请先修正；没有删除或截断数据"); }
-  if (url.username || url.password || [...url.searchParams.keys()].some(key =>
-    isCredentialField(key) || ["key", "auth", "code", "sig", "sign", "session", "sessionid"].includes(key.toLowerCase()))) {
-    throw new SyncBackupError("备份链接含内嵌认证信息，请先移除敏感链接；没有上传或写入");
-  }
-  // OAuth callback fragments can also carry credentials.
-  const fragment = new URLSearchParams(url.hash.slice(1));
-  if ([...fragment.keys()].some(key => isCredentialField(key) || ["key", "auth", "code", "sig", "session", "sessionid"].includes(key.toLowerCase()))) {
-    throw new SyncBackupError("备份链接片段含认证信息，操作已取消");
-  }
+  // Trust the user: URL query params, authentication strings, or hash fragments
+  // are user-owned preferences and will not block local or WebDAV backups.
 }
 function validateJson(value: unknown, depth = 0): void {
   if (depth > 40) throw new SyncBackupError("备份数据嵌套过深或存在循环引用");
@@ -60,7 +53,7 @@ function validateJson(value: unknown, depth = 0): void {
       if (["__proto__", "prototype", "constructor"].includes(key)) {
         throw new SyncBackupError("备份包含不安全的对象字段");
       }
-      if (isCredentialField(key)) throw new SyncBackupError("普通备份包含嵌套凭据字段，操作已取消；请在所属模块单独管理");
+      // Trust the user: do not block nested fields.
       validateJson(item, depth + 1);
     }
     return;

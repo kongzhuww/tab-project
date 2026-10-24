@@ -662,6 +662,11 @@ html[data-theme="endfield"] .settings-view-root .switch {
 }
 
 /* 快捷键配置 */
+.settings-view-root .shortcut-group + .shortcut-group { margin-top: 18px; }
+.settings-view-root .shortcut-group-title { margin: 0 0 8px; font-size: 12px; font-weight: 600; color: var(--heading); }
+.settings-view-root .shortcut-label { min-width: 0; overflow-wrap: anywhere; }
+.settings-view-root .shortcut-actions { flex-shrink: 0; }
+
 .settings-view-root .shortcuts-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
