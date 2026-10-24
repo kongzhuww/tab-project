@@ -1,0 +1,672 @@
+/* 整个卡片全面升级为纯净现代高级白 (Light Mode) */
+.image-benchmark-view.light-mode {
+  width: 100%;
+  padding: 12px 18px 24px;
+  box-sizing: border-box;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  color: #0f172a;
+  background: #f8fafc;
+  border-radius: 12px;
+}
+
+/* 顶部双模型选择器与状态栏 */
+.benchmark-subbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 14px;
+  background: #ffffff;
+  padding: 10px 16px;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  margin-bottom: 14px;
+}
+
+.model-select-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.picker-label {
+  font-size: 13px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.picker-label.primary {
+  color: #1e40af;
+}
+
+.picker-label.compare {
+  color: #c2410c;
+}
+
+.color-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.color-dot.primary {
+  background: #2563eb;
+}
+
+.color-dot.compare {
+  background: #f97316;
+}
+
+.benchmark-select {
+  background: #f8fafc;
+  color: #0f172a;
+  border: 1px solid #cbd5e1;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  outline: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.benchmark-select:focus {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15);
+}
+
+.model-quick-tags {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.quick-tag {
+  font-size: 12px;
+  padding: 3px 8px;
+  border-radius: 5px;
+  background: #f1f5f9;
+  color: #475569;
+  border: 1px solid #e2e8f0;
+}
+
+.quick-tag.badge {
+  background: #eff6ff;
+  color: #1d4ed8;
+  border-color: #bfdbfe;
+  font-weight: 600;
+}
+
+.quick-tag.open {
+  background: #f0fdf4;
+  color: #15803d;
+  border-color: #bbf7d0;
+}
+
+.quick-tag.closed {
+  background: #fef2f2;
+  color: #b91c1c;
+  border-color: #fecaca;
+}
+
+.quick-tag.time {
+  background: #fefce8;
+  color: #a16207;
+  border-color: #fef08a;
+}
+
+.quick-tag.cost {
+  background: #faf5ff;
+  color: #7e22ce;
+  border-color: #e9d5ff;
+  font-weight: 600;
+}
+
+/* 主展示卡片：高级纯白质感 */
+.turing-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 20px 24px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.03);
+}
+
+/* Header */
+.turing-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.creator-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: #64748b;
+  margin-bottom: 4px;
+}
+
+.creator-icon {
+  color: #2563eb;
+}
+
+.title-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.model-title {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 800;
+  color: #0f172a;
+  letter-spacing: -0.5px;
+}
+
+.license-tag {
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 5px;
+  background: #f1f5f9;
+  color: #64748b;
+  font-weight: 600;
+}
+
+.license-tag.is-open {
+  background: #ecfdf5;
+  color: #059669;
+  border: 1px solid #a7f3d0;
+}
+
+.vs-badge {
+  font-size: 13px;
+  color: #ea580c;
+  background: #fff7ed;
+  padding: 3px 10px;
+  border-radius: 6px;
+  border: 1px solid #fed7aa;
+}
+
+.vs-badge b {
+  font-weight: 700;
+}
+
+.source-tag {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: #f8fafc;
+  color: #475569;
+  border: 1px solid #e2e8f0;
+  padding: 6px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* 中部双列布局 */
+.turing-body-grid {
+  display: grid;
+  grid-template-columns: 1.15fr 1fr;
+  gap: 24px;
+}
+
+/* 左侧列：胶囊卡片 + 散点图 + 参数条 */
+.grid-left-col {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.elo-capsules-container {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.elo-capsule {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 12px 14px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+}
+
+.capsule-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.capsule-name {
+  font-size: 12px;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.capsule-rank {
+  font-size: 11px;
+  font-weight: 700;
+  background: #fef3c7;
+  color: #b45309;
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
+.capsule-main {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+
+.capsule-score {
+  font-size: 26px;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.capsule-unit {
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+.capsule-diff {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+
+.capsule-diff.win {
+  color: #16a34a;
+  background: #dcfce7;
+}
+
+.capsule-diff.lose {
+  color: #dc2626;
+  background: #fee2e2;
+}
+
+.capsule-diff.draw {
+  color: #64748b;
+  background: #f1f5f9;
+}
+
+.capsule-footer {
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+/* 帕累托性价比图 */
+.pareto-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 14px 16px;
+}
+
+.pareto-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.pareto-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.pareto-hint {
+  font-size: 11px;
+  font-weight: 400;
+  color: #94a3b8;
+}
+
+.pareto-legend {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 11px;
+  color: #64748b;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.dash-line {
+  width: 14px;
+  height: 2px;
+  border-top: 2px dashed #0284c7;
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.dot.active {
+  background: #2563eb;
+}
+
+.dot.compare {
+  background: #f97316;
+}
+
+.pareto-svg-box {
+  width: 100%;
+}
+
+.pareto-svg {
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.axis-line {
+  stroke: #cbd5e1;
+  stroke-width: 1.5;
+}
+
+.grid-line {
+  stroke: #f1f5f9;
+  stroke-dasharray: 3 3;
+}
+
+.axis-text {
+  font-size: 10px;
+  fill: #94a3b8;
+  font-family: inherit;
+}
+
+.frontier-path {
+  fill: none;
+  stroke: #0284c7;
+  stroke-width: 2;
+  stroke-dasharray: 4 4;
+}
+
+.pareto-dot-group {
+  cursor: pointer;
+}
+
+.model-dot {
+  fill: #94a3b8;
+  transition: all 0.2s ease;
+}
+
+.model-dot:hover {
+  r: 9;
+}
+
+.model-dot.is-active {
+  fill: #2563eb;
+  stroke: #bfdbfe;
+  stroke-width: 3;
+}
+
+.model-dot.is-compare {
+  fill: #f97316;
+  stroke: #fed7aa;
+  stroke-width: 3;
+}
+
+.model-dot.is-frontier {
+  fill: #0284c7;
+}
+
+.dot-label {
+  font-size: 9px;
+  fill: #94a3b8;
+  pointer-events: none;
+}
+
+.dot-label.label-active {
+  font-size: 11px;
+  font-weight: 700;
+  fill: #1d4ed8;
+}
+
+.dot-label.label-compare {
+  font-size: 11px;
+  font-weight: 700;
+  fill: #c2410c;
+}
+
+/* 底部元信息 */
+.model-meta-bar {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 10px 14px;
+}
+
+.meta-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.meta-title {
+  font-size: 11px;
+  color: #64748b;
+}
+
+.meta-val {
+  font-size: 13px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.text-brand {
+  color: #0284c7;
+}
+
+.text-cost {
+  color: #b45309;
+}
+
+/* 右侧列：八维雷达 PK */
+.grid-right-col {
+  display: flex;
+  flex-direction: column;
+}
+
+.radar-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 16px 18px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.radar-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.radar-title-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.radar-heading {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.mean-badge {
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 5px;
+  width: fit-content;
+}
+
+.mean-badge.primary {
+  background: #eff6ff;
+  color: #1e40af;
+  border: 1px solid #dbeafe;
+}
+
+.mean-badge.compare {
+  background: #fff7ed;
+  color: #c2410c;
+  border: 1px solid #ffedd5;
+}
+
+.radar-legend {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  font-size: 11px;
+  color: #64748b;
+}
+
+.radar-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.legend-box {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}
+
+.legend-box.active {
+  background: #2563eb;
+}
+
+.legend-box.compare {
+  background: #f97316;
+}
+
+.legend-dash {
+  width: 12px;
+  height: 2px;
+  border-top: 2px dashed #94a3b8;
+}
+
+.radar-chart-box {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.radar-svg {
+  width: 100%;
+  max-width: 440px;
+  height: auto;
+  overflow: visible;
+}
+
+.radar-grid-inner {
+  fill: none;
+  stroke: #e2e8f0;
+  stroke-width: 1;
+}
+
+.radar-grid-outer {
+  fill: #f8fafc;
+  stroke: #cbd5e1;
+  stroke-width: 1.5;
+}
+
+.radar-axis-line {
+  stroke: #e2e8f0;
+  stroke-width: 1;
+}
+
+.radar-benchmark-polygon {
+  fill: none;
+  stroke: #94a3b8;
+  stroke-width: 1.5;
+  stroke-dasharray: 4 4;
+}
+
+.radar-primary-polygon {
+  stroke: #2563eb;
+  stroke-width: 2.5;
+}
+
+.radar-compare-polygon {
+  stroke: #f97316;
+  stroke-width: 2;
+}
+
+.radar-vertex-dot.primary {
+  fill: #ffffff;
+  stroke: #2563eb;
+  stroke-width: 2.5;
+}
+
+.radar-vertex-dot.compare {
+  fill: #ffffff;
+  stroke: #f97316;
+  stroke-width: 2;
+}
+
+.dim-label-title {
+  font-size: 11px;
+  font-weight: 700;
+  fill: #1e293b;
+  font-family: inherit;
+}
+
+.dim-label-score {
+  font-size: 10px;
+  font-family: inherit;
+}
+
+.score-pri {
+  fill: #2563eb;
+  font-weight: 700;
+}
+
+.score-vs {
+  fill: #f97316;
+  font-weight: 600;
+}
+
+.score-win {
+  fill: #16a34a;
+  font-weight: 700;
+}
+
+.score-lose {
+  fill: #dc2626;
+  font-weight: 700;
+}

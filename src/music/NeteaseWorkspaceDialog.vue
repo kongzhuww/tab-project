@@ -1,0 +1,1074 @@
+<template>
+  <AppWindowFrame
+    id="music-workspace"
+    window-id="music"
+    title="网易云模块"
+    icon="🎵"
+    :visible="musicModuleState.visible"
+    :default-width="960"
+    :default-height="640"
+    :min-width="480"
+    :min-height="360"
+    custom-class="ms-panel ms-source-netease"
+    @minimize="handleMinimize"
+    @close="handleClose"
+  >
+
+    <!-- 网易云工作区内容 -->
+    <div class="ms-source-pane ms-netease-source">
+      <!-- 用户状态栏 -->
+      <div class="ms-netease-user-bar">
+        <div class="ms-netease-user-info">
+          <template v-if="workspaceState.neteaseUser?.nickname">
+            <img
+              class="ms-netease-avatar"
+              :src="workspaceState.neteaseUser.avatarUrl || DEFAULT_USER_AVATAR"
+              alt="avatar"
+            />
+            <div class="ms-netease-meta">
+              <span class="ms-netease-name">
+                {{ workspaceState.neteaseUser.nickname }}
+                <span v-if="workspaceState.neteaseUser.isVip" class="ms-netease-vip-badge">VIP</span>
+              </span>
+              <span class="ms-netease-status-text">已连接网易云音乐账户</span>
+            </div>
+          </template>
+          <template v-else>
+            <div class="ms-netease-meta">
+              <span class="ms-netease-name">免登录模式</span>
+              <span class="ms-netease-status-text">畅听精选榜单与全网搜索</span>
+            </div>
+          </template>
+        </div>
+        <div style="display: flex; gap: 8px; align-items: center;">
+          <button type="button" class="ms-netease-logout-btn" :disabled="musicModuleState.pendingWrites > 0" @click="refreshNetease">⟳ 刷新列表</button>
+          <button
+            type="button"
+            class="ms-netease-logout-btn"
+            style="color: #f43f5e; border-color: rgba(244, 63, 94, 0.4); font-weight: 600;"
+            @click="handleOpenQrModal"
+          >
+            📱 扫码登录
+          </button>
+          <button
+            v-if="workspaceState.neteaseUser?.nickname"
+            type="button"
+            class="ms-netease-logout-btn"
+            @click="logoutNetease"
+          >
+            退出登录
+          </button>
+        </div>
+      </div>
+
+      <!-- 官方扫码登录独立浮层 (模态窗口) -->
+      <div v-if="showQrModal" class="ms-netease-qr-modal-overlay" @click.self="showQrModal = false">
+        <div class="ms-netease-qr-card">
+          <header class="ms-qr-card-header">
+            <div class="ms-qr-card-title">
+              <span class="ms-qr-logo">📱</span>
+              <strong>网易云音乐 · 扫码登录</strong>
+            </div>
+            <button type="button" class="ms-qr-close-btn" title="关闭扫码" @click="showQrModal = false">✕</button>
+          </header>
+
+          <div class="ms-qr-card-body">
+            <div class="ms-netease-qr-wrap">
+              <img v-if="workspaceState.neteaseQrImg" class="ms-netease-qr-img" :src="workspaceState.neteaseQrImg" alt="网易云扫码" />
+              <div v-else class="ms-qr-loading-placeholder">
+                <div class="ms-netease-spinner"></div>
+                <small>正在获取官方二维码…</small>
+              </div>
+            </div>
+
+            <div class="ms-qr-instruction">
+              <strong class="ms-qr-status-pill">{{ workspaceState.neteaseQrStatus || "请使用网易云音乐 App 扫码登录" }}</strong>
+              <small>打开手机网易云音乐 App 首页顶部 <strong>[ 扫一扫 ]</strong> 授权</small>
+            </div>
+
+            <div class="ms-qr-actions">
+              <button type="button" class="ms-page-btn" @click="handleRefreshQr">
+                🔄 刷新二维码
+              </button>
+              <button type="button" class="ms-page-btn" style="color: var(--muted);" @click="showQrModal = false">
+                关闭
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 歌单与歌曲双栏布局 -->
+      <div class="ms-netease-body">
+        <!-- 左侧歌单列表 -->
+        <div class="ms-netease-playlists">
+          <div class="ms-netease-section-title">我的歌单 & 精选推荐</div>
+
+          <!-- 1. 我喜欢的音乐专属置顶卡片 -->
+          <button
+            type="button"
+            class="ms-netease-pl-item ms-netease-pl-favorites"
+            :class="{ active: isShowingFavorites }"
+            @click="selectFavoritesList"
+          >
+            <div class="ms-netease-pl-icon-box" style="background: rgba(244, 63, 94, 0.15); color: #f43f5e;">❤️</div>
+            <div class="ms-netease-pl-info">
+              <div class="ms-netease-pl-name">我喜欢的音乐</div>
+              <div class="ms-netease-pl-count">{{ (favoritePlaylist?.trackCount ?? workspaceState.neteaseSongs.length) || 0 }} 首曲目</div>
+            </div>
+          </button>
+
+          <!-- 2. 最近播放入口 -->
+          <button
+            type="button"
+            class="ms-netease-pl-item ms-netease-pl-recent"
+            :class="{ active: isShowingRecent }"
+            @click="selectRecentList"
+          >
+            <div class="ms-netease-pl-icon-box">🕒</div>
+            <div class="ms-netease-pl-info">
+              <div class="ms-netease-pl-name">最近播放记录</div>
+              <div class="ms-netease-pl-count">{{ workspaceState.neteaseRecentSongs.length }} 首曲目</div>
+            </div>
+          </button>
+
+          <!-- 3. 用户其他歌单与精选推荐 -->
+          <button
+            v-for="pl in userOtherPlaylists"
+            :key="pl.id"
+            type="button"
+            class="ms-netease-pl-item"
+            :class="{ active: !isShowingRecent && !isShowingFavorites && workspaceState.neteaseActivePlaylist?.id === pl.id }"
+            @click="selectPlaylist(pl)"
+          >
+            <img class="ms-netease-pl-cover" :src="pl.coverImgUrl" alt="" loading="lazy" />
+            <div class="ms-netease-pl-info">
+              <div class="ms-netease-pl-name">{{ pl.name }}</div>
+              <div class="ms-netease-pl-count">{{ pl.trackCount || 0 }} 首曲目</div>
+            </div>
+          </button>
+        </div>
+
+        <!-- 右侧曲目详情 -->
+        <div class="ms-netease-tracks">
+          <!-- 搜索条与最近听过快捷栏 -->
+          <div class="ms-netease-search-wrap" ref="searchWrapRef">
+            <input
+              type="text"
+              class="ms-netease-search-input"
+              placeholder="全网搜索网易云单曲、歌手名或专辑…"
+              v-model="searchQuery"
+              @keydown.enter="onSearchEnter"
+              @input="onSearchInput"
+              @focus="isSearchFocused = true"
+            />
+            <!-- 聚焦时浮现的搜索历史与历史听歌面板 -->
+            <div
+              v-if="isSearchFocused && !searchQuery.trim()"
+              class="ms-netease-search-dropdown"
+              @mousedown.prevent
+            >
+              <!-- 搜索历史关键词 -->
+              <div v-if="searchHistory.length > 0" class="ms-dropdown-section">
+                <div class="ms-dropdown-head">
+                  <span class="ms-dropdown-title">🔍 搜索历史</span>
+                  <button type="button" class="ms-dropdown-clear" @click="clearSearchHistory">清空</button>
+                </div>
+                <div class="ms-search-history-tags">
+                  <span
+                    v-for="kw in searchHistory"
+                    :key="'hist-' + kw"
+                    class="ms-search-tag"
+                    @click="applySearchHistory(kw)"
+                  >
+                    {{ kw }}
+                    <b class="ms-tag-del" @click.stop="removeSearchHistory(kw)">×</b>
+                  </span>
+                </div>
+              </div>
+
+              <!-- 历史听歌记录 -->
+              <div v-if="workspaceState.neteaseRecentSongs.length > 0" class="ms-dropdown-section">
+                <div class="ms-dropdown-head">
+                  <span class="ms-dropdown-title">🕒 历史听歌记录</span>
+                  <button type="button" class="ms-dropdown-clear" @click="workspace.clearRecent()">清空</button>
+                </div>
+                <div class="ms-recent-dropdown-list">
+                  <div
+                    v-for="s in workspaceState.neteaseRecentSongs.slice(0, 8)"
+                    :key="'drop-rec-' + s.id"
+                    class="ms-recent-dropdown-item"
+                    :class="{ playing: isCurrentSong(s) }"
+                    @click="playNetease(s); isSearchFocused = false;"
+                  >
+                    <span class="ms-drop-play">{{ isCurrentSong(s) ? '▶' : '♫' }}</span>
+                    <span class="ms-drop-title">{{ s.name }}</span>
+                    <span class="ms-drop-artist">{{ getSongArtists(s) }}</span>
+                    <span class="ms-drop-dur">{{ formatDuration(s) }}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div v-if="!searchHistory.length && !workspaceState.neteaseRecentSongs.length" class="ms-dropdown-empty">
+                暂无搜索与播放历史，输入歌名或歌手即可开始畅听
+              </div>
+            </div>
+          </div>
+
+          <!-- 提示横幅 -->
+          <div v-if="workspaceState.message" class="ms-netease-msg-banner">
+            <span>{{ workspaceState.message }}</span>
+          </div>
+
+          <div class="ms-netease-tracks-head">
+            <div>
+              <div class="ms-netease-tracks-title">
+                {{ isSearching ? `搜索结果 (${workspaceState.neteaseSearchResults.length})` : isShowingRecent ? `最近播放记录 (${workspaceState.neteaseRecentSongs.length})` : isShowingFavorites ? `我喜欢的音乐 (${workspaceState.neteaseSongs.length})` : (workspaceState.neteaseActivePlaylist?.name || "我喜欢的音乐") }}
+              </div>
+              <div class="ms-netease-tracks-sub">
+                {{ isSearching ? "网易云曲库实时检索" : isShowingRecent ? "近期点播收听的历史歌曲" : isShowingFavorites ? "个人云端红心曲库，点击即可一键开始高保真串流播放" : "点击歌曲即可一键开始高保真串流播放" }}
+              </div>
+            </div>
+            <button v-if="isSearching" type="button" class="ms-netease-logout-btn" @click="clearSearch">清除搜索</button>
+            <button v-else-if="isShowingRecent && workspaceState.neteaseRecentSongs.length > 0" type="button" class="ms-netease-logout-btn" @click="workspace.clearRecent()">清空记录</button>
+          </div>
+
+          <!-- 加载中 -->
+          <div v-if="workspaceState.neteaseLoading" class="ms-netease-loading-box">
+            <div class="ms-netease-spinner"></div>
+            <div class="ms-netease-loading-tip">正在同步网易云音源与歌单…</div>
+          </div>
+
+          <!-- 歌曲列表 -->
+          <template v-else>
+            <div
+              v-for="(song, idx) in pagedSongList"
+              :key="song.id || idx"
+              class="ms-netease-track-row"
+              :class="{ playing: isCurrentSong(song) }"
+              @click="playNetease(song)"
+            >
+              <span class="ms-netease-track-idx">{{ isCurrentSong(song) ? "▶" : ((page - 1) * pageSize + idx + 1) }}</span>
+              <img class="ms-netease-track-cover" :src="getSongCover(song)" alt="" loading="lazy" />
+              <div class="ms-netease-track-info">
+                <div class="ms-netease-track-name">{{ song.name }}</div>
+                <div class="ms-netease-track-artist">{{ getSongArtists(song) }}</div>
+              </div>
+              <span class="ms-netease-track-dur">{{ formatDuration(song) }}</span>
+            </div>
+            <div v-if="!currentSongList.length" style="padding: 30px; text-align: center; color: var(--muted); font-size: 13px;">
+              未找到曲目，可尝试在上方搜索框输入关键词
+            </div>
+
+            <!-- 10 首分页控制底栏 -->
+            <div v-if="totalPages > 1" class="ms-netease-pagination-bar">
+              <span class="ms-pagination-info">
+                第 {{ page }} / {{ totalPages }} 页 · 共 {{ currentSongList.length }} 首
+              </span>
+              <div class="ms-pagination-btns">
+                <button
+                  type="button"
+                  class="ms-page-btn"
+                  :disabled="page <= 1"
+                  title="上一页"
+                  @click="prevPage"
+                >
+                  ◀ 上一页
+                </button>
+                <button
+                  type="button"
+                  class="ms-page-btn"
+                  :disabled="page >= totalPages"
+                  title="下一页"
+                  @click="nextPage"
+                >
+                  下一页 ▶
+                </button>
+              </div>
+            </div>
+          </template>
+        </div>
+      </div>
+    </div>
+
+    <!-- 底部常驻播放控制条 -->
+    <footer style="display: flex; align-items: center; gap: 12px; padding: 10px 16px; border-top: 1px solid var(--border); background: var(--panel);">
+      <img
+        :src="homeMusicState.coverUrl || DEFAULT_SIREN_COVER"
+        alt=""
+        style="width: 42px; height: 42px; border-radius: 8px; object-fit: cover; flex-shrink: 0;"
+      />
+      <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px;">
+        <div style="display: flex; justify-content: space-between; font-size: 12px;">
+          <span style="font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--heading);">{{ homeMusicState.title || "暂无播放曲目" }}</span>
+          <span style="color: var(--muted); font-size: 11px;">{{ homeMusicState.formattedCurrent }} / {{ homeMusicState.formattedDuration }}</span>
+        </div>
+        <input
+          type="range"
+          min="0"
+          max="100"
+          step="0.1"
+          :value="homeMusicState.progressPercent"
+          @input="onSeek"
+          style="width: 100%; height: 4px; accent-color: #f43f5e; cursor: pointer;"
+        />
+      </div>
+      <div style="display: flex; align-items: center; gap: 6px;">
+        <button type="button" class="ms-netease-logout-btn" @click="controller.prev()" title="上一首">⏮</button>
+        <button
+          type="button"
+          class="ms-netease-logout-btn"
+          style="background: #f43f5e; color: #fff; border-color: #f43f5e;"
+          @click="controller.togglePlay()"
+          :title="homeMusicState.playing ? '暂停' : '播放'"
+        >
+          {{ homeMusicState.playing ? "⏸" : "▶" }}
+        </button>
+        <button type="button" class="ms-netease-logout-btn" @click="controller.next()" title="下一首">⏭</button>
+        <button type="button" class="ms-netease-logout-btn" @click="controller.cycleMode()" :title="homeMusicState.mode">
+          {{ modeEmoji }}
+        </button>
+      </div>
+    </footer>
+  </AppWindowFrame>
+</template>
+
+<script setup lang="ts">
+import { CACHED_FAVORITES_KEY, CACHED_PLAYLISTS_KEY, removePlaylistCache } from "./playlist-cache";
+import { ref, computed, onMounted, onBeforeUnmount, watch } from "vue";
+import { createMusicWorkspaceData } from "./workspace-data";
+import { musicModuleState, onMusicPause } from "./module-state";
+const pageVisible = ref(!document.hidden);
+const active = computed(() => musicModuleState.visible && pageVisible.value);
+const workspace = createMusicWorkspaceData(() => active.value);
+const workspaceState = workspace.state;
+
+const showQrModal = ref(false);
+
+function handleOpenQrModal() {
+  showQrModal.value = true;
+  void workspace.startQr();
+}
+
+function handleRefreshQr() {
+  void workspace.startQr();
+}
+
+async function logoutNetease() {
+  if (typeof localStorage !== "undefined") {
+    localStorage.setItem("netease_explicit_logout", "true");
+    removePlaylistCache(CACHED_FAVORITES_KEY);
+    removePlaylistCache(CACHED_PLAYLISTS_KEY);
+  }
+  await workspace.logout();
+  homeMusicState.neteaseUser = null;
+  homeMusicState.neteaseSongs = [];
+  homeMusicState.neteasePlaylists = [];
+  showQrModal.value = true;
+  void workspace.startQr();
+}
+
+watch(
+  () => workspaceState.neteaseUser?.nickname,
+  (name) => {
+    if (name) {
+      showQrModal.value = false;
+    }
+  }
+);
+import AppWindowFrame from "../core/AppWindowFrame.vue";
+import {
+  homeMusicState,
+  homeMusicController as controller,
+  DEFAULT_COVER,
+  DEFAULT_SIREN_COVER,
+  type MusicSong
+} from "./store";
+
+const DEFAULT_USER_AVATAR =
+  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='30' fill='%23334155'/%3E%3Ccircle cx='32' cy='24' r='10' fill='%2364748b'/%3E%3Cpath d='M16 52c0-8.8 7.2-16 16-16s16 7.2 16 16' fill='%2364748b'/%3E%3C/svg%3E";
+
+import { type NeteasePlaylist, type NeteaseSong } from "../services/netease.service";
+import { musicService } from "../services/music.service";
+import { windowManagerController } from "../core/window-manager.store";
+
+const searchWrapRef = ref<HTMLElement | null>(null);
+const searchQuery = ref("");
+const isSearchFocused = ref(false);
+let searchTimer: ReturnType<typeof setTimeout> | null = null;
+
+const searchHistory = ref<string[]>([]);
+try {
+  const rawHist = localStorage.getItem("netease_search_history");
+  if (rawHist) {
+    const parsed = JSON.parse(rawHist);
+    if (Array.isArray(parsed)) searchHistory.value = parsed.slice(0, 15);
+  }
+} catch {}
+
+function addSearchHistory(kw: string) {
+  const clean = kw.trim();
+  if (!clean) return;
+  searchHistory.value = [clean, ...searchHistory.value.filter((k) => k !== clean)].slice(0, 15);
+  try {
+    localStorage.setItem("netease_search_history", JSON.stringify(searchHistory.value));
+  } catch {}
+}
+
+function removeSearchHistory(kw: string) {
+  searchHistory.value = searchHistory.value.filter((k) => k !== kw);
+  try {
+    localStorage.setItem("netease_search_history", JSON.stringify(searchHistory.value));
+  } catch {}
+}
+
+function clearSearchHistory() {
+  searchHistory.value = [];
+  try {
+    localStorage.removeItem("netease_search_history");
+  } catch {}
+}
+
+function applySearchHistory(kw: string) {
+  searchQuery.value = kw;
+  isSearchFocused.value = false;
+  void workspace.search(kw);
+}
+
+function onDocumentClick(e: MouseEvent) {
+  const target = e.target as HTMLElement | null;
+  if (!target?.closest(".ms-netease-search-wrap")) {
+    isSearchFocused.value = false;
+  }
+}
+
+const isShowingRecent = ref(false);
+
+const favoritePlaylist = computed(() => {
+  return workspaceState.neteasePlaylists.find(p => p.name?.includes("喜欢的音乐") || p.specialType === 5);
+});
+
+const userOtherPlaylists = computed(() => {
+  const fav = favoritePlaylist.value;
+  if (!fav) return workspaceState.neteasePlaylists;
+  return workspaceState.neteasePlaylists.filter(p => p.id !== fav.id);
+});
+
+const isShowingFavorites = computed(() => {
+  if (isShowingRecent.value || isSearching.value) return false;
+  return favoritePlaylist.value && workspaceState.neteaseActivePlaylist?.id === favoritePlaylist.value.id;
+});
+
+function selectFavoritesList() {
+  workspace.pause();
+  isShowingRecent.value = false;
+  const fav = favoritePlaylist.value;
+  if (fav) {
+    void workspace.selectPlaylist(fav);
+  } else if (workspaceState.neteasePlaylists[0]) {
+    void workspace.selectPlaylist(workspaceState.neteasePlaylists[0]);
+  }
+}
+
+const isSearching = computed(() => {
+  return searchQuery.value.trim().length > 0 && workspaceState.neteaseSearchResults.length > 0;
+});
+
+const currentSongList = computed<NeteaseSong[]>(() => {
+  if (isSearching.value) {
+    return workspaceState.neteaseSearchResults;
+  }
+  if (isShowingRecent.value) {
+    return workspaceState.neteaseRecentSongs;
+  }
+  return workspaceState.neteaseSongs;
+});
+
+// 10 首歌分页逻辑
+const page = ref(1);
+const pageSize = 10;
+const totalPages = computed(() => Math.max(1, Math.ceil(currentSongList.value.length / pageSize)));
+
+const pagedSongList = computed(() => {
+  const start = (page.value - 1) * pageSize;
+  return currentSongList.value.slice(start, start + pageSize);
+});
+
+watch(
+  () => [workspaceState.neteaseActivePlaylist?.id, isSearching.value, isShowingRecent.value],
+  () => {
+    page.value = 1;
+  }
+);
+
+watch(totalPages, (max) => {
+  if (page.value > max) {
+    page.value = Math.max(1, max);
+  }
+});
+
+function prevPage() {
+  if (page.value > 1) page.value--;
+}
+
+function nextPage() {
+  if (page.value < totalPages.value) page.value++;
+}
+
+const modeEmoji = computed(() => {
+  if (homeMusicState.mode === "shuffle") return "🔀";
+  if (homeMusicState.mode === "one") return "🔂";
+  return "🔁";
+});
+
+function handleMinimize() { windowManagerController.minimize("music"); }
+
+function handleClose() {
+  void windowManagerController.close("music");
+}
+
+function selectRecentList() {
+  workspace.pause();
+  isShowingRecent.value = true;
+  workspaceState.neteaseActivePlaylist = null;
+}
+
+function selectPlaylist(pl: NeteasePlaylist) {
+  isShowingRecent.value = false;
+  void workspace.selectPlaylist(pl);
+}
+
+function onSearchInput() {
+  workspace.pause();
+  if (searchTimer) clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => {
+    if (!active.value) return;
+    const q = searchQuery.value.trim();
+    if (q) addSearchHistory(q);
+    void workspace.search(searchQuery.value);
+  }, 400);
+}
+
+function onSearchEnter() {
+  if (searchTimer) clearTimeout(searchTimer);
+  const q = searchQuery.value.trim();
+  if (q) addSearchHistory(q);
+  isSearchFocused.value = false;
+  void workspace.search(searchQuery.value);
+}
+
+function clearSearch() {
+  workspace.pause();
+  searchQuery.value = "";
+  workspaceState.neteaseSearchResults = [];
+}
+
+function playNetease(song: NeteaseSong) {
+  controller.playNeteaseTrack(song);
+}
+
+function isCurrentSong(song: any): boolean {
+  if (song.id && String(song.id) === String(musicService.getState().currentSong?.neteaseId)) {
+    return true;
+  }
+  if (song.cid && String(song.cid) === String(musicService.getState().currentSong?.cid)) {
+    return true;
+  }
+  return false;
+}
+
+function getSongCover(song: NeteaseSong): string {
+  return song.picUrl || song.coverUrl || song.al?.picUrl || song.album?.picUrl || DEFAULT_COVER;
+}
+
+function getSongArtists(song: NeteaseSong): string {
+  const list = song.ar || song.artists;
+  if (Array.isArray(list) && list.length) {
+    return list.map((a: any) => a.name).join(", ");
+  }
+  return "未知歌手";
+}
+
+function formatDuration(song: NeteaseSong): string {
+  const ms = song.dt || song.duration || 0;
+  const sec = Math.floor(ms > 1000 ? ms / 1000 : ms);
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  return `${m}:${String(s).padStart(2, "0")}`;
+}
+
+function onSeek(e: Event) {
+  const val = Number((e.target as HTMLInputElement).value);
+  controller.seek(val);
+}
+
+function refreshNetease() {
+  void workspace.refresh();
+}
+
+function pauseView() {
+  workspace.pause();
+  if (searchTimer) clearTimeout(searchTimer);
+  searchTimer = null; isSearchFocused.value = false;
+  document.removeEventListener("click", onDocumentClick);
+}
+const detachPause = onMusicPause(pauseView);
+let initialRequested = false;
+function initialRead() { if (!initialRequested && active.value) { initialRequested = true; void workspace.refresh(); } }
+function visibility() { pageVisible.value = !document.hidden; }
+function recentUpdated() { workspace.syncLocal(); }
+function accountUpdated() { workspace.accountChanged(); }
+watch(active, visible => {
+  if (!visible) pauseView();
+  else { workspace.syncLocal(); document.addEventListener("click", onDocumentClick); initialRead(); }
+}, { flush: "sync" });
+onMounted(() => {
+  document.addEventListener("visibilitychange", visibility);
+  window.addEventListener("netease:recent-updated", recentUpdated);
+  window.addEventListener("netease:account-updated", accountUpdated);
+  workspace.syncLocal();
+  if (active.value) { document.addEventListener("click", onDocumentClick); initialRead(); }
+});
+onBeforeUnmount(() => {
+  pauseView(); detachPause(); workspace.dispose();
+  document.removeEventListener("visibilitychange", visibility);
+  window.removeEventListener("netease:recent-updated", recentUpdated);
+  window.removeEventListener("netease:account-updated", accountUpdated);
+});
+</script>
+
+<style scoped>
+.ms-netease-search-wrap {
+  position: relative;
+}
+
+.ms-netease-search-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 4px;
+  right: 4px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+  padding: 12px;
+  margin-top: 6px;
+  z-index: 100;
+  max-height: 380px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.ms-dropdown-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ms-dropdown-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.ms-dropdown-title {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--muted, #94a3b8);
+}
+
+.ms-dropdown-clear {
+  background: transparent;
+  border: none;
+  font-size: 11px;
+  color: var(--muted, #94a3b8);
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 4px;
+  transition: color 0.15s ease;
+}
+
+.ms-dropdown-clear:hover {
+  color: #f43f5e;
+}
+
+.ms-search-history-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.ms-search-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: var(--surface, #272730);
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.08));
+  font-size: 11.5px;
+  color: var(--text, #f1f5f9);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.ms-search-tag:hover {
+  border-color: #f43f5e;
+  color: #f43f5e;
+}
+
+.ms-tag-del {
+  font-weight: normal;
+  font-size: 12px;
+  line-height: 1;
+  color: var(--muted, #94a3b8);
+  padding: 0 2px;
+  border-radius: 50%;
+}
+
+.ms-tag-del:hover {
+  color: #ef4444;
+}
+
+.ms-recent-dropdown-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ms-recent-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: background 0.15s ease;
+}
+
+.ms-recent-dropdown-item:hover {
+  background: var(--surface-hover, rgba(255, 255, 255, 0.06));
+}
+
+.ms-recent-dropdown-item.playing {
+  color: #f43f5e;
+  background: rgba(244, 63, 94, 0.1);
+  font-weight: 600;
+}
+
+.ms-drop-play {
+  font-size: 11px;
+  width: 14px;
+  text-align: center;
+  color: #f43f5e;
+  flex-shrink: 0;
+}
+
+.ms-drop-title {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text, #f1f5f9);
+}
+
+.ms-recent-dropdown-item.playing .ms-drop-title {
+  color: #f43f5e;
+}
+
+.ms-drop-artist {
+  max-width: 130px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  color: var(--muted, #94a3b8);
+}
+
+.ms-drop-dur {
+  font-size: 11px;
+  color: var(--dim, #64748b);
+  font-family: monospace;
+  margin-left: 4px;
+  flex-shrink: 0;
+}
+
+.ms-dropdown-empty {
+  font-size: 11.5px;
+  color: var(--muted, #94a3b8);
+  text-align: center;
+  padding: 12px 6px;
+}
+
+.ms-netease-recent-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 4px 8px;
+  background: var(--surface);
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+.ms-netease-recent-label {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--muted);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.ms-netease-recent-chips {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  flex: 1;
+  min-width: 0;
+}
+.ms-netease-recent-chips::-webkit-scrollbar {
+  display: none;
+}
+.ms-netease-recent-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  font-size: 11.5px;
+  color: var(--text);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  max-width: 140px;
+}
+.ms-netease-recent-chip:hover {
+  background: var(--surface-hover, rgba(255, 255, 255, 0.08));
+  border-color: #f43f5e;
+  color: #f43f5e;
+}
+.ms-netease-recent-chip.playing {
+  background: rgba(244, 63, 94, 0.15);
+  border-color: #f43f5e;
+  color: #f43f5e;
+  font-weight: 600;
+}
+.ms-chip-icon {
+  font-size: 10px;
+  color: #f43f5e;
+}
+.ms-chip-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ms-netease-recent-clear-btn {
+  font-size: 11px;
+  color: var(--muted);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  flex-shrink: 0;
+  transition: color 0.15s ease;
+}
+.ms-netease-recent-clear-btn:hover {
+  color: #f43f5e;
+}
+.ms-netease-pl-icon-box {
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
+  background: rgba(244, 63, 94, 0.12);
+  color: #f43f5e;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  flex-shrink: 0;
+}
+.ms-netease-msg-banner {
+  margin: 6px 14px;
+  padding: 7px 12px;
+  background: color-mix(in srgb, var(--panel) 92%, var(--text) 8%);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 11px;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.ms-msg-action {
+  background: #f43f5e;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  padding: 3px 8px;
+  font-size: 10.5px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.ms-msg-action:hover {
+  background: #e11d48;
+}
+
+/* 翻页底栏 */
+.ms-netease-pagination-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px 4px;
+  border-top: 1px solid var(--border);
+  margin-top: 8px;
+  flex-shrink: 0;
+}
+.ms-pagination-info {
+  font-size: 11.5px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+}
+.ms-pagination-btns {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.ms-page-btn {
+  background: var(--surface);
+  color: var(--heading);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+.ms-page-btn:hover:not(:disabled) {
+  background: rgba(244, 63, 94, 0.12);
+  border-color: #f43f5e;
+  color: #f43f5e;
+}
+.ms-page-btn:disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
+}
+
+/* 官方扫码登录独立浮层 */
+.ms-netease-qr-modal-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  animation: qrFadeIn 0.2s ease;
+}
+@keyframes qrFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.ms-netease-qr-card {
+  width: 320px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.25);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.ms-qr-card-header {
+  height: 44px;
+  padding: 0 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+.ms-qr-card-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--heading);
+  font-weight: 700;
+}
+.ms-qr-close-btn {
+  background: transparent;
+  border: 0;
+  color: var(--muted);
+  font-size: 14px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+.ms-qr-close-btn:hover {
+  background: var(--surface);
+  color: var(--heading);
+}
+.ms-qr-card-body {
+  padding: 20px 16px 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+.ms-netease-qr-wrap {
+  width: 170px;
+  height: 170px;
+  background: #fff;
+  border-radius: 10px;
+  padding: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+}
+.ms-netease-qr-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.ms-qr-loading-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  color: #64748b;
+}
+.ms-qr-instruction {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  text-align: center;
+}
+.ms-qr-status-pill {
+  font-size: 12.5px;
+  color: #f43f5e;
+}
+.ms-qr-instruction small {
+  font-size: 11.5px;
+  color: var(--muted);
+}
+.ms-qr-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 4px;
+}
+</style>

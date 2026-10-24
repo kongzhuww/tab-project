@@ -1,0 +1,110 @@
+name: Publish Extension Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      publish_latest:
+        description: 'Publish as latest release'
+        required: true
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    outputs:
+      version: ${{ steps.build.outputs.version }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Validate tag before installing dependencies
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          node --input-type=module -e '
+            import fs from "node:fs";
+            const p = JSON.parse(fs.readFileSync("package.json", "utf8"));
+            const m = JSON.parse(fs.readFileSync("manifest.json", "utf8"));
+            if (!/^\d+\.\d+\.\d+(?:\.\d+)?$/.test(m.version) || p.version !== m.version) {
+              throw new Error("Package and manifest versions must match");
+            }
+            if (process.env.GITHUB_REF_TYPE === "tag" && process.env.RELEASE_TAG !== `v${m.version}`) {
+              throw new Error("Tag, package and manifest versions must match");
+            }
+          '
+      - run: npm ci
+      - name: Typecheck and isolated extension build
+        id: build
+        run: npm run release:build
+      - name: Package extension and checksum
+        env:
+          EXTENSION_DIR: ${{ steps.build.outputs.extension_dir }}
+          BUILD_INFO: ${{ steps.build.outputs.build_info }}
+          VERSION: ${{ steps.build.outputs.version }}
+        run: |
+          set -euo pipefail
+          mkdir -p release-assets
+          archive="$GITHUB_WORKSPACE/release-assets/tab-project-v${VERSION}-extension.zip"
+          (cd "$EXTENSION_DIR" && zip -q -r "$archive" .)
+          cp "$BUILD_INFO" release-assets/build-info.json
+          (cd release-assets && sha256sum ./*.zip > SHA256SUMS.txt)
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: release-assets
+          path: release-assets/
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      # No checkout, npm install or project code execution in this privileged job.
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: release-assets
+          path: release-assets
+      - name: Verify archive checksum
+        working-directory: release-assets
+        run: sha256sum --check SHA256SUMS.txt
+      - name: Create or publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+          VERSION: ${{ needs.build.outputs.version }}
+        run: |
+          set -euo pipefail
+          TAG="${RELEASE_TAG:-v${VERSION}}"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG already exists; uploading assets and setting latest."
+            gh release upload "$TAG" \
+              "release-assets/tab-project-v${VERSION}-extension.zip" \
+              release-assets/SHA256SUMS.txt release-assets/build-info.json \
+              --clobber
+            gh release edit "$TAG" --draft=false --latest
+          else
+            gh release create "$TAG" \
+              "release-assets/tab-project-v${VERSION}-extension.zip" \
+              release-assets/SHA256SUMS.txt release-assets/build-info.json \
+              --verify-tag --latest --generate-notes \
+              --title "LogicWeaver ${TAG}"
+          fi

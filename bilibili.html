@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>B站收藏夹</title>
+    <link rel="icon" type="image/svg+xml" href="assets/bilibili.svg" />
+    <script src="generated/theme-init.js"></script>
+    <link rel="stylesheet" href="generated/vue-ui.css" />
+    <style>
+      html, body {
+        width: 100vw;
+        height: 100vh;
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        background: var(--bg, var(--background, Canvas));
+      }
+      .bili-standalone-main {
+        width: 100vw;
+        height: 100vh;
+        position: relative;
+        overflow: hidden;
+      }
+      /* 全屏卡片样式自动铺满，底部预留 dock 高度空间避免遮挡 */
+      #daily-bilibili,
+      #daily-bilibili.card-fullscreen {
+        position: absolute !important;
+        inset: 0 !important;
+        width: 100% !important;
+        height: 100% !important;
+        margin: 0 !important;
+        border-radius: 0 !important;
+        border: none !important;
+        max-width: 100% !important;
+        max-height: 100% !important;
+        display: flex !important;
+        flex-direction: column !important;
+        padding: 16px 28px 74px !important;
+        box-sizing: border-box !important;
+      }
+      #daily-bilibili .card-head {
+        border-radius: 0 !important;
+        flex-shrink: 0 !important;
+      }
+      /* Dock 栏置底悬浮 */
+      .mac-dock {
+        position: fixed !important;
+        bottom: 12px !important;
+        left: 50% !important;
+        transform: translateX(-50%) !important;
+        z-index: 9999 !important;
+      }
+    </style>
+  </head>
+  <body class="has-card-fullscreen bili-standalone-body">
+    <main class="bili-standalone-main">
+      <div id="vue-bili-favorites-root">
+        <section id="daily-bilibili" class="card wide card-fullscreen">
+          <header class="card-head">
+            <span class="bar" style="background: linear-gradient(180deg,#818cf8,#f472b6)"></span>
+            <h2>B站收藏夹</h2>
+            <span class="grow"></span>
+            <button id="bili-up-group-manager-top" class="fm-tab" type="button" title="管理正在关注的 UP 主分组">⚙ 关注分组管理</button>
+          </header>
+
+          <div class="fm-pane" id="pane-organizer">
+            <div id="fo-body"><p class="muted small">加载中…</p></div>
+          </div>
+
+          <div class="fm-pane" id="pane-sub-video" hidden>
+            <div id="bili-sub-video-body"><p class="muted small">加载中…</p></div>
+          </div>
+
+          <div class="fm-pane music-radio-staging" id="pane-radio" hidden aria-hidden="true">
+            <div class="bili-radio-layout">
+              <aside class="bili-radio-folders">
+                <p class="sw-title">收藏夹</p>
+                <div id="bili-radio-folders"><p class="muted small">加载中…</p></div>
+              </aside>
+              <section class="bili-radio-library">
+                <p id="bili-radio-library-title" class="sw-title">选择左侧收藏夹</p>
+                <div id="bili-radio-videos" class="bili-radio-videos"><p class="muted small">从左侧选择收藏夹后，将视频拖到右边。</p></div>
+              </section>
+              <section class="bili-radio-editor">
+                <div class="bili-radio-name-row">
+                  <input id="bili-radio-name" maxlength="48" placeholder="给系列取名" autocomplete="off" />
+                  <button id="bili-radio-save" type="button">保存系列</button>
+                </div>
+                <div id="bili-radio-queue" class="bili-radio-queue" aria-label="电台播放队列"><p class="muted small">把视频拖到这里；点击任意歌曲会从该处开始连续播放，拖动仍可排序。</p></div>
+                <div class="bili-radio-actions">
+                  <button id="bili-radio-play" type="button">▶ 按顺序播放</button>
+                  <button id="bili-radio-shuffle" type="button">🔀 随机播放</button>
+                  <button id="bili-radio-clear" type="button">清空编辑区</button>
+                </div>
+                <p class="sw-title bili-radio-saved-title">已保存系列</p>
+                <div id="bili-radio-saved" class="bili-radio-saved"></div>
+              </section>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <div id="vue-bili-theater-root">
+        <dialog id="bili-theater-dialog" class="bili-theater-dialog">
+          <header class="bili-theater-header">
+            <div class="bili-theater-meta">
+              <button id="bili-theater-srt-toggle" class="bili-theater-btn bili-theater-srt-toggle-btn" type="button" title="展开/收起字幕抽屉面板 (快捷键 S)">📝 字幕</button>
+              <span class="bili-theater-badge">本地播放</span>
+              <h3 id="bili-theater-title" class="bili-theater-title">--</h3>
+              <span id="bili-theater-author" class="bili-theater-author"></span>
+            </div>
+            <div class="bili-theater-controls">
+              <a id="bili-theater-open-bili" class="bili-theater-btn" target="_blank" rel="noreferrer" title="在 B站 网页中打开">B站播放 ↗</a>
+              <button id="bili-theater-close" class="bili-theater-btn close" type="button" title="关闭 (Esc / Alt+W / Q)">✕</button>
+            </div>
+          </header>
+          <div class="bili-theater-content-wrapper">
+            <div class="bili-theater-body">
+              <div class="bili-theater-player-box">
+                <video id="bili-theater-video" class="bili-theater-video" controls autoplay playsinline preload="metadata"></video>
+                <iframe id="bili-theater-iframe" class="bili-theater-iframe" src="" allowfullscreen="true" allow="autoplay; fullscreen; encrypted-media" hidden></iframe>
+              </div>
+              <div class="bili-theater-comments-section">
+                <div class="bili-theater-comments-head">
+                  <div class="bili-theater-comments-title">
+                    <span>评论</span>
+                    <span id="bili-theater-comments-count" class="muted small">0 条</span>
+                  </div>
+                  <div class="bili-theater-comments-sort">
+                    <button type="button" class="bili-theater-sort-btn on" data-mode="hot">按热度</button>
+                    <button type="button" class="bili-theater-sort-btn" data-mode="time">按时间</button>
+                  </div>
+                </div>
+                <div id="bili-theater-comments-list" class="bili-theater-comments-list"></div>
+                <div class="bili-theater-comments-more">
+                  <button id="bili-theater-comments-more" class="bili-theater-load-more" type="button" hidden>加载更多评论</button>
+                </div>
+              </div>
+            </div>
+            <aside id="bili-theater-srt-drawer" class="bili-theater-srt-drawer" hidden>
+              <header class="bili-theater-srt-head">
+                <span>字幕</span>
+                <div class="bili-theater-srt-actions">
+                  <button id="bili-srt-ai" class="bili-theater-btn" type="button" title="把字幕填入 AI 草稿，发送前不会上传">✦ AI 分析</button>
+                  <button id="bili-srt-copy" class="bili-theater-btn" type="button" title="复制纯文本字幕">📋 复制</button>
+                  <button id="bili-srt-close" class="bili-theater-btn close" type="button" title="收起字幕面板">✕</button>
+                </div>
+              </header>
+              <div id="bili-theater-srt-body" class="bili-theater-srt-body"></div>
+            </aside>
+          </div>
+        </dialog>
+      </div>
+    </main>
+
+    <!-- 独立收藏夹页面也需要挂载迷你播放器；其内容会 Teleport 到 body。 -->
+    <div id="vue-bili-mini-player-root"></div>
+
+    <!-- Reuse the same non-modal settings window as the home page. -->
+    <div id="vue-settings-dialog-root"></div>
+
+    <!-- 底部搬运过来的 Mac Dock 栏 -->
+    <nav id="mac-dock" class="mac-dock" aria-label="快捷应用栏"></nav>
+
+    <div id="app-toast" class="app-toast" hidden></div>
+    <div id="vue-notification-root"></div>
+    <div id="vue-bili-companions-root"></div>
+
+    <script type="module" src="generated/vue-ui.js"></script>
+  </body>
+</html>

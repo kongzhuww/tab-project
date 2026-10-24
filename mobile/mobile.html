@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>LogicWeaver Mobile</title>
+  <meta name="theme-color" content="#0b0f19" id="meta-theme-color">
+  <link rel="stylesheet" href="mobile.css">
+</head>
+<body class="theme-dark">
+  <!-- 顶部状态栏与工具栏 -->
+  <header class="mobile-top-bar">
+    <div class="cube-pill-row">
+      <!-- 胶囊1: 时钟与天气 -->
+      <div class="cube-mini-pill" id="pill-weather">
+        <span class="pill-icon" id="top-weather-icon">⛅</span>
+        <span class="pill-text" id="top-time-text">12:00</span>
+        <span class="pill-sub" id="top-weather-temp">24°C</span>
+      </div>
+
+      <!-- 胶囊2: B站收藏夹直达胶囊 -->
+      <button type="button" class="cube-mini-pill highlight-pill" id="top-bili-pill">
+        <span class="pill-icon" style="color:#00aeec;">📺</span>
+        <span class="pill-text">B站收藏夹</span>
+        <span class="pill-badge" id="top-bili-count">精选</span>
+      </button>
+
+      <!-- 胶囊3: 黑白主题切换 -->
+      <button type="button" class="cube-mini-pill theme-toggle-pill" id="theme-toggle-btn" title="切换黑/白天模式">
+        <span class="pill-icon" id="theme-toggle-icon">☀️</span>
+        <span class="pill-text" id="theme-toggle-text">日间</span>
+      </button>
+
+      <!-- 胶囊4: 电脑过继配置状态 -->
+      <button type="button" class="cube-mini-pill sync-pill" id="top-sync-pill" title="从电脑同步配置">
+        <span class="pill-dot online"></span>
+        <span class="pill-text">同步</span>
+      </button>
+    </div>
+
+    <!-- 搜索栏 -->
+    <div class="mobile-search-dock">
+      <span class="search-engine-badge" id="search-engine-tag">B站/搜索</span>
+      <input type="search" id="mobile-search-input" placeholder="搜B站视频、或者全网内容…" autocomplete="off" />
+      <button type="button" id="mobile-search-go" class="search-go-btn">→</button>
+    </div>
+  </header>
+
+  <!-- 主视口页面 -->
+  <main class="mobile-viewport" id="mobile-viewport">
+    <!-- TAB 1: 🏠 主页 -->
+    <section class="mobile-page active" id="page-home">
+      <!-- B站收藏夹头条卡片 (最先展示) -->
+      <div class="section-card bili-home-card">
+        <div class="card-head-row">
+          <div class="card-title-group">
+            <span class="card-icon" style="color:#00aeec;font-size:18px;">📁</span>
+            <h3>B站收藏夹 · 随身看</h3>
+          </div>
+          <button class="card-link-btn" id="home-goto-bili-fav">全部收藏夹 ›</button>
+        </div>
+
+        <!-- 收藏夹快捷水平药丸栏 -->
+        <div class="bili-folder-chips-scroll" id="home-fav-folders-chips">
+          <!-- 动态收藏夹标签 -->
+        </div>
+
+        <!-- 收藏视频网格预览 -->
+        <div class="home-bili-fav-list" id="home-fav-videos-list">
+          <div class="mobile-empty-hint">加载收藏夹视频中…</div>
+        </div>
+      </div>
+
+      <!-- 常用网站快捷磁贴 -->
+      <div class="section-card">
+        <div class="shelf-tabs-row" id="home-shelf-tabs">
+          <button class="shelf-tab active" data-page="常用网站">常用网站</button>
+          <button class="shelf-tab" data-page="工作学习">工作学习</button>
+          <button class="shelf-tab" data-page="娱乐摸鱼">娱乐摸鱼</button>
+        </div>
+        <div class="launcher-mobile-grid" id="home-launcher-grid">
+          <!-- 动态磁贴 -->
+        </div>
+      </div>
+
+      <!-- Todoist 今日待办速览 -->
+      <div class="section-card">
+        <div class="card-head-row">
+          <div class="card-title-group">
+            <span class="card-icon" style="color:#e44232;">⚡</span>
+            <h3>Todoist · 今日待办</h3>
+          </div>
+          <button class="card-link-btn" id="home-open-tasks-btn">任务中心 ›</button>
+        </div>
+        <div class="home-tasks-preview" id="home-tasks-list">
+          <div class="mobile-empty-hint">暂无待办任务</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 2: 📺 B站收藏与动态中心 (重点第一打造) -->
+    <section class="mobile-page" id="page-media">
+      <div class="sub-header-bar">
+        <h2>Bilibili 收藏夹中心</h2>
+        <div class="sub-header-actions">
+          <button type="button" class="action-btn" id="bili-uid-setting-btn" title="登录B站以读取私密收藏夹">登录</button>
+          <button type="button" class="action-btn" id="bili-fav-refresh-btn" title="刷新视频">↻</button>
+        </div>
+      </div>
+
+      <!-- 与桌面端 foTree 同步的本地分组树 -->
+      <div class="mobile-bili-group-tree" id="mobile-bili-group-tree" hidden></div>
+
+      <!-- 收藏夹顶部分组与切换药丸 -->
+      <div class="bili-folders-horizontal-bar" id="bili-full-folders-bar">
+        <!-- 动态生成各个收藏夹 -->
+      </div>
+
+      <!-- 收藏夹内视频列表 -->
+      <div class="bili-fav-large-grid" id="bili-full-fav-grid">
+        <div class="mobile-empty-hint">加载收藏夹列表中…</div>
+      </div>
+    </section>
+
+    <!-- TAB 3: 📋 待办中心 -->
+    <section class="mobile-page" id="page-tasks">
+      <div class="sub-header-bar">
+        <h2>Todoist 任务中心</h2>
+        <div class="sub-header-actions">
+          <button type="button" class="action-btn" id="task-widget-btn" title="添加Todoist桌面小组件">🧩</button>
+          <button type="button" class="action-btn" id="task-token-btn" title="配置Todoist Token">🔑</button>
+          <button type="button" class="action-btn" id="task-refresh-btn">↻</button>
+        </div>
+      </div>
+
+      <div class="filter-pill-bar">
+        <button class="pill-btn active" data-filter="today">今天</button>
+        <button class="pill-btn" data-filter="inbox">收件箱</button>
+        <button class="pill-btn" data-filter="all">全部任务</button>
+        <button class="pill-btn" data-filter="calendar">日历</button>
+      </div>
+
+      <form class="mobile-add-task-form" id="mobile-add-task-form">
+        <input type="text" id="new-task-input" placeholder="＋ 添加任务…（Enter 保存）" maxlength="150" />
+        <div class="todo-schedule-row">
+          <input type="date" id="new-task-date" aria-label="任务日期" />
+          <input type="time" id="new-task-time" aria-label="任务时间" />
+          <select id="new-task-repeat" aria-label="循环规则">
+            <option value="">不循环</option>
+            <option value="every day">每天</option>
+            <option value="every weekday">每个工作日</option>
+            <option value="every week">每周</option>
+            <option value="every month">每月</option>
+          </select>
+        </div>
+      </form>
+
+      <div class="todoist-inline-calendar" id="todoist-inline-calendar" hidden></div>
+      <div class="task-items-container" id="tasks-full-list">
+        <div class="mobile-empty-hint">加载任务中…</div>
+      </div>
+    </section>
+
+    <!-- TAB 4: 📝 随身笔记 -->
+    <section class="mobile-page" id="page-notes">
+      <div class="sub-header-bar">
+        <h2>Obsidian 随身笔记</h2>
+        <button type="button" class="primary-pill-btn" id="notes-new-btn">＋ 记一条</button>
+      </div>
+
+      <div class="note-quick-composer" id="note-composer" style="display:none;">
+        <input type="text" id="note-title-input" placeholder="笔记标题…" />
+        <textarea id="note-content-input" placeholder="支持 Markdown 记录…" rows="3"></textarea>
+        <div class="composer-actions">
+          <button type="button" class="cancel-btn" id="note-cancel-btn">取消</button>
+          <button type="button" class="save-btn" id="note-save-btn">保存到本地</button>
+        </div>
+      </div>
+
+      <div class="notes-container" id="notes-list"></div>
+    </section>
+
+    <!-- TAB 5: ✨ 随身智脑 -->
+    <section class="mobile-page" id="page-ai">
+      <div class="sub-header-bar">
+        <h2>✨ AI 智能助理</h2>
+        <select class="ai-model-select" id="ai-model-selector">
+          <option value="gemini">Google Gemini 1.5</option>
+          <option value="deepseek">DeepSeek V3</option>
+        </select>
+      </div>
+
+      <div class="ai-chips-scroll">
+        <button class="ai-quick-chip" data-prompt="帮我分析一下最近收藏的 GitHub 仓库并写中文备注">✨ 仓库 AI 备注分析</button>
+        <button class="ai-quick-chip" data-prompt="帮我梳理今天的待办事项优先级">📋 梳理今日待办</button>
+        <button class="ai-quick-chip" data-prompt="写一段干净的现代 JavaScript 代码示例">💻 代码助手</button>
+      </div>
+
+      <div class="ai-chat-thread" id="ai-chat-thread">
+        <div class="ai-bubble-row bot">
+          <div class="ai-avatar">✨</div>
+          <div class="ai-bubble">你好！已自动接入你的 Gemini 智脑。你可以直接与我对话，或者让我为你分析收藏的 GitHub 仓库。</div>
+        </div>
+      </div>
+
+      <div class="ai-input-dock">
+        <input type="text" id="ai-user-input" placeholder="问任何问题或粘贴链接…" autocomplete="off" />
+        <button type="button" id="ai-submit-btn" class="ai-send-btn">➤</button>
+      </div>
+    </section>
+
+    <!-- TAB 6: 🧰 桌面核心功能移动入口 -->
+    <section class="mobile-page" id="page-tools">
+      <div class="sub-header-bar">
+        <div><h2>LogicWeaver 工具箱</h2><small class="mobile-subtitle">桌面核心能力 · 移动端适配</small></div>
+        <div class="sub-header-actions">
+          <button type="button" class="action-btn" id="mobile-update-btn">⬆ 更新</button>
+          <button type="button" class="action-btn" id="mobile-tools-sync-btn">↻ 同步</button>
+        </div>
+      </div>
+      <div class="mobile-tool-filter" id="mobile-tool-filter"></div>
+      <div class="mobile-tool-grid" id="mobile-tool-grid"></div>
+    </section>
+  </main>
+
+  <!-- 底部导航 -->
+  <nav class="mobile-nav-bar">
+    <button type="button" class="nav-tab-btn active" data-page="page-home">
+      <span class="nav-icon">🏠</span>
+      <span class="nav-label">主页</span>
+    </button>
+    <button type="button" class="nav-tab-btn" data-page="page-media">
+      <span class="nav-icon">📺</span>
+      <span class="nav-label">B站收藏</span>
+    </button>
+    <button type="button" class="nav-tab-btn" data-page="page-tasks">
+      <span class="nav-icon">📋</span>
+      <span class="nav-label">待办</span>
+    </button>
+    <button type="button" class="nav-tab-btn" data-page="page-notes">
+      <span class="nav-icon">📝</span>
+      <span class="nav-label">笔记</span>
+    </button>
+    <button type="button" class="nav-tab-btn" data-page="page-ai">
+      <span class="nav-icon">✨</span>
+      <span class="nav-label">智脑</span>
+    </button>
+    <button type="button" class="nav-tab-btn" data-page="page-tools">
+      <span class="nav-icon">🧰</span>
+      <span class="nav-label">工具</span>
+    </button>
+  </nav>
+
+  <!-- B站站内播放影院 -->
+  <div class="mobile-sheet-overlay" id="mobile-bili-theater" hidden>
+    <section class="mobile-sheet mobile-theater-sheet" role="dialog" aria-modal="true" aria-labelledby="mobile-theater-title">
+      <header class="mobile-sheet-head">
+        <div><h3 id="mobile-theater-title">B站视频</h3><small id="mobile-theater-meta"></small></div>
+        <button type="button" class="mobile-sheet-close" id="mobile-theater-close" aria-label="关闭">✕</button>
+      </header>
+      <div class="mobile-player-frame-wrap"><iframe id="mobile-bili-player" title="B站播放器" src="about:blank" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen></iframe></div>
+      <section class="mobile-bili-comments">
+        <div class="mobile-comments-head"><b>评论</b><small id="mobile-comments-count"></small></div>
+        <div id="mobile-bili-comments-list" class="mobile-comments-list"><div class="mobile-empty-hint">正在加载评论…</div></div>
+      </section>
+      <a id="mobile-theater-external" class="mobile-primary-link" target="_blank" rel="noreferrer">在 B站 App / 网页打开 ↗</a>
+    </section>
+  </div>
+
+  <!-- 通用移动工具工作台 -->
+  <div class="mobile-sheet-overlay" id="mobile-tool-sheet" hidden>
+    <section class="mobile-sheet" role="dialog" aria-modal="true" aria-labelledby="mobile-tool-sheet-title">
+      <header class="mobile-sheet-head">
+        <div><h3 id="mobile-tool-sheet-title">工具</h3><small id="mobile-tool-sheet-desc"></small></div>
+        <button type="button" class="mobile-sheet-close" id="mobile-tool-sheet-close" aria-label="关闭">✕</button>
+      </header>
+      <div class="mobile-tool-sheet-body" id="mobile-tool-sheet-body"></div>
+    </section>
+  </div>
+
+  <!-- Alt+E 的触屏版悬浮球与轮盘 -->
+  <div class="mobile-wheel" id="mobile-wheel">
+    <div class="mobile-wheel-sectors" id="mobile-wheel-sectors"></div>
+    <button type="button" class="mobile-wheel-ball" id="mobile-wheel-ball" aria-label="打开快捷轮盘" aria-expanded="false">🧭</button>
+  </div>
+
+  <!-- 吐司通知条 -->
+  <div class="mobile-toast" id="mobile-toast"></div>
+
+  <script src="mobile-shim.js"></script>
+  <script src="mobile.js"></script>
+  <script src="mobile-tools.js"></script>
+</body>
+</html>

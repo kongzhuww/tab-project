@@ -1,0 +1,12 @@
+/**
+ * LogicWeaver 统一全局核心样式总入口 (Vite 统一编译与极速压缩)
+ */
+@import "../styles/newtab.css";
+@import "../styles/newtab-components.css";
+@import "../styles/newtab-windows.css";
+@import "../styles/newtab-calendar.css";
+@import "../styles/newtab-themes.css";
+@import "../styles/newtab-workspaces.css";
+@import "../styles/newtab-integrations.css";
+@import "../styles/newtab-layout.css";
+@import "../styles/newtab-ai.css";

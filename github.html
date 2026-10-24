@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>GitHub 工作台</title>
+    <link rel="icon" type="image/svg+xml" href="assets/nav-github.svg" />
+    <script src="generated/theme-init.js"></script>
+    <link rel="stylesheet" href="generated/vue-ui.css" />
+    <style>
+      html, body {
+        width: 100vw;
+        height: 100vh;
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        background: var(--bg, #0f141c);
+      }
+      .gh-standalone-main {
+        width: 100vw;
+        height: 100vh;
+        position: relative;
+        overflow: hidden;
+      }
+      /* 全屏卡片样式自动铺满，底部预留 dock 高度空间避免遮挡 */
+      #card-github,
+      #card-github.card-fullscreen {
+        position: absolute !important;
+        inset: 0 !important;
+        width: 100% !important;
+        height: 100% !important;
+        margin: 0 !important;
+        border-radius: 0 !important;
+        border: none !important;
+        max-width: 100% !important;
+        max-height: 100% !important;
+        display: flex !important;
+        flex-direction: column !important;
+        padding: 16px 28px 74px !important;
+        box-sizing: border-box !important;
+      }
+      #card-github .card-head {
+        border-radius: 0 !important;
+        flex-shrink: 0 !important;
+      }
+      /* Dock 栏置底悬浮 */
+      .mac-dock {
+        position: fixed !important;
+        bottom: 12px !important;
+        left: 50% !important;
+        transform: translateX(-50%) !important;
+        z-index: 9999 !important;
+      }
+    </style>
+  </head>
+  <body class="has-card-fullscreen gh-standalone-body">
+    <main class="gh-standalone-main">
+      <div id="vue-github-workspace-root">
+      <section class="card wide card-fullscreen" id="card-github">
+        <header class="card-head">
+          <span class="bar" style="background: linear-gradient(180deg,#22c55e,#06b6d4)"></span>
+          <h2>GitHub</h2>
+          <div class="gh-main-tabs" id="gh-main-tabs">
+            <button class="gh-main-tab on" data-gh-tab="stars" type="button">⭐ Star 收藏</button>
+            <button class="gh-main-tab" data-gh-tab="trending" type="button">🔥 趋势</button>
+          </div>
+          <span id="gh-user" class="muted small" style="margin-left: 8px;"></span>
+          <span class="grow"></span>
+          <div class="card-fullscreen-gh-search" id="gh-head-search-wrap">
+            <form id="gh-search-form" class="gh-search-box">
+              <button type="button" id="gh-search-mode-toggle" class="gh-search-mode-toggle" title="当前为：搜当前分类（点击切换为 GitHub 全站搜索）" aria-label="当前为搜当前分类，点击切换为 GitHub 全站搜索">
+                <span id="gh-mode-icon" class="gh-mode-icon">⭐</span>
+                <span id="gh-mode-text" class="gh-mode-text">当前分类</span>
+                <span class="gh-mode-arrow">▾</span>
+              </button>
+              <input id="gh-search-input" placeholder="在当前分类中搜索 Star 仓库…" autocomplete="off" />
+              <button type="button" id="gh-search-clear-btn" class="gh-search-clear-btn" title="清空搜索" hidden>✕</button>
+              <button type="submit" id="gh-search-submit-btn" title="搜索">⌕</button>
+            </form>
+            <div id="gh-search-options" class="gh-search-options" aria-label="搜索来源" hidden>
+              <label title="精确：严格用你的原关键词搜索仓库名和描述"><input type="checkbox" value="exact" checked />精确</label>
+              <label title="宽松匹配：把关键词拆开搜索，并按名称/描述/语言/主题的相似度本地重排"><input type="checkbox" value="loose" />宽松匹配</label>
+              <label title="近义词：自动扩展相关英文词，例如 ai → llm / machine learning"><input type="checkbox" value="related" />近义词</label>
+              <label title="主题标签：搜索 GitHub Topics 标签，例如 topic:llm"><input type="checkbox" value="topic" />主题标签</label>
+              <label title="说明文档：搜索仓库 README 内容"><input type="checkbox" value="readme" />说明文档</label>
+            </div>
+            <div id="gh-search-suggest" class="gh-search-suggest" hidden></div>
+          </div>
+        </header>
+
+        <!-- Tab 1: Star 收藏 -->
+        <div class="gh-main-pane" id="gh-pane-stars">
+          <div class="gh-bili-layout">
+            <aside class="gh-bili-sidebar" id="gh-bili-sidebar">
+              <header class="gh-bili-sidebar-head">
+                <div>
+                  <b style="font-size: 13px; display: flex; align-items: center; gap: 6px;"><i class="fo-folder-icon"></i> 收藏文件夹</b>
+                  <small style="color: var(--dim); font-size: 9.5px;">单一文件夹 · 独立正在使用</small>
+                </div>
+                <button class="fo-sidebar-add" id="gh-folder-add-btn" type="button" title="新建文件夹" aria-label="新建文件夹">＋</button>
+              </header>
+              <nav class="gh-bili-folder-list" id="gh-folder-list"></nav>
+            </aside>
+
+            <section class="gh-bili-main" id="gh-bili-main">
+              <header class="gh-bili-hero" id="gh-hero"></header>
+
+              <div class="gh-main-subbar">
+                <span id="gh-rate" class="gh-rate"></span>
+                <button type="button" class="gh-batch-toggle-btn" id="gh-batch-toggle-btn" hidden style="display:none;">批量操作</button>
+              </div>
+              <div id="gh-batch-bar" class="gh-batch-bar" hidden>
+                <div class="gh-batch-bar-left">
+                  <button type="button" class="gh-batch-action-btn" id="gh-batch-select-all-btn">全选</button>
+                  <span class="gh-batch-count-tip">已选择 <b id="gh-batch-selected-count">0</b> 项</span>
+                </div>
+                <div class="gh-batch-bar-right">
+                  <button type="button" class="gh-batch-action-btn" id="gh-batch-move-btn" title="将选中仓库批量移动到指定文件夹">📁 移动到文件夹</button>
+                  <button type="button" class="gh-batch-action-btn" id="gh-batch-used-btn" title="批量标记或移出正在使用">⚡ 设为正在使用</button>
+                  <button type="button" class="gh-batch-action-btn" id="gh-batch-ai-btn" title="批量使用 AI 生成中文介绍">✨ 批量 AI 分析</button>
+                  <button type="button" class="gh-batch-action-btn danger" id="gh-batch-unstar-btn" title="从 GitHub 批量取消 Star 收藏">🗑 取消收藏</button>
+                </div>
+              </div>
+              <div id="gh-search-body" hidden></div>
+              <div id="vue-github-status-root"></div>
+              <div id="vue-github-repositories-root"></div>
+            </section>
+          </div>
+        </div>
+
+        <!-- Tab 2: 趋势 -->
+        <div id="vue-github-trending-root">
+          <div class="gh-main-pane" id="gh-pane-trending" hidden>
+            <div class="gh-trend-header-row" style="display: flex; align-items: center; justify-content: flex-end; padding: 4px 12px; margin-bottom: 6px;">
+              <span id="trend-range" class="dim small">近 7 天</span>
+            </div>
+            <div id="trend-body"><p class="muted small">加载中…</p></div>
+          </div>
+        </div>
+      </section>
+      </div>
+    </main>
+
+    <!-- 底部 Mac Dock 栏 -->
+    <nav id="mac-dock" class="mac-dock" aria-label="快捷应用栏"></nav>
+
+    <div id="app-toast" class="app-toast" hidden></div>
+    <div id="vue-notification-root"></div>
+
+    <script type="module" src="generated/vue-ui.js"></script>
+  </body>
+</html>

@@ -1,0 +1,131 @@
+{
+  "manifest_version": 3,
+  "minimum_chrome_version": "120",
+  "name": "tab-project 新标签页",
+  "version": "2.3.0",
+  "description": "tab-project 现代化浏览器新标签页与生产力工作台看板：聚合搜索、B站收藏夹、Todoist、模型价格与 GitHub。",
+  "chrome_url_overrides": {
+    "newtab": "newtab-bootstrap.html"
+  },
+  "icons": {
+    "16": "assets/icon-16.png",
+    "32": "assets/icon-32.png",
+    "48": "assets/icon-48.png",
+    "128": "assets/icon-128.png"
+  },
+  "permissions": [
+    "storage",
+    "unlimitedStorage",
+    "topSites",
+    "bookmarks",
+    "favicon",
+    "alarms",
+    "activeTab",
+    "tabs",
+    "cookies",
+    "declarativeNetRequest",
+    "identity",
+    "scripting",
+    "sidePanel",
+    "notifications",
+    "downloads",
+    "contextMenus",
+    "clipboardWrite"
+  ],
+  "host_permissions": [
+    "<all_urls>",
+    "https://*.jianguoyun.com/*",
+    "https://dav.jianguoyun.com/*",
+    "https://api.bilibili.com/*",
+    "https://*.bilibili.com/*",
+    "https://*.hdslb.com/*",
+    "https://*.bilivideo.com/*",
+    "https://*.bilivideo.cn/*",
+    "https://api.todoist.com/*",
+    "https://www.googleapis.com/*",
+    "https://translate.googleapis.com/*",
+    "https://api.mymemory.translated.net/*",
+    "https://generativelanguage.googleapis.com/*",
+    "https://www.youtube.com/*",
+    "https://*.youtube.com/*",
+    "https://api.github.com/*",
+    "https://openrouter.ai/*",
+    "https://cdn.jsdelivr.net/*",
+    "https://favicon.im/*",
+    "https://artificialanalysis.ai/*",
+    "https://api.deepseek.com/*",
+    "https://modelgrep.com/*",
+    "https://lmspeed.net/*",
+    "https://huggingface.co/*",
+    "https://api.open-meteo.com/*",
+    "https://geocoding-api.open-meteo.com/*",
+    "https://aihot.virxact.com/*",
+    "https://aihot.news/*",
+    "https://monster-siren.hypergryph.com/*",
+    "https://*.hycdn.cn/*",
+    "http://127.0.0.1/*",
+    "https://r.jina.ai/*",
+    "https://weread.qq.com/*",
+    "https://*.weread.qq.com/*",
+    "https://i.weread.qq.com/*",
+    "https://itunes.apple.com/*",
+    "https://cn.bing.com/*",
+    "https://*.bing.com/*",
+    "https://image.baidu.com/*",
+    "https://*.baidu.com/*",
+    "https://*.music.126.net/*",
+    "https://*.126.net/*",
+    "https://music.163.com/*",
+    "https://*.music.163.com/*",
+    "https://*.163.com/*",
+    "https://api.multica.ai/*",
+    "https://multica.ai/*"
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'; frame-src 'self' https://player.bilibili.com blob:; img-src 'self' https: http: data: blob:;",
+    "sandbox": "sandbox allow-scripts; script-src 'self' 'unsafe-inline' 'unsafe-eval' blob:; child-src blob:; frame-src blob:;"
+  },
+  "options_page": "options.html",
+  "sandbox": {
+    "pages": [
+      "wallpaper-sandbox.html"
+    ]
+  },
+  "action": {
+    "default_title": "打开 LogicWeaver 快捷工具",
+    "default_icon": {
+      "16": "assets/icon-16.png",
+      "32": "assets/icon-32.png",
+      "48": "assets/icon-48.png",
+      "128": "assets/icon-128.png"
+    }
+  },
+  "commands": {
+    "focus-newtab": {
+      "suggested_key": {
+        "default": "Alt+H",
+        "mac": "Alt+H"
+      },
+      "description": "立即回到 LogicWeaver 新标签页"
+    }
+  },
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  },
+  "background": {
+    "service_worker": "generated/background.js"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "favicon.ico",
+        "assets/icon-16.png",
+        "assets/icon-32.png",
+        "assets/icon-48.png",
+        "assets/icon-128.png",
+        "assets/nav-home.svg"
+      ],
+      "matches": ["<all_urls>"]
+    }
+  ]
+}

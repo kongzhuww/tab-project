@@ -1,0 +1,64 @@
+# 本地敏感与凭据文件
+.env
+.env.*
+!.env.example
+*.local.*
+mobile-synced-config.json
+
+# 临时文件与调试归档
+archive/
+contexts/
+diff_obsidian.txt
+*.tmp
+*.bak
+
+# 依赖与编译产物
+node_modules/
+dist-mobile/
+
+# Android 构建与密钥
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+*.jks
+*.keystore
+*.p12
+*.apk
+*.aab
+
+# macOS 系统垃圾与资源分支
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+
+# Windows 系统垃圾
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Python 缓存 (Native Host Mac)
+__pycache__/
+*.py[cod]
+*$py.class
+
+# IDE 与编辑器配置
+.vscode/
+.idea/
+*.suo
+*.user
+
+# 临时日志与打包发布包
+*.log
+releases/
+dist/
+dist-extension/
+.wrangler/
+
+# Personal preview screenshots remain local; do not publish.
+/assets/preview.png
+/assets/preview-bilibili.png
+/assets/preview-github.png

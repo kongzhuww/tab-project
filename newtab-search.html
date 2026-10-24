@@ -1,0 +1,421 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>新标签页 · 极速搜索</title>
+  <script src="generated/theme-init.js"></script>
+  <link rel="stylesheet" href="generated/vue-ui.css" />
+  <style>
+    :root {
+      --bg: #060911;
+      --border-focus: rgba(236, 72, 153, 0.6);
+      --accent-grad: linear-gradient(135deg, #ec4899, #8b5cf6);
+    }
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
+      user-select: none;
+      transition: background-color 0.25s ease, color 0.25s ease;
+    }
+    body.sub-newtab {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      padding-top: 15vh;
+      box-sizing: border-box;
+      background-color: var(--bg);
+      background-image: radial-gradient(circle at 50% 32%, rgba(139, 92, 246, 0.14) 0%, rgba(236, 72, 153, 0.07) 32%, transparent 70%);
+      color: #fff;
+    }
+
+    /* Light Theme */
+    html[data-theme="light"] body.sub-newtab {
+      background-color: #f1f5f9;
+      background-image: radial-gradient(circle at 50% 32%, rgba(2, 132, 199, 0.1) 0%, transparent 65%);
+      color: #0f172a;
+    }
+    html[data-theme="light"] .sub-newtab-center .hero-clock #greeting {
+      color: #0284c7;
+    }
+    html[data-theme="light"] .sub-newtab-center .hero-clock .clock,
+    html[data-theme="light"] .sub-newtab-center .hero-clock .clock #secs {
+      color: #0f172a;
+    }
+    html[data-theme="light"] .sub-newtab-center .hero-clock .date {
+      color: #64748b;
+    }
+    html[data-theme="light"] .sub-newtab-center .search {
+      background: rgba(255, 255, 255, 0.88);
+      border: 1px solid rgba(0, 0, 0, 0.12);
+      box-shadow: 0 16px 42px rgba(0, 0, 0, 0.08);
+      color: #0f172a;
+    }
+    html[data-theme="light"] .sub-newtab-center .search input {
+      color: #0f172a;
+    }
+    html[data-theme="light"] .sub-newtab-center .search input::placeholder {
+      color: #94a3b8;
+    }
+    html[data-theme="light"] .enter-home-btn {
+      background: rgba(255, 255, 255, 0.88);
+      border: 1px solid rgba(0, 0, 0, 0.12);
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.1);
+      color: #0f172a;
+    }
+    html[data-theme="light"] .enter-home-desc {
+      color: #64748b;
+    }
+    html[data-theme="light"] .enter-home-icon {
+      background: linear-gradient(135deg, #0284c7, #38bdf8);
+      box-shadow: 0 2px 10px rgba(2, 132, 199, 0.35);
+    }
+    html[data-theme="light"] .enter-home-arrow {
+      color: #0284c7;
+    }
+    html[data-theme="light"] .sub-theme-toggle {
+      background: rgba(255, 255, 255, 0.88);
+      border: 1px solid rgba(0, 0, 0, 0.12);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+      color: #0f172a;
+    }
+    html[data-theme="light"] .theme-menu {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      box-shadow: 0 18px 44px -14px rgba(0, 0, 0, 0.18);
+    }
+    html[data-theme="light"] .theme-menu button {
+      color: #0f172a;
+    }
+    html[data-theme="light"] .theme-menu button:hover {
+      background: #f1f5f9;
+    }
+    html[data-theme="light"] .theme-menu button.active {
+      background: #e0f2fe;
+      border-color: #7dd3fc;
+      color: #0284c7;
+    }
+
+    /* Endfield Theme */
+    html[data-theme="endfield"] body.sub-newtab {
+      background-color: #121316;
+      background-image: radial-gradient(circle at 50% 32%, rgba(245, 197, 24, 0.12) 0%, transparent 65%);
+      color: #ffffff;
+    }
+    html[data-theme="endfield"] .sub-newtab-center .hero-clock #greeting {
+      color: #f5c518;
+    }
+    html[data-theme="endfield"] .sub-newtab-center .search {
+      background: rgba(27, 29, 33, 0.88);
+      border: 1px solid rgba(245, 197, 24, 0.35);
+      box-shadow: 0 16px 42px rgba(0, 0, 0, 0.6);
+    }
+    html[data-theme="endfield"] .sub-newtab-center .search:focus-within {
+      border-color: #f5c518;
+      box-shadow: 0 20px 48px rgba(0, 0, 0, 0.6), 0 0 0 3px rgba(245, 197, 24, 0.25);
+    }
+    html[data-theme="endfield"] .enter-home-btn {
+      background: rgba(27, 29, 33, 0.9);
+      border: 1px solid rgba(245, 197, 24, 0.35);
+    }
+    html[data-theme="endfield"] .enter-home-icon {
+      background: linear-gradient(135deg, #f5c518, #eab308);
+      color: #000;
+      box-shadow: 0 2px 10px rgba(245, 197, 24, 0.4);
+    }
+    html[data-theme="endfield"] .enter-home-arrow {
+      color: #f5c518;
+    }
+    html[data-theme="endfield"] .sub-theme-toggle {
+      background: rgba(27, 29, 33, 0.9);
+      border: 1px solid rgba(245, 197, 24, 0.35);
+      color: #f5c518;
+    }
+    html[data-theme="endfield"] .theme-menu {
+      background: #1b1d21;
+      border: 1px solid rgba(245, 197, 24, 0.35);
+      color: #fff;
+    }
+    html[data-theme="endfield"] .theme-menu button {
+      color: #ffffff;
+    }
+    html[data-theme="endfield"] .theme-menu button:hover {
+      background: rgba(245, 197, 24, 0.1);
+    }
+    html[data-theme="endfield"] .theme-menu button.active {
+      background: rgba(245, 197, 24, 0.18);
+      border-color: #f5c518;
+      color: #f5c518;
+    }
+
+    /* Lone Trail Theme */
+    html[data-theme="lonetrail"] body.sub-newtab {
+      background-color: #eae5d8;
+      background-image: radial-gradient(circle at 50% 32%, rgba(163, 78, 60, 0.08) 0%, transparent 65%);
+      color: #26221a;
+    }
+    html[data-theme="lonetrail"] .sub-newtab-center .hero-clock #greeting {
+      color: #a34e3c;
+    }
+    html[data-theme="lonetrail"] .sub-newtab-center .hero-clock .clock {
+      color: #26221a;
+    }
+    html[data-theme="lonetrail"] .sub-newtab-center .hero-clock .date {
+      color: #78716c;
+    }
+    html[data-theme="lonetrail"] .sub-newtab-center .search {
+      background: rgba(255, 255, 255, 0.88);
+      border: 1px solid rgba(163, 78, 60, 0.25);
+      box-shadow: 0 16px 42px rgba(163, 78, 60, 0.08);
+      color: #26221a;
+    }
+    html[data-theme="lonetrail"] .sub-newtab-center .search:focus-within {
+      border-color: #a34e3c;
+      box-shadow: 0 20px 48px rgba(163, 78, 60, 0.15), 0 0 0 3px rgba(163, 78, 60, 0.2);
+    }
+    html[data-theme="lonetrail"] .sub-newtab-center .search input {
+      color: #26221a;
+    }
+    html[data-theme="lonetrail"] .sub-newtab-center .search input::placeholder {
+      color: #a8a29e;
+    }
+    html[data-theme="lonetrail"] .enter-home-btn {
+      background: rgba(255, 255, 255, 0.88);
+      border: 1px solid rgba(163, 78, 60, 0.25);
+      box-shadow: 0 12px 32px rgba(163, 78, 60, 0.12);
+      color: #26221a;
+    }
+    html[data-theme="lonetrail"] .enter-home-desc {
+      color: #78716c;
+    }
+    html[data-theme="lonetrail"] .enter-home-icon {
+      background: linear-gradient(135deg, #a34e3c, #c9993f);
+      box-shadow: 0 2px 10px rgba(163, 78, 60, 0.4);
+    }
+    html[data-theme="lonetrail"] .enter-home-arrow {
+      color: #a34e3c;
+    }
+    html[data-theme="lonetrail"] .sub-theme-toggle {
+      background: rgba(255, 255, 255, 0.88);
+      border: 1px solid rgba(163, 78, 60, 0.25);
+      box-shadow: 0 8px 24px rgba(163, 78, 60, 0.1);
+      color: #26221a;
+    }
+    html[data-theme="lonetrail"] .theme-menu {
+      background: #f4f0e6;
+      border: 1px solid rgba(163, 78, 60, 0.25);
+      box-shadow: 0 18px 44px -14px rgba(163, 78, 60, 0.18);
+    }
+    html[data-theme="lonetrail"] .theme-menu button {
+      color: #26221a;
+    }
+    html[data-theme="lonetrail"] .theme-menu button:hover {
+      background: rgba(163, 78, 60, 0.1);
+    }
+    html[data-theme="lonetrail"] .theme-menu button.active {
+      background: rgba(163, 78, 60, 0.18);
+      border-color: #a34e3c;
+      color: #a34e3c;
+    }
+
+    .sub-newtab-center {
+      position: relative;
+      z-index: 10;
+      width: min(720px, 90vw);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .sub-newtab-center .hero-clock {
+      padding-top: 0;
+      margin-bottom: 22px;
+    }
+    .sub-newtab-center .search {
+      margin: 0;
+      width: 100%;
+      height: 58px;
+      border-radius: 18px;
+      background: rgba(13, 20, 32, 0.82);
+      backdrop-filter: blur(20px);
+      box-shadow: 0 16px 42px rgba(0, 0, 0, 0.52);
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .sub-newtab-center .search:focus-within {
+      border-color: rgba(236, 72, 153, 0.7);
+      box-shadow: 0 20px 48px rgba(0, 0, 0, 0.6), 0 0 0 3px rgba(236, 72, 153, 0.22);
+      transform: translateY(-2px);
+    }
+    .sub-newtab-center .search input {
+      font-size: 16.5px;
+    }
+
+    .sub-newtab-topbar {
+      position: fixed;
+      top: 24px;
+      right: 28px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      z-index: 120;
+    }
+    .sub-theme-toggle {
+      width: 40px;
+      height: 40px;
+      border-radius: 12px;
+      background: rgba(15, 23, 42, 0.8);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+      backdrop-filter: blur(16px);
+      color: #ffffff;
+      font-size: 17px;
+      display: grid;
+      place-items: center;
+      cursor: pointer;
+      outline: none;
+      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .sub-theme-toggle:hover {
+      background: rgba(30, 41, 59, 0.95);
+      border-color: rgba(236, 72, 153, 0.7);
+      transform: scale(1.08);
+      box-shadow: 0 12px 28px rgba(0, 0, 0, 0.5), 0 0 0 2px rgba(236, 72, 153, 0.3);
+    }
+    .sub-theme-toggle:active {
+      transform: scale(0.96);
+    }
+
+    /* 主题选择气泡菜单 */
+    .theme-menu {
+      position: fixed;
+      z-index: 400;
+      min-width: 210px;
+      padding: 6px;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      background: var(--panel, #0f172a);
+      border: 1px solid var(--border-strong, rgba(255, 255, 255, 0.18));
+      border-radius: 14px;
+      box-shadow: 0 18px 44px -14px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(255, 255, 255, 0.08);
+      backdrop-filter: blur(20px);
+      user-select: none;
+      animation: themePopIn 0.12s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    @keyframes themePopIn {
+      from { opacity: 0; transform: scale(0.95) translateY(-4px); }
+      to { opacity: 1; transform: scale(1) translateY(0); }
+    }
+    .theme-menu button {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 9px 12px;
+      background: none;
+      border: 1px solid transparent;
+      border-radius: 8px;
+      color: var(--text, #ffffff);
+      font-size: 13px;
+      cursor: pointer;
+      text-align: left;
+      transition: all 0.15s ease;
+    }
+    .theme-menu button:hover {
+      background: var(--surface-hover, rgba(255, 255, 255, 0.1));
+    }
+    .theme-menu button.active {
+      border-color: var(--border-strong, rgba(236, 72, 153, 0.6));
+      background: var(--surface, rgba(255, 255, 255, 0.08));
+      font-weight: 600;
+    }
+    .theme-swatches {
+      display: inline-flex;
+      gap: 4px;
+      margin-left: auto;
+    }
+    .theme-swatches i {
+      width: 12px;
+      height: 12px;
+      border-radius: 3px;
+      display: inline-block;
+      border: 1px solid rgba(0, 0, 0, 0.25);
+    }
+
+    .enter-home-dock {
+      position: fixed;
+      right: 32px;
+      top: 50%;
+      transform: translateY(-50%);
+      z-index: 100;
+    }
+    .enter-home-btn {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 14px 20px;
+      border-radius: 18px;
+      background: rgba(15, 23, 42, 0.82);
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+      backdrop-filter: blur(16px);
+      color: #ffffff;
+      cursor: pointer;
+      outline: none;
+      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .enter-home-btn:hover {
+      background: rgba(30, 41, 59, 0.95);
+      border-color: rgba(236, 72, 153, 0.7);
+      box-shadow: 0 16px 42px rgba(236, 72, 153, 0.32), 0 0 0 2px rgba(236, 72, 153, 0.4);
+      transform: translateX(-4px) scale(1.04);
+    }
+    .enter-home-btn:active {
+      transform: translateX(-2px) scale(0.98);
+    }
+    .enter-home-icon {
+      width: 26px;
+      height: 26px;
+      border-radius: 8px;
+      background: linear-gradient(135deg, #ec4899, #8b5cf6);
+      display: grid;
+      place-items: center;
+      font-size: 14px;
+      box-shadow: 0 2px 10px rgba(236, 72, 153, 0.5);
+      flex: none;
+    }
+    .enter-home-text {
+      display: flex;
+      flex-direction: column;
+      text-align: left;
+    }
+    .enter-home-title {
+      font-size: 14px;
+      font-weight: 650;
+      letter-spacing: 0.3px;
+    }
+    .enter-home-desc {
+      font-size: 11px;
+      color: #cbd5e1;
+      margin-top: 2px;
+    }
+    .enter-home-arrow {
+      font-size: 16px;
+      color: #f472b6;
+      margin-left: 4px;
+      transition: transform 0.2s;
+    }
+    .enter-home-btn:hover .enter-home-arrow {
+      transform: translateX(4px);
+    }
+  </style>
+</head>
+<body class="sub-newtab">
+  <div id="vue-search-launcher-root">正在加载搜索…</div>
+  <script type="module" src="generated/search-ui.js"></script>
+</body>
+</html>

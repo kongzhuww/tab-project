@@ -1,0 +1,12 @@
+/* Display text is not selectable; editable user content stays usable. */
+.lw-display-copy-disabled body {
+  user-select: none;
+  -webkit-user-select: none;
+}
+.lw-display-copy-disabled input,
+.lw-display-copy-disabled textarea,
+.lw-display-copy-disabled [contenteditable="true"],
+.lw-display-copy-disabled [contenteditable="plaintext-only"] {
+  user-select: text;
+  -webkit-user-select: text;
+}

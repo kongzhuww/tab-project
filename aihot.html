@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AI HOT 资讯流</title>
+    <link rel="icon" type="image/svg+xml" href="assets/nav-aihot.svg" />
+    <script src="generated/theme-init.js"></script>
+    <link rel="stylesheet" href="generated/vue-ui.css" />
+    <style>
+      html, body {
+        width: 100vw;
+        height: 100vh;
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        background: var(--bg, #0f141c);
+      }
+      .aihot-standalone-main {
+        width: 100vw;
+        height: 100vh;
+        position: relative;
+        overflow: hidden;
+      }
+      /* 全屏卡片样式自动铺满，底部预留 dock 高度空间避免遮挡 */
+      #daily-aihot,
+      #daily-aihot.card-fullscreen {
+        position: absolute !important;
+        inset: 0 !important;
+        width: 100% !important;
+        height: 100% !important;
+        margin: 0 !important;
+        border-radius: 0 !important;
+        border: none !important;
+        max-width: 100% !important;
+        max-height: 100% !important;
+        display: flex !important;
+        flex-direction: column !important;
+        padding: 16px 28px 74px !important;
+        box-sizing: border-box !important;
+      }
+      #daily-aihot .card-head {
+        border-radius: 0 !important;
+        flex-shrink: 0 !important;
+      }
+      #aihot-body {
+        flex: 1 1 0 !important;
+        min-height: 0 !important;
+        overflow-y: auto !important;
+        padding-right: 4px !important;
+      }
+      /* Dock 栏置底悬浮 */
+      .mac-dock {
+        position: fixed !important;
+        bottom: 12px !important;
+        left: 50% !important;
+        transform: translateX(-50%) !important;
+        z-index: 9999 !important;
+      }
+    </style>
+  </head>
+  <body class="has-card-fullscreen aihot-standalone-body">
+    <main class="aihot-standalone-main">
+      <div id="vue-aihot-root"><p class="muted small">AI HOT 加载中…</p></div>
+
+      <!-- AI HOT 文章全屏/弹窗阅读器 -->
+      <div id="vue-aihot-viewer-root">
+        <dialog id="aihot-viewer" class="aihot-viewer">
+          <header class="aihot-viewer-head">
+            <div class="aihot-viewer-brand">
+              <span class="aihot-viewer-badge">AI HOT</span>
+              <span id="aihot-viewer-header-source" class="aihot-viewer-source"></span>
+            </div>
+            <span class="grow"></span>
+            <div class="aihot-viewer-actions">
+              <button id="aihot-viewer-import-obs" class="ai-chat-new" type="button" title="一键导入到 Obsidian 专属知识库（AI Hot / Articles）">💎 导入 Obsidian</button>
+              <button id="aihot-viewer-copy" class="ai-chat-new" type="button" title="复制文章内容">📋 复制</button>
+              <a id="aihot-viewer-open" class="ai-chat-new" target="_blank" rel="noreferrer" title="在浏览器新标签页打开原文">原文 ↗</a>
+            </div>
+            <button id="aihot-viewer-close" class="aihot-viewer-close" type="button" title="关闭 (Esc / Alt+W / Q)">✕</button>
+          </header>
+          <div id="aihot-viewer-body" class="aihot-viewer-body"></div>
+        </dialog>
+      </div>
+    </main>
+
+    <!-- 底部 Mac Dock 栏 -->
+    <nav id="mac-dock" class="mac-dock" aria-label="快捷应用栏"></nav>
+
+    <div id="app-toast" class="app-toast" hidden></div>
+    <div id="vue-notification-root"></div>
+
+    <script type="module" src="generated/vue-ui.js"></script>
+  </body>
+</html>

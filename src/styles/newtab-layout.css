@@ -1,0 +1,228 @@
+/* 首页长按布局编辑：黑边调整宽度，× 与设置开关联动 */
+.launcher-widget[data-home-module],
+.launcher-group[data-home-module] { position: relative; }
+#right-task-shelf { width: var(--home-task-shelf-width, 116px); }
+.home-layout-close,
+.home-layout-resize,
+.home-layout-resize-y,
+.home-layout-profiles,
+.home-layout-reset,
+.home-layout-done { display: none; }
+body.home-layout-editing [data-home-module] {
+  outline: 3px solid rgba(3, 7, 18, .92);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 1px rgba(255,255,255,.34), 0 14px 32px -20px rgba(0,0,0,.76);
+}
+body.home-layout-editing [data-home-module].home-layout-selected,
+body.home-layout-editing [data-home-module].home-layout-resizing {
+  outline-color: #10b981;
+  box-shadow: 0 0 0 1px rgba(167,243,208,.9), 0 0 24px rgba(16,185,129,.32);
+}
+body.home-layout-editing .home-layout-close {
+  position: absolute;
+  z-index: 30;
+  top: 6px;
+  right: 6px;
+  display: grid;
+  width: 27px;
+  height: 27px;
+  padding: 0;
+  place-items: center;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  background: #111827;
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(0,0,0,.45);
+  font: 700 18px/1 system-ui;
+  cursor: pointer;
+}
+body.home-layout-editing .home-layout-close:hover,
+body.home-layout-editing .home-layout-close:focus-visible { background: #e11d48; outline: 2px solid #fda4af; }
+body.home-layout-editing .home-layout-resize {
+  position: absolute;
+  z-index: 29;
+  top: 12px;
+  bottom: 12px;
+  display: block;
+  width: 17px;
+  cursor: ew-resize;
+  touch-action: none;
+}
+body.home-layout-editing .home-layout-resize.edge-left { left: 0; }
+body.home-layout-editing .home-layout-resize.edge-right { right: 0; }
+body.home-layout-editing .home-layout-resize::after {
+  position: absolute;
+  top: 50%;
+  left: 5px;
+  width: 7px;
+  height: 54px;
+  border: 1px solid rgba(255,255,255,.72);
+  border-radius: 999px;
+  background: #030712;
+  box-shadow: 0 3px 12px rgba(0,0,0,.5);
+  content: "";
+  transform: translateY(-50%);
+}
+body.home-layout-editing .home-layout-resize:hover::after,
+body.home-layout-editing .home-layout-resize:focus-visible::after { background: #10b981; }
+body.home-layout-editing .home-layout-resize-y {
+  position: absolute;
+  z-index: 28;
+  right: 38px;
+  left: 38px;
+  display: block;
+  height: 17px;
+  cursor: ns-resize;
+  touch-action: none;
+}
+body.home-layout-editing .home-layout-resize-y.edge-top { top: 0; }
+body.home-layout-editing .home-layout-resize-y.edge-bottom { bottom: 0; }
+body.home-layout-editing .home-layout-resize-y::after {
+  position: absolute;
+  left: 50%;
+  width: 58px;
+  height: 7px;
+  border: 1px solid rgba(255,255,255,.72);
+  border-radius: 999px;
+  background: #030712;
+  box-shadow: 0 3px 12px rgba(0,0,0,.5);
+  content: "";
+  transform: translateX(-50%);
+}
+body.home-layout-editing .home-layout-resize-y.edge-top::after { top: 5px; }
+body.home-layout-editing .home-layout-resize-y.edge-bottom::after { bottom: 5px; }
+body.home-layout-editing .home-layout-resize-y:hover::after,
+body.home-layout-editing .home-layout-resize-y:focus-visible::after { background: #10b981; }
+body.home-layout-editing { cursor: default; }
+.home-layout-armed { animation: home-layout-hold 1.1s ease-out both; }
+@keyframes home-layout-hold {
+  from { box-shadow: inset 0 0 0 0 rgba(16,185,129,0); }
+  to { box-shadow: inset 0 0 0 3px rgba(16,185,129,.82); }
+}
+body .home-layout-profiles,
+body .home-layout-reset,
+body .home-layout-done {
+  position: fixed;
+  z-index: 120;
+  right: 24px;
+  bottom: 24px;
+  display: block;
+  min-height: 38px;
+  padding: 0 17px;
+  border: 1px solid rgba(167,243,208,.72);
+  border-radius: 999px;
+  background: #047857;
+  color: #fff;
+  box-shadow: 0 12px 30px -12px rgba(0,0,0,.7);
+  font: 750 13px/1 system-ui;
+  cursor: pointer;
+}
+body .home-layout-profiles,
+body .home-layout-reset {
+  border-color: rgba(255,255,255,.38);
+  background: #111827;
+}
+body .home-layout-profiles { right: 138px; }
+body .home-layout-reset { right: 250px; }
+body .home-layout-profiles:hover,
+body .home-layout-reset:hover { background: #1f2937; }
+.home-layout-profile-panel {
+  position: fixed;
+  z-index: 121;
+  right: 24px;
+  bottom: 74px;
+  width: min(360px, calc(100vw - 28px));
+  max-height: min(480px, calc(100vh - 110px));
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,.24);
+  border-radius: 16px;
+  background: rgba(10,18,28,.97);
+  color: #e5e7eb;
+  box-shadow: 0 24px 60px -18px rgba(0,0,0,.78);
+}
+.home-layout-profile-panel > header { display:flex;align-items:center;gap:12px;padding:14px 15px 10px; }
+.home-layout-profile-panel > header > div { min-width:0;flex:1; }
+.home-layout-profile-panel > header strong,
+.home-layout-profile-panel > header small { display:block; }
+.home-layout-profile-panel > header strong { color:#fff;font-size:14px; }
+.home-layout-profile-panel > header small { margin-top:3px;color:#94a3b8;font-size:10px; }
+.home-layout-profile-panel > header button { width:28px;height:28px;border:0;border-radius:8px;background:rgba(255,255,255,.08);color:#fff;font-size:18px;cursor:pointer; }
+.home-layout-profile-form { display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;padding:0 15px 12px; }
+.home-layout-profile-form input { min-width:0;height:34px;padding:0 10px;border:1px solid rgba(255,255,255,.18);border-radius:9px;outline:0;background:rgba(255,255,255,.07);color:#fff;font:12px inherit; }
+.home-layout-profile-form input:focus { border-color:#10b981;box-shadow:0 0 0 3px rgba(16,185,129,.12); }
+.home-layout-profile-form button { padding:0 11px;border:1px solid rgba(16,185,129,.45);border-radius:9px;background:rgba(16,185,129,.15);color:#6ee7b7;font:700 11px inherit;cursor:pointer; }
+.home-layout-profile-list { display:grid;gap:7px;max-height:350px;overflow:auto;padding:0 15px 15px; }
+.home-layout-profile-empty { margin:4px 0;padding:18px 10px;border:1px dashed rgba(255,255,255,.18);border-radius:10px;color:#94a3b8;font-size:11px;text-align:center; }
+.home-layout-profile-row { display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:5px;padding:6px;border:1px solid rgba(255,255,255,.12);border-radius:11px;background:rgba(255,255,255,.045); }
+.home-layout-profile-row.active { border-color:rgba(16,185,129,.55);background:rgba(16,185,129,.09); }
+.home-layout-profile-row button { border:0;border-radius:7px;background:rgba(255,255,255,.07);color:#cbd5e1;cursor:pointer; }
+.home-layout-profile-apply { min-width:0;padding:6px 8px;text-align:left; }
+.home-layout-profile-apply strong,.home-layout-profile-apply small { display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
+.home-layout-profile-apply strong { color:#fff;font-size:12px; }
+.home-layout-profile-apply small { margin-top:3px;color:#94a3b8;font-size:9px; }
+.home-layout-profile-overwrite,.home-layout-profile-delete { height:28px;padding:0 7px;font-size:9px; }
+.home-layout-profile-delete { color:#fda4af!important; }
+@media (min-width: 761px) {
+  .launcher-weather {
+    width: calc(100% + var(--home-weather-width, 0px));
+    height: calc(var(--launcher-widget-height) + var(--home-weather-height, 0px));
+    transform: translate(var(--home-weather-x, 0px), var(--home-weather-y, 0px));
+  }
+  .launcher-todo {
+    width: calc(100% + var(--home-taskThreads-width, 0px));
+    height: calc(var(--launcher-widget-height) + var(--home-taskThreads-height, 0px));
+    transform: translate(var(--home-taskThreads-x, 0px), var(--home-taskThreads-y, 0px));
+  }
+  .launcher-sites {
+    width: calc(100% + var(--home-sites-width, 0px));
+    height: calc(var(--launcher-group-height) + var(--home-sites-height, 0px));
+    transform: translate(var(--home-sites-x, 0px), var(--home-sites-y, 0px));
+  }
+  .launcher-media-stack {
+    width: calc(100% + var(--home-bili-width, 0px));
+    height: calc(var(--launcher-group-height) + var(--home-bili-height, 0px));
+    transform: translate(var(--home-bili-x, 0px), var(--home-bili-y, 0px));
+  }
+  .launcher-overview {
+    grid-template-columns: minmax(190px, var(--home-weather-track, 1fr)) minmax(380px, 1.35fr) minmax(190px, var(--home-tasks-track, 1fr));
+  }
+  .launcher-groups.has-sites.has-media {
+    grid-template-columns: minmax(240px, var(--home-sites-track, 1fr)) minmax(240px, var(--home-bili-track, 1fr));
+  }
+  .launcher-groups.has-sites.has-media > .launcher-sites { grid-column: 1; }
+  .launcher-groups.has-sites.has-media > .launcher-media-stack { grid-column: 2; }
+}
+@media (max-width: 760px) {
+  body.home-layout-editing .home-layout-resize,
+  body.home-layout-editing .home-layout-resize-y { display: none; }
+  body .home-layout-done { right: 14px; bottom: 14px; }
+  body .home-layout-profiles { right: 128px; bottom: 14px; }
+  body .home-layout-reset { right: 14px; bottom: 60px; }
+  .home-layout-profile-panel { right:14px;bottom:106px; }
+}
+@media (prefers-reduced-motion: reduce) { .home-layout-armed { animation: none; outline: 3px solid #10b981; } }
+
+/* 首页与日报以点击、拖动为主，避免误拖产生整片蓝色文本选择。 */
+#launcher,
+#launcher *,
+#launcher-folder-dialog,
+#launcher-folder-dialog *,
+#right-task-shelf,
+#right-task-shelf *,
+#daily-section,
+#daily-section * {
+  -webkit-user-select: none;
+  user-select: none;
+}
+/* 编辑控件仍须正常选字；AI HOT 的三个资讯视图保留正文选择与复制。 */
+#launcher input,
+#launcher textarea,
+#launcher [contenteditable="true"],
+#daily-section input,
+#daily-section textarea,
+#daily-section [contenteditable="true"],
+#daily-aihot #aihot-body,
+#daily-aihot #aihot-body * {
+  -webkit-user-select: text;
+  user-select: text;
+}

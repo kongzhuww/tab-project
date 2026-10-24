@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>新标签页</title>
+    <link rel="icon" type="image/png" sizes="32x32" href="assets/icon-32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="assets/icon-16.png" />
+    <script>
+      window.addEventListener("load", function() {
+        document.documentElement.dataset.windowLoaded = "true";
+      }, { once: true });
+    </script>
+    <style>
+      html.skip-endfield-loader #endfield-loader,
+      body:not(.is-starting) #endfield-loader,
+      #endfield-loader[data-skipped="true"] {
+        display: none !important;
+      }
+      html.has-card-fullscreen .launcher,
+      html.has-card-fullscreen #hero-background-media,
+      body.has-card-fullscreen .launcher,
+      body.has-card-fullscreen #hero-background-media {
+        display: none !important;
+        visibility: hidden !important;
+      }
+    </style>
+    <script>
+      try {
+        localStorage.removeItem("lw_active_card");
+        var activeCard = null;
+        if (window.location && window.location.hash) {
+          var h = window.location.hash.replace(/^#/, "");
+          if (["todoist", "card-github", "daily-aihot", "daily-bilibili", "daily-youtube", "daily-pricing"].indexOf(h) !== -1) {
+            activeCard = h;
+          }
+        }
+        if (!activeCard) {
+          activeCard = sessionStorage.getItem("lw_active_card");
+        }
+        if (activeCard) {
+          document.documentElement.classList.add("has-card-fullscreen", "skip-endfield-loader");
+        }
+        const t = localStorage.getItem("theme") || "light";
+        document.documentElement.dataset.theme = t;
+        document.documentElement.setAttribute("data-theme", t);
+        const animSetting = localStorage.getItem("showStartupAnimation");
+        const loaderSetting = localStorage.getItem("logicweaverEndfieldLoader");
+        if (animSetting === "0" || animSetting === "false" || loaderSetting === "0" || loaderSetting === "false") {
+          document.documentElement.classList.add("skip-endfield-loader");
+        } else {
+          const startupStyle = localStorage.getItem("startupAnimationStyle") || localStorage.getItem("logicweaverStartupStyle") || "rhinelab";
+          document.documentElement.dataset.startupStyle = startupStyle;
+        }
+        const displaySize = localStorage.getItem("logicweaverDisplaySize") || "auto";
+        if (["classic", "compact", "large"].includes(displaySize)) document.documentElement.dataset.displaySize = displaySize;
+        else delete document.documentElement.dataset.displaySize;
+      } catch (e) {}
+    </script>
+    <!-- 纯血 Vue 3 SPA 统一全局编译样式 -->
+    <link rel="stylesheet" href="generated/vue-ui.css" />
+  </head>
+  <body>
+    <script>
+      (function() {
+        var card = null;
+        try {
+          if (window.location && window.location.hash) {
+            var h = window.location.hash.replace(/^#/, "");
+            if (["todoist", "card-github", "daily-aihot", "daily-bilibili", "daily-youtube", "daily-pricing"].indexOf(h) !== -1) card = h;
+          }
+          if (!card) card = sessionStorage.getItem("lw_active_card");
+        } catch (e) {}
+        if (card) {
+          document.body.classList.add("has-card-fullscreen");
+          document.documentElement.classList.add("has-card-fullscreen", "skip-endfield-loader");
+          var loader = document.getElementById("endfield-loader");
+          if (loader) loader.remove();
+        } else {
+          var s = localStorage.getItem("showStartupAnimation");
+          var l = localStorage.getItem("logicweaverEndfieldLoader");
+          var skip = s === "0" || s === "false" || l === "0" || l === "false" || document.documentElement.classList.contains("skip-endfield-loader");
+          if (skip) {
+            document.documentElement.classList.add("skip-endfield-loader");
+          } else {
+            document.body.classList.add("is-starting");
+          }
+        }
+      })();
+    </script>
+    <div id="endfield-loader" class="endfield-loader notranslate" role="status" aria-live="polite" aria-label="LogicWeaver 正在启动" translate="no" lang="en">
+      <div class="endfield-stage" aria-hidden="true">
+        <div class="endfield-loader-texture"></div>
+        <div class="endfield-loader-rail"></div>
+        <div id="endfield-loader-progress" class="endfield-loader-fill"></div>
+        <div id="endfield-loader-meter" class="endfield-loader-meter">
+          <span class="endfield-loader-tick"></span>
+          <b id="endfield-loader-percent">04%</b>
+          <small id="endfield-loader-status">CORE SHELL...</small>
+        </div>
+        <section class="endfield-loader-brand">
+          <span class="endfield-loader-kicker">DEEPSEEK HARNESS</span>
+          <strong>END</strong><strong>FIELD</strong>
+          <span class="endfield-loader-detail">
+            <i class="endfield-loader-chevron"></i>
+            <span>EDGE INTELLIGENCE THEME</span>
+            <small>TERRA RESEARCH COMMISSION / BOOT SEQUENCE</small>
+            <span class="endfield-loader-squares"><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i><i></i><i class="on"></i><i class="on"></i><i></i><i></i><i></i><i></i></span>
+          </span>
+          <em>OVER THE FRONTIER / INTO THE FRONT</em>
+        </section>
+        <div id="endfield-loader-wipe" class="endfield-loader-wipe"></div>
+      </div>
+      <div class="rhinelab-stage" aria-hidden="true">
+        <div class="rhine-background">
+          <svg viewBox="0 0 1920 1080" preserveAspectRatio="none">
+            <g fill="none" stroke="#ffffff" stroke-width="2.5">
+              <path class="rhine-drift-path1" d="M-210 705C-45 705 182 704 247 567C337 377 99 306 4 435S27 680 169 631C309 584 227 314 279 111S568-113 568-113"/>
+              <path class="rhine-drift-path2" d="M1560-80C1374 114 1671 168 1601 323S1371 367 1431 480S1692 666 1559 787S1329 886 1498 1130"/>
+              <circle class="rhine-drift-circle" cx="1450" cy="648" r="346"/>
+              <circle class="rhine-drift-circle2" cx="1450" cy="648" r="348"/>
+            </g>
+          </svg>
+        </div>
+        <div class="rhine-scaler">
+          <header class="rhine-brand">
+            <h1>RHINE LAB</h1>
+            <div class="rhine-brand-sub">SYNTHESIZE INFORMATION</div>
+            <p class="rhine-brand-os">
+              <span class="rhine-brand-analysis">
+                <span style="left:2px">A</span><span style="left:28px">N</span><span style="left:55px">A</span><span style="left:81px">L</span><span style="left:103px">Y</span><span style="left:129px">S</span><span style="left:154px">I</span><span style="left:166px">S</span>
+              </span>
+              <b>OS</b>
+            </p>
+          </header>
+          <button id="rhine-skip-btn" class="rhine-skip" type="button" title="点击进入系统 (或按 Enter)">ENTER SYSTEM <span>↗</span></button>
+          <div class="rhine-center-group">
+            <div class="rhine-logo-box">
+              <svg class="rhine-logo-svg" viewBox="0 0 310 185" aria-label="Rhine Lab" role="img">
+                <path class="rhine-logo-contour" d="M295 73C295 41 273 15 240 15C221 15 207 23 192 38C186 43 181 47 176 52C127 96 103 128 70 128C38 128 15 101 15 70C15 39 37 15 70 15C103 15 127 48 156 75C182 99 208 128 240 128C273 128 295 105 295 73Z" fill="none" stroke="currentColor" stroke-width="26" pathLength="1"/>
+                <path class="rhine-logo-plus" d="M44 70h50M69 45v50" fill="none" stroke="currentColor" stroke-width="15"/>
+                <path class="rhine-logo-minus" d="M219 70h44" fill="none" stroke="currentColor" stroke-width="15"/>
+                <text class="rhine-logo-text" x="165" y="174" text-anchor="middle" font-size="16" font-weight="700" letter-spacing="22">RHINE·LAB</text>
+              </svg>
+            </div>
+            <div class="rhine-auth-status">
+              <span class="rhine-auth-dot">·</span>
+              <span id="rhine-auth-text" class="rhine-auth-text">ID CONFIRMED : JOYCE MOORE</span>
+              <i class="rhine-cursor" aria-hidden="true"></i>
+            </div>
+          </div>
+          <div id="rhine-scan-box" class="rhine-scan" hidden>
+            <svg viewBox="0 0 1920 1080" aria-hidden="true">
+              <g fill="none" stroke="#080a08" stroke-linecap="round">
+                <circle class="rhine-scan-circle ring-outer" cx="960" cy="540" r="280" stroke-width="2.5" />
+                <circle class="rhine-scan-circle ring-white" cx="960" cy="540" r="260" stroke="#fff" stroke-width="3.5" />
+                <circle class="rhine-scan-circle ring-inner" cx="960" cy="540" r="220" stroke-width="2" />
+                <circle class="rhine-orbit-dot dot-1" cx="960" cy="260" r="8" fill="#ed821b" stroke="none"/>
+                <circle class="rhine-orbit-dot dot-2" cx="960" cy="820" r="8" fill="#ed821b" stroke="none"/>
+                <circle class="rhine-scan-core" cx="960" cy="540" r="6" fill="#080a08" stroke="none"/>
+              </g>
+            </svg>
+            <span class="rhine-scan-label">PERMISSION AUTHORIZED</span>
+          </div>
+          <div id="rhine-cinema-caption" class="rhine-cinema-caption">身份信息确认：JOYCE MOORE</div>
+          <div class="rhine-powered">POWERED BY <b>RHINE LAB</b><i></i></div>
+        </div>
+        <div id="rhine-loader-white" class="rhine-white" aria-hidden="true"></div>
+      </div>
+    </div>
+    <div id="vue-spa-root"></div>
+    <div id="app-toast" class="app-toast" hidden></div>
+    <div id="mobile-transfer-toast-container" class="mobile-transfer-toast-container" aria-live="polite"></div>
+    <script>
+      // 容灾双保险：超时自动移除开屏遮罩，确保首屏以最快速度绝对可见
+      setTimeout(function() {
+        document.body.classList.remove("is-starting");
+        var loader = document.getElementById("endfield-loader");
+        if (loader) loader.remove();
+      }, 180);
+    </script>
+    <!-- 纯血 Vue 3 SPA 唯一单根入口模块 -->
+    <script type="module" src="generated/vue-ui.js"></script>
+  </body>
+</html>

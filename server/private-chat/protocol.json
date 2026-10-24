@@ -1,0 +1,53 @@
+{
+  "schema": 1,
+  "protocol": 1,
+  "messageTypes": {
+    "text": {
+      "legacy": true
+    },
+    "image": {
+      "legacy": false
+    },
+    "music": {
+      "legacy": true
+    },
+    "bilibili": {
+      "legacy": true
+    },
+    "github": {
+      "legacy": true
+    },
+    "bili_series": {
+      "legacy": true
+    },
+    "aihot": {
+      "legacy": true
+    },
+    "youtube": {
+      "legacy": true
+    },
+    "website": {
+      "legacy": true
+    },
+    "server_invite": {
+      "legacy": true
+    },
+    "music_party": {
+      "legacy": true
+    }
+  },
+  "imageMimeTypes": [
+    "image/png",
+    "image/jpeg",
+    "image/gif",
+    "image/webp"
+  ],
+  "limits": {
+    "messageBytes": 262144,
+    "imageMessageBytes": 2097152,
+    "imageBytes": 1048576,
+    "textChars": 8000,
+    "imageMaxDimension": 8192,
+    "imageMaxPixels": 16777216
+  }
+}

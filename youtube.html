@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>YouTube 订阅与探索</title>
+    <link rel="icon" type="image/svg+xml" href="assets/nav-youtube.svg" />
+    <script src="generated/theme-init.js"></script>
+    <link rel="stylesheet" href="generated/vue-ui.css" />
+    <style>
+      html, body {
+        width: 100vw;
+        height: 100vh;
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        background: var(--bg, #0f141c);
+      }
+      .youtube-standalone-main {
+        width: 100vw;
+        height: 100vh;
+        position: relative;
+        overflow: hidden;
+      }
+      /* 全屏卡片样式自动铺满，底部预留 dock 高度空间避免遮挡 */
+      #daily-youtube,
+      #daily-youtube.card-fullscreen {
+        position: absolute !important;
+        inset: 0 !important;
+        width: 100% !important;
+        height: 100% !important;
+        margin: 0 !important;
+        border-radius: 0 !important;
+        border: none !important;
+        max-width: 100% !important;
+        max-height: 100% !important;
+        display: flex !important;
+        flex-direction: column !important;
+        padding: 16px 28px 74px !important;
+        box-sizing: border-box !important;
+      }
+      #daily-youtube .card-head {
+        border-radius: 0 !important;
+        flex-shrink: 0 !important;
+      }
+      #youtube-body,
+      #youtube-explore-pane,
+      #youtube-search-pane,
+      #youtube-channels-pane {
+        flex: 1 1 0 !important;
+        min-height: 0 !important;
+        overflow-y: auto !important;
+      }
+      /* Dock 栏置底悬浮 */
+      .mac-dock {
+        position: fixed !important;
+        bottom: 12px !important;
+        left: 50% !important;
+        transform: translateX(-50%) !important;
+        z-index: 9999 !important;
+      }
+    </style>
+  </head>
+  <body class="has-card-fullscreen youtube-standalone-body">
+    <main class="youtube-standalone-main">
+      <div id="vue-youtube-root"><p class="muted small">正在加载 YouTube 订阅…</p></div>
+    </main>
+
+    <!-- 底部 Mac Dock 栏 -->
+    <nav id="mac-dock" class="mac-dock" aria-label="快捷应用栏"></nav>
+
+    <div id="app-toast" class="app-toast" hidden></div>
+    <div id="vue-notification-root"></div>
+
+    <script type="module" src="generated/vue-ui.js"></script>
+  </body>
+</html>

@@ -1,0 +1,25 @@
+name = "beaver-study-relay"
+main = "src/index.ts"
+compatibility_date = "2024-04-01"
+
+# Cloudflare D1 关系型数据库绑定 (用于持久化房间、永久好友、消息与图片配额)
+[[d1_databases]]
+binding = "DB"
+database_name = "beaver_chat_db"
+database_id = "your-d1-database-id"
+
+# Cloudflare Durable Objects 全局单例房间绑定 (彻底消除跨边缘节点广播隔离)
+[durable_objects]
+bindings = [
+  { name = "ROOM", class_name = "ChatRoom" }
+]
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["ChatRoom"]
+
+# 静态规则与常量
+[vars]
+MAX_STORAGE_BYTES = "5368709120" # 5 GB 免费上限
+MAX_STORED_IMAGES = "3000"       # 自动淘汰滚动清理保留的最近图片张数
+IMAGE_EXPIRE_DAYS = "60"         # 超过 60 天的聊天图片自动释放占位

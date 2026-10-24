@@ -1,0 +1,50 @@
+name: CI Check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Extension build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Typecheck and isolated extension build
+        id: build
+        run: npm run release:build
+      - name: Working-tree whitespace check
+        run: git diff --check
+      - name: Upload unpacked extension for manual review
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: extension-review-${{ github.sha }}
+          path: |
+            ${{ steps.build.outputs.extension_dir }}/
+          if-no-files-found: error
+          retention-days: 7
+      - name: Upload build provenance
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: build-info-${{ github.sha }}
+          path: ${{ steps.build.outputs.build_info }}
+          if-no-files-found: error
+          retention-days: 7
