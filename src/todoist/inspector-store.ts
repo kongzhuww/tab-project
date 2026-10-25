@@ -21,6 +21,7 @@ export interface TodoistInspectorState {
   saving: boolean;
   error: string;
   url?: string;
+  commentAttachments: Array<{ name: string; url: string }>;
 }
 
 export const todoistInspectorState = reactive<TodoistInspectorState>({
@@ -37,7 +38,8 @@ export const todoistInspectorState = reactive<TodoistInspectorState>({
   loading: false,
   saving: false,
   error: "",
-  url: ""
+  url: "",
+  commentAttachments: []
 });
 
 // Serialize title/description snapshots; a slow request must not discard a later edit.
@@ -122,7 +124,7 @@ const inspectorController = {
     Object.assign(todoistInspectorState, {
       title: "", description: "", priority: 1,
       startDate: "", startTime: "", dueDate: "", dueTime: "",
-      labels: [], url: ""
+      labels: [], url: "", commentAttachments: []
     });
 
     if (initialData) {
@@ -171,6 +173,46 @@ const inspectorController = {
 
         todoistInspectorState.labels = [...(task.labels || [])];
         todoistInspectorState.url = task.url || "";
+
+        // 异步并发拉取评论区附件（获取 Todoist 重新签发的新鲜防过期云端直链）
+        try {
+          const comments = await todoistService.getComments(taskId, read.signal);
+          if (comments && read.current()) {
+            const freshAtts: Array<{ name: string; url: string }> = [];
+            for (const c of comments) {
+              if (c?.attachment?.file_url) {
+                const name = c.attachment.file_name || "附件图片";
+                freshAtts.push({ name, url: c.attachment.file_url });
+              }
+            }
+            todoistInspectorState.commentAttachments = freshAtts;
+
+            // 如果任务描述里有旧的过期 CloudFront 链接，用最新签名链接无缝替换刷新
+            if (freshAtts.length > 0 && todoistInspectorState.description) {
+              let updatedDesc = todoistInspectorState.description;
+              let hasReplaced = false;
+              for (const att of freshAtts) {
+                // 匹配带签名的同名附件或者 cloudfront 链接
+                const reg = new RegExp(`(!\\[.*?\\]\\()https?://[^\\s\\)]*cloudfront\\.net[^\\s\\)]*(\\))`, "g");
+                if (reg.test(updatedDesc)) {
+                  updatedDesc = updatedDesc.replace(reg, `$1${att.url}$2`);
+                  hasReplaced = true;
+                }
+              }
+              if (hasReplaced && !todoistTitleDrafts.has(taskId)) {
+                todoistInspectorState.description = updatedDesc;
+                for (const col of todoistTaskListState.columns) {
+                  const found = col.tasks.find((t) => String(t.id) === taskId);
+                  if (found) {
+                    found.description = updatedDesc;
+                    if (found._taskRaw) found._taskRaw.description = updatedDesc;
+                    break;
+                  }
+                }
+              }
+            }
+          }
+        } catch {}
       }
     } catch {
       if (read.current()) todoistInspectorState.error = "任务详情读取失败，请重新打开重试。";

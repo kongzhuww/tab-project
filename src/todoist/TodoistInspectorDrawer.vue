@@ -407,17 +407,27 @@ function clearAllDates() {
   clearDueDate();
 }
 
-// 提取当前任务中所有关联的图片（从原始描述 Markdown 中解析，支持 http 与 data:image）
+// 提取当前任务中所有关联的图片（从描述 Markdown 与云端评论区动态附件汇聚，自动去重）
 const attachedImages = computed(() => {
   const list: Array<{ url: string; name: string }> = [];
+  const seenUrls = new Set<string>();
   const raw = state.description || "";
   const regex = /!\[([^\]]*)\]\(((?:https?:\/\/|data:image\/)[^\s\)]+)\)/g;
   let match;
   while ((match = regex.exec(raw)) !== null) {
+    const url = match[2];
+    seenUrls.add(url);
     list.push({
       name: match[1] || "任务照片",
-      url: match[2]
+      url
     });
+  }
+  // 补充通过官方评论区添加或动态刷新的云端照片
+  for (const ca of state.commentAttachments || []) {
+    if (!seenUrls.has(ca.url)) {
+      seenUrls.add(ca.url);
+      list.push(ca);
+    }
   }
   return list;
 });
