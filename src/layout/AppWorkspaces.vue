@@ -21,11 +21,6 @@ onMounted(() => {
   <div class="logicweaver-workspaces-layer">
     <!-- 原位模块宿主：空闲时准备容器，加载时机由各卡片注册策略保留。 -->
     <main id="daily-section" class="wrap" v-if="isDailyReady">
-      <!-- 聚集工作台 -->
-      <div id="vue-workbench-root">
-        <DockCardModuleHost id="workbench" />
-      </div>
-
       <!-- Todoist 全屏任务工作区 -->
       <div id="vue-todoist-root">
         <DockCardModuleHost id="todoist" />

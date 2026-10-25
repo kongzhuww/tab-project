@@ -1,10 +1,21 @@
 import { reactive } from "vue";
+import { readReminder, saveReminder } from "./local-reminders";
 import { rememberTitleDraft, todoistTitleDrafts } from "./title-drafts";
 import { trackTodoistWrites } from "./module-state";
 import { todoistService } from "../services/todoist.service";
 import { todoistTaskListController, todoistTaskListState, cancelTodoistWorkspaceReads } from "./task-list-store";
 import { todoistCalendarSidebarController } from "./calendar-sidebar-store";
 import { getTaskStartDate, setTaskStartDate, parseDateAndTime, combineDateAndTime } from "./task-date-helper";
+
+export interface TodoistCommentItem {
+  id: string;
+  content: string;
+  postedAt: string;
+  attachment?: {
+    name: string;
+    url: string;
+  };
+}
 
 export interface TodoistInspectorState {
   isOpen: boolean;
@@ -17,11 +28,13 @@ export interface TodoistInspectorState {
   dueDate: string;
   dueTime: string;
   labels: string[];
+  reminderTime: string;
+  comments: TodoistCommentItem[];
+  commentAttachments: Array<{ name: string; url: string }>;
   loading: boolean;
   saving: boolean;
   error: string;
   url?: string;
-  commentAttachments: Array<{ name: string; url: string }>;
 }
 
 export const todoistInspectorState = reactive<TodoistInspectorState>({
@@ -35,11 +48,13 @@ export const todoistInspectorState = reactive<TodoistInspectorState>({
   dueDate: "",
   dueTime: "",
   labels: [],
+  reminderTime: "",
+  comments: [],
+  commentAttachments: [],
   loading: false,
   saving: false,
   error: "",
-  url: "",
-  commentAttachments: []
+  url: ""
 });
 
 // Serialize title/description snapshots; a slow request must not discard a later edit.
@@ -124,7 +139,7 @@ const inspectorController = {
     Object.assign(todoistInspectorState, {
       title: "", description: "", priority: 1,
       startDate: "", startTime: "", dueDate: "", dueTime: "",
-      labels: [], url: "", commentAttachments: []
+      labels: [], reminderTime: "", comments: [], commentAttachments: [], url: ""
     });
 
     if (initialData) {
@@ -151,6 +166,13 @@ const inspectorController = {
       todoistInspectorState.description = retainedDraft.description;
     }
 
+    const reminderRead = beginRead("reminder");
+    void readReminder(taskId).then(reminder => {
+      if (reminderRead.current()) todoistInspectorState.reminderTime = reminder?.time || "";
+    }).catch(() => {
+      if (reminderRead.current()) todoistInspectorState.error = "本机提醒读取失败。";
+    }).finally(reminderRead.finish);
+
     // 异步拉取该任务最新完整详情
     const read = beginRead("detail");
     todoistInspectorState.loading = true;
@@ -174,18 +196,29 @@ const inspectorController = {
         todoistInspectorState.labels = [...(task.labels || [])];
         todoistInspectorState.url = task.url || "";
 
-        // 异步并发拉取评论区附件（获取 Todoist 重新签发的新鲜防过期云端直链）
+
+        // 异步并发拉取评论列表及附件
         try {
           const comments = await todoistService.getComments(taskId, read.signal);
           if (comments && read.current()) {
             const freshAtts: Array<{ name: string; url: string }> = [];
+            const parsedComments: TodoistCommentItem[] = [];
             for (const c of comments) {
+              let att: { name: string; url: string } | undefined;
               if (c?.attachment?.file_url) {
                 const name = c.attachment.file_name || "附件图片";
                 freshAtts.push({ name, url: c.attachment.file_url });
+                att = { name, url: c.attachment.file_url };
               }
+              parsedComments.push({
+                id: c.id,
+                content: c.content || "",
+                postedAt: c.posted_at || "",
+                attachment: att
+              });
             }
             todoistInspectorState.commentAttachments = freshAtts;
+            todoistInspectorState.comments = parsedComments;
 
             // 如果任务描述里有旧的过期 CloudFront 链接，用最新签名链接无缝替换刷新
             if (freshAtts.length > 0 && todoistInspectorState.description) {
@@ -392,9 +425,106 @@ const inspectorController = {
     } finally {
       todoistInspectorState.saving = false;
     }
+  },
+
+  async setPriority(priority: number) {
+    if (!todoistInspectorState.taskId) return;
+    const target = writeTarget();
+    if (![1, 2, 3, 4].includes(priority)) return;
+    const previous = todoistInspectorState.priority;
+    todoistInspectorState.priority = priority;
+    cancelTodoistWorkspaceReads();
+    todoistService.invalidateWorkspaceSnapshots();
+    try {
+      await todoistService.updateTask(target.taskId, { priority });
+      for (const col of todoistTaskListState.columns) {
+        const t = col.tasks.find(item => item.id === target.taskId);
+        if (t) {
+          t.priority = priority;
+          if (t._taskRaw) t._taskRaw.priority = priority;
+        }
+      }
+    } catch (e: any) {
+      if (target.current()) {
+        todoistInspectorState.priority = previous;
+        todoistInspectorState.error = "优先级保存未确认，请刷新核对；未自动重试。";
+      }
+    }
+  },
+
+  async toggleLabel(labelName: string) {
+    if (!todoistInspectorState.taskId) return;
+    const target = writeTarget();
+    const currentLabels = [...todoistInspectorState.labels];
+    const exists = currentLabels.includes(labelName);
+    const nextLabels = exists ? currentLabels.filter(l => l !== labelName) : [...currentLabels, labelName];
+    todoistInspectorState.labels = nextLabels;
+    cancelTodoistWorkspaceReads();
+    todoistService.invalidateWorkspaceSnapshots();
+    try {
+      await todoistService.updateTask(target.taskId, { labels: nextLabels });
+      for (const col of todoistTaskListState.columns) {
+        const t = col.tasks.find(item => item.id === target.taskId);
+        if (t) {
+          t.labels = nextLabels;
+          if (t._taskRaw) t._taskRaw.labels = nextLabels;
+        }
+      }
+    } catch (e: any) {
+      if (target.current()) {
+        todoistInspectorState.labels = currentLabels;
+        todoistInspectorState.error = "标签保存未确认，请刷新核对；未自动重试。";
+      }
+    }
+  },
+
+  async createAndAttachLabel(name: string) {
+    const target = writeTarget();
+    name = name.trim();
+    if (!target.taskId || !name) return;
+    try {
+      const known = await todoistService.getLabels();
+      if (!target.current()) return;
+      if (!known.some(label => label.name === name)) await todoistService.createLabel(name);
+      if (target.current() && !todoistInspectorState.labels.includes(name)) await this.toggleLabel(name);
+    } catch {
+      if (target.current()) todoistInspectorState.error = "标签创建未确认，请刷新标签库核对。";
+    }
+  },
+
+  async addComment(content: string) {
+    if (!todoistInspectorState.taskId || !content.trim()) return;
+    const target = writeTarget();
+    try {
+      const added = await todoistService.addComment({
+        task_id: target.taskId,
+        content: content.trim()
+      });
+      if (added && target.current()) {
+        todoistInspectorState.comments.push({
+          id: added.id || `c_${Date.now()}`,
+          content: added.content || content.trim(),
+          postedAt: added.posted_at || new Date().toISOString()
+        });
+      }
+    } catch (e: any) {
+      if (target.current()) todoistInspectorState.error = "发送评论失败：" + (e?.message || "");
+    }
+  },
+
+  async setReminder(reminderTime: string) {
+    const target = writeTarget();
+    if (!target.taskId) return;
+    try {
+      await saveReminder(target.taskId, reminderTime, todoistInspectorState.title);
+      if (target.current()) { todoistInspectorState.reminderTime = reminderTime; todoistInspectorState.error = ""; }
+    } catch (e) {
+      if (target.current()) todoistInspectorState.error = e instanceof Error ? e.message : "提醒未保存，请重试。";
+    }
   }
 };
 
 export const todoistInspectorController = trackTodoistWrites(inspectorController, [
-  "saveTitleAndDesc", "attachImageToTask", "setStartDateAndTime", "setDueDateAndTime"
+  "saveTitleAndDesc", "attachImageToTask", "setStartDateAndTime", "setDueDateAndTime",
+  "setPriority", "toggleLabel", "setReminder", "addComment", "createAndAttachLabel"
 ]);

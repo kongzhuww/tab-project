@@ -8,7 +8,7 @@ export { fullscreenCardState } from "./fullscreen-card-state";
 import { getDockModule, touchDockModuleTransition } from "../modules/registry";
 import { windowManagerController } from "./window-manager.store";
 
-const cards: CardId[] = ["workbench", "todoist", "card-github", "daily-aihot", "daily-bilibili", "daily-youtube", "daily-pricing"];
+const cards: CardId[] = ["todoist", "card-github", "daily-aihot", "daily-bilibili", "daily-youtube", "daily-pricing"];
 
 let pausedBackgroundVideo: HTMLVideoElement | null = null;
 

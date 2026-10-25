@@ -140,18 +140,18 @@ export class CalendarService {
   private initControllers(): void {
     todoistCalendarSidebarController.onAction(async (action, payload) => {
       if (action === "init") {
-        try { await this.init(); this.syncSidebarToVue(); }
+        try { this.syncSidebarToVue(); }
         catch { calendarWorkspaceController.setStatusText("日历初始化未完成，请稍后重新打开。"); }
       } else if (action === "toggle-collapsed") {
-        const next = !todoistCalendarSidebarController.state.collapsed;
+        const next = todoistCalendarSidebarController.state.collapsed;
         todoistCalendarSidebarController.setCollapsed(next);
         try { localStorage.setItem("lw_todoist_cal_collapsed", next ? "1" : "0"); } catch {}
       } else if (action === "today") {
         this.goToday();
       } else if (action === "prev-month") {
-        this.changeMonth(-1);
+        this.changeMonth(-1, false);
       } else if (action === "next-month") {
-        this.changeMonth(1);
+        this.changeMonth(1, false);
       } else if (action === "prev-year") {
         this.currentMonth = new Date(this.currentMonth.getFullYear() - 1, this.currentMonth.getMonth(), 1);
         this.publishCalendarViews();
@@ -159,7 +159,8 @@ export class CalendarService {
         this.currentMonth = new Date(this.currentMonth.getFullYear() + 1, this.currentMonth.getMonth(), 1);
         this.publishCalendarViews();
       } else if (action === "select-date") {
-        this.selectDate(payload);
+        this.selectedDate = payload;
+        this.publishCalendarViews();
       } else if (action === "drop-task") {
         const { taskId, date } = payload;
         this.highlightDrop("");
@@ -481,11 +482,11 @@ export class CalendarService {
     this.publishCalendarViews();
   }
 
-  public changeMonth(offset: number): void {
+  public changeMonth(offset: number, loadGoogle = true): void {
     this.currentMonth = new Date(this.currentMonth.getFullYear(), this.currentMonth.getMonth() + offset, 1);
     this.selectedDate = "";
     this.publishCalendarViews();
-    this.loadGoogleCalendarRange(false, false).catch(() => {});
+    if (loadGoogle) this.loadGoogleCalendarRange(false, false).catch(() => {});
   }
 
   public goToday(): void {
@@ -598,73 +599,27 @@ export class CalendarService {
   }
 
   public syncSidebarToVue(): void {
+    // Todoist owns task projections; this shared service only supplies month navigation.
     const year = this.currentMonth.getFullYear();
-    const monthIndex = this.currentMonth.getMonth();
-    const monthLabel = CHINESE_MONTHS[monthIndex] || `${monthIndex + 1}月`;
-    const yearLabel = String(year);
-    const first = new Date(year, monthIndex, 1);
-    const mondayOffset = (first.getDay() + 6) % 7;
-    const cursor = new Date(year, monthIndex, 1 - mondayOffset);
+    const month = this.currentMonth.getMonth();
+    const first = new Date(year, month, 1);
+    const offset = (first.getDay() + 6) % 7;
     const today = this.dateKey(new Date());
-
-    const cells: any[] = [];
-    for (let i = 0; i < 42; i++) {
-      const d = new Date(cursor);
-      d.setDate(cursor.getDate() + i);
-      const k = this.dateKey(d);
-      const googleEvents = this.isGoogleConnected ? this.googleEventsForDate(k) : [];
-      const itemCount = googleEvents.length;
-
-      cells.push({
-        date: k,
-        dayNumber: d.getDate(),
-        isOutside: d.getMonth() !== monthIndex,
-        isToday: k === today,
-        isSelected: k === (this.selectedDate || today),
-        itemCount,
-        title: itemCount ? `${this.friendlyDate(k)} · ${itemCount} 项日程` : `${this.friendlyDate(k)}`,
-        hasDot: itemCount > 0
-      });
-    }
-
     const selected = this.selectedDate || today;
-    const isToday = selected === today;
-    const googleEvents = this.isGoogleConnected ? this.googleEventsForDate(selected) : [];
-    const totalAgendaCount = googleEvents.length;
-    const badgeText = this.isGoogleConnected ? "Google 在线" : "未连接";
-    const agendaTitle = isToday ? "今日日程" : `${selected.slice(5)} 日程`;
-    const agendaCount = totalAgendaCount ? `${totalAgendaCount} 项` : "无安排";
-    const agendaItems = googleEvents.map(ev => ({
-      id: ev.id || String(Math.random()),
-      time: ev.start?.date ? "全天"
-        : new Date(ev.start?.dateTime || "").toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit", hour12: false }),
-      summary: ev.summary || "（无标题）",
-      subtitle: ev.location || ev._calendarName || "Google 日历",
-      htmlLink: ev.htmlLink || "",
-      color: ev._calendarColor || "var(--accent)",
-      raw: ev
-    }));
-
-    // 按时间先后排序
-    agendaItems.sort((a, b) => {
-      const tA = (a.time || "").replace(/[^\d:]/g, "");
-      const tB = (b.time || "").replace(/[^\d:]/g, "");
-      return tA.localeCompare(tB);
+    const cells = Array.from({ length: 42 }, (_, index) => {
+      const date = new Date(year, month, 1 - offset + index);
+      const key = this.dateKey(date);
+      return {
+        date: key, dayNumber: date.getDate(), isOutside: date.getMonth() !== month,
+        isToday: key === today, isSelected: key === selected,
+        itemCount: 0, title: key, hasDot: false
+      };
     });
-
     todoistCalendarSidebarController.updateState({
-      badgeText,
-      monthLabel,
-      yearLabel,
-      cells,
-      agendaTitle,
-      agendaCount,
-      agendaItems,
-      emptyText: totalAgendaCount === 0 ? (this.isGoogleConnected ? "当天没有日程 ☕" : "连接 Google 日历后查看日程") : "",
-      selectedDate: selected
+      badgeText: "Todoist", monthLabel: CHINESE_MONTHS[month], yearLabel: String(year),
+      cells, selectedDate: selected
     });
   }
-
 }
 
 export const calendarService = new CalendarService();

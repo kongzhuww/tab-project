@@ -517,31 +517,6 @@ function runVideoAction(idOrVideo: any, action: string): void {
 async function runContextMenuAction(action: string): Promise<void> {
   const { video, folder } = contextMenu.value;
   contextMenu.value.visible = false;
-  if (action === "send-to-workbench") {
-    if (!video) return;
-    try {
-      const { addWorkbenchVideo } = await import("../workbench/workbench.store");
-      addWorkbenchVideo({
-        id: video.id || video.bvid || (video.aid ? `av${video.aid}` : `vid_${Date.now()}`),
-        bvid: video.bvid || (video.aid ? `av${video.aid}` : ""),
-        title: video.title || "未命名视频",
-        pic: video.cover || "",
-        owner: {
-          name: video.author || "未知UP主",
-          face: video.authorFace || ""
-        },
-        duration: video.duration
-      });
-      notifications.show({
-        appName: "海狸工作台",
-        title: "已添加到工作台",
-        message: `已将《${(video.title || '').slice(0, 24)}》置入左侧视频队列`
-      });
-    } catch (e) {
-      console.warn("添加到工作台失败", e);
-    }
-    return;
-  }
   if (action === "share-chat") {
     if (!video) return;
     try {
@@ -1324,9 +1299,6 @@ function onRadioVideoDragStart(event: DragEvent, video: { bvid: string; title: s
       @click.stop
     >
       <div class="fo-context-header" :title="contextMenu.video.title">{{ contextMenu.video.title }}</div>
-      <button type="button" class="fo-context-item" role="menuitem" @click="runContextMenuAction('send-to-workbench')">
-        <span class="fo-context-icon" aria-hidden="true">📌</span> 发送到工作台
-      </button>
       <ChatShareMenu
         label="💬 发送到聊天室"
         match-menu-item

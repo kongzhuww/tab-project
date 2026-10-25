@@ -249,31 +249,6 @@ function handleMoveOut() {
   launcherMenusController.dispatch("link:move-out", { link });
 }
 
-async function handleSendToWorkbench() {
-  const link = state.linkMenu.link;
-  launcherMenusController.closeLinkMenu();
-  if (!link) return;
-  const full = launcherService.getState().links.find(item => String(item.id) === String(link.id));
-  try {
-    const { addWorkbenchWeb } = await import("../workbench/workbench.store");
-    addWorkbenchWeb({
-      id: String(link.id || `web_${Date.now()}`),
-      title: link.title || "未命名网站",
-      url: link.url || "",
-      icon: full?.icon || "",
-      customIcon: full?.customIcon || ""
-    });
-    const { notifications } = await import("../sdk/notifications");
-    notifications.show({
-      appName: "海狸工作台",
-      title: "已添加到工作台",
-      message: `已将网站「${link.title || link.url}」放入常用参考`
-    });
-  } catch (e) {
-    console.warn("添加网站到工作台失败", e);
-  }
-}
-
 function handleLinkMove(page: string) {
   state.linkMenu.flyoutOpen = false;
   const link = state.linkMenu.link;
@@ -428,9 +403,6 @@ watch(() => [state.pageMenu, state.pageMenu.isOpen], () => {
       <button v-if="state.linkMenu.link?.group && state.linkMenu.link.group !== '常用网站'" type="button" @click="handleMoveOut">移出文件夹，放到外面</button>
       <button id="link-menu-rename" type="button" @click="handleLinkRename">
         重命名
-      </button>
-      <button id="link-menu-send-workbench" type="button" @click="handleSendToWorkbench">
-        📌 发送到工作台
       </button>
       <ChatShareMenu id="link-menu-send" :visible="state.linkMenu.isOpen" :disabled="linkMenuBusy" @open="state.linkMenu.flyoutOpen = false" @select="shareLink" />
       <button id="link-menu-change-icon" type="button" @click="handleLinkChangeIcon">

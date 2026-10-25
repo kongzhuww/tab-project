@@ -6,7 +6,8 @@ import NotificationHost from "../notifications/NotificationHost.vue";
 import DockModuleHost from "../modules/DockModuleHost.vue";
 import { useRetainedMount } from "../core/useRetainedMount";
 import { folderState } from "../launcher/folder-store";
-import { profilePanelController } from "../profile/panel-store";
+import { notificationHistoryState } from "../notifications/history-store";
+import { tabManagerState } from "../profile/tab-manager-store";
 import { clockSettingsController } from "../clock/settings-store";
 import { aihotViewerState } from "../viewers/store";
 import { biliTheaterController } from "../bilibili/theater-store";
@@ -20,7 +21,8 @@ import { githubRepoDetailState } from "../github/repo-detail-store";
 import BiliUpPreview from "../bilibili/BiliUpPreview.vue";
 
 const mountMarket = useRetainedMount(() => pluginMarketController.state.isOpen);
-const mountProfile = useRetainedMount(() => profilePanelController.state.isOpen);
+const mountNotificationCenter = useRetainedMount(() => notificationHistoryState.isOpen);
+const mountTabManager = useRetainedMount(() => tabManagerState.isOpen);
 const mountClockSettings = useRetainedMount(() => clockSettingsController.state.isOpen);
 const mountAihotViewer = useRetainedMount(() => aihotViewerState.open);
 
@@ -46,7 +48,8 @@ const BookmarkNoteMenu = defineAsyncComponent(() => import("../bookmarks/Bookmar
 const BookmarkPanel = defineAsyncComponent(() => import("../bookmarks/BookmarkPanel.vue"));
 const ClockSettingsMenu = defineAsyncComponent(() => import("../clock/ClockSettingsMenu.vue"));
 
-const ProfilePanel = defineAsyncComponent(() => import("../profile/ProfilePanel.vue"));
+const NotificationCenter = defineAsyncComponent(() => import("../notifications/NotificationCenter.vue"));
+const TabManagerPanel = defineAsyncComponent(() => import("../profile/TabManagerPanel.vue"));
 const LauncherDialogs = defineAsyncComponent(() => import("../launcher/LauncherDialogs.vue"));
 const LauncherFolderDialog = defineAsyncComponent(() => import("../launcher/LauncherFolderDialog.vue"));
 const LauncherMenus = defineAsyncComponent(() => import("../launcher/LauncherMenus.vue"));
@@ -61,7 +64,6 @@ const GitHubRepoDetailDrawer = defineAsyncComponent(() => import("../github/GitH
 const BiliSubtitleModal = defineAsyncComponent(() => import("../bilibili/BiliSubtitleModal.vue"));
 const FirecrawlModal = defineAsyncComponent(() => import("../firecrawl/FirecrawlModal.vue"));
 const FloatingImageViewer = defineAsyncComponent(() => import("../viewers/FloatingImageViewer.vue"));
-const GitHubAnalysisModal = defineAsyncComponent(() => import("../github/analysis/GitHubAnalysisModal.vue"));
 const CommandPalette = defineAsyncComponent(() => import("../commands/CommandPalette.vue"));
 const AppPromptModal = defineAsyncComponent(() => import("../core/AppPromptModal.vue"));
 // Library mode does not automatically load split CSS. Load shop-only CSS text
@@ -83,7 +85,7 @@ const PluginMarketDialog = defineAsyncComponent(async () => {
       <NotificationHost />
     </div>
 
-    <!-- 账号与性能右键菜单 -->
+    <!-- 头像右键菜单 -->
     <div id="bili-profile-menu" class="bili-profile-menu" hidden>
       <ProfileMenu />
     </div>
@@ -93,10 +95,9 @@ const PluginMarketDialog = defineAsyncComponent(async () => {
       <BiliMessagePanel v-if="mountBiliMessagePanel" />
     </div>
 
-    <!-- 个人信息中心与微架构抽屉 -->
-    <div id="vue-profile-panel-root">
-      <ProfilePanel v-if="mountProfile" />
-    </div>
+    <!-- 顶栏通知历史与独立标签页管理 -->
+    <div id="vue-notification-center-root"><NotificationCenter v-if="mountNotificationCenter" /></div>
+    <div id="vue-tab-manager-root"><TabManagerPanel v-if="mountTabManager" /></div>
 
     <!-- 书签上下文操作与备注菜单 -->
     <div id="vue-bookmark-menu-root">
@@ -185,11 +186,6 @@ const PluginMarketDialog = defineAsyncComponent(async () => {
     <!-- 🖼️ 非模态浮动图片轻量小窗 (0 模糊遮罩，支持自由拖拽与滚轮缩放) -->
     <div id="vue-floating-image-viewer-root">
       <FloatingImageViewer />
-    </div>
-
-    <!-- 🔍 GitHub 本地分析视窗 (GitIngest / GitDiagram / DeepWiki，0模糊遮罩) -->
-    <div id="vue-github-analysis-modal-root">
-      <GitHubAnalysisModal />
     </div>
 
     <!-- ⚡ 全局快捷命令中心 (Ctrl+K / Cmd+K) -->

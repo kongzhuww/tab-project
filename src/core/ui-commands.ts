@@ -15,7 +15,7 @@ export function registerUiCommands(commands: CommandRegistry): void {
     run: () => introController.skip("COMMAND SKIP")
   });
   commands.register({
-    id: "notifications.clear", title: "清除全部通知", category: "通知", keywords: ["toast", "关闭", "清空"], concurrency: "drop",
+    id: "notifications.clear", title: "关闭当前 Toast", category: "通知", keywords: ["toast", "关闭"], description: "只关闭浮动提示，不删除通知中心历史", concurrency: "drop",
     enabled: () => notificationController.size > 0,
     run: () => notificationController.clear()
   });
@@ -120,14 +120,14 @@ export function registerUiCommands(commands: CommandRegistry): void {
     enabled: () => typeof window.LogicWeaverTodoist?.quickAdd === "function", run: () => window.LogicWeaverTodoist?.quickAdd()
   });
   commands.register({
-    id: "profile.show-info", title: "查看本地信息与性能", category: "账号", description: "打开浏览器指纹、环境与硬件性能网格",
-    keywords: ["性能", "指纹", "探针", "profile", "fps"], concurrency: "drop",
+    id: "notifications.open-history", title: "打开通知中心", category: "通知", description: "查看保留的重要通知和未读记录",
+    keywords: ["通知", "未读", "toast", "历史"], concurrency: "drop",
     enabled: () => typeof window.LogicWeaverProfileMenu?.trigger === "function",
     run: () => window.LogicWeaverProfileMenu?.trigger("messages")
   });
   commands.register({
-    id: "profile.refresh", title: "刷新账号与性能探针", category: "账号", description: "清空账号缓存并重新探测性能",
-    keywords: ["刷新", "账号", "探针", "bilibili"], concurrency: "drop",
+    id: "profile.refresh", title: "刷新 B站账号信息", category: "账号", description: "重新读取B站用户和消息信息",
+    keywords: ["刷新", "账号", "bilibili"], concurrency: "drop",
     enabled: () => typeof window.LogicWeaverProfileMenu?.trigger === "function",
     run: () => window.LogicWeaverProfileMenu?.trigger("refresh")
   });
@@ -180,22 +180,14 @@ export function registerUiCommands(commands: CommandRegistry): void {
     run: () => window.LogicWeaverBackgroundLibrary?.resetDefault()
   });
   commands.register({
-    id: "profile.open-panel", title: "打开个人信息与性能面板", category: "个人中心", description: "查看浏览器指纹、环境与性能指标",
-    keywords: ["个人信息", "性能", "浏览器指纹", "profile"], concurrency: "drop",
-    enabled: () => typeof window.LogicWeaverProfilePanel?.openPanel === "function",
-    run: () => window.LogicWeaverProfilePanel?.openPanel()
+    id: "notifications.close-history", title: "关闭通知中心", category: "通知", keywords: ["关闭通知"], concurrency: "drop",
+    enabled: () => typeof window.LogicWeaverNotificationCenter?.close === "function",
+    run: () => window.LogicWeaverNotificationCenter?.close()
   });
   commands.register({
-    id: "profile.close-panel", title: "关闭个人信息面板", category: "个人中心", description: "关闭个人信息与性能采样面板",
-    keywords: ["关闭信息", "close profile"], concurrency: "drop",
-    enabled: () => typeof window.LogicWeaverProfilePanel?.closePanel === "function",
-    run: () => window.LogicWeaverProfilePanel?.closePanel()
-  });
-  commands.register({
-    id: "profile.toggle-tech-drawer", title: "展开/收起微架构抽屉", category: "个人中心", description: "切换多核心 Dedicated Workers 与微架构创新抽屉",
-    keywords: ["微架构", "多核心", "tech drawer"], concurrency: "drop",
-    enabled: () => typeof window.LogicWeaverProfilePanel?.toggleTechDrawer === "function",
-    run: () => window.LogicWeaverProfilePanel?.toggleTechDrawer()
+    id: "browser-tabs.open", title: "标签页管理", category: "浏览器", keywords: ["标签页", "tabs"], concurrency: "drop",
+    enabled: () => typeof window.LogicWeaverProfileMenu?.trigger === "function",
+    run: () => window.LogicWeaverProfileMenu?.trigger("tabs")
   });
   commands.register({
     id: "bookmark.close-menu", title: "关闭书签操作菜单", category: "书签", description: "关闭书签右键操作与备注编辑菜单",

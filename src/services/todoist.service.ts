@@ -343,7 +343,8 @@ export class TodoistService {
         const stored = await chrome.storage.local.get(storageKey);
         if (this.workspaceCacheInvalidated || version !== this.workspaceMutationVersion) return null;
         const entry = stored[storageKey];
-        if (entry?.data?.columns && Date.now() - entry.timestamp < 15 * 60 * 1000) {
+        // 允许 30 天内的本地离线缓存作为底包直出，绝不在超过 15 分钟后强行清空/阻断离线呈现
+        if (entry?.data?.columns && Array.isArray(entry.data.columns) && Date.now() - entry.timestamp < 30 * 86400000) {
           this.workspaceMemoryCache.set(key, entry);
           return entry.data;
         }
@@ -531,10 +532,13 @@ export class TodoistService {
       this.workspaceMemoryCache.set(specificCacheKey, entry);
       if (cacheKey !== specificCacheKey) this.workspaceMemoryCache.set(cacheKey, entry);
       this.workspaceCacheInvalidated = false;
-      // Persist once, without synchronous JSON/localStorage or duplicated legacy payloads.
+      // Persist once, with fallback to legacy cache key for backward compatibility.
       if (typeof chrome !== "undefined" && chrome.storage?.local) {
         try {
-          await chrome.storage.local.set({ [`todoistSnapshot:${specificCacheKey}`]: entry });
+          await chrome.storage.local.set({
+            [`todoistSnapshot:${specificCacheKey}`]: entry,
+            [`todoistSnapshot:${cacheKey}`]: entry
+          });
         } catch (error) { console.warn("[Todoist] Snapshot persistence failed", error); }
         ensureCurrent();
       }
@@ -594,8 +598,22 @@ export class TodoistService {
     await this.initToken();
     signal?.throwIfAborted();
     if (!this.token) throw new Error("Todoist 尚未配置，未读取日历任务");
-    const tasks = await this.getTasks(undefined, signal);
-    return tasks.filter((t) => t?.id && !t.is_completed);
+    const tasks = new Map<string, TodoistRawTask>();
+    const cursors = new Set<string>();
+    let cursor = "";
+    for (let page = 0; page < 100; page++) {
+      signal?.throwIfAborted();
+      const query = new URLSearchParams({ limit: "200" });
+      if (cursor) query.set("cursor", cursor);
+      const response = await this.api<any>(`/tasks?${query}`, { signal });
+      const results = todoistResults<TodoistRawTask>(response);
+      for (const task of results) if (task?.id && !task.is_completed) tasks.set(String(task.id), task);
+      const next = String(response?.next_cursor || "");
+      if (!next) return [...tasks.values()];
+      if (cursors.has(next)) throw new Error("日历任务分页游标重复");
+      cursors.add(next); cursor = next;
+    }
+    throw new Error("日历任务分页超出上限，未应用不完整列表");
   }
 
   public async setTaskDueDate(taskId: string, date: string): Promise<TodoistRawTask> {
@@ -816,9 +834,10 @@ export class TodoistService {
     due_string?: string;
     priority?: number;
     labels?: string[];
-  }): Promise<TodoistRawTask> {
+  }, requestId?: string): Promise<TodoistRawTask> {
     return this.api<TodoistRawTask>("/tasks", {
       method: "POST",
+      headers: requestId ? { "X-Request-Id": requestId } : undefined,
       body: JSON.stringify(payload)
     });
   }
@@ -1132,40 +1151,44 @@ export class TodoistService {
    * 查询历史已完成任务列表 (Sync API v9 /completed/get_all)
    */
   public async getCompletedTasks(params: {
-    since?: string;
-    until?: string;
-    project_id?: string;
-    limit?: number;
-    offset?: number;
+    since?: string; until?: string; project_id?: string; limit?: number;
   } = {}, signal?: AbortSignal): Promise<{
-    items: Array<{
-      id: string;
-      task_id: string;
-      content: string;
-      completed_at: string;
-      project_id: string;
-      section_id?: string;
-      note_count?: number;
-    }>;
-    projects: Record<string, any>;
+    items: Array<TodoistRawTask & { task_id: string; completed_at: string }>;
   }> {
-    if (!this.token) {
-      await this.initToken();
-      if (!this.token) throw new Error("请先在设置中配置 Todoist Token");
+    signal?.throwIfAborted();
+    await this.initToken();
+    signal?.throwIfAborted();
+    if (!this.token) throw new Error("请先配置 Todoist 账户");
+    const until = params.until || new Date().toISOString();
+    const since = params.since || new Date(Date.parse(until) - 30 * 86400000).toISOString();
+    if (!Number.isFinite(Date.parse(since)) || !Number.isFinite(Date.parse(until)) || Date.parse(since) >= Date.parse(until))
+      throw new Error("完成历史日期范围无效");
+    const items: Array<TodoistRawTask & { task_id: string; completed_at: string }> = [];
+    const cursors = new Set<string>();
+    let cursor = "";
+    for (let page = 0; page < 100; page++) {
+      const query = new URLSearchParams({
+        since, until, limit: String(Math.max(1, Math.min(200, params.limit || 200)))
+      });
+      if (params.project_id) query.set("project_id", params.project_id);
+      if (cursor) query.set("cursor", cursor);
+      // Official v1 endpoint and snake_case wire format; never retry the retired Sync v9 route.
+      const response = await this.api<any>(`https://api.todoist.com/api/v1/tasks/completed/by_completion_date?${query}`, { signal });
+      signal?.throwIfAborted();
+      if (!Array.isArray(response?.items)) throw new Error("完成历史返回格式无效");
+      for (const task of response.items) {
+        if (!task || typeof task.id !== "string" || typeof task.content !== "string" ||
+            typeof task.completed_at !== "string" || !Number.isFinite(Date.parse(task.completed_at)))
+          throw new Error("完成历史任务格式无效");
+        items.push({ ...task, task_id: task.id, completed_at: task.completed_at });
+      }
+      const next = response.next_cursor;
+      if (next == null || next === "") return { items };
+      if (typeof next !== "string" || cursors.has(next)) throw new Error("完成历史分页无效");
+      cursors.add(next); cursor = next;
     }
-
-    const query = new URLSearchParams();
-    if (params.since) query.set("since", params.since);
-    if (params.until) query.set("until", params.until);
-    if (params.project_id) query.set("project_id", params.project_id);
-    query.set("limit", String(params.limit || 50));
-    if (params.offset) query.set("offset", String(params.offset));
-    query.set("annotate_notes", "true");
-
-    return this.api(`https://api.todoist.com/sync/v9/completed/get_all?${query.toString()}`, { signal });
-
+    throw new Error("完成历史分页超出上限，未应用不完整列表");
   }
-
   /**
    * 获取 Todoist 云端个人标签库 (REST API v2 /labels)
    */

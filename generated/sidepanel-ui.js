@@ -1,9 +1,9 @@
-import { f as Ct, o as $t, d as It, g as l, h as i, i as s, t as r, x as xt, s as g, q as k, D as U, F as E, z as M, u as T, A as F, k as L, v as Q, b as u, c as at, n as Ut, p as Lt } from "./chunks/vendor-vue-BUkfvXUI.js";
-import { t as C } from "./chunks/todoist.service-DeCQ21Vr.js";
+import { d as Tt, C as $t, y as It, o as l, e as i, f as s, t as r, u as xt, B as g, l as k, z as U, F as E, h as M, g as C, k as F, i as L, n as Q, b as u, s as at, G as Ut, N as Lt } from "./chunks/vendor-vue-CjOHdfe5.js";
+import { t as T } from "./chunks/todoist.service-BD2Y0hDV.js";
 import { i as lt, g as St, s as it, l as Dt, t as jt } from "./chunks/quick-links-export.service-bmE4-0fH.js";
 import { _ as Pt } from "./chunks/_plugin-vue_export-helper-CHgC5LLL.js";
 /* empty css                       */
-const Et = { class: "sp-app-root" }, Mt = { class: "sp-viewport sp-view-tools" }, Wt = { class: "sp-page-card" }, At = { class: "sp-page-ico" }, Kt = ["src"], Vt = { key: 1 }, Nt = { class: "sp-page-meta" }, Ot = ["title"], qt = { class: "sp-page-actions" }, Rt = ["disabled", "title"], Bt = ["title"], zt = { class: "picker-label" }, Gt = { class: "picker-arrow" }, Ht = { class: "sp-page-picker-dropdown" }, Ft = { class: "dropdown-header" }, Qt = { class: "dropdown-list" }, Yt = ["onClick"], Xt = { class: "item-icon" }, Jt = { class: "item-text" }, Zt = {
+const Et = { class: "sp-app-root" }, Mt = { class: "sp-viewport sp-view-tools" }, Wt = { class: "sp-page-card" }, Kt = { class: "sp-page-ico" }, Vt = ["src"], At = { key: 1 }, Nt = { class: "sp-page-meta" }, Ot = ["title"], Bt = { class: "sp-page-actions" }, Rt = ["disabled", "title"], qt = ["title"], zt = { class: "picker-label" }, Gt = { class: "picker-arrow" }, Ht = { class: "sp-page-picker-dropdown" }, Ft = { class: "dropdown-header" }, Qt = { class: "dropdown-list" }, Yt = ["onClick"], Xt = { class: "item-icon" }, Jt = { class: "item-text" }, Zt = {
   key: 0,
   class: "item-check"
 }, te = { class: "sp-manual-panel" }, ee = { class: "manual-head" }, oe = ["onKeydown"], se = ["onKeydown"], ne = ["disabled"], ae = { class: "sp-tab-switcher-card" }, le = { class: "sp-segment-bar" }, ie = { class: "sp-switcher-view-content" }, ce = { class: "sp-view-subheader" }, ue = { class: "subheader-title" }, de = {
@@ -24,19 +24,19 @@ const Et = { class: "sp-app-root" }, Mt = { class: "sp-viewport sp-view-tools" }
 }, ye = { class: "grp-count-badge" }, ge = {
   key: 0,
   class: "tab-group-items"
-}, ke = ["title", "onClick"], we = ["src"], Te = {
+}, ke = ["title", "onClick"], we = ["src"], Ce = {
   key: 1,
   class: "tab-favicon-fallback"
-}, Ce = { class: "tab-title-text" }, $e = {
+}, Te = { class: "tab-title-text" }, $e = {
   key: 2,
   class: "tab-current-pill"
 }, Ie = ["onClick"], xe = { class: "sp-switcher-view-content todoist-view-body" }, Ue = { class: "sp-view-subheader" }, Le = { class: "subheader-title" }, Se = { class: "sp-page-picker-dropdown todoist-section-dropdown" }, De = { class: "dropdown-header" }, je = { class: "dropdown-list" }, Pe = ["onClick"], Ee = { class: "item-text" }, Me = {
   key: 0,
   class: "item-check"
-}, We = { class: "todoist-quick-add-row" }, Ae = ["onKeydown"], Ke = ["disabled"], Ve = {
+}, We = { class: "todoist-quick-add-row" }, Ke = ["onKeydown"], Ve = ["disabled"], Ae = {
   key: 0,
   class: "todoist-tasks-scroll"
-}, Ne = ["title", "onClick"], Oe = { key: 0 }, qe = ["title"], Re = { class: "todoist-task-title" }, Be = {
+}, Ne = ["title", "onClick"], Oe = { key: 0 }, Be = ["title"], Re = { class: "todoist-task-title" }, qe = {
   key: 0,
   class: "todoist-task-due"
 }, ze = {
@@ -45,7 +45,7 @@ const Et = { class: "sp-app-root" }, Mt = { class: "sp-viewport sp-view-tools" }
 }, Ge = {
   key: 2,
   class: "todoist-empty-state"
-}, ct = "lw_sidepanel_todoist_mount_key", He = /* @__PURE__ */ Ct({
+}, ct = "lw_sidepanel_todoist_mount_key", He = /* @__PURE__ */ Tt({
   __name: "SidePanelApp",
   setup(dt) {
     const $ = u("tabs"), R = u(!1), f = u([]), W = u(/* @__PURE__ */ new Set());
@@ -134,7 +134,7 @@ const Et = { class: "sp-app-root" }, Mt = { class: "sp-viewport sp-view-tools" }
       }
       return Array.from(e.values()).sort((t, n) => n.tabs.length - t.tabs.length);
     });
-    async function A() {
+    async function K() {
       if (typeof chrome > "u" || !chrome.tabs?.query) {
         f.value = [
           { id: 1, title: "哔哩哔哩 (゜-゜)つロ 干杯~-bilibili", url: "https://www.bilibili.com", favIconUrl: "https://www.bilibili.com/favicon.ico", active: !1 },
@@ -160,15 +160,15 @@ const Et = { class: "sp-app-root" }, Mt = { class: "sp-viewport sp-view-tools" }
         f.value = f.value.filter((e) => e.id !== o);
       }) : f.value = f.value.filter((e) => e.id !== o);
     }
-    const J = u([]), S = u("inbox:"), m = u(null), D = u(!1), j = u(""), B = u(!1);
+    const J = u([]), S = u("inbox:"), m = u(null), D = u(!1), j = u(""), q = u(!1);
     async function ft() {
-      B.value = !0;
+      q.value = !0;
       try {
         const o = localStorage.getItem(ct) || "inbox:";
         S.value = o;
         const [e, t] = await Promise.all([
-          C.loadWorkspaceData("inbox").catch(() => null),
-          C.loadWorkspaceData("today").catch(() => null)
+          T.loadWorkspaceData("inbox").catch(() => null),
+          T.loadWorkspaceData("today").catch(() => null)
         ]), n = [];
         if (e?.columns)
           for (const a of e.columns)
@@ -199,7 +199,7 @@ const Et = { class: "sp-app-root" }, Mt = { class: "sp-viewport sp-view-tools" }
       } catch (o) {
         console.warn("[SidePanel] Load Todoist mount data failed:", o);
       } finally {
-        B.value = !1;
+        q.value = !1;
       }
     }
     async function Z(o) {
@@ -211,16 +211,16 @@ const Et = { class: "sp-app-root" }, Mt = { class: "sp-viewport sp-view-tools" }
       const [e, t, n] = o.split(":");
       let a = null;
       if (e === "inbox") {
-        a = await C.loadWorkspaceData("inbox").catch(() => null);
+        a = await T.loadWorkspaceData("inbox").catch(() => null);
         const c = t || "";
         m.value = a?.columns?.find((d) => (d.sectionId || "") === c) || a?.columns?.[0] || null;
       } else if (e === "today") {
-        a = await C.loadWorkspaceData("today").catch(() => null);
+        a = await T.loadWorkspaceData("today").catch(() => null);
         const c = t || "today";
         m.value = a?.columns?.find((d) => d.sectionId === c) || a?.columns?.[0] || null;
       } else if (e === "projects") {
         const c = t, d = n || "";
-        a = await C.loadWorkspaceData("projects", c).catch(() => null), m.value = a?.columns?.find((h) => (h.sectionId || "") === d) || a?.columns?.[0] || null;
+        a = await T.loadWorkspaceData("projects", c).catch(() => null), m.value = a?.columns?.find((h) => (h.sectionId || "") === d) || a?.columns?.[0] || null;
       }
     }
     function bt(o) {
@@ -230,7 +230,7 @@ const Et = { class: "sp-app-root" }, Mt = { class: "sp-viewport sp-view-tools" }
       const e = !o.completed;
       o.completed = e;
       try {
-        await C.toggleTaskCompletion(o.id, e), p(e ? `✓ 已完成「${o.content}」` : `已恢复「${o.content}」`), e && m.value && setTimeout(() => {
+        await T.toggleTaskCompletion(o.id, e), p(e ? `✓ 已完成「${o.content}」` : `已恢复「${o.content}」`), e && m.value && setTimeout(() => {
           m.value && (m.value.tasks = m.value.tasks.filter((t) => t.id !== o.id));
         }, 400);
       } catch (t) {
@@ -244,7 +244,7 @@ const Et = { class: "sp-app-root" }, Mt = { class: "sp-viewport sp-view-tools" }
       const [e, t, n] = S.value.split(":"), a = { content: o };
       e === "today" ? a.due_string = "today" : e === "projects" ? (a.project_id = t, n && (a.section_id = n)) : e === "inbox" && t && (a.section_id = t);
       try {
-        const c = await C.createTask(a);
+        const c = await T.createTask(a);
         p(`✓ 任务「${o}」创建成功！`), m.value && c && m.value.tasks.unshift({
           id: String(c.id),
           content: c.content,
@@ -261,14 +261,14 @@ const Et = { class: "sp-app-root" }, Mt = { class: "sp-viewport sp-view-tools" }
     function _(o) {
       return et.value[o] || (o === "常用网站" ? "常用网站" : o);
     }
-    const w = u(!1), K = u(""), ot = u(!1);
+    const w = u(!1), V = u(""), ot = u(!1);
     let z = 0;
     function p(o, e = !1) {
-      K.value = o, ot.value = e, clearTimeout(z), z = window.setTimeout(() => {
-        K.value = "";
+      V.value = o, ot.value = e, clearTimeout(z), z = window.setTimeout(() => {
+        V.value = "";
       }, 3200);
     }
-    const b = u(null), st = u(!1), I = u(!1), x = u(!1), V = u(""), N = u(""), O = u(null), yt = at(() => jt(b.value));
+    const b = u(null), st = u(!1), I = u(!1), x = u(!1), A = u(""), N = u(""), O = u(null), yt = at(() => jt(b.value));
     async function nt() {
       try {
         b.value = await St();
@@ -304,7 +304,7 @@ const Et = { class: "sp-app-root" }, Mt = { class: "sp-viewport sp-view-tools" }
       }
     }
     async function G() {
-      const o = V.value.trim();
+      const o = A.value.trim();
       if (!o) {
         p("请输入网址", !0), O.value?.focus();
         return;
@@ -328,7 +328,7 @@ const Et = { class: "sp-app-root" }, Mt = { class: "sp-viewport sp-view-tools" }
         p(
           n.ok ? n.existed ? `该网址已在「${v.value}」中 ✓` : `已成功添加到「${v.value}」 ✓` : n.error || "添加失败",
           !n.ok
-        ), n.ok && (V.value = "", N.value = "", I.value = !1);
+        ), n.ok && (A.value = "", N.value = "", I.value = !1);
       } catch (n) {
         p(n?.message || "添加失败", !0);
       } finally {
@@ -338,7 +338,7 @@ const Et = { class: "sp-app-root" }, Mt = { class: "sp-viewport sp-view-tools" }
     function wt() {
       chrome.tabs.create({ url: chrome.runtime.getURL("newtab.html"), active: !0 });
     }
-    function Tt() {
+    function Ct() {
       try {
         const o = localStorage.getItem("theme") || "light";
         document.documentElement.dataset.theme = o, typeof chrome < "u" && chrome?.storage?.local && chrome.storage.local.get("theme").then((e) => {
@@ -347,11 +347,11 @@ const Et = { class: "sp-app-root" }, Mt = { class: "sp-viewport sp-view-tools" }
       } catch {
       }
     }
-    function q() {
+    function B() {
       nt();
     }
     return $t(() => {
-      Tt(), nt(), ft(), A();
+      Ct(), nt(), ft(), K();
       const o = () => {
         Dt().then(({ pages: e, labels: t }) => {
           e && e.length && (P.value = e), et.value = t || {};
@@ -359,11 +359,11 @@ const Et = { class: "sp-app-root" }, Mt = { class: "sp-viewport sp-view-tools" }
           n && P.value.includes(n) ? v.value = n : P.value.includes(v.value) || (v.value = P.value[0] || "常用网站");
         });
       };
-      o(), typeof chrome < "u" && chrome?.tabs && (chrome.tabs.onActivated?.addListener(q), chrome.tabs.onUpdated?.addListener(q), chrome.tabs.onCreated?.addListener(A), chrome.tabs.onRemoved?.addListener(A)), typeof chrome < "u" && chrome?.storage?.onChanged && chrome.storage.onChanged.addListener((e, t) => {
+      o(), typeof chrome < "u" && chrome?.tabs && (chrome.tabs.onActivated?.addListener(B), chrome.tabs.onUpdated?.addListener(B), chrome.tabs.onCreated?.addListener(K), chrome.tabs.onRemoved?.addListener(K)), typeof chrome < "u" && chrome?.storage?.onChanged && chrome.storage.onChanged.addListener((e, t) => {
         t === "local" && (e?.theme?.newValue && (document.documentElement.dataset.theme = e.theme.newValue), (e?.launcherPages || e?.pages || e?.launcherPageLabels || e?.quickLinks) && o());
       });
     }), It(() => {
-      clearTimeout(z), typeof chrome < "u" && chrome?.tabs && (chrome.tabs.onActivated?.removeListener(q), chrome.tabs.onUpdated?.removeListener(q));
+      clearTimeout(z), typeof chrome < "u" && chrome?.tabs && (chrome.tabs.onActivated?.removeListener(B), chrome.tabs.onUpdated?.removeListener(B));
     }), (o, e) => (l(), i("div", Et, [
       s("header", { class: "sp-global-nav" }, [
         e[12] || (e[12] = s("div", { class: "sp-nav-title" }, [
@@ -379,12 +379,12 @@ const Et = { class: "sp-app-root" }, Mt = { class: "sp-viewport sp-view-tools" }
       ]),
       s("main", Mt, [
         s("div", Wt, [
-          s("div", At, [
+          s("div", Kt, [
             st.value && b.value?.favIconUrl ? (l(), i("img", {
               key: 0,
               src: b.value.favIconUrl,
               alt: ""
-            }, null, 8, Kt)) : (l(), i("span", Vt, "🌐"))
+            }, null, 8, Vt)) : (l(), i("span", At, "🌐"))
           ]),
           s("div", Nt, [
             e[13] || (e[13] = s("small", null, "当前活跃标签页", -1)),
@@ -393,7 +393,7 @@ const Et = { class: "sp-app-root" }, Mt = { class: "sp-viewport sp-view-tools" }
             }, r(b.value?.title || "正在读取网页…"), 9, Ot),
             s("span", null, r(yt.value || "内部或本地页面"), 1)
           ]),
-          s("div", qt, [
+          s("div", Bt, [
             s("button", {
               class: "sp-collect-btn",
               type: "button",
@@ -409,7 +409,7 @@ const Et = { class: "sp-app-root" }, Mt = { class: "sp-viewport sp-view-tools" }
             }, [
               s("span", zt, r(_(v.value)), 1),
               s("span", Gt, r(w.value ? "▲" : "▼"), 1)
-            ], 10, Bt)
+            ], 10, qt)
           ])
         ]),
         k(s("div", Ht, [
@@ -430,7 +430,7 @@ const Et = { class: "sp-app-root" }, Mt = { class: "sp-viewport sp-view-tools" }
             }, [
               s("span", Xt, r(t === "常用网站" ? "⭐" : _(t).includes("游戏") ? "🎮" : _(t).includes("办公") ? "💼" : _(t).includes("实验") ? "🧪" : _(t).includes("就业") ? "🎯" : _(t).includes("工具") ? "🛠️" : "📁"), 1),
               s("span", Jt, r(_(t)), 1),
-              t === v.value ? (l(), i("span", Zt, "✓")) : T("", !0)
+              t === v.value ? (l(), i("span", Zt, "✓")) : C("", !0)
             ], 10, Yt))), 128))
           ])
         ], 512), [
@@ -447,12 +447,12 @@ const Et = { class: "sp-app-root" }, Mt = { class: "sp-viewport sp-view-tools" }
           k(s("input", {
             ref_key: "manualUrlInput",
             ref: O,
-            "onUpdate:modelValue": e[3] || (e[3] = (t) => V.value = t),
+            "onUpdate:modelValue": e[3] || (e[3] = (t) => A.value = t),
             type: "text",
             placeholder: "如 bilibili.com 或 https://...",
             onKeydown: F(L(G, ["prevent"]), ["enter"])
           }, null, 40, oe), [
-            [Q, V.value]
+            [Q, A.value]
           ]),
           k(s("input", {
             "onUpdate:modelValue": e[4] || (e[4] = (t) => N.value = t),
@@ -491,7 +491,7 @@ const Et = { class: "sp-app-root" }, Mt = { class: "sp-viewport sp-view-tools" }
                 type: "button",
                 class: "sp-tab-refresh-btn",
                 title: "刷新标签页列表",
-                onClick: L(A, ["stop"])
+                onClick: L(K, ["stop"])
               }, " ↻ 刷新 ")
             ]),
             R.value ? (l(), i("div", de, [...e[16] || (e[16] = [
@@ -517,10 +517,10 @@ const Et = { class: "sp-app-root" }, Mt = { class: "sp-viewport sp-view-tools" }
                     onError: e[7] || (e[7] = (n) => n.target.style.display = "none")
                   }, null, 40, he)) : (l(), i("span", fe, "🌐")),
                   s("strong", be, r(t.domainTitle), 1),
-                  t.domain !== "tab-project" && t.domain !== t.domainTitle && !t.domainTitle.includes(t.domain) ? (l(), i("small", _e, " (" + r(t.domain) + ") ", 1)) : T("", !0),
+                  t.domain !== "tab-project" && t.domain !== t.domainTitle && !t.domainTitle.includes(t.domain) ? (l(), i("small", _e, " (" + r(t.domain) + ") ", 1)) : C("", !0),
                   s("span", ye, r(t.tabs.length), 1)
                 ], 8, pe),
-                Y(t.domain) ? T("", !0) : (l(), i("div", ge, [
+                Y(t.domain) ? C("", !0) : (l(), i("div", ge, [
                   (l(!0), i(E, null, M(t.tabs, (n) => (l(), i("div", {
                     key: n.id,
                     class: g(["tab-tree-row", { "is-active-tab": n.active }]),
@@ -535,9 +535,9 @@ ${n.url}`,
                       alt: "",
                       loading: "lazy",
                       onError: e[8] || (e[8] = (a) => a.target.style.display = "none")
-                    }, null, 40, we)) : (l(), i("span", Te, "🌐")),
-                    s("span", Ce, r(n.title || "未命名网页"), 1),
-                    n.active ? (l(), i("span", $e, "当前")) : T("", !0),
+                    }, null, 40, we)) : (l(), i("span", Ce, "🌐")),
+                    s("span", Te, r(n.title || "未命名网页"), 1),
+                    n.active ? (l(), i("span", $e, "当前")) : C("", !0),
                     s("button", {
                       type: "button",
                       class: "tab-close-btn",
@@ -578,7 +578,7 @@ ${n.url}`,
                   onClick: (n) => bt(t)
                 }, [
                   s("span", Ee, r(t.label), 1),
-                  t.key === S.value ? (l(), i("span", Me, "✓")) : T("", !0)
+                  t.key === S.value ? (l(), i("span", Me, "✓")) : C("", !0)
                 ], 10, Pe))), 128))
               ])
             ], 512), [
@@ -591,7 +591,7 @@ ${n.url}`,
                 placeholder: "随手记任务… 按 Enter 添加",
                 class: "todoist-quick-input",
                 onKeydown: F(L(tt, ["prevent"]), ["enter"])
-              }, null, 40, Ae), [
+              }, null, 40, Ke), [
                 [Q, j.value]
               ]),
               s("button", {
@@ -599,9 +599,9 @@ ${n.url}`,
                 class: "todoist-quick-submit",
                 disabled: !j.value.trim(),
                 onClick: tt
-              }, " 添加 ", 8, Ke)
+              }, " 添加 ", 8, Ve)
             ]),
-            m.value && m.value.tasks.length ? (l(), i("div", Ve, [
+            m.value && m.value.tasks.length ? (l(), i("div", Ae, [
               (l(!0), i(E, null, M(m.value.tasks, (t) => (l(), i("div", {
                 key: t.id,
                 class: g(["todoist-task-item", { completed: t.completed }])
@@ -612,17 +612,17 @@ ${n.url}`,
                   title: t.completed ? "已完成" : "点击划去完成",
                   onClick: (n) => _t(t)
                 }, [
-                  t.completed ? (l(), i("span", Oe, "✓")) : T("", !0)
+                  t.completed ? (l(), i("span", Oe, "✓")) : C("", !0)
                 ], 10, Ne),
                 s("div", {
                   class: "todoist-task-content",
                   title: t.content
                 }, [
                   s("span", Re, r(t.content), 1),
-                  t.dueText ? (l(), i("span", Be, "📅 " + r(t.dueText), 1)) : T("", !0)
-                ], 8, qe)
+                  t.dueText ? (l(), i("span", qe, "📅 " + r(t.dueText), 1)) : C("", !0)
+                ], 8, Be)
               ], 2))), 128))
-            ])) : B.value ? (l(), i("div", ze, " ⏳ 加载任务中… ")) : (l(), i("div", Ge, " ✨ 当前板块暂无待办任务，可在上方随时登记添加 "))
+            ])) : q.value ? (l(), i("div", ze, " ⏳ 加载任务中… ")) : (l(), i("div", Ge, " ✨ 当前板块暂无待办任务，可在上方随时登记添加 "))
           ], 512), [
             [U, $.value === "todoist"]
           ])
@@ -630,8 +630,8 @@ ${n.url}`,
       ]),
       k(s("div", {
         class: g(["sp-toast", { bad: ot.value }])
-      }, r(K.value), 3), [
-        [U, K.value]
+      }, r(V.value), 3), [
+        [U, V.value]
       ])
     ]));
   }

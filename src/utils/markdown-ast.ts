@@ -623,14 +623,28 @@ export class MarkdownAstEngine {
         continue;
       }
 
-      // 9. 简单普通段落
+      // 9. 段落与原生 HTML 块
       if (!line.trim()) { i++; continue; }
       const paragraph: string[] = [line];
       i++;
       while (i < lines.length && lines[i].trim() && !/^(```|#{1,6}\s|>\s?|\s*[-*+]\s+|\s*\$\s*)/.test(lines[i]) && !(lines[i].includes("|") && this.isTableDelimiterRow(lines[i + 1]))) {
         paragraph.push(lines[i++]);
       }
-      html += `<p>${paragraph.map((p) => this.inlineMarkdown(p, options)).join("<br>")}</p>`;
+
+      const rawCombined = paragraph.join("\n").trim();
+      // 如果本身就是原生 HTML 块（如 <p align="center">...</p>、<div>...</div> 等），直接放行
+      if (/^<([a-z0-9_-]+)[^>]*>/i.test(rawCombined) && /<\/([a-z0-9_-]+)>\s*$/i.test(rawCombined)) {
+        html += this.inlineMarkdown(rawCombined.replace(/\r?\n/g, " "), options) + "\n";
+      } else {
+        // 标准 Markdown 段落：普通软换行保留空格自然流式排版，仅当行尾有两个及以上空格或反斜杠时才触发硬换行 <br>
+        const formatted = paragraph.map((p, idx) => {
+          const hasHardBreak = /(?: {2,}|\\)$/.test(p);
+          const cleanLine = p.replace(/(?: {2,}|\\)$/, "");
+          const rendered = this.inlineMarkdown(cleanLine, options);
+          return idx < paragraph.length - 1 ? (hasHardBreak ? rendered + "<br>" : rendered + " ") : rendered;
+        }).join("");
+        html += `<p>${formatted}</p>\n`;
+      }
     }
 
     return html;

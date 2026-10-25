@@ -117,6 +117,138 @@ async function syncYouTubeNetRules() {
   }
 }
 
+// src/notifications/history-contract.ts
+var NOTIFICATION_HISTORY_KEY = "notificationHistoryV1";
+var HISTORY_LIMIT = 200;
+var HISTORY_AGE_MS = 30 * 864e5;
+function safeTarget(raw) {
+  if (raw?.type === "todoist-task" && typeof raw.taskId === "string" && /^[A-Za-z0-9_-]{1,100}$/.test(raw.taskId)) return { type: raw.type, taskId: raw.taskId };
+  if (raw?.type === "module" && typeof raw.moduleId === "string" && /^[a-z][a-z0-9-]{0,60}$/.test(raw.moduleId)) return { type: raw.type, moduleId: raw.moduleId };
+  if (raw?.type === "bili-messages") return { type: raw.type };
+  if (raw?.type === "github-repository" && typeof raw.fullName === "string" && raw.fullName.length <= 240 && /^[\w.-]+\/[\w.-]+$/.test(raw.fullName) && !raw.fullName.split("/").some((part) => part === "." || part === "..")) return { type: raw.type, fullName: raw.fullName };
+  return void 0;
+}
+function historyText(value, length) {
+  if (typeof value !== "string") return "";
+  return value.slice(0, 6e3).replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, "").replace(/\bBearer\s+[A-Za-z0-9._~+\/-]+=*/gi, "Bearer [\u5DF2\u9690\u85CF]").replace(/\b(?:ghp_|github_pat_|sk-)[A-Za-z0-9_-]{8,}/g, "[\u5DF2\u9690\u85CF]").replace(/((?:token|password|passwd|secret|api[_-]?key|authorization|cookie)\s*[:=]\s*)[^\s,;]+/gi, "$1[\u5DF2\u9690\u85CF]").replace(/https?:\/\/[^\s<>"']+/gi, (value2) => {
+    try {
+      const url = new URL(value2);
+      url.username = "";
+      url.password = "";
+      url.search = "";
+      url.hash = "";
+      return url.href;
+    } catch {
+      return "[\u94FE\u63A5]";
+    }
+  }).slice(0, length);
+}
+function safeArchive(raw) {
+  if (!raw || typeof raw.id !== "string" || !/^[A-Za-z0-9_:-]{1,200}$/.test(raw.id) || typeof raw.title !== "string" || !Number.isFinite(raw.createdAt) || !["info", "success", "warning", "error"].includes(raw.level)) throw new Error("Invalid notification record");
+  return { id: raw.id, appType: historyText(raw.appType, 40), appName: historyText(raw.appName, 60), title: historyText(raw.title, 160), subtitle: historyText(raw.subtitle, 240), message: historyText(raw.message, 2e3), level: raw.level, createdAt: raw.createdAt, read: raw.read === true, target: safeTarget(raw.target) };
+}
+function safeSnapshot(raw) {
+  if (raw == null) return { version: 0, items: [] };
+  if (!raw || !Number.isSafeInteger(raw.version) || raw.version < 0 || !Array.isArray(raw.items) || raw.items.length > HISTORY_LIMIT) throw new Error("Invalid notification history");
+  const now = Date.now();
+  return { version: raw.version, items: raw.items.map(safeArchive).filter((item) => item.createdAt >= now - HISTORY_AGE_MS && item.createdAt <= now + 6e4).sort((a, b) => b.createdAt - a.createdAt) };
+}
+
+// src/notifications/history-repository.ts
+var queue = Promise.resolve();
+function notificationHistoryOperation(action, payload) {
+  const operation = queue.then(async () => {
+    if (typeof chrome === "undefined" || !chrome.storage?.local) {
+      throw new Error("Chrome storage API unavailable");
+    }
+    const stored = await chrome.storage.local.get(NOTIFICATION_HISTORY_KEY);
+    const snapshot = safeSnapshot(stored[NOTIFICATION_HISTORY_KEY]);
+    if (action === "list") {
+      return snapshot;
+    }
+    if (action === "append") {
+      const item = safeArchive(payload);
+      item.createdAt = Date.now();
+      item.read = false;
+      if (!snapshot.items.some((entry) => entry.id === item.id)) {
+        snapshot.items.unshift(item);
+      }
+      snapshot.items = snapshot.items.slice(0, HISTORY_LIMIT);
+    } else if (action === "read-all") {
+      snapshot.items = snapshot.items.map((item) => ({ ...item, read: true }));
+    } else if (action === "clear") {
+      snapshot.items = [];
+    } else if (action === "read" || action === "remove") {
+      if (typeof payload !== "string" || payload.length > 200) {
+        throw new Error("Invalid notification id");
+      }
+      if (action === "remove") {
+        snapshot.items = snapshot.items.filter((item) => item.id !== payload);
+      } else {
+        snapshot.items = snapshot.items.map((item) => item.id === payload ? { ...item, read: true } : item);
+      }
+    } else {
+      throw new Error("Invalid history operation");
+    }
+    snapshot.version++;
+    await chrome.storage.local.set({ [NOTIFICATION_HISTORY_KEY]: snapshot });
+    return snapshot;
+  });
+  queue = operation.catch(() => {
+  });
+  return operation;
+}
+
+// src/todoist/local-reminders.ts
+var PREFIX = "todoist_reminder_v2:";
+var REMINDER_ALARM = "todoist_remind_";
+async function readReminder(taskId) {
+  if (typeof chrome === "undefined" || !chrome.storage?.local) return void 0;
+  const key = PREFIX + taskId;
+  const stored = await chrome.storage.local.get([key, "todoist_reminders_map_v1"]);
+  if (Object.prototype.hasOwnProperty.call(stored, key)) return stored[key] || void 0;
+  return stored.todoist_reminders_map_v1?.[taskId];
+}
+async function deliverReminder(taskId) {
+  const reminder = await readReminder(taskId);
+  if (!reminder) return;
+  const when = new Date(reminder.time).getTime();
+  if (!Number.isFinite(when)) return;
+  if (when > Date.now() + 1e3) {
+    await chrome.alarms.create(REMINDER_ALARM + taskId, { when });
+    return;
+  }
+  try {
+    await notificationHistoryOperation("append", {
+      id: "reminder_" + taskId + "_" + when,
+      appType: "todoist",
+      appName: "Todoist",
+      title: "\u4EFB\u52A1\u63D0\u9192",
+      subtitle: "",
+      message: reminder.title || "\u4EFB\u52A1\u65F6\u95F4\u5DF2\u5230",
+      level: "info",
+      createdAt: Date.now(),
+      read: false,
+      target: { type: "todoist-task", taskId }
+    });
+  } catch {
+    console.warn("[Todoist Alarm] Notification history was not confirmed.");
+  }
+  await chrome.notifications.create(REMINDER_ALARM + taskId, { type: "basic", iconUrl: chrome.runtime.getURL("assets/icon-128.png"), title: "\u5F85\u529E\u63D0\u9192", message: reminder.title || "\u4EFB\u52A1\u65F6\u95F4\u5DF2\u5230", priority: 2 });
+  await chrome.storage.local.set({ [PREFIX + taskId]: null });
+}
+async function restoreReminderAlarms() {
+  const stored = await chrome.storage.local.get(null);
+  const tasks = /* @__PURE__ */ new Map();
+  for (const [id, value] of Object.entries(stored.todoist_reminders_map_v1 || {})) tasks.set(id, value);
+  for (const [key, value] of Object.entries(stored)) if (key.startsWith(PREFIX)) tasks.set(key.slice(PREFIX.length), value);
+  for (const [id, value] of tasks) {
+    if (!value) continue;
+    const time = new Date(value.time).getTime();
+    if (Number.isFinite(time)) await chrome.alarms.create(REMINDER_ALARM + id, { when: Math.max(Date.now() + 1e3, time) });
+  }
+}
+
 // src/background/notifications.ts
 function enableStickerSidePanel() {
   if (!chrome.sidePanel?.setPanelBehavior) return;
@@ -135,9 +267,16 @@ function flashBadge(text, color) {
 }
 function initNotificationListeners() {
   if (typeof chrome === "undefined") return;
-  chrome.alarms?.onAlarm?.addListener?.((alarm) => {
+  void restoreReminderAlarms().catch(() => console.warn("[Todoist Alarm] Restore failed."));
+  chrome.alarms?.onAlarm?.addListener?.(async (alarm) => {
     if (alarm.name === "clear-badge") {
       chrome.action.setBadgeText({ text: "" });
+    } else if (alarm.name?.startsWith("todoist_remind_")) {
+      try {
+        await deliverReminder(alarm.name.slice("todoist_remind_".length));
+      } catch {
+        console.warn("[Todoist Alarm] Notification not confirmed; reminder retained.");
+      }
     }
   });
 }

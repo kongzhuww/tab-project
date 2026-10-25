@@ -10,6 +10,13 @@
     <header ref="headerRef" class="inspector-header" @pointerdown="onHeaderPointerDown($event)">
       <div class="inspector-title-row">
         <span class="inspector-badge">📋 任务属性</span>
+        <div v-if="currentDraft" class="inspector-save-status no-drag" @pointerdown.stop>
+          <span class="inspector-save-text" role="status" aria-live="polite"
+            :title="draftStatusDetail" :aria-label="draftStatusDetail">{{ draftStatusText }}</span>
+          <button v-if="currentDraft.status !== 'saving'" type="button"
+            :disabled="state.saving || !editTitle.trim()" @click.stop="retryDraft"
+          >{{ currentDraft.status === 'failed' ? '重试保存' : '保存草稿' }}</button>
+        </div>
         <a
           v-if="state.url"
           :href="state.url"
@@ -29,238 +36,59 @@
       >×</button>
     </header>
 
-    <div v-if="state.isOpen" class="inspector-body">
-      <div v-if="currentDraft" class="draft-status" role="status" aria-live="polite">
-        <template v-if="currentDraft.status === 'failed'">
-          <span>保存未确认，草稿保留在当前页面。{{ currentDraft.error }}</span>
-          <button type="button" :disabled="state.saving || !editTitle.trim()" @click="retryDraft">重试保存</button>
-        </template>
-        <span v-else>{{ currentDraft.status === 'saving' ? '正在保存…' : (editTitle.trim() ? '有未保存的修改' : '标题不能为空，尚未保存') }}</span>
-        <button v-if="currentDraft.status === 'editing'" type="button" :disabled="state.saving || !editTitle.trim()" @click="retryDraft">保存草稿</button>
-        <small>刷新或关闭浏览器标签页会丢失未保存草稿。</small>
-      </div>
-      <p v-if="state.error" class="draft-status" role="alert">{{ state.error }}</p>
+    <TodoistInspectorBody
+      v-if="state.isOpen"
+      :key="state.taskId"
+      :state="state"
+      v-model:edit-title="editTitle"
+      v-model:edit-description="editDescription"
+      v-model:edit-start-date="editStartDate"
+      v-model:edit-start-time="editStartTime"
+      v-model:edit-due-date="editDueDate"
+      v-model:edit-due-time="editDueTime"
+      :is-uploading-img="isUploadingImg"
+      :is-drag-over="isDragOver"
+      :is-task-completed="isTaskCompleted"
+      :subtasks="subtasks"
+      :completed-subtasks-count="completedSubtasksCount"
+      v-model:is-adding-subtask="isAddingSubtask"
+      v-model:new-subtask-text="newSubtaskText"
+      v-model:new-comment-text="newCommentText"
+      :is-submitting-comment="isSubmittingComment"
+      :attached-images="attachedImages"
+      :available-labels="todoistTaskListState.availableLabels || []"
+      @schedule-draft-save="scheduleDraftSave"
+      @save-title-and-desc="saveTitleAndDesc"
+      @toggle-complete="toggleTaskComplete"
+      @trigger-file-input="triggerFileInput"
+      @dragover="isDragOver = true"
+      @dragleave="isDragOver = false"
+      @drop-image="onDropImage"
+      @desc-paste="onDescPaste"
+      @remove-attached-image="removeAttachedImage"
+      @toggle-subtask="toggleSubtask"
+      @remove-subtask="removeSubtask"
+      @confirm-add-subtask="confirmAddSubtask"
+      @submit-comment="submitComment"
+      @start-change="onStartChange"
+      @clear-start-date="clearStartDate"
+      @clear-start-time="clearStartTime"
+      @due-change="onDueChange"
+      @clear-due-date="clearDueDate"
+      @clear-due-time="clearDueTime"
+      @select-priority="selectPriority"
+      @toggle-label-select="toggleLabelSelect"
+      @remove-label="removeLabel"
+      @create-label="createOrSelectLabel"
+    />
 
-      <!-- 1. 任务标题 -->
-      <section class="inspector-section">
-        <label class="inspector-label">任务标题</label>
-        <input
-          v-model="editTitle"
-          :disabled="isUploadingImg"
-          type="text"
-          class="inspector-input-title"
-          placeholder="任务标题"
-          @input="scheduleDraftSave"
-          @compositionend="scheduleDraftSave"
-          @blur="saveTitleAndDesc"
-          @keydown.enter.prevent="saveTitleAndDesc"
-        />
-      </section>
-
-      <!-- 2. 任务描述与照片一体区 (支持文本说明 + 拖入图片 + 文本框内 Ctrl+V 粘贴图片) -->
-      <section class="inspector-section">
-        <div class="section-head-row">
-          <label class="inspector-label">
-            任务描述
-            <span v-if="attachedImages.length" style="font-weight: normal; opacity: 0.85;">
-              · 包含 {{ attachedImages.length }} 张照片
-            </span>
-          </label>
-          <button
-            type="button"
-            class="inspector-add-img-btn"
-            title="选择本地图片文件上传至任务"
-            @click="triggerFileInput"
-          >＋ 上传照片</button>
-        </div>
-
-        <!-- 统一的图文一体卡片：支持拖拽图片进入、在文本框内直接 Ctrl+V 粘贴图片 -->
-        <div
-          class="inspector-desc-composite-box"
-          :class="{ dragging: isDragOver, uploading: isUploadingImg }"
-          @dragover.prevent="isDragOver = true"
-          @dragleave.prevent="isDragOver = false"
-          @drop.prevent="onDropImage"
-        >
-          <textarea
-            v-model="editDescription"
-            :disabled="isUploadingImg"
-            rows="8"
-            class="inspector-textarea-desc"
-            placeholder="添加文字说明…（直接拖入照片，或在此 Ctrl+V 粘贴图片即可贴入）"
-            @input="scheduleDraftSave"
-            @compositionend="scheduleDraftSave"
-            @blur="saveTitleAndDesc"
-            @paste="onDescPaste"
-          ></textarea>
-
-          <!-- 已有关联照片网格：无缝贴合在描述框内部底端 -->
-          <div v-if="attachedImages.length > 0" class="attached-img-grid in-desc">
-            <div
-              v-for="(img, idx) in attachedImages"
-              :key="idx"
-              class="attached-img-card"
-            >
-              <div
-                class="attached-img-link"
-                title="点击在小窗查看大图"
-                @click="imageViewerController.open(img.url, img.name)"
-              >
-                <img :src="img.url" class="attached-preview-img" alt="任务照片" loading="lazy" />
-              </div>
-              <div class="attached-img-info">
-                <span class="attached-img-name" :title="img.name">{{ img.name }}</span>
-                <div class="attached-img-actions">
-                  <button
-                    type="button"
-                    class="attached-open-btn"
-                    title="点击在小窗查看大图"
-                    @click="imageViewerController.open(img.url, img.name)"
-                  >查看 ↗</button>
-                  <button
-                    type="button"
-                    class="attached-del-btn"
-                    title="从任务中移除此照片"
-                    @click="removeAttachedImage(img.url)"
-                  >×</button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- 底部轻量提示条与回形针快捷上传 -->
-          <div class="desc-composite-footer">
-            <span v-if="isUploadingImg" class="composite-hint uploading">⏳ 照片上传同步中…</span>
-            <span v-else-if="isDragOver" class="composite-hint dragging">📥 松开鼠标立即存入照片</span>
-            <span v-else class="composite-hint">📷 拖入图片或按 Ctrl+V 粘贴照片</span>
-            <button
-              type="button"
-              class="composite-attach-icon"
-              title="选择本地照片"
-              @click.stop="triggerFileInput"
-            >📎</button>
-          </div>
-        </div>
-
-        <!-- 隐藏的本地文件选择器 -->
-        <input
-          ref="fileInputRef"
-          type="file"
-          accept="image/*"
-          style="display: none"
-          @change="onFileInputChange"
-        />
-      </section>
-
-      <!-- 3. 时间规划中心：支持具体时间 (如 12:00)，支持仅开始(绿)/仅截止(红)/区间段 -->
-      <section class="inspector-section inspector-time-hub">
-        <div class="section-head-row">
-          <div class="hub-header-title">
-            <label class="inspector-label">时间规划</label>
-            <span v-if="timePlanSummaryText" class="time-plan-badge" :class="timePlanStatusClass">
-              {{ timePlanSummaryText }}
-            </span>
-          </div>
-          <button
-            v-if="editStartDate || editDueDate"
-            type="button"
-            class="inspector-clear-all-dates-btn"
-            title="清空全部时间设置"
-            @click="clearAllDates"
-          >
-            清空时间
-          </button>
-        </div>
-
-        <!-- 开始时间与截止时间并排卡片 -->
-        <div class="time-hub-cards-row">
-          <!-- 开始时间卡片 (左) -->
-          <div class="time-hub-card start-card">
-            <div class="time-card-head">
-              <span class="time-card-label">🛫 开始时间</span>
-              <button
-                v-if="editStartDate || editStartTime"
-                type="button"
-                class="time-clear-btn"
-                title="清除开始时间"
-                @click="clearStartDate"
-              >✕</button>
-            </div>
-
-            <div class="time-card-inputs">
-              <input
-                v-model="editStartDate"
-                type="date"
-                class="inspector-date-input"
-                title="选择开始日期"
-                @change="onStartChange"
-              />
-              <div class="time-input-wrap">
-                <input
-                  v-model="editStartTime"
-                  type="time"
-                  class="inspector-time-input"
-                  placeholder="具体时间"
-                  title="随时设置具体时间 (如 12:00)"
-                  @change="onStartChange"
-                />
-                <button
-                  v-if="editStartTime"
-                  type="button"
-                  class="time-sub-clear"
-                  title="清除具体时间"
-                  @click="clearStartTime"
-                >×</button>
-              </div>
-            </div>
-          </div>
-
-          <!-- 中间连接箭头 -->
-          <div class="time-hub-arrow">至</div>
-
-          <!-- 截止时间卡片 (右) -->
-          <div class="time-hub-card due-card">
-            <div class="time-card-head">
-              <span class="time-card-label">▣ 截止日期</span>
-              <button
-                v-if="editDueDate || editDueTime"
-                type="button"
-                class="time-clear-btn"
-                title="清除截止时间"
-                @click="clearDueDate"
-              >✕</button>
-            </div>
-
-            <div class="time-card-inputs">
-              <input
-                v-model="editDueDate"
-                type="date"
-                class="inspector-date-input"
-                title="选择截止日期"
-                @change="onDueChange"
-              />
-              <div class="time-input-wrap">
-                <input
-                  v-model="editDueTime"
-                  type="time"
-                  class="inspector-time-input"
-                  placeholder="具体时间"
-                  title="随时设置具体时间 (如 12:00)"
-                  @change="onDueChange"
-                />
-                <button
-                  v-if="editDueTime"
-                  type="button"
-                  class="time-sub-clear"
-                  title="清除具体时间"
-                  @click="clearDueTime"
-                >×</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-    </div>
+    <input
+      ref="fileInputRef"
+      type="file"
+      accept="image/*"
+      style="display: none"
+      @change="onFileInputChange"
+    />
 
     <!-- 窗口四向缩放手柄 -->
     <i class="todoist-resize-handle todoist-resize-n" data-resize-edge="n" aria-hidden="true" @pointerdown="onResizePointerDown($event, 'n')"></i>
@@ -273,17 +101,27 @@
 <script setup lang="ts">
 import { ref, computed, watch, onUnmounted } from "vue";
 import { todoistModuleState } from "./module-state";
-import { imageViewerController } from "../viewers/image-viewer-store";
 import { todoistInspectorState, todoistInspectorController } from "./inspector-store";
+import { todoistTaskListController, todoistTaskListState } from "./task-list-store";
+import { todoistService } from "../services/todoist.service";
 import { todoistTitleDrafts } from "./title-drafts";
-import { formatMonthDayTime } from "./task-date-helper";
 import { useWindowDraggable } from "../core/useWindowDraggable";
-import { windowManagerController } from "../core/window-manager.store";
+import TodoistInspectorBody from "./TodoistInspectorBody.vue";
 
 const state = todoistInspectorState;
 const currentDraft = computed(() => todoistTitleDrafts.get(state.taskId));
+const draftStatusText = computed(() => {
+  if (currentDraft.value?.status === "failed") return "保存未确认";
+  if (currentDraft.value?.status === "saving") return "正在保存…";
+  return editTitle.value.trim() ? "有未保存的修改" : "标题不能为空，尚未保存";
+});
+const draftStatusDetail = computed(() => [
+  draftStatusText.value,
+  currentDraft.value?.status === "failed" ? currentDraft.value.error : "",
+  "刷新或关闭浏览器标签页会丢失未保存草稿。"
+].filter(Boolean).join("；"));
 
-const INSPECTOR_POSITION_KEY = "todoistInspectorPosition";
+const INSPECTOR_POSITION_KEY = "todoistInspectorPositionV2";
 
 const {
   panelRef,
@@ -296,12 +134,12 @@ const {
 } = useWindowDraggable({
   windowId: "todoist-inspector",
   storageKey: INSPECTOR_POSITION_KEY,
-  defaultWidth: 400,
-  defaultHeight: 620,
-  defaultLeft: typeof window !== "undefined" ? Math.max(16, window.innerWidth - 440) : 960,
+  defaultWidth: 720,
+  defaultHeight: 480,
+  defaultLeft: typeof window !== "undefined" ? Math.max(16, window.innerWidth - 760) : 700,
   defaultTop: 76,
-  minWidth: 320,
-  minHeight: 360,
+  minWidth: 340,
+  minHeight: 300,
   active: () => state.isOpen && todoistModuleState.active
 });
 
@@ -318,6 +156,133 @@ const isUploadingImg = ref(false);
 const isDragOver = ref(false);
 const fileInputRef = ref<HTMLInputElement | null>(null);
 
+// 子任务管理 (存储在任务 description 中的 Markdown 检查清单 - [ ] / - [x])
+interface LocalSubtask {
+  id: string;
+  text: string;
+  completed: boolean;
+}
+
+const isAddingSubtask = ref(false);
+const newSubtaskText = ref("");
+const newCommentText = ref("");
+const isSubmittingComment = ref(false);
+
+const subtasks = computed<LocalSubtask[]>(() => {
+  const raw = state.description || "";
+  const list: LocalSubtask[] = [];
+  const lines = raw.split("\n");
+  let idx = 0;
+  for (const line of lines) {
+    const match = line.match(/^\s*-\s*\[([ xX])\]\s+(.+)$/);
+    if (match) {
+      list.push({
+        id: `st_${idx++}`,
+        completed: match[1].toLowerCase() === "x",
+        text: match[2].trim()
+      });
+    }
+  }
+  return list;
+});
+
+const completedSubtasksCount = computed(() => subtasks.value.filter(s => s.completed).length);
+
+function updateSubtasksInDescription(newSubtasks: LocalSubtask[]) {
+  const raw = state.description || "";
+  const lines = raw.split("\n");
+  const nonSubtaskLines = lines.filter(l => !l.match(/^\s*-\s*\[([ xX])\]/));
+  const subtaskLines = newSubtasks.map(s => `- [${s.completed ? 'x' : ' '}] ${s.text}`);
+  const finalDesc = [...nonSubtaskLines, ...subtaskLines].join("\n").trim();
+  editDescription.value = finalDesc.replace(/!\[.*?\]\((?:https?:\/\/|data:image\/)[^\s\)]+\)/g, "").trim();
+  void todoistInspectorController.saveTitleAndDesc(editTitle.value, finalDesc);
+}
+
+function confirmAddSubtask() {
+  if (!newSubtaskText.value.trim()) return;
+  const list = [...subtasks.value, {
+    id: `st_${Date.now()}`,
+    text: newSubtaskText.value.trim(),
+    completed: false
+  }];
+  newSubtaskText.value = "";
+  isAddingSubtask.value = false;
+  updateSubtasksInDescription(list);
+}
+
+function toggleSubtask(id: string) {
+  const list = subtasks.value.map(s => s.id === id ? { ...s, completed: !s.completed } : s);
+  updateSubtasksInDescription(list);
+}
+
+function removeSubtask(id: string) {
+  const list = subtasks.value.filter(s => s.id !== id);
+  updateSubtasksInDescription(list);
+}
+
+// 任务完成状态与看板联动
+const isTaskCompleted = computed(() => {
+  for (const col of todoistTaskListState.columns || []) {
+    const t = col.tasks.find(item => item.id === state.taskId);
+    if (t) return !!t.completed;
+  }
+  return false;
+});
+
+async function toggleTaskComplete() {
+  for (const col of todoistTaskListState.columns || []) {
+    const t = col.tasks.find(item => item.id === state.taskId);
+    if (t) {
+      const nextCompleted = !t.completed;
+      t.completed = nextCompleted;
+      if (t._taskRaw) t._taskRaw.checked = nextCompleted;
+      try {
+        await todoistService.toggleTaskCompletion(t.id, nextCompleted);
+
+      } catch {
+        t.completed = !nextCompleted;
+        if (t._taskRaw) t._taskRaw.checked = !nextCompleted;
+        state.error = "完成状态保存未确认，请刷新核对。";
+      }
+      break;
+    }
+  }
+}
+
+// 优先级
+function selectPriority(level: number) {
+  void todoistInspectorController.setPriority(level);
+}
+
+// 标签
+function toggleLabelSelect(label: string) {
+  void todoistInspectorController.toggleLabel(label);
+}
+
+function removeLabel(label: string) {
+  void todoistInspectorController.toggleLabel(label);
+}
+
+async function createOrSelectLabel(name: string) {
+  if (!name.trim()) return;
+  if (!state.labels.includes(name.trim())) {
+    await todoistInspectorController.createAndAttachLabel(name.trim());
+  }
+}
+
+// 评论提交
+async function submitComment() {
+  if (!newCommentText.value.trim() || isSubmittingComment.value) return;
+  const content = newCommentText.value.trim();
+  isSubmittingComment.value = true;
+  try {
+    await todoistInspectorController.addComment(content);
+    newCommentText.value = "";
+  } finally {
+    isSubmittingComment.value = false;
+  }
+}
+
 // Updating a title must not reset an independently edited description.
 watch(() => state.title, title => { editTitle.value = title || ""; }, { immediate: true });
 watch(() => state.description, description => {
@@ -328,38 +293,6 @@ watch(() => state.startDate, d => { editStartDate.value = d || ""; }, { immediat
 watch(() => state.startTime, t => { editStartTime.value = t || ""; }, { immediate: true });
 watch(() => state.dueDate, d => { editDueDate.value = d || ""; }, { immediate: true });
 watch(() => state.dueTime, t => { editDueTime.value = t || ""; }, { immediate: true });
-
-// 状态总结徽标（仅开始/仅截止/区间段）
-const timePlanSummaryText = computed(() => {
-  const start = editStartDate.value;
-  const startTime = editStartTime.value;
-  const due = editDueDate.value;
-  const dueTime = editDueTime.value;
-
-  if (start && due) {
-    const sText = formatMonthDayTime(start, startTime);
-    const dText = formatMonthDayTime(due, dueTime);
-    return `${sText} ~ ${dText}`;
-  }
-  if (start && !due) {
-    const sText = formatMonthDayTime(start, startTime);
-    return `自 ${sText} 起 (无截止)`;
-  }
-  if (!start && due) {
-    const dText = formatMonthDayTime(due, dueTime);
-    return `截止 ${dText}`;
-  }
-  return "";
-});
-
-const timePlanStatusClass = computed(() => {
-  const start = editStartDate.value;
-  const due = editDueDate.value;
-  if (start && due) return "status-range";
-  if (start && !due) return "status-start-only";
-  if (!start && due) return "status-due-only";
-  return "";
-});
 
 function getTodayDateStr(): string {
   const now = new Date();
@@ -402,12 +335,7 @@ function clearDueDate() {
   onDueChange();
 }
 
-function clearAllDates() {
-  clearStartDate();
-  clearDueDate();
-}
-
-// 提取当前任务中所有关联的图片（从描述 Markdown 与云端评论区动态附件汇聚，自动去重）
+// 提取当前任务中所有关联的图片
 const attachedImages = computed(() => {
   const list: Array<{ url: string; name: string }> = [];
   const seenUrls = new Set<string>();
@@ -422,7 +350,6 @@ const attachedImages = computed(() => {
       url
     });
   }
-  // 补充通过官方评论区添加或动态刷新的云端照片
   for (const ca of state.commentAttachments || []) {
     if (!seenUrls.has(ca.url)) {
       seenUrls.add(ca.url);
@@ -437,10 +364,11 @@ let pendingDraft: { taskId: string; title: string; description: string } | undef
 
 function captureDraft() {
   const imgMarkdown = (state.description.match(/!\[.*?\]\((?:https?:\/\/|data:image\/)[^\s\)]+\)/g) || []).join("\n\n");
+  const parts = [editDescription.value.trim(), imgMarkdown].filter(Boolean);
   return {
     taskId: state.taskId,
     title: editTitle.value,
-    description: [editDescription.value.trim(), imgMarkdown].filter(Boolean).join("\n\n")
+    description: parts.join("\n\n")
   };
 }
 
@@ -588,4 +516,4 @@ async function removeAttachedImage(url: string) {
 }
 </script>
 
-<style scoped src="./todoist-inspector.css"></style>
+<style scoped src="./inspector-window.css"></style>

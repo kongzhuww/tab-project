@@ -6,6 +6,7 @@ import { fullscreenCardState } from "../core/fullscreen-card-state";
 import { settingsController } from "../settings/store";
 import { windowManagerController } from "../core/window-manager.store";
 import { topProfileState, profileMenuController } from "../profile/store";
+import { notificationHistoryController, notificationHistoryState, notificationUnreadCount } from "../notifications/history-store";
 import { bookmarkFolderStripState } from "../bookmarks/folder-strip-store";
 import { bookmarksService } from "../services/bookmarks.service";
 
@@ -38,10 +39,7 @@ function handleToggleBookmark(event: MouseEvent) {
 
 function handleOpenProfile(event: MouseEvent) {
   event.preventDefault();
-  const win = typeof window !== "undefined" ? (window as any) : null;
-  if (win?.LogicWeaverProfilePanel?.open) {
-    win.LogicWeaverProfilePanel.open();
-  }
+  notificationHistoryController.toggle();
 }
 
 function handleContextMenuProfile(event: MouseEvent) {
@@ -106,6 +104,7 @@ function handleTopBarSelectStart(e: Event) {
 }
 
 onMounted(() => {
+  notificationHistoryController.start();
   const saved = localStorage.getItem("theme") || "light";
   document.documentElement.dataset.theme = saved;
   document.documentElement.setAttribute("data-theme", saved);
@@ -125,20 +124,23 @@ onMounted(() => {
         id="bili-profile-button"
         class="bili-profile-button"
         type="button"
-        title="头像 · 个人与浏览器信息"
+        title="通知中心"
+        aria-controls="notification-center"
+        :aria-expanded="notificationHistoryState.isOpen"
+        :aria-label="notificationUnreadCount ? `通知中心，${notificationUnreadCount} 条未读` : '通知中心'"
         @click="handleOpenProfile"
         @contextmenu.prevent="handleContextMenuProfile($event)"
       >
         <img
           id="bili-profile-avatar"
           :src="topProfileState.avatarUrl || 'assets/bilibili.svg'"
-          :alt="topProfileState.userName || '信息中心头像'"
+          :alt="topProfileState.userName || '通知中心头像'"
         />
         <span
           id="bili-profile-badge"
           class="bili-profile-badge"
-          :hidden="topProfileState.unreadCount <= 0"
-        >{{ topProfileState.unreadCount }}</span>
+          :hidden="notificationUnreadCount <= 0"
+        >{{ notificationUnreadCount > 99 ? '99+' : notificationUnreadCount }}</span>
       </button>
       <button
         id="bookmark-handle"

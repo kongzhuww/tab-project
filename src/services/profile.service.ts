@@ -1,7 +1,8 @@
 declare const chrome: any;
 
 import { biliMessagePanelController } from "../bilibili/message-panel-store";
-import { profilePanelController } from "../profile/panel-store";
+import { notificationHistoryController } from "../notifications/history-store";
+import { tabManagerController } from "../profile/tab-manager-store";
 import { notificationController } from "../notifications/store";
 import { topProfileState, profileMenuState, profileMenuController } from "../profile/store";
 
@@ -182,17 +183,13 @@ export class ProfileService {
     const avatar = this.customAvatar || String(profile?.face || fallback).replace(/^http:/, "https:");
 
     const visibleUnread = this.getVisibleUnread();
-    const totalUnread = Object.values(visibleUnread).reduce((sum, c) => sum + (c || 0), 0);
 
     topProfileState.avatarUrl = avatar;
     topProfileState.userName = profile?.uname || "哔哩哔哩用户";
-    topProfileState.buttonTitle = this.customAvatar
-      ? "打开信息中心"
-      : profile ? `${profile.uname} · B站消息` : "未登录 B站";
-    topProfileState.unreadCount = totalUnread;
+    topProfileState.buttonTitle = "通知中心";
 
     profileMenuState.avatarUrl = avatar;
-    profileMenuState.userName = profile?.uname || "浏览器指纹与环境";
+    profileMenuState.userName = profile?.uname || "用户";
     profileMenuState.mid = profile?.mid;
 
     if (typeof document !== "undefined") {
@@ -202,7 +199,6 @@ export class ProfileService {
       if (topBtn) topBtn.title = topProfileState.buttonTitle;
     }
 
-    profilePanelController.setUserInfo(avatar, profile?.uname || "浏览器指纹与环境");
 
     biliMessagePanelController.updateState({
       userName: profile?.uname || "哔哩哔哩用户",
@@ -365,7 +361,9 @@ export class ProfileService {
     profileMenuController.setActions({
       onAction: async (action) => {
         if (action === "messages") {
-          profilePanelController.open();
+          notificationHistoryController.open();
+        } else if (action === "tabs") {
+          tabManagerController.open();
         } else if (action === "refresh") {
           await this.refreshBiliProfile();
         } else if (action === "switch") {

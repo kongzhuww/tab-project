@@ -1,16 +1,16 @@
-import { f as _, b as d, o as w, n as b, d as k, g as y, h as S, i as t, t as a, j as E, k as $, l as D, m as C, F as L, c as i, p as x } from "./chunks/vendor-vue-BUkfvXUI.js";
-import { _ as B, i as T } from "./chunks/dock-lifecycle.store-Dbc-Xtfj.js";
-import { q as H } from "./chunks/search.service-BNKrftAD.js";
-import { cliBridgeRuntime as I } from "./chunks/cli-bridge-D8zwsecG.js";
-const M = { class: "sub-newtab-topbar" }, N = { class: "sub-newtab-center" }, V = { class: "hero-clock" }, F = { id: "greeting" }, A = {
+import { d as _, b as d, C as w, G as b, y as k, o as y, e as S, f as t, t as a, m as D, i as E, D as $, H as C, F as L, s as i, N as x } from "./chunks/vendor-vue-CjOHdfe5.js";
+import { _ as B, i as H } from "./chunks/dock-lifecycle.store-sB0Ll9yF.js";
+import { s as N } from "./chunks/search.service-CzxjlNxM.js";
+import { cliBridgeRuntime as T } from "./chunks/cli-bridge-BzDCKJ6A.js";
+const I = { class: "sub-newtab-topbar" }, M = { class: "sub-newtab-center" }, V = { class: "hero-clock" }, F = { id: "greeting" }, A = {
   id: "clock",
   class: "clock"
 }, K = { id: "secs" }, P = {
   id: "date",
   class: "date"
-}, j = /* @__PURE__ */ _({
+}, G = /* @__PURE__ */ _({
   __name: "SearchLauncher",
-  setup(q) {
+  setup(R) {
     const n = d(/* @__PURE__ */ new Date()), o = d(document.documentElement.dataset.theme || "light");
     let l = 0;
     const m = i(() => {
@@ -31,12 +31,12 @@ const M = { class: "sub-newtab-topbar" }, N = { class: "sub-newtab-center" }, V 
     }
     return w(() => {
       l = window.setInterval(c, 1e3), document.addEventListener("visibilitychange", c), window.addEventListener("keydown", r), b(() => {
-        H.focus();
+        N.focus();
       });
     }), k(() => {
       clearInterval(l), document.removeEventListener("visibilitychange", c), window.removeEventListener("keydown", r);
     }), (e, s) => (y(), S(L, null, [
-      t("div", M, [
+      t("div", I, [
         t("button", {
           id: "theme-toggle",
           class: "sub-theme-toggle",
@@ -45,11 +45,11 @@ const M = { class: "sub-newtab-topbar" }, N = { class: "sub-newtab-center" }, V 
           onClick: p
         }, a(o.value === "light" ? "☀" : "🌙"), 1)
       ]),
-      t("div", N, [
+      t("div", M, [
         t("div", V, [
           t("p", F, a(m.value), 1),
           t("p", A, [
-            E(a(h.value), 1),
+            D(a(h.value), 1),
             t("span", K, a(v.value), 1)
           ]),
           t("p", P, a(g.value), 1)
@@ -57,10 +57,10 @@ const M = { class: "sub-newtab-topbar" }, N = { class: "sub-newtab-center" }, V 
         t("form", {
           id: "search",
           class: "search",
-          onSubmit: s[0] || (s[0] = $(() => {
+          onSubmit: s[0] || (s[0] = E(() => {
           }, ["prevent"]))
         }, [
-          D(B)
+          $(B)
         ], 32)
       ]),
       t("aside", { class: "enter-home-dock" }, [
@@ -77,7 +77,7 @@ const M = { class: "sub-newtab-topbar" }, N = { class: "sub-newtab-center" }, V 
     ], 64));
   }
 });
-T();
+H();
 const u = document.getElementById("vue-search-launcher-root");
-u && x(j).mount(u);
-I.start();
+u && x(G).mount(u);
+T.start();

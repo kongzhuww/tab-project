@@ -12,8 +12,7 @@
 .daily-top-open { border-color:rgba(56,189,248,.28);background:linear-gradient(135deg,rgba(56,189,248,.11),rgba(168,85,247,.07)); }
 .daily-top-open:hover { border-color:rgba(56,189,248,.48); }
 .bili-message-panel>:first-child { cursor:default;user-select:none; }
-.bili-message-panel,
-.my-info-panel {
+.bili-message-panel {
   width: min(340px, calc(100vw - 24px)) !important;
   max-width: 340px !important;
   height: calc(100vh - var(--topbar-height) - 24px) !important;
@@ -46,72 +45,6 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.bili-message-panel > header > .my-info-tech-btn,
-.my-info-tech-btn {
-  width: auto !important;
-  min-width: 44px;
-  height: 25px !important;
-  padding: 0 10px !important;
-  border-radius: 6px;
-  border: 1px solid rgba(56,189,248,.35);
-  background: rgba(56,189,248,.1);
-  color: #38bdf8;
-  font-family: inherit;
-  font-size: 11px;
-  font-weight: 700;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  white-space: nowrap !important;
-  word-break: keep-all !important;
-  flex: none;
-  line-height: 1;
-  transition: all .15s ease;
-}
-.bili-message-panel > header > .my-info-tech-btn:hover,
-.my-info-tech-btn:hover { background:rgba(56,189,248,.22);border-color:#38bdf8;color:#fff; }
-.bili-message-panel > header > .my-info-tech-btn.on,
-.my-info-tech-btn.on { background:#38bdf8;color:#0f172a;border-color:#38bdf8;box-shadow:0 0 10px rgba(56,189,248,.4); }
-.my-info-body { display:flex;flex-direction:column;gap:8px;padding:11px 12px 16px;max-height:min(72vh,660px);overflow-y:auto; }
-.my-info-section-title { font-size:13px;font-weight:750;color:var(--heading);display:flex;align-items:center;gap:6px;margin:2px 0 2px; }
-.my-info-grid { display:flex;flex-direction:column;gap:7px; }
-.my-info-grid-item { padding:9px 12px;border:1px solid var(--border);border-radius:10px;background:var(--surface);display:flex;flex-direction:column;gap:4px; }
-.my-info-grid-label { font-size:11.5px;color:var(--muted);font-weight:650;display:flex;justify-content:space-between;align-items:center; }
-.my-info-grid-value {
-  font-size: 12.5px;
-  font-weight: 600;
-  color: var(--heading);
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
-  font-variant-numeric: tabular-nums;
-  font-feature-settings: "tnum" 1;
-  letter-spacing: 0.15px;
-  line-height: 1.45;
-  word-break: break-word;
-}
-.my-info-meter-track { height:6px;border-radius:3px;background:rgba(255,255,255,.08);overflow:hidden;margin-top:3px; }
-.my-info-meter-fill { height:100%;border-radius:3px;background:linear-gradient(90deg,#10b981,#38bdf8);transition:width .3s ease; }
-.my-info-pill { font-size:10px;padding:2px 7px;border-radius:999px;background:rgba(16,185,129,.14);color:#34d399;font-weight:700; }
-.my-info-workers-status { display:flex;flex-direction:column;gap:4px;margin-top:3px; }
-.my-info-worker-tag { font-size:10.5px;padding:3px 6px;border-radius:5px;background:rgba(56,189,248,.08);color:#38bdf8;border:1px solid rgba(56,189,248,.18);white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
-
-/* 架构拓扑与创新引擎右侧拓展栏 */
-.my-info-tech-drawer { position:fixed!important;z-index:92;top:calc(var(--topbar-height) + 8px)!important;left:340px!important;width:min(340px,calc(100vw - 352px))!important;max-height:min(82vh,740px);display:flex;flex-direction:column;overflow:hidden;border:1px solid var(--border-strong,rgba(255,255,255,.2));border-radius:14px;background:var(--panel,#1e293b);box-shadow:0 24px 70px -20px rgba(0,0,0,.75);animation:tech-drawer-in .18s cubic-bezier(.16,1,.3,1); }
-.my-info-tech-drawer[hidden] { display:none!important; }
-@keyframes tech-drawer-in { from{opacity:0;transform:translateX(-10px)} to{opacity:1;transform:translateX(0)} }
-@media(max-width:720px){.my-info-tech-drawer{left:12px!important;top:calc(var(--topbar-height) + 40px)!important;width:min(320px,calc(100vw - 24px))!important;z-index:95}}
-.my-info-tech-head { display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px;border-bottom:1px solid var(--border);background:var(--surface); }
-.my-info-tech-title h3 { margin:0;font-size:13px;font-weight:750;color:var(--heading); }
-.my-info-tech-title span { font-size:10px;color:var(--dim); }
-.my-info-tech-head button { width:26px;height:26px;border:0;border-radius:6px;background:transparent;color:var(--muted);cursor:pointer;font-size:13px; }
-.my-info-tech-head button:hover { background:var(--surface-hover);color:var(--heading); }
-.my-info-tech-body { padding:12px 14px;display:flex;flex-direction:column;gap:12px;overflow-y:auto;max-height:min(72vh,660px); }
-.my-info-tech-card { display:flex;flex-direction:column;gap:8px;padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:var(--surface); }
-.my-info-tech-card-title { font-size:12px;font-weight:750;color:var(--heading);display:flex;align-items:center;justify-content:space-between; }
-.my-info-tech-item { display:flex;flex-direction:column;gap:2px;padding:6px 8px;border-radius:6px;background:rgba(255,255,255,.03);border-left:2.5px solid #38bdf8; }
-.my-info-tech-item b { font-size:11.5px;color:var(--heading); }
-.my-info-tech-item p { margin:0;font-size:10px;color:var(--muted);line-height:1.45; }
-
 /* Todoist workspace uses the dashboard accent; red remains reserved for overdue dates/errors. */
 .todoist-mark { background:linear-gradient(135deg,#14b8a6,#38bdf8); }
 .todoist-view-tabs button.on { color:#0f9f91; }

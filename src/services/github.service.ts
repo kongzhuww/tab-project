@@ -1032,10 +1032,6 @@ ${repoInfo}`;
     githubAiJob.message += " 用户声明已核对供应商记录，仅解除本页提交限制，未重新发送请求。";
   }
 
-  public async analyzeRepoWithAi(repo: GitHubRawRepo): Promise<void> {
-    await this.runAiJob([this.copyStarTarget(repo)]);
-  }
-
   public batchAnalyzeWithAi(): void {
     void this.analyzeAllWithAi([...this.selectedRepos]);
   }

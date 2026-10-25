@@ -3,11 +3,11 @@
     id="todoist-calendar-sidebar"
     class="todoist-calendar-sidebar"
     :class="{ collapsed: state.collapsed }"
-    aria-label="DayLine 日历拓展"
+    aria-label="Todoist 任务日历"
   >
     <div class="todoist-cal-head">
       <div class="todoist-cal-title-row">
-        <span class="todoist-cal-logo">📅 <strong>Google 日历</strong></span>
+        <span class="todoist-cal-logo">📅 <strong>任务日历</strong></span>
         <span id="todoist-cal-month-badge" class="todoist-cal-badge">{{ state.badgeText }}</span>
       </div>
       <div class="todoist-cal-head-actions">
@@ -88,83 +88,20 @@
 
     <div class="todoist-cal-agenda">
       <div class="todoist-cal-agenda-head">
-        <div class="todoist-cal-tab-switch">
-          <button
-            type="button"
-            class="cal-tab-btn"
-            :class="{ active: state.tabMode === 'agenda' }"
-            @click="setTabMode('agenda')"
-          >
-            {{ state.agendaTitle.includes(' ') ? state.agendaTitle.split(' ')[0] + ' 日程' : state.agendaTitle }}
-          </button>
-          <button
-            type="button"
-            class="cal-tab-btn"
-            :class="{ active: state.tabMode === 'todo' }"
-            @click="setTabMode('todo')"
-          >
-            待办
-          </button>
-        </div>
-        <span id="todoist-cal-agenda-count" class="agenda-count">
-          {{ state.tabMode === 'agenda' ? state.agendaCount : `${state.todoItems.length} 项` }}
-        </span>
+        <strong class="todoist-cal-agenda-title">{{ state.agendaTitle }}</strong>
+        <span id="todoist-cal-agenda-count" class="agenda-count">{{ state.todoItems.length }} 项</span>
       </div>
-
-      <!-- 1. Google 日程列表 -->
-      <div
-        v-if="state.tabMode === 'agenda'"
-        id="todoist-cal-agenda-list"
-        class="todoist-cal-agenda-list"
-      >
-        <div v-if="state.agendaItems.length === 0" class="todoist-cal-empty">
-          {{ state.emptyText }}
-        </div>
-        <template v-else>
-          <template v-for="item in state.agendaItems" :key="item.id">
-            <a
-              v-if="item.htmlLink"
-              :href="item.htmlLink"
-              target="_blank"
-              rel="noreferrer"
-              class="todoist-cal-agenda-item todoist-cal-event-item google-calendar-agenda-item"
-              :style="item.color ? { '--google-event-color': item.color } : undefined"
-              title="点击打开 Google 日历；右键可修改、复制或删除"
-              @contextmenu.prevent="onAgendaContextMenu(item, $event)"
-            >
-              <span class="agenda-event-time">{{ item.time }}</span>
-              <span class="agenda-event-copy">
-                <b :title="item.summary">{{ item.summary }}</b>
-                <small>{{ item.subtitle }}</small>
-              </span>
-            </a>
-            <div
-              v-else
-              class="todoist-cal-agenda-item todoist-cal-event-item google-calendar-agenda-item"
-              :style="item.color ? { '--google-event-color': item.color } : undefined"
-              title="Google 日历日程；右键可修改、复制或删除"
-              @contextmenu.prevent="onAgendaContextMenu(item, $event)"
-            >
-              <span class="agenda-event-time">{{ item.time }}</span>
-              <span class="agenda-event-copy">
-                <b :title="item.summary">{{ item.summary }}</b>
-                <small>{{ item.subtitle }}</small>
-              </span>
-            </div>
-          </template>
-        </template>
+      <p v-if="state.writeError" class="todoist-cal-empty" role="alert">{{ state.writeError }}</p>
+      <div v-if="state.emptyText" class="todoist-cal-empty" role="status">
+        {{ state.emptyText }}
+        <button type="button" class="todoist-cal-retry" :disabled="state.todoLoading || todoistModuleState.pendingWrites > 0"
+          @click="todoistCalendarSidebarController.loadTodosForDate(state.selectedDate, true)">重试读取</button>
       </div>
-
-      <!-- 2. 待办与历史完成任务列表 (灰杠保持+撤销) -->
-      <div
-        v-else
-        id="todoist-cal-todo-list"
-        class="todoist-cal-agenda-list todoist-cal-todos"
-      >
-        <div v-if="state.todoLoading" class="todoist-cal-empty">
+      <div id="todoist-cal-todo-list" class="todoist-cal-agenda-list todoist-cal-todos">
+        <div v-if="state.todoLoading && !state.todoItems.length" class="todoist-cal-empty">
           正在读取待办与完成历史…
         </div>
-        <div v-else-if="state.todoItems.length === 0" class="todoist-cal-empty">
+        <div v-else-if="state.todoItems.length === 0 && !state.emptyText" class="todoist-cal-empty">
           当天没有待办或完成任务 ☕
         </div>
         <template v-else>
@@ -180,6 +117,7 @@
                 type="button"
                 class="todoist-cal-check"
                 :class="{ checked: item.completed }"
+                :disabled="todoistModuleState.pendingWrites > 0"
                 :title="item.completed ? '已完成 · 点击撤销(Reopen)' : '点击标记完成'"
                 @click.stop="onToggleTodo(item)"
               >
@@ -188,6 +126,7 @@
               <span class="todoist-cal-todo-title" :class="{ strike: item.completed }">
                 {{ item.content }}
               </span>
+              <small v-if="item.time" class="todoist-cal-task-time">{{ item.time }}</small>
               <span v-if="item.completed" class="todoist-cal-completed-tag">已完成</span>
             </div>
 
@@ -209,22 +148,24 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted } from "vue";
+import { onMounted, onUnmounted, watch } from "vue";
+import { todoistModuleState } from "./module-state";
+import { calendarService } from "../services/calendar.service";
 import { imageViewerController } from "../viewers/image-viewer-store";
 import {
   todoistCalendarSidebarState,
   todoistCalendarSidebarController,
-  type CalendarAgendaItem,
-  type CalendarTodoItem,
-  type CalendarTabMode
+  type CalendarTodoItem
 } from "./calendar-sidebar-store";
 import { todoistInspectorController } from "./inspector-store";
 
 const state = todoistCalendarSidebarState;
+onUnmounted(() => todoistCalendarSidebarController.cancelReads());
 
-function setTabMode(mode: CalendarTabMode) {
-  todoistCalendarSidebarController.setTabMode(mode);
-}
+watch(() => [todoistModuleState.active, todoistModuleState.pendingWrites] as const, ([active, writes], previous) => {
+  if (!active || writes) { todoistCalendarSidebarController.cancelReads(); return; }
+  void todoistCalendarSidebarController.loadTodosForDate(state.selectedDate, Boolean(previous?.[1]));
+}, { immediate: true, flush: "sync" });
 
 function onToggleTodo(item: CalendarTodoItem) {
   void todoistCalendarSidebarController.toggleTodoItem(item);
@@ -235,7 +176,7 @@ function onOpenTaskInspector(item: CalendarTodoItem) {
 }
 
 onMounted(() => {
-  todoistCalendarSidebarController.dispatch("init");
+  calendarService.syncSidebarToVue();
 });
 
 function onToday() {
@@ -291,42 +232,13 @@ function onDrop(date: string, event: DragEvent) {
   }
 }
 
-function onAgendaContextMenu(item: CalendarAgendaItem, event: MouseEvent) {
-  todoistCalendarSidebarController.dispatch("context-agenda", {
-    item,
-    clientX: event.clientX,
-    clientY: event.clientY
-  });
-}
 </script>
 
 <style scoped>
-.todoist-cal-tab-switch {
-  display: inline-flex;
-  align-items: center;
-  background: var(--panel-hover, rgba(0, 0, 0, 0.05));
-  border-radius: 6px;
-  padding: 2px;
-  gap: 2px;
-}
-
-.cal-tab-btn {
-  background: transparent;
-  border: none;
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--muted, #64748b);
-  padding: 2px 8px;
-  border-radius: 4px;
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.cal-tab-btn.active {
-  background: var(--panel, #ffffff);
-  color: var(--heading, #1e293b);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
-}
+.todoist-cal-retry { border: 0; background: transparent; color: var(--accent); font: inherit; cursor: pointer; }
+.todoist-cal-retry:disabled { opacity: .5; cursor: default; }
+.todoist-cal-agenda-title { font-size: 12px; color: var(--heading); }
+.todoist-cal-task-time { flex-shrink: 0; font-size: 10px; color: var(--muted); }
 
 .todoist-cal-todos {
   gap: 4px;

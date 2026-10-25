@@ -7,11 +7,20 @@ import {
   type RepoHeadingItem
 } from "./repo-detail-store";
 import { images } from "../sdk/images";
+import GitHubRepositoryTasks from "./GitHubRepositoryTasks.vue";
+import { githubTaskCreation } from "../todoist/github-task-target";
+import { openTodoistTask } from "../todoist/task-navigation";
 
 const copyStatus = ref<string>("");
-const saveStatus = ref<string>("");
 const isTocOpen = ref<boolean>(false);
-const isExpanded = ref<boolean>(false);
+const taskPaneOpen = ref(false);
+watch(() => state.fullName, () => { taskPaneOpen.value = false; });
+watch(taskPaneOpen, async () => {
+  await nextTick();
+  if (!pos.value || !windowRef.value) return;
+  const width = windowRef.value.getBoundingClientRect().width;
+  pos.value = { ...pos.value, x: Math.max(10, Math.min(pos.value.x, window.innerWidth - width - 10)) };
+});
 const readmeContainerRef = ref<HTMLElement | null>(null);
 const windowRef = ref<HTMLElement | null>(null);
 const pos = ref<{ x: number; y: number } | null>(null);
@@ -20,7 +29,6 @@ const pageVisible = ref(!document.hidden);
 let pagePresent = true;
 let uiVersion = 0, copyVersion = 0;
 let copyTimer: ReturnType<typeof setTimeout> | undefined;
-let saveTimer: ReturnType<typeof setTimeout> | undefined;
 let stopDrag = () => {};
 let isDragging = false;
 let startMouseX = 0;
@@ -65,9 +73,10 @@ function onHeaderMouseDown(e: MouseEvent) {
 function handleClose() {
   controller.close();
 }
-
-function toggleExpand() {
-  isExpanded.value = !isExpanded.value;
+function openCreatedTask(taskId: string) {
+  if (githubTaskCreation.saving) return;
+  controller.close();
+  openTodoistTask(taskId);
 }
 
 function handleKeydown(e: KeyboardEvent) {
@@ -88,14 +97,6 @@ async function copyText(text: string, label: string) {
     if (current()) copyStatus.value = "复制未确认";
   }
   if (current()) copyTimer = setTimeout(() => { if (current()) copyStatus.value = ""; }, 2000);
-}
-
-function copyGitClone() {
-  copyText(`git clone ${state.htmlUrl}.git`, "Clone 命令");
-}
-
-function copyPxClone() {
-  copyText(`px git clone ${state.htmlUrl}.git`, "px Clone 命令");
 }
 
 function handleArticleClick(e: MouseEvent) {
@@ -148,8 +149,8 @@ watch(
 
 function clearUiWork() {
   ++uiVersion; ++copyVersion;
-  clearTimeout(copyTimer); clearTimeout(saveTimer);
-  copyStatus.value = ""; saveStatus.value = ""; isTocOpen.value = false;
+  clearTimeout(copyTimer);
+  copyStatus.value = ""; isTocOpen.value = false;
   stopDrag();
 }
 watch(() => [state.revision, state.isOpen, pageVisible.value], () => {
@@ -188,7 +189,7 @@ onUnmounted(() => {
     <div
       ref="windowRef"
       class="gh-modal-window"
-      :class="{ 'is-expanded': isExpanded }"
+      :class="{ 'has-task-pane': taskPaneOpen }"
       :style="pos ? { position: 'fixed', left: `${pos.x}px`, top: `${pos.y}px`, margin: '0' } : {}"
       role="dialog"
       aria-modal="false"
@@ -215,41 +216,13 @@ onUnmounted(() => {
         <!-- 操作按钮工具栏 -->
         <div class="gh-modal-actions">
           <span v-if="copyStatus" class="gh-status-tip">{{ copyStatus }}</span>
-          <span v-if="saveStatus" class="gh-status-tip gh-status-save">{{ saveStatus }}</span>
-
-          <button
-            type="button"
-            class="gh-btn gh-btn-action"
-            :title="'复制 git clone ' + state.htmlUrl + '.git'"
-            @click="copyGitClone"
-          >
-            <span>Clone</span>
-          </button>
-
-          <button
-            type="button"
-            class="gh-btn gh-btn-action"
-            title="复制 px git clone (用于手机或代理环境)"
-            @click="copyPxClone"
-          >
-            <span>px</span>
-          </button>
-
-          <button type="button" class="gh-btn gh-btn-action" :disabled="state.isLoading" @click="controller.reload()">重读</button>
-
-          <!-- 缩放尺寸切换：默认 Steam 紧凑 520px，点击放大到 880px -->
-          <button
-            type="button"
-            class="gh-btn gh-btn-expand"
-            :title="isExpanded ? '还原为 Steam 紧凑视窗' : '展开为宽屏视窗'"
-            @click="toggleExpand"
-          >
-            {{ isExpanded ? "⛶" : "🗖" }}
-          </button>
+          <button type="button" class="gh-btn gh-btn-action" :aria-expanded="taskPaneOpen"
+            :disabled="githubTaskCreation.saving" @click="taskPaneOpen = !taskPaneOpen">任务</button>
 
           <button
             type="button"
             class="gh-btn gh-btn-close"
+            :disabled="githubTaskCreation.saving"
             title="关闭视窗 (Esc)"
             @click="handleClose"
           >
@@ -258,6 +231,8 @@ onUnmounted(() => {
         </div>
       </header>
 
+      <div class="gh-modal-content">
+      <div class="gh-repository-content">
       <!-- 2. 项目核心元信息条 (Repo Meta Ribbon) -->
       <div class="gh-modal-ribbon">
         <div class="gh-meta-badges">
@@ -343,6 +318,11 @@ onUnmounted(() => {
           @click="handleArticleClick"
         ></article>
       </main>
+      </div>
+      <GitHubRepositoryTasks v-if="taskPaneOpen" :key="state.fullName"
+        :repository="{ fullName: state.fullName, description: state.description, stars: state.stars, language: state.language, updated: state.pushedAt }"
+        @close="taskPaneOpen = false" @open-task="openCreatedTask" />
+      </div>
     </div>
   </div>
 </template>
@@ -383,24 +363,25 @@ onUnmounted(() => {
 /* 桌面工具风格独立视窗卡片：像其他桌面工具一样小巧利落，支持拖动，不遮挡背景内容 */
 .gh-modal-window {
   pointer-events: auto;
-  width: min(440px, 94vw);
-  height: min(680px, 86vh);
-  background: var(--panel, #ffffff);
+  width: min(780px, 94vw);
+  height: min(780px, 90vh);
+  background: var(--panel);
   border: 1px solid var(--border, rgba(255, 255, 255, 0.15));
   border-radius: 12px;
   box-shadow: 0 16px 40px rgba(0, 0, 0, 0.38), 0 0 0 1px var(--border, rgba(255, 255, 255, 0.08));
   display: flex;
   flex-direction: column;
-  color: var(--text, #dbe4ee);
+  color: var(--text);
   overflow: hidden;
-  transition: width 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-  will-change: width, transform;
   contain: paint;
 }
 
-/* 宽屏展开模式：供需要查看超宽表格时一键切换 */
-.gh-modal-window.is-expanded {
-  width: min(780px, 94vw);
+.gh-modal-window.has-task-pane { width: min(1100px, 96vw); }
+.gh-modal-content { display: flex; flex: 1; min-height: 0; min-width: 0; }
+.gh-repository-content { display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 0; }
+@media (max-width: 620px) {
+  .gh-modal-window.has-task-pane .gh-repository-content { display: none; }
+  .gh-modal-window.has-task-pane :deep(.github-repository-tasks) { width: 100%; border-left: 0; }
 }
 
 /* 顶部 Header 标题栏 */
@@ -409,7 +390,7 @@ onUnmounted(() => {
   align-items: center;
   justify-content: space-between;
   padding: 10px 14px;
-  background: var(--panel, #0f172a);
+  background: var(--panel);
   border-bottom: 1px solid var(--border, rgba(255, 255, 255, 0.1));
   gap: 8px;
   flex-shrink: 0;
@@ -437,7 +418,7 @@ onUnmounted(() => {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  color: var(--heading, #ffffff);
+  color: var(--heading);
   text-decoration: none;
   font-size: 14px;
   font-weight: 600;
@@ -496,8 +477,8 @@ onUnmounted(() => {
   padding: 0 8px;
   border-radius: 5px;
   border: 1px solid var(--border, rgba(255, 255, 255, 0.12));
-  background: var(--surface, #1e293b);
-  color: var(--text, #cbd5e1);
+  background: var(--surface);
+  color: var(--text);
   font-size: 11.5px;
   font-weight: 500;
   cursor: pointer;
@@ -507,38 +488,15 @@ onUnmounted(() => {
 
 .gh-btn:hover {
   background: var(--surface-hover, rgba(255, 255, 255, 0.1));
-  color: var(--heading, #ffffff);
+  color: var(--heading);
   border-color: rgba(255, 255, 255, 0.25);
 }
 
-.gh-btn-obsidian {
-  background: rgba(139, 92, 246, 0.18);
-  border-color: rgba(139, 92, 246, 0.38);
-  color: #a78bfa;
-}
-
-.gh-btn-obsidian:hover {
-  background: rgba(139, 92, 246, 0.3);
-  color: #fff;
-}
-
-.gh-btn-obsidian.is-saved {
-  background: rgba(16, 185, 129, 0.2);
-  border-color: rgba(16, 185, 129, 0.5);
-  color: #34d399;
-}
-
-.gh-btn-expand,
 .gh-btn-close {
   width: 26px;
   padding: 0;
   font-size: 12px;
   opacity: 0.8;
-}
-
-.gh-btn-expand:hover {
-  opacity: 1;
-  color: #38bdf8;
 }
 
 .gh-btn-close:hover {
@@ -551,7 +509,7 @@ onUnmounted(() => {
 /* 元信息 Ribbon */
 .gh-modal-ribbon {
   padding: 10px 14px;
-  background: color-mix(in srgb, var(--panel, #ffffff) 92%, var(--text) 8%);
+  background: color-mix(in srgb, var(--panel) 92%, var(--text) 8%);
   border-bottom: 1px solid var(--border, rgba(255, 255, 255, 0.08));
   display: flex;
   flex-direction: column;
@@ -573,9 +531,9 @@ onUnmounted(() => {
   gap: 3px;
   padding: 2px 6px;
   border-radius: 4px;
-  background: var(--panel, #0f172a);
+  background: var(--panel);
   border: 1px solid var(--border, rgba(255, 255, 255, 0.08));
-  color: var(--dim, #94a3b8);
+  color: var(--dim);
 }
 
 .gh-meta-stars {
@@ -601,7 +559,7 @@ onUnmounted(() => {
   margin: 0;
   font-size: 12px;
   line-height: 1.45;
-  color: var(--text, #cbd5e1);
+  color: var(--text);
   opacity: 0.95;
 }
 
@@ -633,7 +591,7 @@ onUnmounted(() => {
 
 /* 目录 TOC */
 .gh-modal-toc {
-  background: var(--panel, #0f172a);
+  background: var(--panel);
   border-bottom: 1px solid var(--border, rgba(255, 255, 255, 0.08));
   flex-shrink: 0;
   transition: all 0.15s ease;
@@ -647,7 +605,7 @@ onUnmounted(() => {
   cursor: pointer;
   font-size: 11.5px;
   font-weight: 600;
-  color: var(--dim, #94a3b8);
+  color: var(--dim);
   user-select: none;
 }
 
@@ -682,7 +640,7 @@ onUnmounted(() => {
   border-radius: 3px;
   font-size: 11.5px;
   cursor: pointer;
-  color: var(--text, #cbd5e1);
+  color: var(--text);
   transition: background 0.12s, color 0.12s;
 }
 
@@ -711,7 +669,7 @@ onUnmounted(() => {
   box-sizing: border-box;
   font-size: 13.5px;
   line-height: 1.7;
-  color: var(--text, #dbe4ee);
+  color: var(--text);
   word-break: break-word;
   user-select: text !important;
   -webkit-user-select: text !important;
@@ -726,7 +684,7 @@ onUnmounted(() => {
   justify-content: center;
   padding: 60px 16px;
   gap: 12px;
-  color: var(--dim, #94a3b8);
+  color: var(--dim);
   font-size: 13px;
 }
 
@@ -756,24 +714,38 @@ onUnmounted(() => {
   padding-bottom: 4px;
   margin-top: 18px;
   margin-bottom: 10px;
-  color: var(--heading, #f1f5f9);
+  color: var(--heading);
   font-weight: 650;
   line-height: 1.35;
 }
 
-.gh-readme-rendered :deep(h1) { font-size: 18px; }
-.gh-readme-rendered :deep(h2) { font-size: 16px; }
-.gh-readme-rendered :deep(h3) { font-size: 14.5px; }
+.gh-readme-rendered :deep(h1) { font-size: 21px; font-weight: 700; margin-top: 20px; margin-bottom: 12px; }
+.gh-readme-rendered :deep(h2) { font-size: 17px; font-weight: 650; margin-top: 18px; margin-bottom: 10px; }
+.gh-readme-rendered :deep(h3) { font-size: 14.5px; font-weight: 600; margin-top: 14px; margin-bottom: 8px; }
 
 .gh-readme-rendered :deep(p) {
-  margin: 10px 0;
-  line-height: 1.7;
+  margin: 12px 0;
+  line-height: 1.65;
+}
+
+.gh-readme-rendered :deep(p[align="center"]) {
+  text-align: center;
 }
 
 .gh-readme-rendered :deep(a) {
-  color: #38bdf8;
+  color: var(--accent, #0969da);
   text-decoration: underline;
-  text-underline-offset: 2px;
+  text-underline-offset: 2.5px;
+  white-space: nowrap;
+}
+
+.gh-readme-rendered :deep(blockquote) {
+  border-left: 3.5px solid var(--accent, #0969da);
+  padding: 6px 14px;
+  background: var(--surface);
+  border-radius: 0 6px 6px 0;
+  margin: 14px 0;
+  color: var(--text);
 }
 
 /* 🌟 H1 标题右侧的内联 App 图标 */
@@ -834,7 +806,7 @@ onUnmounted(() => {
 
 .gh-readme-rendered :deep(pre) {
   position: relative;
-  background: var(--panel, #0b1120) !important;
+  background: var(--panel) !important;
   border: 1px solid var(--border, rgba(255, 255, 255, 0.1)) !important;
   border-radius: 6px !important;
   padding: 10px 14px !important;
@@ -858,7 +830,7 @@ onUnmounted(() => {
   border-radius: 4px;
   border: 1px solid var(--border, rgba(255, 255, 255, 0.15));
   background: var(--surface, rgba(30, 41, 59, 0.85));
-  color: var(--dim, #94a3b8);
+  color: var(--dim);
   cursor: pointer;
   backdrop-filter: blur(4px);
   transition: all 0.15s;

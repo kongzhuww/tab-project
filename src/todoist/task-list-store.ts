@@ -192,7 +192,10 @@ export const todoistTaskListController = {
           (targetView === "today" ? "今天" : "收件箱")
       });
     };
-    this.setLoading(todoistTaskListState.columns.length === 0);
+    // 仅在界面没有任何数据时才显示全屏加载中；若已有数据，保持安静
+    const hasExistingData = todoistTaskListState.columns.length > 0;
+    this.setLoading(!hasExistingData);
+
     try {
       // Distinguish missing configuration from storage, authentication and network failures.
       await todoistService.initToken();
@@ -202,16 +205,29 @@ export const todoistTaskListController = {
         this.updateState({ loading: false, columns: [], projects: [], availableLabels: [], emptyText: "" });
         return;
       }
+
+      let cacheApplied = false;
       if (!force) {
+        // 优先读取本地持久化或内存缓存（0ms 极速直出）
         const cached = await todoistService.getCachedWorkspaceData(targetView, targetProjectId);
         if (!current()) return;
-        if (cached) apply(cached);
+        if (cached && Array.isArray(cached.columns) && cached.columns.length > 0) {
+          apply(cached);
+          cacheApplied = true;
+          this.setLoading(false);
+        }
       }
+
+      // 静默向云端同步最新数据：即使云端较慢或网络异常，由于上方缓存已直出，用户不会感到任何卡顿或重新加载
       const data = await todoistService.loadWorkspaceData(targetView, targetProjectId, force, request.signal);
       apply(data);
-    } catch {
-      if (current()) this.updateState({ loading: false,
-        emptyText: todoistTaskListState.columns.length ? "刷新未完成，保留已有数据。" : "待办读取失败，请手动刷新。" });
+    } catch (err: any) {
+      if (current()) {
+        this.setLoading(false);
+        if (!todoistTaskListState.columns.length) {
+          this.updateState({ emptyText: "待办读取失败，请手动刷新。" });
+        }
+      }
     } finally {
       if (workspaceAbort === request) workspaceAbort = undefined;
     }

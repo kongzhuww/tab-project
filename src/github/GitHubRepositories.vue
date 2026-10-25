@@ -8,7 +8,6 @@ import type { GitHubRepositoryCardView } from "./repositories";
 import { githubRepositoryController as controller, githubRepositoryState as state } from "./repositories";
 import { githubRepoDetailController } from "./repo-detail-store";
 import { gitHubService } from "../services/github.service";
-import { githubAnalysisController } from "./analysis/analysis-store";
 import ChatShareMenu from "../chat/ChatShareMenu.vue";
 import { chatService } from "../chat/chat.service";
 import type { ChatShareTarget } from "../chat/private-chat-client";
@@ -26,7 +25,7 @@ const contextMenuState = reactive({
 });
 
 // 🌟 级联悬浮子菜单状态（类似浏览器书签展开，悬停即出）
-const activeSubMenu = ref<"folder" | "analysis" | null>(null);
+const activeSubMenu = ref<"folder" | null>(null);
 const isFlyoutLeft = ref(false);
 
 function onCardClick(event: MouseEvent, card: GitHubRepositoryCardView): void {
@@ -100,42 +99,6 @@ function clearRemark(): void {
   beginRemark(name, true);
 }
 
-function triggerAiAnalyze(): void {
-  const repo = gitHubService.findRepository(contextMenuState.fullName);
-  if (repo) {
-    void gitHubService.analyzeRepoWithAi(repo);
-  }
-  closeContextMenu();
-}
-
-function openGitDiagram(): void {
-  if (contextMenuState.fullName) {
-    githubAnalysisController.open(contextMenuState.fullName, "gitdiagram");
-  }
-  closeContextMenu();
-}
-
-function openArchify(): void {
-  if (contextMenuState.fullName) {
-    githubAnalysisController.open(contextMenuState.fullName, "archify");
-  }
-  closeContextMenu();
-}
-
-function openGitIngest(): void {
-  if (contextMenuState.fullName) {
-    githubAnalysisController.open(contextMenuState.fullName, "gitingest");
-  }
-  closeContextMenu();
-}
-
-function openDeepWiki(): void {
-  if (contextMenuState.fullName) {
-    githubAnalysisController.open(contextMenuState.fullName, "deepwiki");
-  }
-  closeContextMenu();
-}
-
 async function copyUrl(): Promise<void> {
   const url = contextMenuState.url;
   closeContextMenu();
@@ -160,32 +123,6 @@ function shareToRoom(target: ChatShareTarget): void {
     url: repo.html_url || `https://github.com/${repo.full_name}`,
     updatedAt: repo.updated_at ? repo.updated_at.split("T")[0] : undefined
   }, target);
-}
-
-async function sendToWorkbench(): Promise<void> {
-  const repo = gitHubService.findRepository(contextMenuState.fullName);
-  closeContextMenu();
-  if (!repo) return;
-  try {
-    const { addWorkbenchRepo } = await import("../workbench/workbench.store");
-    addWorkbenchRepo({
-      id: repo.full_name,
-      owner: repo.owner?.login || repo.full_name.split("/")[0] || "",
-      name: repo.name || repo.full_name.split("/")[1] || repo.full_name,
-      description: repo.description || "",
-      stars: repo.stargazers_count,
-      language: repo.language || "",
-      htmlUrl: repo.html_url || `https://github.com/${repo.full_name}`
-    });
-    const { notifications } = await import("../sdk/notifications");
-    notifications.show({
-      appName: "海狸工作台",
-      title: "已添加到工作台",
-      message: `已将项目「${repo.full_name}」放入关联仓库`
-    });
-  } catch (e) {
-    console.warn("添加到工作台失败", e);
-  }
 }
 
 function openExternal(): void {
@@ -370,40 +307,7 @@ function onDragStart(event: DragEvent, fullName: string): void {
         </div>
       </div>
 
-      <!-- 2. 深度分析（悬停即展开子菜单） -->
-      <div
-        class="gh-menu-has-sub"
-        :class="{ 'is-active': activeSubMenu === 'analysis' }"
-        @mouseenter="activeSubMenu = 'analysis'"
-      >
-        <button class="fo-cover-menu-item with-sub-arrow" type="button">
-          <span>🔍 深度分析</span>
-          <span class="sub-arrow">›</span>
-        </button>
-        <!-- 侧边级联飞出子菜单 -->
-        <div class="gh-sub-flyout" :class="{ 'flyout-left': isFlyoutLeft }" @click.stop>
-          <button class="fo-cover-menu-item" type="button" @click="triggerAiAnalyze">
-            ✨ AI 提炼中文简介
-          </button>
-          <button class="fo-cover-menu-item" type="button" @click="openGitDiagram">
-            📊 GitDiagram 架构图解
-          </button>
-          <button class="fo-cover-menu-item" type="button" @click="openArchify">
-            📐 Archify 架构图谱
-          </button>
-          <button class="fo-cover-menu-item" type="button" @click="openGitIngest">
-            📦 GitIngest 代码文本提取
-          </button>
-          <button class="fo-cover-menu-item" type="button" @click="openDeepWiki">
-            🌐 DeepWiki 知识库
-          </button>
-        </div>
-      </div>
-
       <!-- 其他普通主菜单项，鼠标滑过自动收起子菜单 -->
-      <button class="fo-cover-menu-item" type="button" @mouseenter="activeSubMenu = null" @click="sendToWorkbench">
-        📌 发送到工作台
-      </button>
       <button class="fo-cover-menu-item" type="button" @mouseenter="activeSubMenu = null" @click="startInlineRemark()">
         ✏️ 编辑备注…
       </button>

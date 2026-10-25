@@ -60,29 +60,6 @@ const { menuRef: articleMenuRef, style: articleMenuStyle } = useContextMenu({
   dismiss: closeArticleMenu
 });
 
-async function sendArticleToWorkbench(): Promise<void> {
-  const article = aihotContextMenu.value.item;
-  const snapshot = article ? { title: article.title, url: article.url } : null;
-  closeArticleMenu();
-  if (!snapshot?.url) return;
-  try {
-    const url = new URL(snapshot.url);
-    if (url.protocol !== "https:" && url.protocol !== "http:") {
-      notifications.show({ appName: "海狸工作台", title: "无法添加文章", message: "仅支持 HTTP/HTTPS 文章链接。" });
-      return;
-    }
-    const { addWorkbenchWeb } = await import("../workbench/workbench.store");
-    const added = addWorkbenchWeb(snapshot);
-    notifications.show({
-      appName: "海狸工作台",
-      title: added ? "已添加到工作台" : "文章已在工作台中",
-      message: added ? `已将「${snapshot.title}」放入常用网站 / 参考` : "没有重复添加"
-    });
-  } catch {
-    notifications.show({ appName: "海狸工作台", title: "添加失败", message: "未能添加文章，请重试。" });
-  }
-}
-
 const state = aihotFeedState;
 
 const { active, standalone } = useCardActivity("daily-aihot", "/aihot.html");
@@ -593,9 +570,6 @@ function handleSelectDailyDate(date: string) {
       @click.stop
     >
       <div class="menu-head">{{ aihotContextMenu.item?.title }}</div>
-      <button type="button" class="menu-item" role="menuitem" :disabled="!aihotContextMenu.item?.url" @click="sendArticleToWorkbench">
-        <span class="menu-icon" aria-hidden="true">📌</span> 移动到工作台
-      </button>
       <ChatShareMenu
         label="💬 发送到聊天室"
         match-menu-item

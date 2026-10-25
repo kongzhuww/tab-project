@@ -1,8 +1,7 @@
 import { reactive, watch } from "vue";
-export type CardId = "todoist" | "card-github" | "daily-aihot" | "daily-bilibili" | "daily-youtube" | "daily-pricing" | "workbench";
+export type CardId = "todoist" | "card-github" | "daily-aihot" | "daily-bilibili" | "daily-youtube" | "daily-pricing";
 
 export const VALID_FULLSCREEN_CARDS: readonly CardId[] = [
-  "workbench",
   "todoist",
   "card-github",
   "daily-aihot",

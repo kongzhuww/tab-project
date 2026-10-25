@@ -8,10 +8,11 @@ function onActionClick(action: ProfileAction) {
 
 <template>
   <button type="button" data-action="messages" @click.stop="onActionClick('messages')">
-    在本地查看我的信息与性能
+    通知中心
   </button>
+  <button type="button" data-action="tabs" @click.stop="onActionClick('tabs')">标签页管理</button>
   <button type="button" data-action="refresh" @click.stop="onActionClick('refresh')">
-    刷新账号与性能探针
+    刷新 B站账号信息
   </button>
   <button type="button" data-action="switch" @click.stop="onActionClick('switch')">
     切换用户（打开 B站）

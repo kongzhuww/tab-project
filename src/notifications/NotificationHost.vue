@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { nextTick, onBeforeUnmount, onMounted, ref } from "vue";
 import { notificationController, notificationItems, type NotificationItem } from "./store";
+import { notificationHistoryController } from "./history-store";
 
 const timers = new Map<string, number>();
 const startedAt = new Map<string, number>();
@@ -49,8 +50,9 @@ function close(item: NotificationItem): void {
 }
 
 function activate(item: NotificationItem): void {
+  void notificationHistoryController.markRead(item.id);
   close(item);
-  if (!item.onClick) return;
+  if (!item.onClick) { if (item.target) void notificationHistoryController.openTarget(item.target); return; }
   try {
     Promise.resolve(item.onClick()).catch((error) => console.warn("Notification action failed", error));
   } catch (error) {

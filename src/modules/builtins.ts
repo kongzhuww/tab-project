@@ -8,13 +8,10 @@ import { pricingDockModule } from "../pricing/module";
 import { stickersDockModule } from "../stickers/module";
 import { musicDockModule, sirenDockModule } from "../music/module";
 import { todoistDockModule } from "../todoist/module";
-import { workbenchDockModule } from "../workbench/module";
 import { chatDockModule } from "../chat/module";
 
 // Registration imports only lightweight state/settings declarations, not the Vue view.
 registerDockModule(chatDockModule);
-// Insert the target before its dependent Dock entry to preserve legacy ordering.
-registerDockModule(workbenchDockModule);
 // Register card insertion targets before their dependents to preserve the original Dock order.
 registerDockModule(todoistDockModule);
 registerDockModule(stickersDockModule);

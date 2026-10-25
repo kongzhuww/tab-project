@@ -5,6 +5,7 @@ import { reactive, readonly } from "vue";
 import { ReadSessionSlot } from "../core/read-session";
 import { markdownAstEngine } from "../utils/markdown-ast";
 import { GitHubDetailReadError, readRepositoryDocument } from "./detail-read";
+import { githubTaskCreation } from "../todoist/github-task-target";
 
 export interface RepoHeadingItem {
   id: string;
@@ -183,7 +184,7 @@ class GitHubRepoDetailController {
     this.stopReading(); ++state.revision;
     state.readmeMarkdown = ""; state.readmeHtml = ""; state.headings = [];
     state.hasReadme = false; state.isZh = false; state.notice = "";
-    state.error = "GitHub 账号设置已变化，已停止旧请求；请点击重读使用最新配置。";
+    state.error = "GitHub 账号设置已变化，已停止旧请求；请关闭并重新打开仓库详情以使用最新配置。";
   };
   private accountStorageChanged = (changes: Record<string, unknown>, area: string): void => {
     if (area === "local" && ("ghUser" in changes || "ghToken" in changes)) this.invalidateAccount();
@@ -205,6 +206,7 @@ class GitHubRepoDetailController {
   }
 
   public open(fullNameOrOwner: string, repoName?: string, initialMeta?: any): void {
+    if (githubTaskCreation.saving) return;
     const fullName = repoName ? `${fullNameOrOwner.trim()}/${repoName.trim()}` : fullNameOrOwner.trim();
     if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(fullName) || fullName.split("/").some(part => part === "." || part === "..")) return;
     this.stopReading(); this.watchAccount();
@@ -223,8 +225,8 @@ class GitHubRepoDetailController {
       readmeMarkdown: "", readmeHtml: "", headings: [], isZh: false,
       hasReadme: false, notice: "", error: null
     });
-    if (this.pageActive) void this.reload();
-    else state.error = "读取已暂停，请返回页面后点击重读。";
+    if (this.pageActive) void this.readOnOpen();
+    else state.error = "读取已暂停，请返回页面后重新打开仓库详情。";
   }
 
   private stopReading(): void {
@@ -232,6 +234,7 @@ class GitHubRepoDetailController {
   }
 
   public close(): void {
+    if (githubTaskCreation.saving) return;
     this.stopReading(); this.unwatchAccount(); ++state.revision; state.isOpen = false;
   }
 
@@ -239,11 +242,11 @@ class GitHubRepoDetailController {
     this.pageActive = active;
     if (!active && this.reads.pending) {
       this.stopReading();
-      state.error = "读取已暂停，请返回页面后点击重读。";
+      state.error = "读取已暂停，请返回页面后重新打开仓库详情。";
     }
   }
 
-  public async reload(): Promise<void> {
+  private async readOnOpen(): Promise<void> {
     if (!state.isOpen || !this.pageActive || state.isLoading) return;
     const revision = ++state.revision;
     const { owner, repo } = state;
@@ -252,7 +255,7 @@ class GitHubRepoDetailController {
       isCurrent: () => state.isOpen && this.pageActive && state.revision === revision,
       onStop: reason => {
         state.isLoading = false;
-        if (reason === "timeout") state.error = "README 读取超过整体 45 秒上限，请重读。";
+        if (reason === "timeout") state.error = "README 读取超过整体 45 秒上限，请重新打开仓库详情。";
       }
     });
     const current = request.current;
@@ -281,8 +284,8 @@ class GitHubRepoDetailController {
       state.headings = extractHeadings(markdown); state.hasReadme = true;
     } catch (error) {
       if (current()) state.error = error instanceof GitHubDetailReadError ? error.message
-        : request.signal.aborted ? "README 读取已取消或超过整体 45 秒上限，请重读。"
-        : "README 内容解析失败，请重读或到 GitHub 查看。";
+        : request.signal.aborted ? "README 读取已取消或超过整体 45 秒上限，请重新打开仓库详情。"
+        : "README 内容解析失败，请重新打开仓库详情或到 GitHub 查看。";
     } finally {
       if (request.finish()) state.isLoading = false;
     }

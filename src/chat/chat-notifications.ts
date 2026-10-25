@@ -59,6 +59,9 @@ export function notifyIncomingChatMessage(msg: ChatMessage, channelId?: string):
     subtitle,
     message: formatMessageNotificationPreview(msg),
     duration: 6500,
+    level: "info",
+    history: true,
+    target: { type: "module", moduleId: "chat" },
     actionLabel: "查看消息",
     onClick: () => {
       windowManagerController.handleToolClick("chat");

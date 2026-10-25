@@ -1,4 +1,6 @@
 import { reactive, readonly } from "vue";
+import { archiveToast } from "./history-store";
+import { safeTarget, type NotificationLevel, type NotificationTarget } from "./history-contract";
 
 export type NotificationAppType = "chat" | "qq" | "bili" | "phone" | "fetch" | string;
 
@@ -13,6 +15,9 @@ export interface NotificationOptions {
   actionLabel?: string;
   showActions?: boolean;
   duration?: number;
+  history?: boolean;
+  level?: NotificationLevel;
+  target?: NotificationTarget;
   onClick?: (() => void | Promise<void>) | null;
 }
 
@@ -43,11 +48,18 @@ export interface NotificationItem {
   duration: number;
   onClick: (() => void | Promise<void>) | null;
   closing: boolean;
+  target?: NotificationTarget;
 }
 
 const items = reactive<NotificationItem[]>([]);
 const recentFingerprints = new Map<string, number>();
-let sequence = 0;
+function shouldArchive(options: NotificationOptions, text: string): boolean {
+  if (options.history !== undefined) return options.history;
+  if (options.level === "warning" || options.level === "error" || /失败|错误|异常|未确认|未获确认|未保存|无法|不可用|拒绝|超时|警告|到期|时间已到/.test(text)) return true;
+  if (/复制成功|已复制|保存成功|已保存|设置成功|已更新设置|配置已更新|已设为|已取消|已切换/.test(text)) return false;
+  if (/^(正在|开始读取|加载中|同步中)/.test(text)) return false;
+  return options.appType === "chat" || options.appType === "bili" || /提醒|任务已创建|任务完成|已完成任务|任务结果|下载完成|新消息|新私信|新回复|新提及|有可用更新/.test(text);
+}
 
 const APP_DEFAULTS: Record<string, { name: string; icon: string; action: string }> = {
   chat: { name: "海狸聊天室", icon: "assets/icon-48.png", action: "查看消息" },
@@ -91,7 +103,7 @@ function show(options: NotificationOptions): NotificationHandle | null {
   if (items.some((item) => item.fingerprint === fingerprint && !item.closing)) return null;
   recentFingerprints.set(fingerprint, now);
 
-  const id = `toast_${now}_${++sequence}`;
+  const id = `toast_${crypto.randomUUID()}`;
   const item: NotificationItem = {
     id,
     fingerprint,
@@ -105,10 +117,17 @@ function show(options: NotificationOptions): NotificationHandle | null {
     showActions: options.showActions !== false,
     duration,
     onClick: typeof options.onClick === "function" ? options.onClick : null,
-    closing: false
+    closing: false,
+    target: safeTarget(options.target)
   };
 
   items.push(item);
+  const summary = title + " " + subtitle + " " + message;
+  if (shouldArchive(options, summary)) {
+    const level = options.level || (/失败|错误|异常|未确认|未获确认|无法|超时/.test(summary) ? "error" : "info");
+    const target = safeTarget(options.target) || (appType === "bili" ? { type: "bili-messages" as const } : appType === "chat" ? { type: "module" as const, moduleId: "chat" } : undefined);
+    archiveToast({ id, appType, appName: item.appName, title, subtitle, message, level, createdAt: now, read: false, target });
+  }
   const activeItems = items.filter((entry) => !entry.closing);
   if (activeItems.length > 5) close(activeItems[0].id);
   return Object.freeze({ id, close: () => close(id) });

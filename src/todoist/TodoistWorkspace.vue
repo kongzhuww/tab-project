@@ -137,8 +137,7 @@ onUnmounted(() => {
   windowManagerController.unregister("todoist", getWindowElement);
   todoistInspectorController.close();
   Object.assign(todoistInspectorState, { title: "", description: "", taskId: "", comments: [], availableLabels: [], labels: [], error: "" });
-  todoistTaskListController.updateState({ accountConfigured: null, columns: [], projects: [], availableLabels: [], loading: false,
-    view: "inbox", activeProjectId: "", activeProjectName: "", emptyText: "", addingSection: false, activeComposerSectionId: null });
+  todoistTaskListController.updateState({ loading: false, addingSection: false, activeComposerSectionId: null });
   todoistMainWorkspaceController.updateState({ title: "收件箱", isSaving: false, isCalendarOpen: true, isLabelPopoverOpen: false });
   todoistLabelController.update([]);
 });

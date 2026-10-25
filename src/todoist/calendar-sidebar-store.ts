@@ -1,125 +1,77 @@
 import { reactive } from "vue";
-import { todoistModuleState } from "./module-state";
+import { todoistModuleState, withTodoistWrite } from "./module-state";
 import { todoistService } from "../services/todoist.service";
 import { todoistTaskListState, todoistTaskListController } from "./task-list-store";
+import { createTaskStartDateReader, parseDateAndTime } from "./task-date-helper";
 
 export interface CalendarCellItem {
-  date: string;
-  dayNumber: number;
-  isOutside: boolean;
-  isToday: boolean;
-  isSelected: boolean;
-  itemCount: number;
-  title: string;
-  hasDot: boolean;
+  date: string; dayNumber: number; isOutside: boolean; isToday: boolean;
+  isSelected: boolean; itemCount: number; title: string; hasDot: boolean;
 }
-
-export interface CalendarAgendaItem {
-  id: string;
-  time: string;
-  summary: string;
-  subtitle: string;
-  htmlLink?: string;
-  color?: string;
-  raw?: any;
-}
-
-export type CalendarTabMode = "agenda" | "todo";
-
 export interface CalendarTodoItem {
-  id: string;
-  content: string;
-  completed: boolean;
-  priority: number;
-  completedAt?: string;
-  dueText?: string;
-  labels?: string[];
-  thumbUrl?: string;
-  raw?: any;
+  id: string; content: string; completed: boolean; priority: number;
+  completedAt?: string; dueText?: string; labels?: string[]; thumbUrl?: string;
+  scheduledDate?: string; time?: string; raw?: any;
 }
-
 export interface TodoistCalendarSidebarState {
-  collapsed: boolean;
-  tabMode: CalendarTabMode;
-  selectedDate: string;
-  badgeText: string;
-  monthLabel: string;
-  yearLabel: string;
-  cells: CalendarCellItem[];
-  agendaTitle: string;
-  agendaCount: string;
-  agendaItems: CalendarAgendaItem[];
-  todoItems: CalendarTodoItem[];
-  todoLoading: boolean;
-  emptyText: string;
+  collapsed: boolean; selectedDate: string; badgeText: string;
+  monthLabel: string; yearLabel: string; cells: CalendarCellItem[];
+  agendaTitle: string; todoItems: CalendarTodoItem[]; todoLoading: boolean; emptyText: string; writeError: string;
 }
-
-export function getLocalTodayDateStr(): string {
-  const d = new Date();
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
+export function getLocalTodayDateStr(date = new Date()): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
-
 const LOCAL_COMPLETED_KEY = "todoist_local_completed_tasks_v1";
-
 function getLocalCompletedMap(): Record<string, CalendarTodoItem> {
   try {
-    const raw = localStorage.getItem(LOCAL_COMPLETED_KEY);
-    return raw ? JSON.parse(raw) : {};
-  } catch {
-    return {};
-  }
+    const parsed = JSON.parse(localStorage.getItem(LOCAL_COMPLETED_KEY) || "{}");
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
+    return Object.fromEntries(Object.entries(parsed).filter(([, value]: [string, any]) =>
+      value && typeof value === "object" && typeof value.id === "string" && typeof value.content === "string")) as Record<string, CalendarTodoItem>;
+  } catch { return {}; }
 }
-
 function saveLocalCompletedMap(map: Record<string, CalendarTodoItem>) {
-  try {
-    localStorage.setItem(LOCAL_COMPLETED_KEY, JSON.stringify(map));
-  } catch {}
+  localStorage.setItem(LOCAL_COMPLETED_KEY, JSON.stringify(map));
 }
-
-function extractThumbUrl(desc?: string): string | undefined {
-  if (!desc) return undefined;
-  const match = desc.match(/!\[.*?\]\(((?:https?:\/\/|data:image\/)[^\s\)]+)\)/);
-  return match ? match[1] : undefined;
+function completedDay(item: any): string {
+  const raw = item.completedAt || item.completed_at || item.completed_date;
+  const date = new Date(raw || "");
+  return Number.isFinite(date.getTime()) ? getLocalTodayDateStr(date) : "";
 }
-
-// 🗄️ 内存 SWR 高性能缓存：按日期缓存待办列表，保证 0 延迟秒开，彻底杜绝无休止刷新闪烁
-const todosDateCache: Record<string, { items: CalendarTodoItem[]; timestamp: number }> = {};
-
+function mapTask(task: any, readStart = createTaskStartDateReader()): CalendarTodoItem {
+  const raw = task._taskRaw || task.raw || task;
+  const id = String(task.task_id || task.id);
+  const description = task.description || raw.description || "";
+  const start = task.startDate || readStart(id, description);
+  const due = raw.due?.datetime || raw.due?.date || task.dueDate || "";
+  let scheduled = parseDateAndTime(start || due);
+  if (!start && /T.*(?:Z|[+-]\d{2}:?\d{2})$/i.test(due)) {
+    const local = new Date(due);
+    if (Number.isFinite(local.getTime())) scheduled = {
+      date: getLocalTodayDateStr(local),
+      time: `${String(local.getHours()).padStart(2, "0")}:${String(local.getMinutes()).padStart(2, "0")}`
+    };
+  }
+  return {
+    id, content: task.content || "未命名任务", completed: Boolean(task.completed || task.is_completed),
+    priority: task.priority || 1, labels: task.labels || [], raw,
+    scheduledDate: scheduled.date, time: scheduled.time,
+    dueText: raw.due?.string || raw.due?.date || "",
+    thumbUrl: description.match(/!\[.*?\]\(((?:https?:\/\/|data:image\/)[^\s\)]+)\)/)?.[1]
+  };
+}
+let activeTasks: any[] = [];
+let savedAt = 0;
+const history = new Map<string, { items: CalendarTodoItem[]; savedAt: number }>();
+const reopenedIds = new Set<string>();
 export const todoistCalendarSidebarState = reactive<TodoistCalendarSidebarState>({
-  collapsed: false,
-  tabMode: "agenda",
-  selectedDate: getLocalTodayDateStr(),
-  badgeText: "在线",
-  monthLabel: "",
-  yearLabel: "",
-  cells: [],
-  agendaTitle: "今日日程",
-  agendaCount: "",
-  agendaItems: [],
-  todoItems: [],
-  todoLoading: false,
-  emptyText: ""
+  collapsed: false, selectedDate: getLocalTodayDateStr(), badgeText: "Todoist",
+  monthLabel: "", yearLabel: "", cells: [], agendaTitle: "今日任务",
+  todoItems: [], todoLoading: false, emptyText: "", writeError: ""
 });
-
-export type CalendarSidebarAction =
-  | "init"
-  | "toggle-collapsed"
-  | "today"
-  | "prev-month"
-  | "next-month"
-  | "prev-year"
-  | "next-year"
-  | "select-date"
-  | "context-date"
-  | "drop-task"
-  | "context-agenda"
-  | "open-inspector";
-
+export type CalendarSidebarAction = "init" | "toggle-collapsed" | "today" | "prev-month" | "next-month" |
+  "prev-year" | "next-year" | "select-date" | "context-date" | "drop-task" | "open-inspector";
 export type CalendarSidebarActionHandler = (action: CalendarSidebarAction, payload?: any) => void;
-
 const actionHandlers = new Set<CalendarSidebarActionHandler>();
 let dateVersion = 0;
 let dateAbort: AbortController | undefined;
@@ -127,258 +79,138 @@ export function cancelTodoistDateReads() {
   dateVersion++; dateAbort?.abort(); dateAbort = undefined;
   todoistCalendarSidebarState.todoLoading = false;
 }
-
+function projectTasks() {
+  const state = todoistCalendarSidebarState;
+  const readStart = createTaskStartDateReader();
+  const active = activeTasks.filter(t => !t.is_completed).map(t => mapTask(t, readStart));
+  const selected = state.selectedDate;
+  const local = Object.values(getLocalCompletedMap()).filter(item => !reopenedIds.has(item.id));
+  const merged = new Map<string, CalendarTodoItem>();
+  for (const item of [...(history.get(selected)?.items || []), ...local]) {
+    if (!reopenedIds.has(item.id) && (item.scheduledDate || completedDay(item)) === selected) merged.set(item.id, item);
+  }
+  for (const item of active) if (item.scheduledDate === selected) merged.set(item.id, item);
+  state.todoItems = [...merged.values()].sort((a, b) => Number(a.completed) - Number(b.completed) || (a.time || "").localeCompare(b.time || ""));
+  state.agendaTitle = selected === getLocalTodayDateStr() ? "今日任务" : `${selected.slice(5).replace("-", "月")}日任务`;
+  const counts = new Map<string, Set<string>>();
+  for (const item of [...Array.from(history.values()).flatMap(entry => entry.items), ...local, ...active]) {
+    const date = item.scheduledDate || completedDay(item);
+    if (!date) continue;
+    if (!counts.has(date)) counts.set(date, new Set());
+    counts.get(date)!.add(item.id);
+  }
+  for (const cell of state.cells) {
+    cell.itemCount = counts.get(cell.date)?.size || 0;
+    cell.hasDot = cell.itemCount > 0;
+    cell.title = `${cell.date}${cell.itemCount ? ` · ${cell.itemCount} 个任务` : ""}`;
+  }
+}
 export const todoistCalendarSidebarController = {
   state: todoistCalendarSidebarState,
-
-  setCollapsed(collapsed: boolean) {
-    todoistCalendarSidebarState.collapsed = collapsed;
-  },
-
+  cancelReads: cancelTodoistDateReads,
+  setCollapsed(collapsed: boolean) { todoistCalendarSidebarState.collapsed = collapsed; },
   toggleCollapsed() {
-    todoistCalendarSidebarState.collapsed = !todoistCalendarSidebarState.collapsed;
+    this.setCollapsed(!todoistCalendarSidebarState.collapsed);
     this.dispatch("toggle-collapsed", todoistCalendarSidebarState.collapsed);
   },
-
-  setTabMode(mode: CalendarTabMode) {
-    cancelTodoistDateReads();
-    todoistCalendarSidebarState.tabMode = mode;
-    if (mode === "todo") {
-      void this.loadTodosForDate(todoistCalendarSidebarState.selectedDate || getLocalTodayDateStr());
-    }
-  },
-
-  /**
-   * 记录本地任务完成/撤销，就地更新响应式列表，0 延迟秒开且杜绝刷新白屏
-   */
   recordTaskCompletion(task: any, completed: boolean) {
-    const id = String(task.id || task.task_id);
+    cancelTodoistDateReads(); savedAt = 0;
+    const id = String(task.task_id || task.id);
     const map = getLocalCompletedMap();
     if (completed) {
-      const todayStr = getLocalTodayDateStr();
-      const desc = task.description || task._taskRaw?.description || "";
-      const completedItem: CalendarTodoItem = {
-        id,
-        content: task.content || "已完成任务",
-        completed: true,
-        priority: task.priority || 1,
-        completedAt: new Date().toISOString(),
-        dueText: todayStr,
-        labels: task.labels || [],
-        thumbUrl: extractThumbUrl(desc),
-        raw: task
-      };
-      map[id] = completedItem;
-      saveLocalCompletedMap(map);
-
-      // 就地响应式更新：存在则打勾灰杠，不存在则追加到末尾
-      const existingIdx = todoistCalendarSidebarState.todoItems.findIndex((t) => t.id === id);
-      if (existingIdx >= 0) {
-        todoistCalendarSidebarState.todoItems[existingIdx].completed = true;
-      } else {
-        todoistCalendarSidebarState.todoItems.push(completedItem);
-      }
+      reopenedIds.delete(id);
+      const item = mapTask(task);
+      map[id] = { ...item, scheduledDate: task.scheduledDate || item.scheduledDate, completed: true, completedAt: new Date().toISOString() };
+      activeTasks = activeTasks.filter(t => String(t.id) !== id);
     } else {
-      delete map[id];
-      saveLocalCompletedMap(map);
-      const existingIdx = todoistCalendarSidebarState.todoItems.findIndex((t) => t.id === id);
-      if (existingIdx >= 0) {
-        todoistCalendarSidebarState.todoItems[existingIdx].completed = false;
-      }
+      reopenedIds.add(id); delete map[id];
+      if (!activeTasks.some(t => String(t.id) === id)) activeTasks.push({ ...(task.raw || task._taskRaw || task), id, is_completed: false, completed: false });
     }
-
-    // 同步更新缓存字典
-    const curDate = todoistCalendarSidebarState.selectedDate || getLocalTodayDateStr();
-    todosDateCache[curDate] = {
-      items: [...todoistCalendarSidebarState.todoItems],
-      timestamp: Date.now()
-    };
+    try { saveLocalCompletedMap(map); } catch { todoistCalendarSidebarState.writeError = "完成状态的本机记录未保存，请核对。"; }
+    history.clear(); projectTasks();
   },
-
-  /**
-   * 严格缓存优先 (SWR) 读取待办列表，绝不反复清空或闪烁
-   */
-  async loadTodosForDate(dateStr: string) {
-    if (!todoistModuleState.active) return;
+  async loadTodosForDate(dateStr: string, force = false) {
+    if (!todoistModuleState.active || todoistModuleState.pendingWrites) return;
     cancelTodoistDateReads();
     const request = new AbortController(); dateAbort = request;
     const version = dateVersion, session = todoistModuleState.session;
-    const current = () => !request.signal.aborted && version === dateVersion &&
-      session === todoistModuleState.session && todoistModuleState.active &&
-      todoistCalendarSidebarState.tabMode === "todo";
-    if (!dateStr) dateStr = getLocalTodayDateStr();
+    dateStr ||= getLocalTodayDateStr();
+    const current = () => !request.signal.aborted && version === dateVersion && session === todoistModuleState.session &&
+      todoistModuleState.active && todoistCalendarSidebarState.selectedDate === dateStr && !todoistModuleState.pendingWrites;
     todoistCalendarSidebarState.selectedDate = dateStr;
-
-    const isToday = dateStr === getLocalTodayDateStr();
-
-    // 1. 命中缓存：立即展示，绝不触发 loading 动画或白屏
-    const cached = todosDateCache[dateStr];
-    if (cached && cached.items && cached.items.length > 0) {
-      todoistCalendarSidebarState.todoItems = cached.items;
-      // 30 秒内的缓存视为新鲜，直接复用，不重复发起网络请求
-      if (Date.now() - cached.timestamp < 30000) {
-        return;
-      }
-    } else if (todoistCalendarSidebarState.todoItems.length === 0) {
-      // 只有没有任何数据时才展示轻量 loading
-      todoistCalendarSidebarState.todoLoading = true;
-    }
-
+    todoistCalendarSidebarState.emptyText = "";
+    projectTasks();
+    todoistCalendarSidebarState.todoLoading = true;
     try {
-      // 2. 静默拉取未完成任务（严格只筛选到期日属于该天的任务，分区独立性不受任何影响）
-      const allTasks = await todoistService.getTasks(undefined, request.signal);
-      if (!current()) return;
-      const activeForDate = allTasks.filter((t) => {
-        const d = t.due?.date || "";
-        return d.startsWith(dateStr);
-      });
-
-      const mappedActive: CalendarTodoItem[] = activeForDate.map((t) => {
-        const desc = t.description || "";
-        return {
-          id: String(t.id),
-          content: t.content,
-          completed: false,
-          priority: t.priority || 1,
-          dueText: t.due?.string || t.due?.date || "",
-          labels: t.labels || [],
-          thumbUrl: extractThumbUrl(desc),
-          raw: t
-        };
-      });
-
-      // 3. 汇聚已完成任务（三合一：本地看板即时状态 + 本地持久化记录 + Todoist 云端历史）
-      const completedList: CalendarTodoItem[] = [];
-      const seenIds = new Set<string>();
-
-      // 3.1 本地看板即时已完成
-      for (const col of todoistTaskListState.columns || []) {
-        for (const t of col.tasks || []) {
-          if (t.completed) {
-            const id = String(t.id);
-            if (!seenIds.has(id)) {
-              seenIds.add(id);
-              const desc = t.description || t._taskRaw?.description || "";
-              completedList.push({
-                id,
-                content: t.content,
-                completed: true,
-                priority: t.priority || 1,
-                completedAt: new Date().toISOString(),
-                labels: t.labels || [],
-                thumbUrl: extractThumbUrl(desc),
-                raw: t
-              });
-            }
+      if (force || !savedAt || Date.now() - savedAt > 30000) {
+        const tasks = await todoistService.listCalendarTasks(request.signal);
+        if (!current()) return;
+        activeTasks = tasks; savedAt = Date.now(); projectTasks();
+      }
+      const cached = history.get(dateStr);
+      if (force || !cached || Date.now() - cached.savedAt > 30000) {
+        const nextDay = new Date(`${dateStr}T00:00:00`); nextDay.setDate(nextDay.getDate() + 1);
+        try {
+          const response = await todoistService.getCompletedTasks({ since: new Date(`${dateStr}T00:00:00`).toISOString(), until: nextDay.toISOString(), limit: 200 }, request.signal);
+          if (!current()) return;
+          const items = response.items.filter(t => completedDay(t) === dateStr).map(t => ({
+            ...mapTask(t), completed: true, completedAt: t.completed_at
+          }));
+          history.set(dateStr, { items, savedAt: Date.now() });
+          if (history.size > 42) history.delete(history.keys().next().value!);
+        } catch (error) {
+          if (current()) {
+            const code = error instanceof Error ? error.message.match(/^Todoist API 请求失败 \((\d{3})\)$/)?.[1] : undefined;
+            todoistCalendarSidebarState.emptyText = code === "401" || code === "403"
+              ? `完成历史读取失败（HTTP ${code}），请检查 Todoist 账户或接口访问权限；现有任务保留。`
+              : `完成历史读取失败${code ? `（HTTP ${code}）` : ""}；现有任务保留，可重试读取。`;
           }
         }
       }
-
-      // 3.2 本地持久化完成记录
-      const localMap = getLocalCompletedMap();
-      for (const [id, item] of Object.entries(localMap)) {
-        if (!seenIds.has(id)) {
-          const cDate = item.completedAt ? new Date(item.completedAt).toLocaleDateString("en-CA") : "";
-          if (cDate === dateStr || (isToday && !cDate)) {
-            seenIds.add(id);
-            completedList.push(item);
-          }
-        }
-      }
-
-      // 3.3 云端历史完成记录兜底
-      const completedRes = await todoistService.getCompletedTasks({ limit: 50 }, request.signal);
-      if (!current()) return;
-      for (const t of completedRes.items || []) {
-        const id = String(t.task_id || t.id);
-        if (!seenIds.has(id)) {
-          const rawDate = (t as any).completed_at || (t as any).completed_date || "";
-          const cDate = rawDate ? new Date(rawDate).toLocaleDateString("en-CA") : "";
-          if (cDate === dateStr || (isToday && !cDate)) {
-            seenIds.add(id);
-            completedList.push({
-              id,
-              content: t.content,
-              completed: true,
-              priority: 1,
-              completedAt: rawDate,
-              labels: [],
-              thumbUrl: undefined,
-              raw: t
-            });
-          }
-        }
-      }
-
-      // 4. 合并并平滑写入
-      const cleanActive = mappedActive.filter((t) => !seenIds.has(t.id));
-      const finalList = [...cleanActive, ...completedList];
-
-      // 更新内存缓存与界面
-      todosDateCache[dateStr] = { items: finalList, timestamp: Date.now() };
-      todoistCalendarSidebarState.todoItems = finalList;
+      if (current()) projectTasks();
     } catch {
-      if (current()) todoistCalendarSidebarState.emptyText = "任务历史读取失败，保留已有数据。";
+      if (current()) todoistCalendarSidebarState.emptyText = "任务读取失败，请检查 Todoist 连接后刷新；当前日期的已有数据保留。";
     } finally {
       if (current()) todoistCalendarSidebarState.todoLoading = false;
       if (dateAbort === request) dateAbort = undefined;
     }
   },
-
   async toggleTodoItem(item: CalendarTodoItem) {
-    const nextCompleted = !item.completed;
-    item.completed = nextCompleted;
-    this.recordTaskCompletion(item, nextCompleted);
-
-    try {
-      if (nextCompleted) {
-        await todoistService.toggleTaskCompletion(item.id, true);
-        // 如果在日历里勾选完成，从右侧看板中移除
-        for (const col of todoistTaskListState.columns || []) {
-          const idx = col.tasks.findIndex((t) => String(t.id) === String(item.id));
-          if (idx >= 0) col.tasks.splice(idx, 1);
-        }
-      } else {
-        await todoistService.reopenTask(item.id);
-        // Read the current view from Todoist instead of guessing a destination column.
+    if (todoistModuleState.pendingWrites) return;
+    const next = !item.completed;
+    todoistCalendarSidebarState.writeError = "";
+    await withTodoistWrite(async () => {
+      cancelTodoistDateReads();
+      try {
+        await todoistService.toggleTaskCompletion(item.id, next);
+        this.recordTaskCompletion(item, next);
         todoistService.invalidateWorkspaceSnapshots();
-        if (todoistModuleState.active) await todoistTaskListController.loadWorkspace(undefined, undefined, true);
+        if (next) {
+          for (const col of todoistTaskListState.columns) col.tasks = col.tasks.filter(t => String(t.id) !== item.id);
+        } else if (todoistModuleState.active) await todoistTaskListController.loadWorkspace(undefined, undefined, true);
+      } catch {
+        todoistCalendarSidebarState.writeError = "完成状态保存未确认，请刷新核对；未自动重试。";
       }
-    } catch (err) {
-      item.completed = !nextCompleted; // 失败回滚
-      this.recordTaskCompletion(item, !nextCompleted);
-      console.error("[Todoist Calendar] Toggle todo completion failed:", err);
-    }
+    });
   },
-
   updateTaskTitle(taskId: string, title: string) {
-    const item = todoistCalendarSidebarState.todoItems.find(t => String(t.id) === String(taskId));
+    const task = activeTasks.find(t => String(t.id) === String(taskId));
+    if (task) task.content = title;
+    const item = todoistCalendarSidebarState.todoItems.find(t => t.id === String(taskId));
     if (item) item.content = title;
   },
-
   updateState(partial: Partial<TodoistCalendarSidebarState>) {
     const oldDate = todoistCalendarSidebarState.selectedDate;
     Object.assign(todoistCalendarSidebarState, partial);
-    // 关键防抖保护：只有当用户真正切换了不同日期时，才去加载对应日期的待办；同一日期绝不重复重新拉取
-    if (partial.selectedDate && partial.selectedDate !== oldDate && todoistCalendarSidebarState.tabMode === "todo") {
-      void this.loadTodosForDate(partial.selectedDate);
-    }
+    projectTasks();
+    if (partial.selectedDate && partial.selectedDate !== oldDate) void this.loadTodosForDate(partial.selectedDate);
   },
-
   onAction(handler: CalendarSidebarActionHandler): () => void {
-    actionHandlers.add(handler);
-    return () => {
-      actionHandlers.delete(handler);
-    };
+    actionHandlers.add(handler); return () => { actionHandlers.delete(handler); };
   },
-
   dispatch(action: CalendarSidebarAction, payload?: any) {
     for (const handler of actionHandlers) {
-      try {
-        handler(action, payload);
-      } catch (err) {
-        console.error(`[TodoistCalendarSidebar] Handler error for action ${action}:`, err);
-      }
+      try { handler(action, payload); } catch { todoistCalendarSidebarState.emptyText = "日历操作未完成，请重新打开。"; }
     }
   }
 };

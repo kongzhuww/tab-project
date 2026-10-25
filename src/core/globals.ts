@@ -21,7 +21,7 @@ import { todoistWorkspaceController } from "../todoist/workspace";
 import { todoistCalendarSidebarController } from "../todoist/calendar-sidebar-store";
 import { todoistTaskListController } from "../todoist/task-list-store";
 import { wallpaperLibraryController } from "../wallpaper/store";
-import { profilePanelController } from "../profile/panel-store";
+import { notificationHistoryController } from "../notifications/history-store";
 import { bookmarkMenuController } from "../bookmarks/menu-store";
 import { bookmarkPanelController } from "../bookmarks/panel-store";
 import { bookmarkFolderStripController } from "../bookmarks/folder-strip-store";
@@ -92,7 +92,7 @@ declare global {
     LogicWeaverWorkspaceLaunchers?: typeof workspaceLaunchersController;
     LogicWeaverMacDock?: typeof macDockController;
     LogicWeaverBackgroundLibrary?: typeof wallpaperLibraryController;
-    LogicWeaverProfilePanel?: typeof profilePanelController;
+    LogicWeaverNotificationCenter?: typeof notificationHistoryController;
     LogicWeaverBookmarkMenu?: typeof bookmarkMenuController;
     LogicWeaverBookmarkPanel?: typeof bookmarkPanelController;
     LogicWeaverBookmarkFolderStrip?: typeof bookmarkFolderStripController;
@@ -183,7 +183,7 @@ export function installGlobalControllers(commands: CommandRegistry, features: Fe
   (window as any).cycleFullscreenCard = () => fullscreenCardsController.cycle();
   (window as any).LogicWeaverPageVisibility = pageVisibility;
   window.LogicWeaverBackgroundLibrary = wallpaperLibraryController;
-  window.LogicWeaverProfilePanel = profilePanelController;
+  window.LogicWeaverNotificationCenter = notificationHistoryController;
   window.LogicWeaverBookmarkMenu = bookmarkMenuController;
   window.LogicWeaverBookmarkPanel = bookmarkPanelController;
   window.LogicWeaverBookmarkFolderStrip = bookmarkFolderStripController;

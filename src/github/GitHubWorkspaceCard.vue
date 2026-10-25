@@ -280,7 +280,7 @@ onBeforeUnmount(() => { gitHubService.setAiViewActive(false); ++initialVersion; 
                 <div class="fo-sidebar-sub-main">
                   <span class="fo-sidebar-sub-icon">🌟</span>
                   <div class="fo-sidebar-sub-text">
-                    <strong>Awesome 专区</strong>
+                    <strong>资源专区</strong>
                     <small>神级清单 · 全球精选</small>
                   </div>
                 </div>

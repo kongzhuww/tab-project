@@ -1,6 +1,6 @@
 import { reactive, readonly, type DeepReadonly } from "vue";
 
-export type ProfileAction = "messages" | "refresh" | "switch" | "web";
+export type ProfileAction = "messages" | "tabs" | "refresh" | "switch" | "web";
 
 export interface ProfileMenuSnapshot {
   mounted: boolean;
@@ -34,14 +34,12 @@ export interface TopProfileState {
   avatarUrl: string;
   userName: string;
   buttonTitle: string;
-  unreadCount: number;
 }
 
 export const topProfileState = reactive<TopProfileState>({
   avatarUrl: "assets/bilibili.svg",
   userName: "哔哩哔哩用户",
-  buttonTitle: "打开信息中心",
-  unreadCount: 0
+  buttonTitle: "通知中心"
 });
 
 const initialState = (): ProfileMenuSnapshot => ({
@@ -50,7 +48,7 @@ const initialState = (): ProfileMenuSnapshot => ({
   x: 0,
   y: 0,
   avatarUrl: "assets/bilibili.svg",
-  userName: "浏览器指纹与环境"
+  userName: "用户"
 });
 
 export const profileMenuState = reactive<ProfileMenuSnapshot>(initialState());

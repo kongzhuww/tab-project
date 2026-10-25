@@ -32,9 +32,9 @@ function allowModuleUnmount(id: string): DockLifecycleResult {
 }
 
 export const dockLifecycleController = {
-  // 检查应用是否在内存中运行（驱动 Dock 上的小圆点）
+  // 检查应用是否处于运行显示状态（驱动 Dock 上的小圆点：关闭即熄灭，不保留 macOS 风格后台悬浮绿点）
   isRunning(id: string): boolean {
-    return runningAppsState.has(id);
+    return this.isVisible(id);
   },
 
   // 检查应用当前是否在屏幕上可见（窗口是否打开）
@@ -78,8 +78,9 @@ export const dockLifecycleController = {
     windowManagerController.open(id);
   },
 
-  // 隐藏窗口（应用仍保留在后台内存中保活）
+  // 隐藏/关闭窗口：立即退出可见运行态并熄灭 Dock 指示绿点
   hideApp(id: string) {
+    runningAppsState.delete(id);
     if (getDockModule(id)) {
       void windowManagerController.close(id);
       return;

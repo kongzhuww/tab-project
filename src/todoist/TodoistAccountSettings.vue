@@ -2,7 +2,6 @@
 import { ref, watch, onUnmounted } from "vue";
 import { todoistModuleState } from "./module-state";
 import { ModuleSettingsPanel } from "../sdk/ui";
-import GoogleCalendarConnection from "../calendar/GoogleCalendarConnection.vue";
 import { loadTodoistAccountToken, saveTodoistAccountToken } from "./account-settings";
 const props = defineProps<{ anchor: HTMLElement | null; visible: boolean }>();
 const emit = defineEmits<{ close: []; accountSaved: [] }>();
@@ -10,7 +9,6 @@ const token = ref("");
 const ready = ref(false);
 const busy = ref(false);
 const message = ref("");
-const googleCalendarRef = ref<InstanceType<typeof GoogleCalendarConnection> | null>(null);
 let initial = "";
 let loadVersion = 0;
 
@@ -39,11 +37,7 @@ async function saveAll() {
       changed = true;
       emit("accountSaved");
     }
-    if (googleCalendarRef.value?.save) {
-      const gOk = await googleCalendarRef.value.save();
-      if (!gOk) throw new Error("Google 日历 Client ID 格式无效，可留空不填");
-      changed = true;
-    }
+
     message.value = changed ? "✅ 配置已成功保存！" : "配置未变动。";
   } catch (err: any) {
     message.value = `❌ 保存失败：${err?.message || "请检查输入后重试"}`;
@@ -63,8 +57,6 @@ async function saveAll() {
         <a href="https://app.todoist.com/app/settings/integrations/developer" target="_blank" rel="noreferrer" class="api-link">🔗 获取 Todoist Token</a>
       </div>
       <input id="todoist-account-token" v-model="token" type="password" autocomplete="off" :disabled="!ready || busy" placeholder="请输入你的 Todoist API Token" />
-
-      <GoogleCalendarConnection ref="googleCalendarRef" :visible="visible" />
 
       <p v-if="message" role="status" class="status-msg">{{ message }}</p>
       <button v-if="!ready" type="button" @click="load">重新读取</button>
