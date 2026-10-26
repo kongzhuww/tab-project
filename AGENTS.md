@@ -53,12 +53,12 @@
 ### 3.1 顶栏区域（TopBar）
 | 用户口令 | 对应源码文件 | 作用位置与说明 |
 | :--- | :--- | :--- |
-| **头像** | `src/profile/ProfilePanel.vue` / `ProfileMenu.vue` | 顶栏最左侧头像按钮及弹出的个人信息、会话与树状标签页管理中心 (Tab Manager) |
+| **头像 / 通知中心** | `src/notifications/NotificationCenter.vue` / `src/profile/ProfileMenu.vue` / `src/profile/TabManagerPanel.vue` | 顶栏最左侧头像点击直开**持久通知中心**（聚合30天重要Toast与任务闹钟）；右键菜单提供独立无模态**标签页管理**。旧 ProfilePanel 与微架构硬件探针已彻底移除 |
 | **书签** | `src/bookmarks/BookmarkFolderStrip.vue` / `BookmarkBoard.vue` | 顶栏书签条及弹出的常用网站式平铺看板展开 |
-| **工作区（已移除）** | 原 `src/layout/AppTopBar.vue` 的 `#workspace-bar` | 用户已要求整条及课表/热点/VPS/Phone Link专属链路删除，不恢复；与工作台、工作区导航及监控快捷栏不是同一功能 |
+| **工作区（已移除）** | 原 `src/layout/AppTopBar.vue` 的 `#workspace-bar` | 用户已要求整条及课表/热点/VPS/Phone Link专属链路删除，不恢复；与常用网站工作区、工作区导航不是同一功能 |
 | **滚动立方体** | `src/layout/TopInfoCube.vue` / `CubeConfigDialog.vue` | 仅主界面顶栏的 3D 旋转信息块（音乐默认面、自定义倒计时/便签/链接面配置），不进入各大屏 |
-| **桌宠快捷栏（已移除）** | 无入口 | 新仓库按用户要求整套删除，不恢复 |
-| **监控快捷栏** | `src/layout/AgentLaunchers.vue` | 顶栏本机后台后端与 AI 服务状态下拉栏 |
+| **桌宠快捷栏（已移除）** | 无入口 | 新仓库按用户要求整套删除，严禁恢复 |
+| **监控快捷栏（已移除）** | 无入口 | 原 `AgentLaunchers.vue` 与专属服务探针已彻底移除，严禁恢复 |
 | **设置** | `src/settings/SettingsDialog.vue` / `SettingsView.vue` | 顶栏右上角设置齿轮按钮及非模态设置面板 |
 | **主题** | `src/layout/AppTopBar.vue` (`#theme-toggle`) | 顶栏最右上角主题切换按钮（Light / Lonetrail / Dark） |
 
@@ -82,9 +82,9 @@
 ### 3.4 全屏插件（Dock 栏左侧/中段大看板 · 展开占满全屏）
 | 用户口令 | 对应源码文件 | 核心功能与当前状态 |
 | :--- | :--- | :--- |
-| **todoist** | `src/todoist/TodoistWorkspace.vue` | `todoist` | 独立可拖动待办看板、收件箱/项目切换、左侧日历与右侧时间规划抽屉；未配置 Token 时显示引导卡片 |
+| **todoist** | `src/todoist/TodoistWorkspace.vue` | `todoist` | 独立可拖动待办看板：支持本地 0ms 离线缓存直出；支持 GitHub 任务区按关联仓库自动分层排版；未配置 Token 时显示引导卡片 |
 | **b站插件** | `src/bilibili/BilibiliWorkspace.vue` | B站双栏收藏夹整理、AI 字幕提取、刹那观察室订阅视频与小窗播放 |
-| **github插件** | `src/github/GitHubWorkspaceCard.vue` | GitHub Star 仓库深度检索、本地目录分类与 Release 雷达 |
+| **github插件** | `src/github/GitHubWorkspaceCard.vue` | GitHub Star 仓库深度检索、资源专区（原Awesome专区）、开阔式标准 Markdown README 阅读与一键创建关联任务 |
 | **ai hot插件** | `src/aihot/AihotFeed.vue` | 每日精选 AI 科技资讯热榜与沉浸阅读器 |
 | **模型插件** | `src/pricing/ModelPricingCard.vue` | 全网主流大模型 Token 价格雷达与性价比对比 |
 | **youtube插件** | `src/youtube/YouTubeCard.vue` | ⚠️ **【状态：封藏】** 用户指示暂未达到发布标准，暂不对外暴露，禁止主动扩展 |
