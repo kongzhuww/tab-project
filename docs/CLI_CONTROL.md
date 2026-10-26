@@ -1,4 +1,6 @@
-# LogicWeaver 本机 CLI 控制（当前源码入口）
+# LogicWeaver 本机 CLI 控制（已退役的历史记录）
+
+> **禁止作为现行使用说明**：用户已要求开发版与商店版完全移除 CLI/Broker、页面/后台执行器及 Jev 协作桥接。下文命令、文件路径和验收结果仅供历史追溯；对应脚本和入口已删除，不执行或恢复。当前范围见 [DEBUG_BRIDGE_REMOVAL.md](DEBUG_BRIDGE_REMOVAL.md)。
 
 这不是 Pi 的通用浏览器工具，而是仓库内置的扩展 RPC 控制链路。只有获得用户页面诊断授权后才考虑这些命令；`status/inspect` 也可能启动 Broker 或唤醒主页，不能因“只读”而绕过浏览器授权。当前功能导航先读 [CURRENT_STATE.md](CURRENT_STATE.md)。QQ UI 已移除，下方 QQ 章节仅为历史审计；CLI/原生宿主兼容入口残留不代表允许调用或应该恢复旧模块。
 

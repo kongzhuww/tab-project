@@ -54,7 +54,7 @@ try {
   execFileSync(process.execPath, [npmCli, "run", "check"], { cwd: work, stdio: "inherit" });
   await copyFiles(runtimeFiles, output);
   await cp(path.join(work, "generated"), path.join(output, "generated"), { recursive: true });
-  // Keep compatibility workers until their remaining CLI references are retired.
+  // Preserve legacy worker filenames; retiring debug RPC does not change runtime entry paths.
   for (const file of ["background.js", "bookmarks-worker.js"]) {
     await cp(path.join(work, file), path.join(output, file));
   }

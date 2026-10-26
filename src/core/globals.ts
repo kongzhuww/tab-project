@@ -313,13 +313,4 @@ export function installGlobalControllers(commands: CommandRegistry, features: Fe
   (window as any).setLauncherBackground = (val: any) => WallpaperService.setWallpaper(val);
   (window as any).backgroundDbClear = (key?: string) => backgroundDbClear(key);
   (window as any).openBackgroundHistory = () => wallpaperLibraryController.openDialog();
-  const startCli = () => {
-    void import("./cli-bridge").then(({ cliBridgeRuntime }) => cliBridgeRuntime.start());
-  };
-  if (document.readyState === "complete" || document.readyState === "interactive") {
-    setTimeout(startCli, 400);
-  } else {
-    window.addEventListener("load", () => setTimeout(startCli, 400), { once: true });
-    setTimeout(startCli, 1200);
-  }
 }

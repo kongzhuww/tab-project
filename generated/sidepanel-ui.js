@@ -1,9 +1,9 @@
-import { d as Tt, C as $t, y as It, o as l, e as i, f as s, t as r, u as xt, B as g, l as k, z as U, F as E, h as M, g as C, k as F, i as L, n as Q, b as u, s as at, G as Ut, N as Lt } from "./chunks/vendor-vue-CjOHdfe5.js";
-import { t as T } from "./chunks/todoist.service-BD2Y0hDV.js";
+import { d as Tt, C as $t, y as It, o as l, e as i, f as s, t as r, u as xt, B as g, l as k, z as U, F as E, h as M, g as C, k as F, i as L, n as Q, b as u, s as at, G as Ut, O as Lt } from "./chunks/vendor-vue-DokqDua_.js";
+import { t as T } from "./chunks/todoist.service-DhWmfqf0.js";
 import { i as lt, g as St, s as it, l as Dt, t as jt } from "./chunks/quick-links-export.service-bmE4-0fH.js";
 import { _ as Pt } from "./chunks/_plugin-vue_export-helper-CHgC5LLL.js";
 /* empty css                       */
-const Et = { class: "sp-app-root" }, Mt = { class: "sp-viewport sp-view-tools" }, Wt = { class: "sp-page-card" }, Kt = { class: "sp-page-ico" }, Vt = ["src"], At = { key: 1 }, Nt = { class: "sp-page-meta" }, Ot = ["title"], Bt = { class: "sp-page-actions" }, Rt = ["disabled", "title"], qt = ["title"], zt = { class: "picker-label" }, Gt = { class: "picker-arrow" }, Ht = { class: "sp-page-picker-dropdown" }, Ft = { class: "dropdown-header" }, Qt = { class: "dropdown-list" }, Yt = ["onClick"], Xt = { class: "item-icon" }, Jt = { class: "item-text" }, Zt = {
+const Et = { class: "sp-app-root" }, Mt = { class: "sp-viewport sp-view-tools" }, Wt = { class: "sp-page-card" }, Kt = { class: "sp-page-ico" }, Vt = ["src"], At = { key: 1 }, Ot = { class: "sp-page-meta" }, Nt = ["title"], Bt = { class: "sp-page-actions" }, Rt = ["disabled", "title"], qt = ["title"], zt = { class: "picker-label" }, Gt = { class: "picker-arrow" }, Ht = { class: "sp-page-picker-dropdown" }, Ft = { class: "dropdown-header" }, Qt = { class: "dropdown-list" }, Yt = ["onClick"], Xt = { class: "item-icon" }, Jt = { class: "item-text" }, Zt = {
   key: 0,
   class: "item-check"
 }, te = { class: "sp-manual-panel" }, ee = { class: "manual-head" }, oe = ["onKeydown"], se = ["onKeydown"], ne = ["disabled"], ae = { class: "sp-tab-switcher-card" }, le = { class: "sp-segment-bar" }, ie = { class: "sp-switcher-view-content" }, ce = { class: "sp-view-subheader" }, ue = { class: "subheader-title" }, de = {
@@ -36,7 +36,7 @@ const Et = { class: "sp-app-root" }, Mt = { class: "sp-viewport sp-view-tools" }
 }, We = { class: "todoist-quick-add-row" }, Ke = ["onKeydown"], Ve = ["disabled"], Ae = {
   key: 0,
   class: "todoist-tasks-scroll"
-}, Ne = ["title", "onClick"], Oe = { key: 0 }, Be = ["title"], Re = { class: "todoist-task-title" }, qe = {
+}, Oe = ["title", "onClick"], Ne = { key: 0 }, Be = ["title"], Re = { class: "todoist-task-title" }, qe = {
   key: 0,
   class: "todoist-task-due"
 }, ze = {
@@ -268,7 +268,7 @@ const Et = { class: "sp-app-root" }, Mt = { class: "sp-viewport sp-view-tools" }
         V.value = "";
       }, 3200);
     }
-    const b = u(null), st = u(!1), I = u(!1), x = u(!1), A = u(""), N = u(""), O = u(null), yt = at(() => jt(b.value));
+    const b = u(null), st = u(!1), I = u(!1), x = u(!1), A = u(""), O = u(""), N = u(null), yt = at(() => jt(b.value));
     async function nt() {
       try {
         b.value = await St();
@@ -287,7 +287,7 @@ const Et = { class: "sp-app-root" }, Mt = { class: "sp-viewport sp-view-tools" }
     }
     async function kt() {
       if (!lt(b.value)) {
-        I.value = !I.value, I.value && (await Ut(), O.value?.focus());
+        I.value = !I.value, I.value && (await Ut(), N.value?.focus());
         return;
       }
       x.value = !0, p("正在保存…");
@@ -306,7 +306,7 @@ const Et = { class: "sp-app-root" }, Mt = { class: "sp-viewport sp-view-tools" }
     async function G() {
       const o = A.value.trim();
       if (!o) {
-        p("请输入网址", !0), O.value?.focus();
+        p("请输入网址", !0), N.value?.focus();
         return;
       }
       const e = /^https?:\/\//i.test(o) ? o : `https://${o}`;
@@ -316,19 +316,19 @@ const Et = { class: "sp-app-root" }, Mt = { class: "sp-viewport sp-view-tools" }
         if (!/^https?:$/.test(n.protocol) || !n.hostname) throw new Error("协议不受支持");
         t = n.href;
       } catch {
-        p("网址格式不正确", !0), O.value?.focus();
+        p("网址格式不正确", !0), N.value?.focus();
         return;
       }
       x.value = !0, p("正在添加…");
       try {
         const n = await it({
           url: t,
-          title: N.value.trim() || new URL(t).hostname
+          title: O.value.trim() || new URL(t).hostname
         }, v.value);
         p(
           n.ok ? n.existed ? `该网址已在「${v.value}」中 ✓` : `已成功添加到「${v.value}」 ✓` : n.error || "添加失败",
           !n.ok
-        ), n.ok && (A.value = "", N.value = "", I.value = !1);
+        ), n.ok && (A.value = "", O.value = "", I.value = !1);
       } catch (n) {
         p(n?.message || "添加失败", !0);
       } finally {
@@ -386,11 +386,11 @@ const Et = { class: "sp-app-root" }, Mt = { class: "sp-viewport sp-view-tools" }
               alt: ""
             }, null, 8, Vt)) : (l(), i("span", At, "🌐"))
           ]),
-          s("div", Nt, [
+          s("div", Ot, [
             e[13] || (e[13] = s("small", null, "当前活跃标签页", -1)),
             s("strong", {
               title: b.value?.title
-            }, r(b.value?.title || "正在读取网页…"), 9, Ot),
+            }, r(b.value?.title || "正在读取网页…"), 9, Nt),
             s("span", null, r(yt.value || "内部或本地页面"), 1)
           ]),
           s("div", Bt, [
@@ -446,7 +446,7 @@ const Et = { class: "sp-app-root" }, Mt = { class: "sp-viewport sp-view-tools" }
           ]),
           k(s("input", {
             ref_key: "manualUrlInput",
-            ref: O,
+            ref: N,
             "onUpdate:modelValue": e[3] || (e[3] = (t) => A.value = t),
             type: "text",
             placeholder: "如 bilibili.com 或 https://...",
@@ -455,12 +455,12 @@ const Et = { class: "sp-app-root" }, Mt = { class: "sp-viewport sp-view-tools" }
             [Q, A.value]
           ]),
           k(s("input", {
-            "onUpdate:modelValue": e[4] || (e[4] = (t) => N.value = t),
+            "onUpdate:modelValue": e[4] || (e[4] = (t) => O.value = t),
             type: "text",
             placeholder: "网站名称（选填）",
             onKeydown: F(L(G, ["prevent"]), ["enter"])
           }, null, 40, se), [
-            [Q, N.value]
+            [Q, O.value]
           ]),
           s("button", {
             class: "manual-submit-btn",
@@ -612,8 +612,8 @@ ${n.url}`,
                   title: t.completed ? "已完成" : "点击划去完成",
                   onClick: (n) => _t(t)
                 }, [
-                  t.completed ? (l(), i("span", Oe, "✓")) : C("", !0)
-                ], 10, Ne),
+                  t.completed ? (l(), i("span", Ne, "✓")) : C("", !0)
+                ], 10, Oe),
                 s("div", {
                   class: "todoist-task-content",
                   title: t.content

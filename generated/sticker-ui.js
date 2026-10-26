@@ -1,35 +1,34 @@
-import { d as D, C as F, y as M, o as a, e as n, f as o, g as d, D as f, t as h, F as g, h as P, u as y, B as V, E as w, b as p, N as z } from "./chunks/vendor-vue-CjOHdfe5.js";
-import { S as L } from "./chunks/StickerBoard-BKVV-W-Y.js";
-import { a as v } from "./chunks/stickers.service-IL7ouITS.js";
-import { j as $ } from "./chunks/read-session-C1M3QoXl.js";
-import { g as b, i as S, s as j } from "./chunks/quick-links-export.service-bmE4-0fH.js";
-import { _ as H } from "./chunks/_plugin-vue_export-helper-CHgC5LLL.js";
+import { d as D, C as F, y as M, o as n, e as a, f as o, g as d, D as v, t as h, F as g, h as P, u as y, B as V, E as w, b as p, O as z } from "./chunks/vendor-vue-DokqDua_.js";
+import { S as L } from "./chunks/StickerBoard-i35nS9AK.js";
+import { b as f, w as $ } from "./chunks/InlineEditStatus.vue_vue_type_style_index_0_scoped_28642927_lang-ChQUbu-A.js";
+import { g as b, i as S, s as H } from "./chunks/quick-links-export.service-bmE4-0fH.js";
+import { _ as O } from "./chunks/_plugin-vue_export-helper-CHgC5LLL.js";
 const Q = { class: "sticker-app" }, U = {
   key: 0,
   class: "sticker-side-nav"
-}, q = {
+}, j = {
   key: 1,
   class: "sticker-side-tools"
-}, G = {
+}, q = {
   key: 2,
   class: "sticker-page-section"
-}, J = { class: "sticker-page-grid" }, K = {
+}, G = { class: "sticker-page-grid" }, J = {
   key: 0,
   class: "sticker-empty"
-}, O = ["title", "onClick"], R = ["src"], X = ["hidden"], Y = /* @__PURE__ */ D({
+}, K = ["title", "onClick"], R = ["src"], X = ["hidden"], Y = /* @__PURE__ */ D({
   __name: "StickerStandalone",
   setup(tt) {
-    const T = w(() => import("./chunks/SettingsDialog-BqOcgoAB.js")), B = w(() => import("./chunks/AppPromptModal-DLEL0uaJ.js")), m = document.body.dataset.mode === "sidepanel", l = p([]), i = p("等待扫描"), u = p(""), _ = p(!1);
-    let k = 0;
+    const T = w(() => import("./chunks/SettingsDialog-NmkgbAkX.js")), B = w(() => import("./chunks/AppPromptModal-BeukD1Gs.js")), k = document.body.dataset.mode === "sidepanel", l = p([]), i = p("等待扫描"), u = p(""), _ = p(!1);
+    let m = 0;
     function r(s, e = !1) {
-      u.value = s, _.value = e, clearTimeout(k), k = window.setTimeout(() => {
+      u.value = s, _.value = e, clearTimeout(m), m = window.setTimeout(() => {
         u.value = "";
       }, 2800);
     }
     F(() => {
-      v.onToast = r;
+      f.onToast = r;
     }), M(() => {
-      v.onToast = void 0, clearTimeout(k);
+      f.onToast = void 0, clearTimeout(m);
     });
     function E() {
       location.href = "stickers.html";
@@ -38,7 +37,7 @@ const Q = { class: "sticker-app" }, U = {
       try {
         const s = await b();
         if (!S(s)) throw new Error("当前标签页不是普通网页");
-        const e = await j(s);
+        const e = await H(s);
         r(e.ok ? "已保存到常用网站" : e.error || "保存失败", !e.ok);
       } catch (s) {
         r(s?.message || "保存失败", !0);
@@ -56,7 +55,7 @@ const Q = { class: "sticker-app" }, U = {
             width: t.naturalWidth || t.width,
             height: t.naturalHeight || t.height,
             alt: t.alt || ""
-          })).filter((t) => t.url && !t.url.startsWith("blob:") && t.width >= 32 && t.height >= 32).filter((t, c, N) => N.findIndex((x) => x.url === t.url) === c).sort((t, c) => c.width * c.height - t.width * t.height).slice(0, 80)
+          })).filter((t) => t.url && !t.url.startsWith("blob:") && t.width >= 32 && t.height >= 32).filter((t, c, x) => x.findIndex((N) => N.url === t.url) === c).sort((t, c) => c.width * c.height - t.width * t.height).slice(0, 80)
         });
         l.value = e?.[0]?.result || [], i.value = `${l.value.length} 张 · 点击保存`;
       } catch (s) {
@@ -65,21 +64,21 @@ const Q = { class: "sticker-app" }, U = {
     }
     async function A(s) {
       try {
-        const e = await $(() => v.saveImageToFavoritesAny({ url: s.url }));
+        const e = await $(() => f.saveImageToFavoritesAny({ url: s.url }));
         if (!e.ok) throw new Error(e.error);
         r("图片已保存到当前图库");
       } catch (e) {
         r(e?.message || "保存图片失败", !0);
       }
     }
-    return (s, e) => (a(), n(g, null, [
+    return (s, e) => (n(), a(g, null, [
       o("main", Q, [
-        m ? (a(), n("nav", U, [...e[0] || (e[0] = [
+        k ? (n(), a("nav", U, [...e[0] || (e[0] = [
           o("a", { href: "sidepanel.html" }, "← 工具首页", -1),
           o("span", null, "表情包", -1)
         ])])) : d("", !0),
-        f(L),
-        m ? (a(), n("div", q, [
+        v(L),
+        k ? (n(), a("div", j, [
           o("button", {
             type: "button",
             onClick: E
@@ -89,7 +88,7 @@ const Q = { class: "sticker-app" }, U = {
             onClick: I
           }, "☆ 保存网页到常用网站")
         ])) : d("", !0),
-        m ? (a(), n("section", G, [
+        k ? (n(), a("section", q, [
           o("header", null, [
             o("div", null, [
               e[1] || (e[1] = o("strong", null, "当前网页图片", -1)),
@@ -100,9 +99,9 @@ const Q = { class: "sticker-app" }, U = {
               onClick: W
             }, "扫描当前页")
           ]),
-          o("div", J, [
-            i.value.endsWith("0 张 · 点击保存") ? (a(), n("div", K, "当前页面没有可收集的图片")) : d("", !0),
-            (a(!0), n(g, null, P(l.value, (t) => (a(), n("button", {
+          o("div", G, [
+            i.value.endsWith("0 张 · 点击保存") ? (n(), a("div", J, "当前页面没有可收集的图片")) : d("", !0),
+            (n(!0), a(g, null, P(l.value, (t) => (n(), a("button", {
               key: t.url,
               type: "button",
               class: "sticker-page-image",
@@ -115,12 +114,12 @@ const Q = { class: "sticker-app" }, U = {
                 alt: ""
               }, null, 8, R),
               o("i", null, h(t.width) + "×" + h(t.height), 1)
-            ], 8, O))), 128))
+            ], 8, K))), 128))
           ])
         ])) : d("", !0)
       ]),
-      f(y(T)),
-      f(y(B)),
+      v(y(T)),
+      v(y(B)),
       o("div", {
         id: "sticker-toast",
         class: V(["sticker-toast", { bad: _.value }]),
@@ -128,5 +127,5 @@ const Q = { class: "sticker-app" }, U = {
       }, h(u.value), 11, X)
     ], 64));
   }
-}), Z = /* @__PURE__ */ H(Y, [["__scopeId", "data-v-afcc7f36"]]), C = document.getElementById("vue-sticker-standalone-root");
+}), Z = /* @__PURE__ */ O(Y, [["__scopeId", "data-v-afcc7f36"]]), C = document.getElementById("vue-sticker-standalone-root");
 C && z(Z).mount(C);

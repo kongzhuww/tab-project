@@ -7,7 +7,6 @@ import { createFeatureRegistry } from "../core/features";
 import { installGlobalControllers } from "../core/globals";
 import { registerUiCommands } from "../core/ui-commands";
 import { registerUiFeatures } from "../core/ui-features";
-import { registerJevCooperativeDock } from "../services/jev-cooperative.service";
 import { bookmarksService } from "../services/bookmarks.service";
 import { introController } from "./controller";
 
@@ -16,7 +15,6 @@ const featureRegistry = createFeatureRegistry(commandRegistry);
 installGlobalControllers(commandRegistry, featureRegistry);
 registerUiCommands(commandRegistry);
 registerUiFeatures(featureRegistry);
-registerJevCooperativeDock();
 void bookmarksService.loadBookmarks();
 
 void (async () => {

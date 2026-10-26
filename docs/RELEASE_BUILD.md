@@ -12,7 +12,7 @@ The command copies current working-tree source (including non-ignored new source
 
 The output does not include source, native-host binaries, backend, mobile, tests, `.local.*`, account credentials, or personal schedule configuration. Users must configure their own integrations. Runtime assets under `assets/` and license files under `third_party/` are included only when known to Git or non-ignored. Removed mascot/mobile trees are not release inputs. This allowlist is not a secret scanner: inspect new assets and sources before publishing.
 
-The two root compatibility workers remain alongside `generated/` workers until their CLI references are retired. Old hash chunks in the live development directory are deliberately preserved for already-open pages.
+The two root compatibility workers remain alongside `generated/` workers without changing runtime entry paths. CLI/Broker and Jev debug bridges have been removed from both development and release sources; do not restore them from historical documentation. Unrelated old hash chunks in the live development directory remain preserved; retired debug artifacts may be removed only after confirming they are unreachable from current entries.
 
 ## Manual acceptance before distribution
 

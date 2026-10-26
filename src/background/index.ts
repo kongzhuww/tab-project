@@ -3,10 +3,7 @@
  *
  * 统一调度：
  * - Bilibili DeclarativeNetRequest 防盗链动态网络规则
- * - 原生 Native Messaging 伴侣通信与多功能 RPC 路由
  * - 图片搜索与跨域防盗链提取代理
- * - Jev 扩展协作双向通道
- * - 本机 CLI 守护通道 (127.0.0.1:19826)
  * - 标签页智能生命周期、单例去重与原生空标签页自动清除
  */
 
@@ -16,7 +13,6 @@ import {
   enableStickerSidePanel,
   flashBadge
 } from "./notifications";
-import { initJevBridge } from "./jev-bridge";
 import {
   dedupeLogicWeaverNewTab,
   bookmarkCurrentTab,
@@ -25,7 +21,6 @@ import {
   openOrFocusNewTab
 } from "./tab-manager";
 import { handleSearchWebImages, handleFetchSiteImages } from "./image-proxy";
-import { startBgCliPolling } from "./cli-bridge";
 
 declare const chrome: any;
 
@@ -36,9 +31,7 @@ initNotificationListeners();
 for (const name of ["gmail-inbox-poll", "x-account-poll"]) {
   chrome.alarms.clear(name).catch(() => console.warn("[Migration] Could not clear retired feed alarm"));
 }
-initJevBridge();
 initTabWatcher();
-startBgCliPolling();
 initContextMenu();
 
 // 监听扩展全局快捷键（例如 Alt+H 回到新标签页）

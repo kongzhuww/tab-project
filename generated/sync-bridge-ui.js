@@ -1,10 +1,10 @@
-import { d as w, o as b, e as f, f as o, m, l as v, n as y, B, t as U, g as x, b as l, N as D } from "./chunks/vendor-vue-CjOHdfe5.js";
+import { d as w, o as b, e as f, f as o, m, l as v, n as y, B, t as U, g as x, b as l, O as D } from "./chunks/vendor-vue-DokqDua_.js";
 const I = { class: "card" }, C = {
   class: "step-box",
   style: { background: "rgba(99,102,241,.06)", "border-color": "rgba(99,102,241,.25)" }
-}, $ = { class: "bridge-form" }, N = ["disabled"], V = ["disabled"], j = /* @__PURE__ */ w({
+}, $ = { class: "bridge-form" }, V = ["disabled"], j = ["disabled"], A = /* @__PURE__ */ w({
   __name: "SyncBridgeApp",
-  setup(A) {
+  setup(M) {
     const r = l(""), a = l(""), i = l(!1), u = l(""), d = l("");
     function s(e, t = "") {
       u.value = e, d.value = t;
@@ -93,7 +93,7 @@ B站 UID: ${e.biliUserMid || "未配置"}
             type: "button",
             disabled: i.value,
             onClick: g
-          }, "🚀 立即直推到手机端", 8, N)
+          }, "🚀 立即直推到手机端", 8, V)
         ])
       ]),
       o("button", {
@@ -101,7 +101,7 @@ B站 UID: ${e.biliUserMid || "未配置"}
         type: "button",
         disabled: i.value,
         onClick: T
-      }, "🔍 检查当前电脑同步池状态", 8, V),
+      }, "🔍 检查当前电脑同步池状态", 8, j),
       u.value ? (b(), f("div", {
         key: 0,
         class: B(["status", d.value]),
@@ -111,4 +111,4 @@ B站 UID: ${e.biliUserMid || "未配置"}
     ]));
   }
 }), k = document.getElementById("vue-sync-bridge-root");
-k && D(j).mount(k);
+k && D(A).mount(k);

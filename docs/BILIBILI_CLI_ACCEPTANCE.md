@@ -1,4 +1,6 @@
-# B站只读 CLI：发布前有限验收记录
+# B站只读 CLI：历史有限验收记录（工具已退役）
+
+> CLI/Broker 已按用户要求从开发版与商店版移除。本文是历史样本证据，不代表当前出口仍可用，不据此恢复脚本或页面执行器。见 [DEBUG_BRIDGE_REMOVAL.md](DEBUG_BRIDGE_REMOVAL.md)。
 
 > 这是指定轮次的有限验收证据，不是当前 Broker/浏览器状态或再次执行的授权。源码、受管副本与线上运行版本可能不同；先按 [CURRENT_STATE.md](CURRENT_STATE.md) 定位，调用 CLI/读取账号内容须另获授权，不重复执行历史验收来证明文档。
 

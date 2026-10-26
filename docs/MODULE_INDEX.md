@@ -1,5 +1,7 @@
 # tab-project 模块入口索引与历史台账
 
+> **当前退役状态**：用户要求开发版和商店版都移除 CLI/Broker 和 Jev 调试桥接。本文旧 CLI 命令、eval 和自动化运行记录仅为历史，不能视为现行功能或恢复依据。见 [DEBUG_BRIDGE_REMOVAL.md](DEBUG_BRIDGE_REMOVAL.md)。
+
 > **现行入口优先看 [CURRENT_STATE.md](CURRENT_STATE.md) 和根 [AGENTS.md](../AGENTS.md)。** 本文件体积较大，包含按时点追加的历史摘要；“最新/本轮/下一步”、失败状态、模块数量和部署结论不自动代表当前状态。
 > 当前注册表是 `src/modules/builtins.ts`，目前 6 个卡片与 6 个浮窗；QQ、独立频道、Popup、旧监控/工作流入口不能按历史资料恢复。聊天当前使用 HTTP 私有服务，动态分享与同父聊天室好友请求已接入，旧 P2P/中继记录不是现行链路。
 
