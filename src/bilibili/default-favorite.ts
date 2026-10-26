@@ -7,8 +7,6 @@ function notifyToast(text: string): void {
   const g = globalThis as any;
   if (typeof g.showBiliToast === "function") {
     g.showBiliToast(text);
-  } else {
-    console.log("[BiliFavoriteToast]", text);
   }
 }
 

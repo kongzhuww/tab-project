@@ -113,8 +113,6 @@ function notifyToast(text: string, options?: any): void {
   const g = globalThis as any;
   if (typeof g.showBiliToast === "function") {
     g.showBiliToast(text, options);
-  } else {
-    console.log("[BiliChannelToast]", text);
   }
 }
 

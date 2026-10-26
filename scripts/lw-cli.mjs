@@ -431,16 +431,6 @@ async function runCli() {
     return;
   }
 
-  if (cmd === "obsidian" || cmd === "notes") {
-    const sub = positional[1] || "status";
-    const res = await sendCommand("page", "obsidian", {
-      sub,
-      key: positional[2] || flags.key
-    });
-    console.log(JSON.stringify(res, null, 2));
-    return;
-  }
-
   if (cmd === "music") {
     const sub = positional[1] || "status";
     const res = await sendCommand("page", "music", { sub });
@@ -457,12 +447,6 @@ async function runCli() {
   if (cmd === "eval") {
     const code = positional.slice(1).join(" ") || flags.code;
     const res = await sendCommand("page", "eval", { code });
-    console.log(JSON.stringify(res, null, 2));
-    return;
-  }
-
-  if (cmd === "pet-debug") {
-    const res = await sendCommand("page", "pet-debug");
     console.log(JSON.stringify(res, null, 2));
     return;
   }
@@ -539,13 +523,6 @@ async function runCli() {
     return;
   }
 
-  if (cmd === "monitor") {
-    const sub = positional[1] || "status";
-    const res = await sendCommand("page", "monitor", { sub });
-    console.log(JSON.stringify(res, null, 2));
-    return;
-  }
-
   if (cmd === "click") {
     const selector = positional[1];
     const res = await sendCommand("page", "dom", { sub: "click", selector });
@@ -605,14 +582,13 @@ async function runCli() {
   console.log(`LogicWeaver CLI (lw-cli)
 可用命令:
   status                                    查看插件连接、后台与当前页面完整状态
-  nav <home|bilibili|github|youtube|aihot|pricing|todoist|obsidian|settings>
+  nav <home|bilibili|github|youtube|aihot|pricing|todoist|settings>
   inspect <selector> [compareSelector]      测量元素坐标/尺寸/样式，以及双元素间距与重叠检测
   search [query] [--mode ...] [--scope all|bookmarks|launcher] [--submit]
   launcher <list|add|rename|delete> ...     查看或操作首页常用网站
   bili <list-folders|list-videos|video-info|video-subtitles|video-comments|comment-replies>
                                             B站只读数据通道（供 Agent 提取收藏、字幕与评论）
   dock <list|modules|open|hide|reload|quit> [appId] 列出内置模块元数据，或控制 Dock 运行/可见状态与重启/退出
-  monitor [status|diagnose]                 查看双端(Mac + Win)与各容器链路健康诊断快照
   eval <code>                               在页面上下文中远程执行 JS 表达式
   todoist <status|view|project|refresh>     控制 Todoist 看板并查看各列任务数
   sync <status|webdav-test|webdav-push|webdav-pull|cloud-push|cloud-pull>

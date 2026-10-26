@@ -363,8 +363,6 @@ function notifyToast(text: string, opts?: any): void {
       message: text,
       duration: 3200
     });
-  } else {
-    console.log(`[BiliFavorites] ${text}`);
   }
 }
 

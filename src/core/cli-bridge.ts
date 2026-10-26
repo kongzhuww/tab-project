@@ -234,17 +234,6 @@ async function executeCommand(cmd: { action: string; params?: Record<string, any
       };
     }
 
-    case "qq-messages": {
-      const q = (window as any).__qqState;
-      const activeId = q?.activeSessionId;
-      const msgs = activeId && q?.messages ? q.messages[activeId] : [];
-      return {
-        activeSessionId: activeId,
-        messageCount: msgs?.length || 0,
-        messages: msgs?.slice(-15) || []
-      };
-    }
-
     case "search": {
       if (params.mode) {
         searchService.setMode(params.mode);
@@ -614,7 +603,6 @@ async function executeCommand(cmd: { action: string; params?: Record<string, any
       }
       const targetRepo = params.fullName || params.query || params.category;
       if (sub === "open-detail" && targetRepo) {
-        console.log("[CLI Bridge] Opening GitHub detail for:", targetRepo);
         githubRepoDetailController.open(String(targetRepo));
       } else if (sub === "close-detail") {
         githubRepoDetailController.close();

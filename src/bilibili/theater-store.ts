@@ -104,8 +104,6 @@ function notifyToast(msg: string, isError = false) {
     (window as any).showBiliToast(msg, isError ? 4000 : 2500);
   } else if (typeof (window as any).notifyToast === "function") {
     (window as any).notifyToast(msg, { isError });
-  } else {
-    console.log(`[BiliTheater] ${msg}`);
   }
 }
 

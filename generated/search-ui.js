@@ -1,7 +1,7 @@
 import { d as _, b as d, C as w, G as b, y as k, o as y, e as S, f as t, t as a, m as D, i as E, D as $, H as C, F as L, s as i, N as x } from "./chunks/vendor-vue-CjOHdfe5.js";
-import { _ as B, i as H } from "./chunks/dock-lifecycle.store-sB0Ll9yF.js";
-import { s as N } from "./chunks/search.service-CzxjlNxM.js";
-import { cliBridgeRuntime as T } from "./chunks/cli-bridge-BzDCKJ6A.js";
+import { _ as B, i as H } from "./chunks/dock-lifecycle.store-DsRd7nze.js";
+import { s as N } from "./chunks/search.service-lHw6yJW3.js";
+import { cliBridgeRuntime as T } from "./chunks/cli-bridge-BIlexgHR.js";
 const I = { class: "sub-newtab-topbar" }, M = { class: "sub-newtab-center" }, V = { class: "hero-clock" }, F = { id: "greeting" }, A = {
   id: "clock",
   class: "clock"
