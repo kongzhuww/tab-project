@@ -106,5 +106,5 @@ jobs:
               "release-assets/tab-project-v${VERSION}-extension.zip" \
               release-assets/SHA256SUMS.txt release-assets/build-info.json \
               --verify-tag --latest --generate-notes \
-              --title "LogicWeaver ${TAG}"
+              --title "tab-project-next ${TAG}"
           fi
