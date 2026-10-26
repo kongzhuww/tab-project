@@ -93,14 +93,20 @@ jobs:
           VERSION: ${{ needs.build.outputs.version }}
         run: |
           set -euo pipefail
-          TAG="${RELEASE_TAG:-v${VERSION}}"
+          # 自动计算规范 Tag：若为 Tag 触发则取 tag 名，若为手动触发则取 v+version，防止出现 main tag 错误
+          if [ "${GITHUB_REF_TYPE:-}" = "tag" ]; then
+            TAG="${RELEASE_TAG}"
+          else
+            TAG="v${VERSION}"
+          fi
+
           if gh release view "$TAG" >/dev/null 2>&1; then
             echo "Release $TAG already exists; uploading assets and setting latest."
             gh release upload "$TAG" \
               "release-assets/tab-project-v${VERSION}-extension.zip" \
               release-assets/SHA256SUMS.txt release-assets/build-info.json \
               --clobber
-            gh release edit "$TAG" --draft=false --latest
+            gh release edit "$TAG" --title "tab-project-next ${TAG}" --draft=false --latest
           else
             gh release create "$TAG" \
               "release-assets/tab-project-v${VERSION}-extension.zip" \
