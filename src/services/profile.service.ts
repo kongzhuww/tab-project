@@ -309,6 +309,7 @@ export class ProfileService {
         title: diffPrivate > 1 ? `收到 ${diffPrivate} 条新私信` : "收到新的私信",
         subtitle: "B站私信消息",
         message: "有人给你发送了私信，点击查看对话",
+        target: { type: "bili-messages" },
         actionLabel: "查看私信",
         showActions: true,
         onClick: () => {
@@ -325,6 +326,7 @@ export class ProfileService {
         title: diffReply > 1 ? `收到 ${diffReply} 条新回复` : "收到新的评论回复",
         subtitle: "评论回复通知",
         message: "有人在评论区回复了你",
+        target: { type: "bili-messages" },
         actionLabel: "查看回复",
         showActions: true,
         onClick: () => {
@@ -341,6 +343,7 @@ export class ProfileService {
         title: diffAt > 1 ? `收到 ${diffAt} 次新提及` : "有人 @了你",
         subtitle: "提到我的通知",
         message: "有人在动态或评论中 @了你",
+        target: { type: "bili-messages" },
         actionLabel: "查看提及",
         showActions: true,
         onClick: () => {

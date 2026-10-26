@@ -125,8 +125,31 @@ function safeTarget(raw) {
   if (raw?.type === "todoist-task" && typeof raw.taskId === "string" && /^[A-Za-z0-9_-]{1,100}$/.test(raw.taskId)) return { type: raw.type, taskId: raw.taskId };
   if (raw?.type === "module" && typeof raw.moduleId === "string" && /^[a-z][a-z0-9-]{0,60}$/.test(raw.moduleId)) return { type: raw.type, moduleId: raw.moduleId };
   if (raw?.type === "bili-messages") return { type: raw.type };
+  if (raw?.type === "bili-video") {
+    if (typeof raw.bvid === "string" && /^BV[A-Za-z0-9]{10}$/.test(raw.bvid)) return { type: raw.type, bvid: raw.bvid };
+    if (typeof raw.aid === "string" && /^[1-9][0-9]{0,19}$/.test(raw.aid)) return { type: raw.type, aid: raw.aid };
+  }
   if (raw?.type === "github-repository" && typeof raw.fullName === "string" && raw.fullName.length <= 240 && /^[\w.-]+\/[\w.-]+$/.test(raw.fullName) && !raw.fullName.split("/").some((part) => part === "." || part === "..")) return { type: raw.type, fullName: raw.fullName };
   return void 0;
+}
+function biliVideoTargetFromUrl(value) {
+  if (typeof value !== "string") return void 0;
+  try {
+    const url = new URL(value);
+    if (url.protocol !== "https:" || url.username || url.password || url.port || !["bilibili.com", "www.bilibili.com", "m.bilibili.com"].includes(url.hostname)) return void 0;
+    const match = /^\/video\/(BV[A-Za-z0-9]{10}|av[1-9][0-9]{0,19})\/?$/.exec(url.pathname);
+    if (match) return match[1].startsWith("BV") ? { type: "bili-video", bvid: match[1] } : { type: "bili-video", aid: match[1].slice(2) };
+  } catch {
+  }
+  return void 0;
+}
+function biliVideoTargetFromText(text) {
+  const targets = /* @__PURE__ */ new Map();
+  for (const match of text.matchAll(/https:\/\/[^\s<>"']+/g)) {
+    const target = biliVideoTargetFromUrl(match[0].replace(/[)）。，,;；]+$/, ""));
+    if (target) targets.set(JSON.stringify(target), target);
+  }
+  return targets.size === 1 ? targets.values().next().value : void 0;
 }
 function historyText(value, length) {
   if (typeof value !== "string") return "";
@@ -145,7 +168,11 @@ function historyText(value, length) {
 }
 function safeArchive(raw) {
   if (!raw || typeof raw.id !== "string" || !/^[A-Za-z0-9_:-]{1,200}$/.test(raw.id) || typeof raw.title !== "string" || !Number.isFinite(raw.createdAt) || !["info", "success", "warning", "error"].includes(raw.level)) throw new Error("Invalid notification record");
-  return { id: raw.id, appType: historyText(raw.appType, 40), appName: historyText(raw.appName, 60), title: historyText(raw.title, 160), subtitle: historyText(raw.subtitle, 240), message: historyText(raw.message, 2e3), level: raw.level, createdAt: raw.createdAt, read: raw.read === true, target: safeTarget(raw.target) };
+  let target = safeTarget(raw.target);
+  if (raw.appType === "bili" && (!target || target.type === "bili-messages")) {
+    target = biliVideoTargetFromText([raw.title, raw.subtitle, raw.message].filter((value) => typeof value === "string").join(" ")) || target;
+  }
+  return { id: raw.id, appType: historyText(raw.appType, 40), appName: historyText(raw.appName, 60), title: historyText(raw.title, 160), subtitle: historyText(raw.subtitle, 240), message: historyText(raw.message, 2e3), level: raw.level, createdAt: raw.createdAt, read: raw.read === true, target };
 }
 function safeSnapshot(raw) {
   if (raw == null) return { version: 0, items: [] };

@@ -14,9 +14,9 @@ const emit = defineEmits<{ "open-ai-settings": [] }>();
   <div class="gh-bili-heading">
     <div class="gh-hero-title-row">
       <h3 id="gh-hero-title" :title="state.title">{{ state.title }}</h3>
-      <div v-if="status.actionText && !status.actionError" class="gh-hero-inline-status" role="status" aria-live="polite" aria-atomic="true">
+      <div v-if="status.actionText" class="gh-hero-inline-status" :class="{ 'is-error': status.actionError }" :role="status.actionError ? 'alert' : 'status'" :aria-live="status.actionError ? 'assertive' : 'polite'" aria-atomic="true">
         <span class="gh-hero-status-text" :title="status.actionText">{{ status.actionText }}</span>
-        <button type="button" title="关闭提示" aria-label="关闭同步状态提示" @click="githubStatusController.update({ actionText: '', actionError: false })">×</button>
+        <button type="button" title="关闭提示" aria-label="关闭状态提示" @click="githubStatusController.update({ actionText: '', actionError: false })">×</button>
       </div>
     </div>
     <p id="gh-hero-desc">{{ state.description }}</p>
@@ -64,6 +64,10 @@ const emit = defineEmits<{ "open-ai-settings": [] }>();
   color: var(--muted);
   font-size: 10px;
   line-height: 1;
+}
+.gh-hero-inline-status.is-error {
+  color: var(--danger, #ef4444);
+  border-color: color-mix(in srgb, var(--danger, #ef4444) 35%, var(--border));
 }
 .gh-hero-status-text {
   min-width: 0;

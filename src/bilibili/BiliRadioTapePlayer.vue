@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref, watch } from "vue";
+import { onMounted, onUnmounted, ref } from "vue";
 import { radioTapeState, radioTapeController } from "./radio-tape-store";
 
 const props = withDefaults(defineProps<{
@@ -73,13 +73,6 @@ onUnmounted(() => {
   if (dock && (dock as any).__bili_dock_ro) {
     (dock as any).__bili_dock_ro.disconnect();
     delete (dock as any).__bili_dock_ro;
-  }
-});
-
-// 当开始播放音乐时，如果之前收起，自动智能展开以展示曲目与进度
-watch(() => radioTapeState.playing, (playing) => {
-  if (playing && isCollapsed.value) {
-    isCollapsed.value = false;
   }
 });
 
@@ -208,8 +201,7 @@ function updateSeekFromPointer(e: PointerEvent) {
     <div
       v-if="props.dockSide && isCollapsed"
       class="tape-collapsed-capsule"
-      :title="`电台：${radioTapeState.title || '哔哩哔哩电台'} (点击展开)`"
-      @click="isCollapsed = false"
+      :title="`电台：${radioTapeState.title || '哔哩哔哩电台'}`"
     >
       <div class="tape-capsule-spool" :class="{ spinning: radioTapeState.playing }">
         <div class="spool-center-dot"></div>
@@ -483,7 +475,6 @@ function updateSeekFromPointer(e: PointerEvent) {
   min-width: 150px;
   max-width: 210px;
   border-radius: 999px;
-  cursor: pointer;
 }
 .tape-collapsed-capsule {
   display: flex;

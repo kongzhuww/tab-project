@@ -150,6 +150,9 @@ export const notificationHistoryController = {
       } else if (target.type === 'github-repository') {
         const { githubRepoDetailController } = await import('../github/repo-detail-store');
         githubRepoDetailController.open(target.fullName);
+      } else if (target.type === 'bili-video') {
+        const { biliMiniPlayerController } = await import('../bilibili/mini-player-store');
+        await biliMiniPlayerController.openVideo({ bvid: target.bvid, aid: target.aid });
       } else if (target.type === 'bili-messages') {
         const { biliMessagePanelController } = await import('../bilibili/message-panel-store');
         biliMessagePanelController.openPanel();

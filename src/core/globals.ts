@@ -2,6 +2,7 @@ declare const chrome: any;
 
 import { introController } from "../intro/controller";
 import { notificationController } from "../notifications/store";
+import { safeTarget, biliVideoTargetFromUrl, biliVideoTargetFromText } from "../notifications/history-contract";
 import { weatherController } from "../weather/store";
 import { clockController } from "../clock/store";
 import { searchController } from "../search/store";
@@ -242,21 +243,17 @@ export function installGlobalControllers(commands: CommandRegistry, features: Fe
   // 1. 全局 Windows 10/11 亚克力浮窗通知门面
   (window as any).showWindowsToast = (opts: any) => {
     if (!opts) return null;
+    const target = safeTarget(opts.target) || biliVideoTargetFromUrl(opts.url) ||
+      (opts.appType === "bili" ? biliVideoTargetFromText([opts.title, opts.subtitle, opts.message].filter(value => typeof value === "string").join(" ")) : undefined);
     return notificationController.show({
       ...opts,
+      target,
       onClick: () => {
         if (typeof opts?.onClick === "function") return opts.onClick();
+        if (target) return notificationHistoryController.openTarget(target);
         if (opts?.url) {
           window.open(opts.url, "_blank");
           return;
-        }
-        if (opts?.appType === "bili") {
-          if ((window as any).LogicWeaverBiliMessagePanel) {
-            (window as any).LogicWeaverBiliMessagePanel.openPanel();
-          } else {
-            window.open("https://message.bilibili.com/", "_blank");
-          }
-
         }
       }
     });
@@ -274,7 +271,9 @@ export function installGlobalControllers(commands: CommandRegistry, features: Fe
   };
 
   // 3. 全局统一 B站专属 Toast
-  (window as any).showBiliToast = (text: string, duration = 3200, opts: any = {}) => {
+  (window as any).showBiliToast = (text: string, durationOrOptions: number | Record<string, any> = 3200, extraOptions: any = {}) => {
+    const opts = typeof durationOrOptions === "object" && durationOrOptions ? durationOrOptions : extraOptions;
+    const duration = typeof durationOrOptions === "number" ? durationOrOptions : 3200;
     const isError = opts.isError || /失败|错误|异常|未获取|未找到/i.test(text);
     const title = opts.title || (isError ? "B站操作未完成" : "哔哩哔哩");
     const subtitle = opts.subtitle || (text.length > 36 ? "" : text);
@@ -290,6 +289,8 @@ export function installGlobalControllers(commands: CommandRegistry, features: Fe
       showActions: Boolean(opts.showActions || opts.actionLabel),
       actionLabel: opts.actionLabel || "",
       onClick: opts.onClick || null,
+      target: safeTarget(opts.target) || biliVideoTargetFromUrl(opts.url) || safeTarget({ type: "bili-video", bvid: opts.bvid, aid: opts.aid ? String(opts.aid) : undefined }),
+      url: opts.url,
       duration: Math.max(3000, duration)
     };
     return (window as any).showWindowsToast(toastData);

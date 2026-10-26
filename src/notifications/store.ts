@@ -1,6 +1,6 @@
 import { reactive, readonly } from "vue";
 import { archiveToast } from "./history-store";
-import { safeTarget, type NotificationLevel, type NotificationTarget } from "./history-contract";
+import { safeTarget, biliVideoTargetFromText, type NotificationLevel, type NotificationTarget } from "./history-contract";
 
 export type NotificationAppType = "chat" | "qq" | "bili" | "phone" | "fetch" | string;
 
@@ -90,6 +90,7 @@ function show(options: NotificationOptions): NotificationHandle | null {
   const title = String(options.title || "新消息通知");
   const subtitle = String(options.subtitle || "");
   const message = String(options.message || "");
+  const target = safeTarget(options.target) || (appType === "bili" ? biliVideoTargetFromText(`${title} ${subtitle} ${message}`) : undefined);
   const duration = Math.max(500, Number(options.duration) || 7000);
   const fingerprint = String(options.id || `${appType}_${title}_${subtitle}_${message}`).trim();
   const now = Date.now();
@@ -118,15 +119,15 @@ function show(options: NotificationOptions): NotificationHandle | null {
     duration,
     onClick: typeof options.onClick === "function" ? options.onClick : null,
     closing: false,
-    target: safeTarget(options.target)
+    target
   };
 
   items.push(item);
   const summary = title + " " + subtitle + " " + message;
   if (shouldArchive(options, summary)) {
     const level = options.level || (/失败|错误|异常|未确认|未获确认|无法|超时/.test(summary) ? "error" : "info");
-    const target = safeTarget(options.target) || (appType === "bili" ? { type: "bili-messages" as const } : appType === "chat" ? { type: "module" as const, moduleId: "chat" } : undefined);
-    archiveToast({ id, appType, appName: item.appName, title, subtitle, message, level, createdAt: now, read: false, target });
+    const archiveTarget = target || (appType === "chat" ? { type: "module" as const, moduleId: "chat" } : undefined);
+    archiveToast({ id, appType, appName: item.appName, title, subtitle, message, level, createdAt: now, read: false, target: archiveTarget });
   }
   const activeItems = items.filter((entry) => !entry.closing);
   if (activeItems.length > 5) close(activeItems[0].id);

@@ -15,6 +15,14 @@ import { storageCache } from "./storage-cache.service";
 
 export const DEFAULT_AIHOT_API = "https://aihot.virxact.com/api/v1";
 
+// Keep source-page controls out of every article extraction path, including templates.
+const ARTICLE_NOISE_SELECTORS = [
+  "aside", "nav", "script", "style", "link", "meta", "iframe", "object", "embed",
+  "form", "button", "input", "select", "textarea",
+  ".dt-aside", ".dt-outline", ".dt-outline-list", ".detail-mobile-only",
+  ".detail-reading-tail", ".dt-tags-wrap", ".dt-share-wrap", "[data-detail-aside]", ".dt-detail-reason"
+].join(", ");
+
 export class AiHotService {
   private static instance: AiHotService;
   private owner: symbol | null = null;
@@ -274,11 +282,13 @@ export class AiHotService {
 
   public async fetchArticleContent(item: { id?: string | number; url?: string; summary?: string; title?: string }): Promise<string> {
     const itemId = item.id ? String(item.id) : "";
+    // Old entries may contain a whole source-page article, including duplicate responsive controls.
+    const cacheKey = `aihot_art_v2_${itemId}`;
     if (itemId && this.aihotArticleCache.has(itemId)) {
       return this.aihotArticleCache.get(itemId)!;
     }
     if (itemId) {
-      const persisted = await storageCache.get<string>(`aihot_art_${itemId}`);
+      const persisted = await storageCache.get<string>(cacheKey);
       if (persisted) {
         this.aihotArticleCache.set(itemId, persisted);
         return persisted;
@@ -321,7 +331,7 @@ export class AiHotService {
         const parsed = this.extractArticleHtml(html, itemId);
         if (parsed && parsed.length > 20) {
           this.aihotArticleCache.set(itemId, parsed);
-          void storageCache.set(`aihot_art_${itemId}`, parsed, { ttlMs: 24 * 3600 * 1000 });
+          void storageCache.set(cacheKey, parsed, { ttlMs: 24 * 3600 * 1000 });
           return parsed;
         }
       } catch (err: any) {
@@ -350,12 +360,18 @@ export class AiHotService {
 
   private sanitizeAndProxyArticleHtml(rawHtml: string): string {
     if (!rawHtml) return "";
-    let html = rawHtml;
-
-    // 1. 彻底过滤可能泄漏的侧边栏、目录导航与重复推荐理由
-    html = html.replace(/<aside[\s\S]*?<\/aside>/gi, "");
-    html = html.replace(/<div class="[^"]*(?:dt-aside|dt-outline|detail-reading-tail|dt-tags-wrap)[^"]*"[\s\S]*?<\/div>/gi, "");
-    html = html.replace(/<ol class="[^"]*dt-outline-list[^"]*"[\s\S]*?<\/ol>/gi, "");
+    // 1. Remove nested source controls structurally, not with unbalanced div regexes.
+    const doc = new DOMParser().parseFromString(rawHtml, "text/html");
+    doc.querySelectorAll(ARTICLE_NOISE_SELECTORS).forEach((el) => el.remove());
+    for (const el of doc.body.querySelectorAll("*")) {
+      for (const attr of Array.from(el.attributes)) {
+        if (/^on/i.test(attr.name) || attr.name === "srcdoc") el.removeAttribute(attr.name);
+        if (["href", "src", "xlink:href"].includes(attr.name) && /^\s*(?:javascript|vbscript|data):/i.test(attr.value)) {
+          el.removeAttribute(attr.name);
+        }
+      }
+    }
+    let html = doc.body.innerHTML;
 
     // 2. 补全并代理图片路径（防 404 与防盗链）
     html = html.replace(/src=["'](?:\/api\/img-proxy\?([^"']+))["']/gi, (m, q) => {
@@ -403,19 +419,22 @@ export class AiHotService {
         const doc = parser.parseFromString(html, "text/html");
 
         // 移除所有侧边栏、目录列表、推荐理由、外链分享等噪音容器
-        doc.querySelectorAll(
-          "aside, .dt-aside, .dt-outline, .dt-outline-list, .detail-mobile-only, .detail-reading-tail, .dt-tags-wrap, .dt-share-wrap, [data-detail-aside], .dt-detail-reason"
-        ).forEach((el) => el.remove());
+        doc.querySelectorAll(ARTICLE_NOISE_SELECTORS).forEach((el) => el.remove());
 
-        // 优先查找正文容器，避免直接捕获外层包含侧边栏的 article 标签
-        const container = doc.querySelector(
-          `.dt-article-content, #detail-article-${itemId}, .detail-content, .article-content, .prose, article`
-        );
-        if (container) {
-          const cleanHtml = container.innerHTML;
-          if (cleanHtml && cleanHtml.trim().length > 30) {
-            return this.sanitizeAndProxyArticleHtml(cleanHtml);
-          }
+        // A comma selector returns document order, NOT selector priority: an outer article wins.
+        // Resolve each candidate separately so the real body (.prose in the current source) wins.
+        const containers = [
+          doc.querySelector(".dt-article-content"),
+          doc.getElementById(`detail-article-${itemId}`),
+          doc.querySelector(".detail-content"),
+          doc.querySelector(".article-content"),
+          doc.querySelector(".prose"),
+          doc.querySelector("article")
+        ];
+        for (const container of containers) {
+          if (!container) continue;
+          const cleanHtml = this.sanitizeAndProxyArticleHtml(container.innerHTML);
+          if (cleanHtml.length > 30) return cleanHtml;
         }
       }
     } catch {}

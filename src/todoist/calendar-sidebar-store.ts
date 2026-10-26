@@ -1,6 +1,6 @@
 import { reactive } from "vue";
 import { todoistModuleState, withTodoistWrite } from "./module-state";
-import { todoistService } from "../services/todoist.service";
+import { todoistService, isTodoistTaskCompleted } from "../services/todoist.service";
 import { todoistTaskListState, todoistTaskListController } from "./task-list-store";
 import { createTaskStartDateReader, parseDateAndTime } from "./task-date-helper";
 
@@ -53,7 +53,7 @@ function mapTask(task: any, readStart = createTaskStartDateReader()): CalendarTo
     };
   }
   return {
-    id, content: task.content || "未命名任务", completed: Boolean(task.completed || task.is_completed),
+    id, content: task.content || "未命名任务", completed: typeof task.completed === "boolean" ? task.completed : isTodoistTaskCompleted(task),
     priority: task.priority || 1, labels: task.labels || [], raw,
     scheduledDate: scheduled.date, time: scheduled.time,
     dueText: raw.due?.string || raw.due?.date || "",
@@ -82,7 +82,7 @@ export function cancelTodoistDateReads() {
 function projectTasks() {
   const state = todoistCalendarSidebarState;
   const readStart = createTaskStartDateReader();
-  const active = activeTasks.filter(t => !t.is_completed).map(t => mapTask(t, readStart));
+  const active = activeTasks.filter(t => !isTodoistTaskCompleted(t)).map(t => mapTask(t, readStart));
   const selected = state.selectedDate;
   const local = Object.values(getLocalCompletedMap()).filter(item => !reopenedIds.has(item.id));
   const merged = new Map<string, CalendarTodoItem>();
@@ -124,7 +124,7 @@ export const todoistCalendarSidebarController = {
       activeTasks = activeTasks.filter(t => String(t.id) !== id);
     } else {
       reopenedIds.add(id); delete map[id];
-      if (!activeTasks.some(t => String(t.id) === id)) activeTasks.push({ ...(task.raw || task._taskRaw || task), id, is_completed: false, completed: false });
+      if (!activeTasks.some(t => String(t.id) === id)) activeTasks.push({ ...(task.raw || task._taskRaw || task), id, checked: false, is_completed: false, completed: false });
     }
     try { saveLocalCompletedMap(map); } catch { todoistCalendarSidebarState.writeError = "完成状态的本机记录未保存，请核对。"; }
     history.clear(); projectTasks();

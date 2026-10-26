@@ -112,22 +112,33 @@ async function handleCopy() {
       <div class="aihot-viewer-actions">
         <button
           id="aihot-viewer-copy"
-          class="ai-chat-new"
+          class="aihot-viewer-action"
+          :class="{ 'is-copied': aihotViewerState.copied }"
           type="button"
           title="复制文章内容"
           @click="handleCopy"
         >
-          {{ aihotViewerState.copied ? "✓ 已复制" : "📋 复制" }}
+          <svg v-if="aihotViewerState.copied" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="m5 12 4 4L19 6" />
+          </svg>
+          <svg v-else viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="8" y="8" width="12" height="12" rx="2" />
+            <path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3" />
+          </svg>
+          <span aria-live="polite">{{ aihotViewerState.copied ? "已复制" : "复制" }}</span>
         </button>
         <a
           id="aihot-viewer-open"
-          class="ai-chat-new"
+          class="aihot-viewer-action"
           :href="aihotViewerState.url"
           target="_blank"
           rel="noreferrer"
           title="在浏览器新标签页打开原文"
         >
-          原文 ↗
+          <span>原文</span>
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M14 4h6v6m0-6L10 14M20 14v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h4" />
+          </svg>
         </a>
       </div>
       <button

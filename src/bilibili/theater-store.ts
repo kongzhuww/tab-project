@@ -101,7 +101,7 @@ let actionCallback: BiliTheaterActionCallback | null = null;
 
 function notifyToast(msg: string, isError = false) {
   if (typeof (window as any).showBiliToast === "function") {
-    (window as any).showBiliToast(msg, isError ? 4000 : 2500);
+    (window as any).showBiliToast(msg, isError ? 4000 : 2500, { isError, target: { type: "bili-video", bvid: state.bvid, aid: state.aid } });
   } else if (typeof (window as any).notifyToast === "function") {
     (window as any).notifyToast(msg, { isError });
   }

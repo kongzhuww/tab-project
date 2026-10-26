@@ -1,11 +1,6 @@
 <script setup lang="ts">
-import { githubStatusState as state, githubStatusController } from "./store";
 import { githubAiJob } from "./ai-job";
 import { gitHubService } from "../services/github.service";
-
-function clearActionText() {
-  githubStatusController.update({ actionText: "", actionError: false });
-}
 </script>
 
 <template>
@@ -22,31 +17,5 @@ function clearActionText() {
       </template>
     </template>
   </section>
-  <!-- Routine progress is inline in GitHubHero; errors remain fully readable here. -->
-  <div v-if="state.actionText && state.actionError" class="gh-action-status" :class="{ error: state.actionError }" role="status">
-    <span>{{ state.actionText }}</span>
-    <button type="button" class="gh-action-status-close" title="关闭提示" @click="clearActionText">✕</button>
-  </div>
+  <!-- All ordinary progress/errors live beside the GitHubHero title; retain AI risk controls here. -->
 </template>
-
-<style scoped>
-.gh-action-status {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-.gh-action-status-close {
-  background: transparent;
-  border: 0;
-  color: inherit;
-  font-size: 13px;
-  cursor: pointer;
-  padding: 0 4px;
-  opacity: 0.7;
-  transition: opacity 0.15s;
-}
-.gh-action-status-close:hover {
-  opacity: 1;
-}
-</style>

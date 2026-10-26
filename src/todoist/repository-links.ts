@@ -4,7 +4,27 @@ export interface RepositoryLink {
 export function validRepositoryName(name: unknown): name is string {
   return typeof name === 'string' && name.length <= 240 && /^[\w.-]+\/[\w.-]+$/.test(name) && !name.split('/').some(part => part === '.' || part === '..');
 }
-const key = (taskId: string) => 'todoist_repository_links_v1:' + taskId;
+const KEY_PREFIX = 'todoist_repository_links_v1:';
+const key = (taskId: string) => KEY_PREFIX + taskId;
+/** Reverse lookup existing local associations; no second index or name-based guessing. */
+export function findRepositoryTaskIds(fullName: string): { taskIds: string[]; unreadableCount: number } {
+  if (!validRepositoryName(fullName)) throw new Error('仓库名称无效');
+  const keys: string[] = [];
+  for (let index = 0; index < localStorage.length; index++) {
+    const storedKey = localStorage.key(index);
+    if (storedKey?.startsWith(KEY_PREFIX)) keys.push(storedKey);
+  }
+  const taskIds: string[] = [];
+  let unreadableCount = 0;
+  for (const storedKey of keys) {
+    const taskId = storedKey.slice(KEY_PREFIX.length);
+    if (!taskId) continue;
+    try {
+      if (readRepositoryLinks(taskId).some(link => link.fullName.toLowerCase() === fullName.toLowerCase())) taskIds.push(taskId);
+    } catch { unreadableCount++; }
+  }
+  return { taskIds, unreadableCount };
+}
 export function readRepositoryLinks(taskId: string): RepositoryLink[] {
   if (!taskId) return [];
   const raw = JSON.parse(localStorage.getItem(key(taskId)) || '[]');

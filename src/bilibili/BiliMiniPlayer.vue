@@ -10,6 +10,7 @@ import { attachBiliPlaybackSync, detachBiliPlaybackSync } from "./playback-sync"
 import { bilibiliChannelService } from "../services/bilibili-channel.service";
 import { formatBiliCompactNumber } from "./channel-format";
 import BiliRichText from "./BiliRichText.vue";
+import { images } from "../sdk/images";
 
 const videoRef = ref<HTMLVideoElement | null>(null);
 const playerRef = ref<HTMLElement | null>(null);
@@ -1056,6 +1057,18 @@ onUnmounted(() => {
                 <div class="bili-comment-text">
                   <BiliRichText :text="c.message" :emotes="c.emotes" />
                 </div>
+                <div v-if="c.pictures.length" class="bili-mini-comment-pictures">
+                  <button
+                    v-for="(picture, index) in c.pictures"
+                    :key="`${picture}-${index}`"
+                    type="button"
+                    class="bili-mini-comment-picture"
+                    :aria-label="`查看 ${c.uname} 的评论图片 ${index + 1}`"
+                    @click.stop="images.open({ source: picture, title: `${c.uname} 的评论图片` })"
+                  >
+                    <img :src="picture" alt="评论图片" loading="lazy" referrerpolicy="no-referrer" />
+                  </button>
+                </div>
                 <div class="bili-comment-actions">
                   <span>👍 {{ c.likeCount }}</span>
                   <span v-if="c.replyCount">💬 {{ c.replyCount }}</span>
@@ -1063,7 +1076,19 @@ onUnmounted(() => {
                 <div v-if="c.replies?.length" class="bili-comment-sub-list">
                   <div v-for="sub in c.replies" :key="sub.id" class="bili-comment-sub-item">
                     <strong class="bili-comment-sub-uname">{{ sub.userName }}:</strong>
-                    <BiliRichText :text="sub.message" />
+                    <BiliRichText :text="sub.message" :emotes="sub.emotes" />
+                    <div v-if="sub.pictures.length" class="bili-mini-comment-pictures">
+                      <button
+                        v-for="(picture, index) in sub.pictures"
+                        :key="`${picture}-${index}`"
+                        type="button"
+                        class="bili-mini-comment-picture"
+                        :aria-label="`查看 ${sub.userName} 的回复图片 ${index + 1}`"
+                        @click.stop="images.open({ source: picture, title: `${sub.userName} 的回复图片` })"
+                      >
+                        <img :src="picture" alt="回复图片" loading="lazy" referrerpolicy="no-referrer" />
+                      </button>
+                    </div>
                   </div>
                   <!-- 原地展开 / 点击查看楼中楼控制条 -->
                   <div class="bili-comment-sub-more">
@@ -1134,6 +1159,37 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
+.bili-mini-comment-pictures {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+.bili-mini-comment-picture {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100px;
+  max-width: 100%;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel);
+  color: var(--text);
+  cursor: zoom-in;
+}
+.bili-mini-comment-picture:hover,
+.bili-mini-comment-picture:focus-visible {
+  border-color: var(--accent, #00aeec);
+}
+.bili-mini-comment-picture img {
+  display: block;
+  width: 100%;
+  max-height: 120px;
+  object-fit: contain;
+}
+
 .bili-comment-emote {
   display: inline-block;
   vertical-align: text-bottom;

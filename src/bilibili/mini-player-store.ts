@@ -16,8 +16,9 @@ export interface BiliMiniPlayerComment {
   likeCount: number;
   replyCount?: number;
   emotes?: Record<string, string>;
+  pictures: string[];
   isUp?: boolean;
-  replies?: Array<{ id: string | number; userName: string; message: string }>;
+  replies?: Array<{ id: string | number; userName: string; message: string; pictures: string[]; emotes?: Record<string, string> }>;
   subRepliesExpanded?: boolean;
   subRepliesLoading?: boolean;
   subRepliesHasMore?: boolean;
@@ -151,13 +152,15 @@ let globalZIndex = 10000;
 function notifyToast(text: string, isError = false) {
   const g = globalThis as any;
   if (typeof g.showBiliToast === "function") {
-    g.showBiliToast(text, 3200, { isError });
+    g.showBiliToast(text, 3200, { isError, target: { type: "bili-video", bvid: biliMiniPlayerState.bvid, aid: biliMiniPlayerState.aid } });
   } else if (typeof g.showWindowsToast === "function") {
     g.showWindowsToast({
       id: `bili_mini_${Date.now()}`,
       appName: "哔哩哔哩",
       icon: "assets/bilibili.svg",
       title: "B站迷你播放器",
+      appType: "bili",
+      target: { type: "bili-video", bvid: biliMiniPlayerState.bvid, aid: biliMiniPlayerState.aid },
       message: text,
       duration: 3200
     });
@@ -204,7 +207,7 @@ export const biliMiniPlayerController = {
     this.bringToFront();
 
     // 如果当前正在播放同一个视频且播放源正常，只需取消折叠并唤醒
-    const isSameVideo = biliMiniPlayerState.bvid === bvid || (Boolean(aid) && biliMiniPlayerState.aid === aid);
+    const isSameVideo = (Boolean(bvid) && biliMiniPlayerState.bvid === bvid) || (Boolean(aid) && biliMiniPlayerState.aid === aid);
     if (biliMiniPlayerState.isOpen && isSameVideo && !videoPayload.cachedSourceUrl && (biliMiniPlayerState.videoSrc || biliMiniPlayerState.iframeSrc) && !biliMiniPlayerState.errorMsg) {
       biliMiniPlayerState.collapsed = false;
       return;
@@ -568,7 +571,7 @@ export const biliMiniPlayerController = {
         biliMiniPlayerState.commentsSort
       );
 
-      const mapped: BiliMiniPlayerComment[] = (res.comments || []).map((c: any) => {
+      const mapped: BiliMiniPlayerComment[] = (res.comments || []).map((c) => {
         const cMid = c.mid ? String(c.mid) : "";
         const cUname = String(c.uname || "").trim();
         const authorMid = biliMiniPlayerState.authorMid ? String(biliMiniPlayerState.authorMid) : "";
@@ -587,11 +590,14 @@ export const biliMiniPlayerController = {
           likeCount: c.like || 0,
           replyCount: c.rcount || 0,
           emotes: c.emotes,
+          pictures: c.pictures || [],
           isUp,
-          replies: (c.replies || []).map((r: any) => ({
+          replies: (c.replies || []).map((r) => ({
             id: String(r.rpid),
             userName: r.uname,
-            message: r.message
+            message: r.message,
+            pictures: r.pictures || [],
+            emotes: r.emotes
           }))
         };
       });
@@ -651,7 +657,9 @@ export const biliMiniPlayerController = {
       const newReplies = (res.replies || []).map(r => ({
         id: String(r.rpid),
         userName: r.uname,
-        message: r.message
+        message: r.message,
+        pictures: r.pictures || [],
+        emotes: r.emotes
       }));
 
       // 合并并去重

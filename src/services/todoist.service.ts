@@ -45,6 +45,7 @@ export interface TodoistRawTask {
   content: string;
   description?: string;
   is_completed?: boolean;
+  checked?: boolean;
   due?: {
     date?: string;
     string?: string;
@@ -56,6 +57,11 @@ export interface TodoistRawTask {
   section_id?: string;
   url?: string;
   [key: string]: any;
+}
+
+/** Unified API v1 uses checked; legacy REST responses used is_completed. */
+export function isTodoistTaskCompleted(task: { checked?: unknown; is_completed?: unknown }): boolean {
+  return typeof task.checked === "boolean" ? task.checked : task.is_completed === true;
 }
 
 export interface TodoistRawProject {
@@ -571,7 +577,7 @@ export class TodoistService {
         id: String(task.id),
         content: task.content || "未命名任务",
         description: task.description || "",
-        completed: !!task.is_completed,
+        completed: isTodoistTaskCompleted(task),
         dueDate: task.due?.date || "",
         startDate: readStartDate(String(task.id), task.description || ""),
         dueText: formatDueText(task.due),
@@ -607,7 +613,7 @@ export class TodoistService {
       if (cursor) query.set("cursor", cursor);
       const response = await this.api<any>(`/tasks?${query}`, { signal });
       const results = todoistResults<TodoistRawTask>(response);
-      for (const task of results) if (task?.id && !task.is_completed) tasks.set(String(task.id), task);
+      for (const task of results) if (task?.id && !isTodoistTaskCompleted(task)) tasks.set(String(task.id), task);
       const next = String(response?.next_cursor || "");
       if (!next) return [...tasks.values()];
       if (cursors.has(next)) throw new Error("日历任务分页游标重复");
@@ -804,7 +810,7 @@ export class TodoistService {
 
   public async reopenTask(taskId: string): Promise<void> {
     await this.api(`/tasks/${encodeURIComponent(taskId)}/reopen`, { method: "POST" });
-    this.broadcastTaskChange({ type: "updated", task: { id: taskId, is_completed: false } });
+    this.broadcastTaskChange({ type: "updated", task: { id: taskId, checked: false, is_completed: false } });
   }
 
   public async updateTask(

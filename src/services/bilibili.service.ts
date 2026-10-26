@@ -134,6 +134,20 @@ export interface BiliCommentItem {
   replies?: BiliCommentItem[];
 }
 
+function parseBiliCommentPictures(pictures: unknown): string[] {
+  if (!Array.isArray(pictures)) return [];
+  return pictures.flatMap((picture) => {
+    const source = typeof picture === "string" ? picture : picture?.img_src;
+    if (typeof source !== "string" || !source.trim()) return [];
+    try {
+      const url = new URL(source.trim().replace(/^http:/i, "https:").replace(/^\/\//, "https://"));
+      return url.protocol === "https:" && !url.username && !url.password ? [url.href] : [];
+    } catch {
+      return [];
+    }
+  });
+}
+
 export interface BiliFavTreeNode {
   id: string;
   name?: string;
@@ -1432,7 +1446,8 @@ export class BilibiliService {
             avatar: String(sub.member?.avatar || "").replace(/^http:/, "https:"),
             message: String(sub.content?.message || ""),
             timeText: new Date(Number(sub.ctime || 0) * 1000).toLocaleString(),
-            like: Number(sub.like || 0)
+            like: Number(sub.like || 0),
+            pictures: parseBiliCommentPictures(sub.content?.pictures)
           }))
         : [];
       return {
@@ -1444,7 +1459,7 @@ export class BilibiliService {
         timeText: new Date(Number(r.ctime || 0) * 1000).toLocaleString(),
         like: Number(r.like || 0),
         rcount: Number(r.rcount || 0),
-        pictures: (r.content?.pictures || []).map((p: any) => String(p.img_src || "").replace(/^http:/, "https:")),
+        pictures: parseBiliCommentPictures(r.content?.pictures),
         emotes,
         replies: subReplies
       };
@@ -1491,6 +1506,7 @@ export class BilibiliService {
         message: String(r.content?.message || ""),
         timeText: new Date(Number(r.ctime || 0) * 1000).toLocaleString(),
         like: Number(r.like || 0),
+        pictures: parseBiliCommentPictures(r.content?.pictures),
         emotes
       };
     });

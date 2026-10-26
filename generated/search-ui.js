@@ -1,6 +1,6 @@
 import { d as _, b as d, C as w, G as b, y as k, o as y, e as S, f as t, t as a, m as D, i as E, D as $, H as C, F as L, s as c, O as x } from "./chunks/vendor-vue-DokqDua_.js";
-import { _ as H, i as T } from "./chunks/SearchBox.vue_vue_type_script_setup_true_lang-COsFKoJk.js";
-import { s as B } from "./chunks/search.service-Du6XfCKa.js";
+import { _ as H, i as T } from "./chunks/SearchBox.vue_vue_type_script_setup_true_lang-hp1nuTuW.js";
+import { s as B } from "./chunks/search.service-N0DgqU3Q.js";
 const I = { class: "sub-newtab-topbar" }, M = { class: "sub-newtab-center" }, N = { class: "hero-clock" }, V = { id: "greeting" }, F = {
   id: "clock",
   class: "clock"

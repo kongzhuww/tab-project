@@ -1,7 +1,9 @@
 <template>
-  <aside class="github-repository-tasks" aria-label="仓库任务创建栏">
-    <header><div><strong>创建任务</strong><small>关联当前 GitHub 仓库</small></div><button type="button" :disabled="githubTaskCreation.saving" aria-label="收起任务栏" @click="emit('close')">×</button></header>
+  <aside class="github-repository-tasks" aria-label="仓库关联任务与创建栏">
+    <header><div><strong>仓库任务</strong><small>关联当前 GitHub 仓库</small></div><button type="button" :disabled="githubTaskCreation.saving" aria-label="收起任务栏" @click="emit('close')">×</button></header>
     <div class="task-pane-content">
+      <GitHubRepositoryLinkedTasks :repository-name="repository.fullName" :disabled="githubTaskCreation.saving" @open-task="emit('openTask', $event)" />
+      <h3 class="task-create-heading">创建任务</h3>
       <div class="repository-reference"><span>◇</span><div><strong>{{ repository.fullName }}</strong><small>{{ repository.description || '创建后自动关联此仓库' }}</small></div></div>
       <p v-if="!target" class="task-guide">请先打开 Todoist，在目标分组的“更多”菜单中选择“设为 GitHub 任务区”。设置后即可在此创建。</p>
       <p v-else class="task-destination">创建到 <strong>{{ target.title }}</strong><small>Todoist 分组 · 仅本机选择</small></p>
@@ -47,6 +49,7 @@ import { attachRepository, readRepositoryLinks, type RepositoryLink } from '../t
 import { useGitHubTaskTarget, refreshGitHubTaskTarget, githubTaskCreation, type GitHubTaskTarget } from '../todoist/github-task-target';
 import TaskRepositoryLinks from '../todoist/TaskRepositoryLinks.vue';
 import TodoistDatePickerPopover from '../todoist/TodoistDatePickerPopover.vue';
+import GitHubRepositoryLinkedTasks from './GitHubRepositoryLinkedTasks.vue';
 const props = defineProps<{ repository: RepositoryLink }>();
 const emit = defineEmits<{ close: []; openTask: [taskId: string] }>();
 const target = useGitHubTaskTarget();
@@ -150,7 +153,8 @@ header small, .task-destination small { display: block; color: var(--muted); mar
 button { color: var(--text); font: inherit; cursor: pointer; border: 1px solid var(--border); background: var(--panel); border-radius: 6px; padding: 6px 9px; }
 button:disabled { opacity: .5; cursor: default; }
 header button { border: 0; background: transparent; font-size: 18px; padding: 0 3px; }
-.task-pane-content { min-height: 0; overflow: auto; padding: 13px; }
+.task-pane-content { flex: 1; min-height: 0; overflow: auto; padding: 13px; }
+.task-create-heading { margin: 0 0 10px; color: var(--heading); font-size: 12px; font-weight: 600; }
 .repository-reference { display: flex; gap: 8px; padding: 10px; background: var(--panel); border: 1px solid var(--border); border-radius: 8px; }
 .repository-reference div { min-width: 0; }
 .repository-reference strong { display: block; overflow-wrap: anywhere; color: var(--heading); }
