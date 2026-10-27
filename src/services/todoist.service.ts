@@ -9,7 +9,9 @@ import type {
   TodoistColumnItem,
   TodoistProjectOption
 } from "../todoist/task-list-store";
-import { trackTodoistWrites, withTodoistWrite } from "../todoist/module-state";
+import { trackTodoistWrites, withTodoistWrite, todoistModuleState } from "../todoist/module-state";
+import { createTodoistChangeChannel } from "../todoist/change-channel";
+import { TodoistApiError, todoistHttpError, todoistErrorText } from "../todoist/api-error";
 import { storageCache } from "./storage-cache.service";
 import { createTaskStartDateReader } from "../todoist/task-date-helper";
 
@@ -31,6 +33,8 @@ export function setDefaultSectionName(name: string): void {
 }
 
 export interface TodoistWorkspaceData {
+  /** Transient stale-cache warning, never persisted as a successful snapshot. */
+  readWarning?: string;
   columns: TodoistColumnItem[];
   projects: TodoistProjectOption[];
   activeProjectId: string;
@@ -163,6 +167,11 @@ export class TodoistService {
   private activeProjectId: string = "";
   private activeProjectName: string = "";
 
+  private readonly changeChannel = createTodoistChangeChannel(() => this.initToken(), () => {
+    this.invalidateWorkspaceSnapshots();
+    todoistModuleState.dataRevision++;
+  });
+
   private constructor() {
     this.initToken();
     this.initTimers();
@@ -247,38 +256,67 @@ export class TodoistService {
   /**
    * API v1 请求器（仅只读 404 可回退 rest/v2，写操作不重发）
    */
+  private rateLimit: { token: string; until: number } | undefined;
   public async api<T = any>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const controller = new AbortController();
     const abort = () => controller.abort(options.signal?.reason);
     if (options.signal?.aborted) abort();
     else options.signal?.addEventListener("abort", abort, { once: true });
-    const timeout = setTimeout(() => controller.abort(), 15000);
+    let timedOut = false, submitted = false;
+    const timeout = setTimeout(() => { timedOut = true; controller.abort(); }, 15000);
     try {
       controller.signal.throwIfAborted();
       if (!this.token) {
-        await this.initToken();
+        try { await this.initToken(); } catch { throw new TodoistApiError("configuration"); }
         controller.signal.throwIfAborted();
-        if (!this.token) throw new Error("请先在设置中配置 Todoist Token");
+        if (!this.token) throw new TodoistApiError("configuration");
       }
+      const requestToken = this.token;
+      if (this.rateLimit?.token === requestToken && this.rateLimit.until > Date.now())
+        throw new TodoistApiError("rate-limit", 429, this.rateLimit.until - Date.now());
       const headers = new Headers(options.headers || {});
-      headers.set("Authorization", `Bearer ${this.token}`);
+      headers.set("Authorization", `Bearer ${requestToken}`);
       if (options.body && typeof options.body === "string" && !headers.has("Content-Type"))
         headers.set("Content-Type", "application/json");
       const base = "https://api.todoist.com/api/v1";
       const url = endpoint.startsWith("http") ? endpoint : `${base}${endpoint}`;
       const target = new URL(url);
       if (target.origin !== "https://api.todoist.com" || target.username || target.password)
-        throw new Error("Todoist 请求目标无效");
+        throw new TodoistApiError("configuration");
+      const method = String(options.method || "GET").toUpperCase();
+      const writing = !["GET", "HEAD"].includes(method);
       const init = { ...options, headers, signal: controller.signal, credentials: "omit" as const, redirect: "error" as const };
+      submitted = true;
       let resp = await fetch(url, init);
-      if (resp.status === 404 && !endpoint.startsWith("http") &&
-          ["GET", "HEAD"].includes(String(options.method || "GET").toUpperCase())) {
-        const fallback = await fetch(`https://api.todoist.com/rest/v2${endpoint}`, init);
-        if (fallback.ok) resp = fallback;
+      if (resp.status === 404 && !endpoint.startsWith("http") && !writing) {
+        // Only an unsupported read endpoint may fall back; auth/rate limits never do.
+        await resp.body?.cancel();
+        resp = await fetch(`https://api.todoist.com/rest/v2${endpoint}`, init);
       }
-      if (!resp.ok) throw new Error(`Todoist API 请求失败 (${resp.status})`);
+      if (!resp.ok) {
+        const error = todoistHttpError(resp, submitted);
+        if (error.kind === "rate-limit")
+          this.rateLimit = { token: requestToken, until: Date.now() + (error.retryAfterMs || 60000) };
+        await resp.body?.cancel();
+        throw error;
+      }
+      if (writing) {
+        if (requestToken === this.token) {
+          this.invalidateWorkspaceSnapshots();
+          todoistModuleState.dataRevision++;
+        }
+        void this.changeChannel.publish(requestToken);
+      }
       if (resp.status === 204) return null as T;
-      return await resp.json();
+      try { return await resp.json(); } catch (error) {
+        if (controller.signal.aborted) throw error;
+        throw new TodoistApiError("invalid-response", resp.status, undefined, submitted);
+      }
+    } catch (error) {
+      if (error instanceof TodoistApiError) throw error;
+      if (controller.signal.aborted) throw new TodoistApiError(
+        options.signal?.aborted ? "cancelled" : timedOut ? "timeout" : "cancelled", undefined, undefined, submitted);
+      throw new TodoistApiError("network", undefined, undefined, submitted);
     } finally {
       clearTimeout(timeout);
       options.signal?.removeEventListener("abort", abort);
@@ -555,7 +593,7 @@ export class TodoistService {
       console.warn("[TodoistService] Online fetch failed, fallback to local cache:", netErr);
       if (this.workspaceCacheInvalidated) throw netErr;
       const cached = await this.getCachedWorkspaceData(view, targetProjectId);
-      if (cached) return cached;
+      if (cached) return { ...cached, readWarning: todoistErrorText(netErr) };
       throw netErr;
     }
   }
@@ -780,13 +818,15 @@ export class TodoistService {
       try {
         const res = await this.api<any>(`/tasks/filter?query=${encodeURIComponent(filter)}`, { signal });
         return todoistResults<TodoistRawTask>(res);
-      } catch {
+      } catch (error) {
         signal?.throwIfAborted();
+        if (!(error instanceof TodoistApiError) || error.kind !== "not-found") throw error;
         try {
           const res = await this.api<any>(`/tasks?filter=${encodeURIComponent(filter)}`, { signal });
           return todoistResults<TodoistRawTask>(res);
-        } catch {
+        } catch (error) {
           signal?.throwIfAborted();
+          if (!(error instanceof TodoistApiError) || error.kind !== "not-found") throw error;
           const fallback = await this.api<any>("/tasks?limit=200", { signal });
           return todoistResults<TodoistRawTask>(fallback);
         }

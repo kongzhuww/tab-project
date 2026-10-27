@@ -432,12 +432,14 @@
           <p class="hint">组件停用后，不显示也不触发对应快捷键；原绑定保留，重新启用后恢复。导航轮盘与工具轮盘同样只列出已启用组件。</p>
 
           <div class="fixed-shortcuts-card" style="margin-top: 18px;">
-            <div class="fixed-shortcuts-head">固定操作（不在上方重复配置）</div>
+            <div class="fixed-shortcuts-head">浏览器快捷键（在浏览器中修改）</div>
             <div class="fixed-shortcuts-grid">
-              <div class="fixed-row"><span class="fs-desc">关闭当前工作区 / 窗口</span><span class="fs-keys"><kbd>Alt</kbd> + <kbd>W</kbd></span></div>
-              <div class="fixed-row"><span class="fs-desc">回到新标签页</span><span class="fs-keys"><kbd>Alt</kbd> + <kbd>H</kbd></span></div>
-              <div class="fixed-row"><span class="fs-desc">取消录制 / 退出当前浮层</span><span class="fs-keys"><kbd>Esc</kbd></span></div>
+              <div class="fixed-row"><span class="fs-desc">侧边栏（浏览器右侧）</span><button type="button" class="shortcut-key-btn" @click="openBrowserShortcutSettings">{{ browserShortcutLabel('open-side-panel') }}</button></div>
+              <div class="fixed-row"><span class="fs-desc">回到新标签页</span><button type="button" class="shortcut-key-btn" @click="openBrowserShortcutSettings">{{ browserShortcutLabel('focus-newtab') }}</button></div>
             </div>
+            <p class="hint">侧边栏默认 Alt+W，回到新标签页默认 Alt+H；以上显示浏览器实际绑定。点击按键可前往浏览器修改。若未分配，请在那里手动设置。</p>
+            <button type="button" class="shortcut-key-btn" @click="refreshBrowserShortcuts">重读浏览器绑定</button>
+            <p class="hint">Esc：取消录制 / 退出当前浮层。Alt+W 不再关闭工作区或窗口。</p>
           </div>
         </section>
 
@@ -1311,8 +1313,30 @@ const shortcutGroups = computed(() => [
 ].filter(group => group.tools.length));
 const customShortcuts = ref<Record<string, string>>({});
 const recordingToolId = ref<string | null>(null);
+const browserShortcuts = ref<Record<string, string> | null>(null);
+let browserShortcutRead = 0;
+function browserShortcutLabel(id: string) {
+  return browserShortcuts.value ? (browserShortcuts.value[id] || '未分配') : '点击查看 / 修改';
+}
+async function refreshBrowserShortcuts() {
+  if (!props.active || currentTab.value !== 'shortcuts') return;
+  const version = ++browserShortcutRead;
+  try {
+    const commands = await chrome.commands.getAll();
+    if (!alive || version !== browserShortcutRead) return;
+    browserShortcuts.value = Object.fromEntries(commands.filter((item: any) => typeof item.name === 'string')
+      .map((item: any) => [item.name, typeof item.shortcut === 'string' ? item.shortcut : '']));
+  } catch { if (alive && version === browserShortcutRead) browserShortcuts.value = null; }
+}
+async function openBrowserShortcutSettings() {
+  cancelShortcutRecording();
+  const url = /Edg\//.test(navigator.userAgent) ? 'edge://extensions/shortcuts' : 'chrome://extensions/shortcuts';
+  try { await chrome.tabs.create({ url }); }
+  catch { notify(`请手动打开 ${url} 修改扩展快捷键。`, true); }
+}
 watch(() => [props.active, currentTab.value], () => {
-  if (!props.active || currentTab.value !== "shortcuts") cancelShortcutRecording();
+  if (!props.active || currentTab.value !== 'shortcuts') cancelShortcutRecording();
+  else void refreshBrowserShortcuts();
 });
 
 // 书签排除状态
@@ -1688,8 +1712,13 @@ function handleGlobalKeyDown(e: KeyboardEvent) {
   if (!isShortcutToolAvailable(recordingToolId.value)) { cancelShortcutRecording(); return; }
   const shortcut = parseShortcutEvent(e);
   if (!shortcut) return;
-  if (["Alt+W", "Alt+H", "Alt+Space", "Ctrl+K", "Meta+K", "Ctrl+W", "Meta+W"].includes(shortcut)) {
-    notify("该组合由系统固定操作使用，请选择其他按键。", true);
+  const browserBindings = browserShortcuts.value ? Object.values(browserShortcuts.value) : ['Alt+W', 'Alt+H'];
+  if (browserBindings.some(key => key.replace(/^Command\+/, 'Meta+').toLowerCase() === shortcut.toLowerCase())) {
+    notify('该组合用于浏览器快捷键，请在下方“浏览器快捷键”中修改；上方只配置页面内操作。', true);
+    return;
+  }
+  if (['Alt+Space', 'Ctrl+K', 'Meta+K', 'Ctrl+W', 'Meta+W', 'Alt+H'].includes(shortcut)) {
+    notify('该组合由浏览器或固定页面操作使用，请选择其他按键。', true);
     return;
   }
   const conflict = shortcutTools.value.find(tool => tool.id !== recordingToolId.value && effectiveShortcut(customShortcuts.value, tool).toLowerCase().replace(/^cmd\+/, "meta+") === shortcut.toLowerCase());
@@ -1919,6 +1948,8 @@ onMounted(() => {
   loadAll();
   initWebDav();
   window.addEventListener("keydown", handleGlobalKeyDown, true);
+  window.addEventListener('focus', refreshBrowserShortcuts);
+  void refreshBrowserShortcuts();
 });
 
 onUnmounted(() => {
@@ -1926,6 +1957,7 @@ onUnmounted(() => {
   stopSettingsDrag();
   alive = false;
   window.removeEventListener("keydown", handleGlobalKeyDown, true);
+  window.removeEventListener('focus', refreshBrowserShortcuts);
   if (saveTimer) clearTimeout(saveTimer);
 });
 </script>

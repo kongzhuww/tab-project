@@ -1,42 +1,13 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from "vue";
 import { searchState, searchController } from "./store";
-import { searchService, type WebSearchScope } from "../services/search.service";
+import { searchService } from "../services/search.service";
 import { gitHubService, type GitHubSearchRule } from "../services/github.service";
 
 const currentGhRule = ref<GitHubSearchRule>(gitHubService.searchRule || "exact");
-const currentWebScope = ref<WebSearchScope>(searchService.webScope || "all");
-
-const WEB_SEARCH_SCOPE_METAS = [
-  { id: "all", icon: "🌐", name: "全部", placeholder: "搜索，或输入网址直接打开", desc: "同时检索常用网站、书签与网页" },
-  { id: "bookmarks", icon: "🔖", name: "书签", placeholder: "在书签中搜索…", desc: "仅在浏览器书签中查找" },
-  { id: "launcher", icon: "⭐", name: "常用网站", placeholder: "在常用网站中搜索…", desc: "仅在首页常用网站中查找" }
-] as const;
-
-const activeWebScopeMeta = computed(() => {
-  return WEB_SEARCH_SCOPE_METAS.find((s) => s.id === currentWebScope.value) || WEB_SEARCH_SCOPE_METAS[0];
-});
-
-const isWebHistoryActive = computed(() => {
-  return (
-    searchState.mode === "web" &&
-    searchState.isSuggestionsVisible &&
-    searchState.suggestions.length > 0
-  );
-});
-
-function onToggleWebHistory(e: MouseEvent) {
-  e.preventDefault();
-  if (isWebHistoryActive.value) {
-    searchController.setSuggestionsVisible(false);
-  } else {
-    if (searchState.query) {
-      searchController.setQuery("");
-    }
-    void searchService.loadWebRecentRecommendations(true);
-  }
-}
-
+const webStatus = computed(() => !searchState.hasQuery ? "历史记录" :
+  /^\/bm[\s:]/i.test(searchState.query.trim()) ? "书签结果" :
+  /^\/sites[\s:]/i.test(searchState.query.trim()) ? "网站结果" : "全部结果");
 const GH_SEARCH_RULES = [
   { id: "exact", icon: "🎯", name: "精确", desc: "严格匹配完整关键词" },
   { id: "fuzzy", icon: "🔍", name: "模糊", desc: "多词拆解自由容错" },
@@ -207,32 +178,11 @@ onUnmounted(() => {
     @click="onInputClick"
     @keydown.enter="onSubmit"
   />
-  <button
+  <span
     v-if="searchState.mode === 'web'"
-    id="search-web-scope-btn"
-    class="search-history-btn search-web-scope-btn"
-    :class="[`scope-${activeWebScopeMeta.id}`, { active: isWebHistoryActive }]"
-    type="button"
-    title="点击查看最近的常用网站与书签历史记录"
-    aria-label="历史记录"
-    @click="onToggleWebHistory"
-  >
-    <svg
-      class="search-history-icon"
-      viewBox="0 0 24 24"
-      width="13"
-      height="13"
-      fill="none"
-      stroke="currentColor"
-      stroke-width="2"
-      stroke-linecap="round"
-      stroke-linejoin="round"
-    >
-      <circle cx="12" cy="12" r="10"></circle>
-      <polyline points="12 6 12 12 16 14"></polyline>
-    </svg>
-    <span>历史记录</span>
-  </button>
+    class="search-web-status"
+    :title="searchState.hasQuery ? '按匹配度排序；普通关键词同时匹配历史、书签和常用网站，/bm 与 /sites 可明确限定范围' : '点击搜索栏显示最近点击记录；输入后搜索全部来源'"
+  >{{ webStatus }}</span>
   <button
     v-if="searchState.mode === 'netease'"
     id="search-netease-history-btn"
@@ -357,3 +307,22 @@ onUnmounted(() => {
     </button>
   </div>
 </template>
+
+<style scoped>
+.search-web-status {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  height: 26px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 13px;
+  background: var(--panel);
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: default;
+  user-select: none;
+}
+</style>

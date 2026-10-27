@@ -107,6 +107,7 @@ export type TaskListAction =
 export type TaskListActionHandler = (action: TaskListAction, payload?: any) => void;
 
 import { todoistService } from "../services/todoist.service";
+import { todoistErrorText } from "./api-error";
 
 const actionHandlers = new Set<TaskListActionHandler>();
 let loadWorkspaceSeq = 0;
@@ -186,7 +187,7 @@ export const todoistTaskListController = {
         todoistTaskListState.moveError = false;
       }
       this.updateState({ ...copy, view: targetView, loading: false,
-        emptyText: copy.columns.length ? "" : "暂无待办任务" });
+        emptyText: copy.readWarning || (copy.columns.length ? "" : "暂无待办任务") });
       (window as any).LogicWeaverTodoistMainWorkspace?.updateState?.({
         title: targetView === "projects" ? "项目" :
           (targetView === "today" ? "今天" : "收件箱")
@@ -224,9 +225,7 @@ export const todoistTaskListController = {
     } catch (err: any) {
       if (current()) {
         this.setLoading(false);
-        if (!todoistTaskListState.columns.length) {
-          this.updateState({ emptyText: "待办读取失败，请手动刷新。" });
-        }
+        this.updateState({ emptyText: todoistErrorText(err) });
       }
     } finally {
       if (workspaceAbort === request) workspaceAbort = undefined;

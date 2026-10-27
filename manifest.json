@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "minimum_chrome_version": "120",
   "name": "tab-project 新标签页",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "tab-project 现代化浏览器新标签页与生产力工作台看板：聚合搜索、B站收藏夹、Todoist、模型价格与 GitHub。",
   "chrome_url_overrides": {
     "newtab": "newtab-bootstrap.html"
@@ -92,7 +92,7 @@
     ]
   },
   "action": {
-    "default_title": "打开 LogicWeaver 快捷工具",
+    "default_title": "打开 tab-project-next 快捷工具",
     "default_icon": {
       "16": "assets/icon-16.png",
       "32": "assets/icon-32.png",
@@ -101,12 +101,16 @@
     }
   },
   "commands": {
+    "open-side-panel": {
+      "suggested_key": { "default": "Alt+W", "mac": "Alt+W" },
+      "description": "打开浏览器右侧的插件侧边栏"
+    },
     "focus-newtab": {
       "suggested_key": {
         "default": "Alt+H",
         "mac": "Alt+H"
       },
-      "description": "立即回到 LogicWeaver 新标签页"
+      "description": "立即回到 tab-project-next 新标签页"
     }
   },
   "side_panel": {

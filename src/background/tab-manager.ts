@@ -159,7 +159,12 @@ export async function bookmarkCurrentTab(
   }
 }
 
-export function isNativeNewTab(tab: any): boolean {
+/**
+ * 检查目标标签页是否为浏览器系统自带的默认空白页（如 edge://newtab, chrome://newtab, about:blank）
+ * 架构说明：此处的“Native”历史上指代浏览器厂商自带的原厂新标签页，现已规范命名为 BrowserDefault。
+ * 本逻辑不依赖也不代表 Native Host / Native Messaging 功能仍存在。
+ */
+export function isBrowserDefaultNewTab(tab: any): boolean {
   if (!tab) return false;
   const u = tab.url || tab.pendingUrl || "";
   const title = (tab.title || "").trim();
@@ -193,7 +198,13 @@ export function isNativeNewTab(tab: any): boolean {
   return false;
 }
 
-export async function cleanupOrReplaceNativeNewTabs(): Promise<void> {
+/** 历史兼容别名（不代表 Native Host 功能仍存在） */
+export const isNativeNewTab = isBrowserDefaultNewTab;
+
+/**
+ * 清理或重定向浏览器系统自带的默认空白标签页（edge://newtab / chrome://newtab）
+ */
+export async function cleanupOrReplaceBrowserDefaultNewTabs(): Promise<void> {
   if (typeof chrome === "undefined" || !chrome.tabs?.query) return;
   try {
     const tabs = await chrome.tabs.query({});
@@ -203,7 +214,7 @@ export async function cleanupOrReplaceNativeNewTabs(): Promise<void> {
       return u.includes(myId) && u.includes("newtab.html");
     });
 
-    const strayTabs = tabs.filter(isNativeNewTab);
+    const strayTabs = tabs.filter(isBrowserDefaultNewTab);
     if (!strayTabs.length) return;
 
     // 检查用户是否开启了“仅保留一个主界面（后续标签打开大号搜索）”
@@ -245,14 +256,17 @@ export async function cleanupOrReplaceNativeNewTabs(): Promise<void> {
   } catch {}
 }
 
+/** 历史兼容别名（不代表 Native Host 功能仍存在） */
+export const cleanupOrReplaceNativeNewTabs = cleanupOrReplaceBrowserDefaultNewTabs;
+
 export function initTabWatcher(): void {
   if (typeof chrome === "undefined" || !chrome.tabs?.onCreated) return;
   chrome.tabs.onCreated.addListener(() => {
-    setTimeout(cleanupOrReplaceNativeNewTabs, 300);
+    setTimeout(cleanupOrReplaceBrowserDefaultNewTabs, 300);
   });
   chrome.tabs.onUpdated.addListener((_tabId: number, changeInfo: any) => {
     if (changeInfo.status === "complete" || changeInfo.title) {
-      setTimeout(cleanupOrReplaceNativeNewTabs, 300);
+      setTimeout(cleanupOrReplaceBrowserDefaultNewTabs, 300);
     }
   });
 }

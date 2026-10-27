@@ -96,10 +96,10 @@ function close() { void windowManagerController.close("sync"); }
         </form>
         <h3>WebDAV 备份</h3>
         <div class="actions"><button type="button" @click="request('webdav-push')">上传备份</button><button type="button" @click="request('webdav-pull')">恢复备份</button></div>
-        <h3>私有云中枢 / Native Host</h3>
-        <div class="actions"><button type="button" @click="request('cloud-push')">VPS 备份</button><button type="button" @click="request('cloud-pull')">VPS 恢复</button></div>
+        <h3>私有云中枢 / Native Host（已停用）</h3>
+        <div class="actions"><button type="button" @click="request('cloud-push')" title="Native Host 已于 v1.0.2 彻底移除，请使用 WebDAV 备份">VPS 备份（已停用）</button><button type="button" @click="request('cloud-pull')" title="Native Host 已于 v1.0.2 彻底移除，请使用 WebDAV 备份">VPS 恢复（已停用）</button></div>
       </fieldset>
-      <p>普通备份只含白名单偏好、布局、常用网站和分组等数据，不读取或导出模块存储中的账号、Token、Cookie、密码或私有服务连接配置；频道及旧 AI 整组配置也不备份。JSON 未加密，书签、备注和头像仍可能涉及隐私或用户手填秘密，不等于匿名脱敏或全部扩展数据镜像。Native Host 有 58 KB 预算。</p>
+      <p>普通备份只含白名单偏好、布局、常用网站和分组等数据，不读取或导出模块存储中的账号、Token、Cookie、密码或私有服务连接配置；频道及旧 AI 整组配置也不备份。JSON 未加密，书签、备注和头像仍可能涉及隐私或用户手填秘密，不等于匿名脱敏或全部扩展数据镜像。历史 Native Host 伴侣已在 v1.0.2 彻底停用，请使用 WebDAV 完整云端备份。</p>
       <section v-if="pending" class="confirmation" aria-label="同步操作确认">
         <p>{{ restorePending ? '恢复只覆盖白名单中的普通设置与常用网站，不是合并。旧备份中的账号、凭据、服务连接和频道/AI 整组配置将忽略，不会清空现有登录设置。请先备份当前普通数据。' : '上传普通备份会覆盖同名云端文件，不会携带模块连接配置和凭据。若该旧文件曾包含凭据，覆盖后不能从新文件找回；服务端历史版本可能仍保留。请确认目标并妥善保管旧备份。' }}</p>
         <div class="actions"><button type="button" :disabled="busy" @click="confirmOperation">{{ restorePending ? '确认恢复覆盖' : '确认上传' }}</button><button type="button" @click="pending = null">取消</button></div>

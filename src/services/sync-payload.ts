@@ -13,7 +13,7 @@ const booleanKeys = new Set([
 const arrayKeys = new Set([
   "searchIgnoredBookmarkFolders", "wereadSortIds",
   "foGroups", "launcherGroups", "quickLinks", "launcherPages",
-  "foCollapsedGroupsV1", "biliFollowingGroupsV1", "biliSubCustomChannelsV1",
+  "foCollapsedGroupsV1", "biliFollowingGroupsV1", "biliSubCustomChannelsV1", "biliRadioSeriesV1",
   "ghCats", "ghUsed"
 ]);
 const objectKeys = new Set([

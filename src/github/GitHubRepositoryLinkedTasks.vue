@@ -6,6 +6,8 @@ import { findRepositoryTaskIds } from '../todoist/repository-links';
 import { todoistModuleState, withTodoistWrite } from '../todoist/module-state';
 import { todoistTaskListController } from '../todoist/task-list-store';
 
+import { useTaskInvalidation } from '../todoist/use-task-invalidation';
+import { TodoistApiError, todoistErrorText } from '../todoist/api-error';
 const props = defineProps<{ repositoryName: string; disabled?: boolean }>();
 const emit = defineEmits<{ openTask: [taskId: string] }>();
 interface LinkedTask { id: string; task?: TodoistRawTask; error?: string }
@@ -15,7 +17,9 @@ const completingId = ref(''), completionError = ref('');
 const visibleTasks = computed(() => tasks.value.filter(entry => !entry.task || !isTodoistTaskCompleted(entry.task)));
 const reads = new ReadSessionSlot();
 let mounted = false, pagePresent = true, queued = false;
-const visible = () => mounted && pagePresent && !document.hidden;
+const pageVisible = ref(!document.hidden);
+const visible = () => mounted && pagePresent && pageVisible.value;
+useTaskInvalidation(() => pageVisible.value && !props.disabled, () => reads.cancel(), () => scheduleReload());
 
 function scheduleReload() {
   if (queued || !visible()) return;
@@ -79,8 +83,7 @@ async function reload() {
           tasks.value[index] = { id, task };
         } catch (error) {
           if (!session.current()) return;
-          const denied = error instanceof Error && /\((401|403)\)/.test(error.message);
-          tasks.value[index] = { id, error: denied ? '账号或权限不可用，请检查 Todoist 配置。' : '暂无法读取此任务，请刷新或在 Todoist 中核对。' };
+          tasks.value[index] = { id, error: todoistErrorText(error) };
         }
       }
     };
@@ -117,10 +120,11 @@ async function completeTask(entry: LinkedTask) {
       }, true);
     });
     if (todoistModuleState.active) void todoistTaskListController.loadWorkspace(undefined, undefined, true);
-  } catch {
+  } catch (error) {
+    if (error instanceof TodoistApiError && !error.submitted) sent = false;
     if (mounted && props.repositoryName === repositoryName) completionError.value = confirmed
       ? '任务已完成，但本地显示更新失败，请刷新核对。'
-      : sent ? '完成结果未确认，请刷新核对；未自动重试。' : '页面或账号状态已变化，尚未提交完成操作。';
+      : sent ? '完成结果未确认，请刷新核对；未自动重试。' : error instanceof TodoistApiError ? todoistErrorText(error) + ' 尚未提交完成操作。' : '页面或账号状态已变化，尚未提交完成操作。';
   } finally {
     completingId.value = '';
     scheduleReload();
@@ -132,6 +136,7 @@ function associationChanged(event: Event) {
   scheduleReload();
 }
 function visibilityChanged() {
+  pageVisible.value = !document.hidden;
   if (visible()) scheduleReload();
   else reads.cancel();
 }

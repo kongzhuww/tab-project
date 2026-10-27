@@ -5,7 +5,7 @@
  * 2. 自定义工具全局快捷键管理；
  * 3. 搜索排除书签文件夹管理与收集；
  * 5. Limbus 沉浸歌词样式参数模型与预设；
- * 6. Native Messaging 通信与 Git 版本热更新；
+ * 6. 历史 Native Messaging 存根（已停用，Native Host 权限已自 Manifest 移除）；
  * 7. 多端私有云配置安全同步与白名单校验。
  */
 
@@ -263,7 +263,8 @@ export class OptionsService {
   }
 
   /**
-   * 调用 Native Messaging 桥接服务
+   * 历史兼容存根：Native Host 已在 v1.0.2 彻底移除。
+   * 此方法仅保留为类型安全存根，不再发起任何底层原生进程连接。
    */
   public async callNativeHost(payload: NativeRequest): Promise<GitCheckReply> {
     if (payload.command !== "git-check-update" && payload.command !== "git-apply-update") {

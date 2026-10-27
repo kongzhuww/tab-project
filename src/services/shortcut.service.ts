@@ -167,12 +167,6 @@ export class ShortcutService {
       "keydown",
       (event: KeyboardEvent) => {
         if (shortcutCaptureState.active || event.defaultPrevented || event.isComposing || event.repeat) return;
-        if (fullscreenCardsController.activeId && event.altKey && event.key.toLowerCase() === "w") {
-          event.preventDefault();
-          event.stopPropagation();
-          fullscreenCardsController.exit();
-          return;
-        }
         // 如果正在输入文字且未按功能组合键（Alt/Ctrl/Meta），不拦截日常打字（例如输入 "/"）
         const inInput =
           event.target &&

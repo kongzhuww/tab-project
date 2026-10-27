@@ -27,7 +27,7 @@ export const LEGACY_AVATAR_KEY = "customAvatar";
 export const SYNC_WHITELIST_KEYS: readonly string[] = [
   ...BASE_KEYS, SHORTCUT_KEY, SEARCH_IGNORED_BOOKMARK_FOLDERS_KEY, LIMBUS_CONFIG_KEY,
   "wereadSortIds", "foGroups",
-  "foTree", "foCollapsedGroupsV1", "biliFollowingGroupsV1", "biliSubCustomChannelsV1",
+  "foTree", "foCollapsedGroupsV1", "biliFollowingGroupsV1", "biliSubCustomChannelsV1", "biliRadioSeriesV1",
   "ghCats", "ghMap", "ghUsed", "ghRepoRemarksV1",
   "ghUser", "ghToken", "todoistToken", "todoistActiveProjectIdV1", "lw_private_chat_v1", "googleCalendarSessionTokenV1", "lw_webdav_config",
   "launcherGroups", "launcherFolders", "quickLinks", "quickLinkGroupSizes",
@@ -67,10 +67,10 @@ export async function readSyncSettings(): Promise<Record<string, unknown>> {
     });
     // Include localStorage items (e.g. private chat config) if not present in chrome.storage.local
     if (typeof localStorage !== "undefined") {
-      const extraKeys = ["lw_private_chat_v1", "ghUser", "ghToken", "todoistToken", "googleCalendarSessionTokenV1", "lw_webdav_config"];
+      const extraKeys = ["lw_private_chat_v1", "ghUser", "ghToken", "todoistToken", "googleCalendarSessionTokenV1", "lw_webdav_config", "biliRadioSeriesV1"];
       for (const k of extraKeys) {
         if (data[k] === undefined) {
-          const val = localStorage.getItem(k);
+          const val = localStorage.getItem(k) ?? (k === "biliRadioSeriesV1" ? localStorage.getItem("lw_backup_bili_radio_series") : null);
           if (val !== null) {
             try { data[k] = JSON.parse(val); } catch { data[k] = val; }
           }
@@ -154,6 +154,18 @@ export async function restoreSyncBackup(data: unknown) {
         : "恢复失败且部分数据无法回滚，请勿继续编辑，先检查本地存储与备份");
     }
   }
+  if (typeof localStorage !== "undefined" && Object.hasOwn(settings, "biliRadioSeriesV1")) {
+    try {
+      const json = JSON.stringify(settings.biliRadioSeriesV1);
+      localStorage.setItem("biliRadioSeriesV1", json);
+      localStorage.setItem("lw_backup_bili_radio_series", json);
+    } catch {}
+  }
+  if (typeof window !== "undefined") {
+    try {
+      window.dispatchEvent(new CustomEvent("logicweaver:sync-restored", { detail: settings }));
+    } catch {}
+  }
   return { restoredCount: parsed.count, clientDevice: parsed.clientDevice };
 }
 
@@ -179,6 +191,7 @@ export class SyncService {
     return SyncService.instance;
   }
 
+  /** 历史兼容存根：Native Host 已在 v1.0.2 彻底移除，调用立即以错误拒绝 */
   public async callNativeHost(message: NativeRequest): Promise<NativeReply> {
     if (message.command !== "logicweaver-sync-get" && message.command !== "logicweaver-sync-put") {
       return { ok: false, error: "同步服务不允许此原生命令；未发送请求" };

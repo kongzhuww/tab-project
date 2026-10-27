@@ -4,7 +4,10 @@
  * 统一调度：
  * - Bilibili DeclarativeNetRequest 防盗链动态网络规则
  * - 图片搜索与跨域防盗链提取代理
- * - 标签页智能生命周期、单例去重与原生空标签页自动清除
+ * - 标签页智能生命周期、单例去重与浏览器默认空白页（edge://newtab）自动接管
+ *
+ * 架构声明：
+ * - 本扩展为纯前端 Chromium Manifest V3 架构，已彻底移除 Native Messaging、Native Host 及伴侣进程。
  */
 
 import { initBilibiliNetRules, syncYouTubeNetRules, removeLegacyGlobalNetRule } from "./dnr";
@@ -16,11 +19,12 @@ import {
 import {
   dedupeLogicWeaverNewTab,
   bookmarkCurrentTab,
-  cleanupOrReplaceNativeNewTabs,
+  cleanupOrReplaceBrowserDefaultNewTabs,
   initTabWatcher,
   openOrFocusNewTab
 } from "./tab-manager";
 import { handleSearchWebImages, handleFetchSiteImages } from "./image-proxy";
+import { acquireImageSlot, fetchImageBytes, mediaUrl, MAX_IMAGE_BYTES, MAX_IMAGE_PIXELS, validateImagePixels } from "./media-fetch";
 
 declare const chrome: any;
 
@@ -36,9 +40,19 @@ initContextMenu();
 
 // 监听扩展全局快捷键（例如 Alt+H 回到新标签页）
 if (typeof chrome !== "undefined" && chrome.commands?.onCommand) {
-  chrome.commands.onCommand.addListener((command: string) => {
-    if (command === "focus-newtab") {
-      void openOrFocusNewTab();
+  chrome.commands.onCommand.addListener((command: string, tab?: { windowId?: number }) => {
+    if (command === "focus-newtab") void openOrFocusNewTab();
+    if (command === "open-side-panel") {
+      const failed = () => { void flashBadge("ERR", "#ef4444"); console.warn("[SidePanel] Could not open panel from keyboard command."); };
+      // Call directly in the command gesture when the browser supplies the active tab.
+      if (Number.isInteger(tab?.windowId) && tab!.windowId! >= 0) {
+        chrome.sidePanel.open({ windowId: tab!.windowId }).catch(failed);
+      } else {
+        chrome.windows.getLastFocused().then((win: { id?: number }) => {
+          if (!Number.isInteger(win.id)) throw new Error("No active browser window");
+          return chrome.sidePanel.open({ windowId: win.id });
+        }).catch(failed);
+      }
     }
   });
 }
@@ -109,118 +123,51 @@ function detectImageFormatByMagic(bytes: Uint8Array): { ext: string; isAvif: boo
   if (headerStr.includes("ftypavif") || headerStr.includes("ftypavis")) {
     return { ext: "avif", isAvif: true };
   }
-  return { ext: "png", isAvif: false };
+  throw new Error("不支持的图片格式");
 }
 
 async function convertAvifToPngDataUrl(buffer: ArrayBuffer): Promise<string> {
+  const bitmap = await createImageBitmap(new Blob([buffer], { type: "image/avif" }));
   try {
-    const blob = new Blob([buffer], { type: "image/avif" });
-    const bitmap = await createImageBitmap(blob);
+    if (bitmap.width * bitmap.height > MAX_IMAGE_PIXELS || bitmap.width > 16384 || bitmap.height > 16384)
+      throw new Error("图片尺寸过大");
     const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
     const ctx = canvas.getContext("2d");
-    if (ctx) {
-      ctx.drawImage(bitmap, 0, 0);
-      bitmap.close();
-      const pngBlob = await canvas.convertToBlob({ type: "image/png" });
-      const pngBuffer = await pngBlob.arrayBuffer();
-      return `data:image/png;base64,${bufferToBase64(pngBuffer)}`;
-    }
-  } catch (_) {}
-  return `data:image/png;base64,${bufferToBase64(buffer)}`;
+    if (!ctx) throw new Error("图片转换不可用");
+    ctx.drawImage(bitmap, 0, 0);
+    const pngBlob = await canvas.convertToBlob({ type: "image/png" });
+    if (pngBlob.size > MAX_IMAGE_BYTES) throw new Error("转换后的图片超过 12 MiB 限制");
+    return `data:image/png;base64,${bufferToBase64(await pngBlob.arrayBuffer())}`;
+  } finally { bitmap.close(); }
 }
 
 async function saveImageToFavoritesFolder(param: { url?: string; dataUrl?: string }): Promise<{ ok: boolean; fileName?: string; error?: string }> {
+  let release: (() => void) | undefined;
   try {
-    let finalDataUrl = param.dataUrl;
-    let ext = "png";
-    const stamp = new Date().toISOString().replace(/[-:TZ.]/g, "").slice(0, 14);
-    const randomSuffix = crypto.randomUUID().slice(0, 6);
-
-    if (!finalDataUrl && param.url) {
-      const cleanUrl = cleanBiliImageUrl(param.url);
-      try {
-        const headers: Record<string, string> = {
-          "Accept": "image/gif,image/png,image/jpeg,image/webp,*/*;q=0.8"
-        };
-        if (cleanUrl.includes("hdslb.com") || cleanUrl.includes("bilibili.com")) {
-          headers["Referer"] = "https://www.bilibili.com/";
-        } else if (cleanUrl.includes("qq.com") || cleanUrl.includes("qpic.cn")) {
-          headers["Referer"] = "https://im.qq.com/";
-        }
-
-        const resp = await fetch(cleanUrl, {
-          headers,
-          referrerPolicy: "no-referrer"
-        });
-        if (resp.ok) {
-          const buffer = await resp.arrayBuffer();
-          const bytes = new Uint8Array(buffer);
-          const magic = detectImageFormatByMagic(bytes);
-
-          if (magic.isAvif) {
-            finalDataUrl = await convertAvifToPngDataUrl(buffer);
-            ext = "png";
-          } else {
-            ext = magic.ext;
-            const mime = magic.ext === "gif" ? "image/gif" : magic.ext === "jpg" ? "image/jpeg" : magic.ext === "webp" ? "image/webp" : "image/png";
-            finalDataUrl = `data:${mime};base64,${bufferToBase64(buffer)}`;
-          }
-        }
-      } catch (fetchErr) {
-        console.warn("[saveImageToFavoritesFolder] Fetch 预解析失败，回退到原生下载引擎:", fetchErr);
-      }
-
-      // 如果 Fetch 失败（如跨域或严格防盗链），直接通过原生 chrome.downloads.download 兜底
-      if (!finalDataUrl) {
-        const extMatch = cleanUrl.match(/\.(png|jpe?g|gif|webp|bmp)/i);
-        const fileExt = extMatch ? extMatch[1].toLowerCase() : "jpg";
-        const fileName = `${stamp}-${randomSuffix}.${fileExt}`;
-
-        await chrome.downloads.download({
-          url: cleanUrl,
-          filename: `新标签页/收藏夹/${fileName}`,
-          saveAs: false,
-          conflictAction: "uniquify"
-        });
-
-        flashBadge("OK", "#10b981");
-        return { ok: true, fileName };
-      }
-    } else if (finalDataUrl) {
-      // 提取 base64 前 32 字节检测真实格式
-      const base64Part = finalDataUrl.split(",")[1] || "";
-      const rawHeader = atob(base64Part.slice(0, 48));
-      const bytes = new Uint8Array(rawHeader.length);
-      for (let i = 0; i < rawHeader.length; i++) bytes[i] = rawHeader.charCodeAt(i);
-      const magic = detectImageFormatByMagic(bytes);
-      if (magic.isAvif) {
-        const binStr = atob(base64Part);
-        const buf = new Uint8Array(binStr.length);
-        for (let i = 0; i < binStr.length; i++) buf[i] = binStr.charCodeAt(i);
-        finalDataUrl = await convertAvifToPngDataUrl(buf.buffer);
-        ext = "png";
-      } else {
-        ext = magic.ext;
-      }
-    }
-
-    if (!finalDataUrl) throw new Error("未能获取图片有效数据");
-
-    const fileName = `${stamp}-${randomSuffix}.${ext}`;
-
-    await chrome.downloads.download({
-      url: finalDataUrl,
-      filename: `新标签页/收藏夹/${fileName}`,
-      saveAs: false,
-      conflictAction: "uniquify"
-    });
-
-    flashBadge("OK", "#10b981");
+    release = acquireImageSlot();
+    let buffer: ArrayBuffer;
+    if (param.dataUrl) {
+      if (param.dataUrl.length > Math.ceil(MAX_IMAGE_BYTES / 3) * 4 + 128 ||
+          !/^data:image\/(?:png|jpeg|gif|webp|avif);base64,/i.test(param.dataUrl)) throw new Error("图片格式无效或超过 12 MiB 限制");
+      const raw = atob(param.dataUrl.slice(param.dataUrl.indexOf(",") + 1));
+      if (raw.length > MAX_IMAGE_BYTES) throw new Error("图片超过 12 MiB 限制");
+      buffer = Uint8Array.from(raw, char => char.charCodeAt(0)).buffer;
+    } else if (param.url) {
+      buffer = await fetchImageBytes(cleanBiliImageUrl(param.url));
+    } else throw new Error("图片地址为空");
+    const magic = detectImageFormatByMagic(new Uint8Array(buffer));
+    const mime = magic.ext === "jpg" ? "image/jpeg" : "image/" + magic.ext;
+    await validateImagePixels(buffer, mime);
+    const dataUrl = magic.isAvif ? await convertAvifToPngDataUrl(buffer) : `data:${mime};base64,${bufferToBase64(buffer)}`;
+    const ext = magic.isAvif ? "png" : magic.ext;
+    const fileName = `${new Date().toISOString().replace(/[-:TZ.]/g, "").slice(0, 14)}-${crypto.randomUUID().slice(0, 6)}.${ext}`;
+    await chrome.downloads.download({ url: dataUrl, filename: `新标签页/收藏夹/${fileName}`, saveAs: false, conflictAction: "uniquify" });
+    flashBadge("DL", "#10b981");
     return { ok: true, fileName };
-  } catch (err: any) {
+  } catch (error) {
     flashBadge("ERR", "#ef4444");
-    return { ok: false, error: err?.message || "写入文件失败" };
-  }
+    return { ok: false, error: error instanceof Error ? error.message : "图片下载未创建" };
+  } finally { release?.(); }
 }
 
 (globalThis as any).saveImageToFavoritesFolder = saveImageToFavoritesFolder;
@@ -269,27 +216,11 @@ chrome.runtime.onMessage.addListener((message: any, sender: any, sendResponse: (
         // Bilibili rules cover the fetch fallback; abort if legacy rule cleanup fails.
         await removeLegacyGlobalNetRule();
 
-        let downloadId: number | null = null;
-        try {
-          downloadId = await chrome.downloads.download({
-            url,
-            filename: fileName,
-            saveAs: false,
-            conflictAction: "uniquify"
-          });
-        } catch (downloadErr: any) {
-          // 若底层直链下载异常，采用 Service Worker fetch 流式拉取（受扩展白名单与 DNR 保护）
-          const resp = await fetch(url, { referrerPolicy: "no-referrer" });
-          if (!resp.ok) throw new Error(`视频流下载响应码 ${resp.status}`);
-          const buffer = await resp.arrayBuffer();
-          const base64 = bufferToBase64(buffer);
-          downloadId = await chrome.downloads.download({
-            url: `data:video/mp4;base64,${base64}`,
-            filename: fileName,
-            saveAs: false,
-            conflictAction: "uniquify"
-          });
-        }
+        const downloadUrl = mediaUrl(url);
+        const downloadId = await chrome.downloads.download({
+          url: downloadUrl, filename: fileName, saveAs: false, conflictAction: "uniquify"
+        });
+        // Accepted by the download manager, not completion. Never buffer videos in this worker.
 
         flashBadge("DL", "#10b981");
         return { ok: true, downloadId };
@@ -336,9 +267,10 @@ chrome.runtime.onMessage.addListener((message: any, sender: any, sendResponse: (
     return handleFetchSiteImages(message, sendResponse);
   }
 
-  // J. 清理重启扩展时残留的原生新建标签页
-  if (message?.type === "cleanupNativeTabs") {
-    cleanupOrReplaceNativeNewTabs().then(() => sendResponse({ ok: true }));
+  // J. 清理重启扩展时残留的浏览器默认空白标签页（如 edge://newtab / chrome://newtab）
+  // 历史兼容命名 cleanupNativeTabs 指的是浏览器厂商自带的默认空白标签页，不代表当前 Native Host 功能仍存在
+  if (message?.type === "cleanupNativeTabs" || message?.type === "cleanupBrowserDefaultTabs") {
+    cleanupOrReplaceBrowserDefaultNewTabs().then(() => sendResponse({ ok: true }));
     return true;
   }
 
@@ -350,41 +282,18 @@ chrome.runtime.onMessage.addListener((message: any, sender: any, sendResponse: (
       return false;
     }
     (async () => {
-      const candidates = [rawUrl];
-      if (rawUrl.startsWith("https://")) {
-        candidates.push(rawUrl.replace(/^https:\/\//i, "http://"));
-      } else if (rawUrl.startsWith("http://")) {
-        candidates.push(rawUrl.replace(/^http:\/\//i, "https://"));
-      }
-
-      for (const curUrl of candidates) {
-        try {
-          const cleanUrl = cleanBiliImageUrl(curUrl);
-          const resp = await fetch(cleanUrl, {
-            referrerPolicy: "no-referrer"
-          });
-          if (!resp.ok) continue;
-          const buffer = await resp.arrayBuffer();
-          const bytes = new Uint8Array(buffer);
-          const magic = detectImageFormatByMagic(bytes);
-
-          let finalDataUrl = "";
-          let isPng = false;
-          if (magic.isAvif) {
-            finalDataUrl = await convertAvifToPngDataUrl(buffer);
-            isPng = true;
-          } else {
-            isPng = magic.ext === "png";
-            const mime = magic.ext === "gif" ? "image/gif" : magic.ext === "jpg" ? "image/jpeg" : magic.ext === "webp" ? "image/webp" : "image/png";
-            finalDataUrl = `data:${mime};base64,${bufferToBase64(buffer)}`;
-          }
-          sendResponse({ ok: true, dataUrl: finalDataUrl, isPng });
-          return;
-        } catch {
-          // 当前候选地址拉取失败，尝试下一候选
-        }
-      }
-      sendResponse({ ok: false, error: "图片拉取失败" });
+      let release: (() => void) | undefined;
+      try {
+        release = acquireImageSlot();
+        const buffer = await fetchImageBytes(cleanBiliImageUrl(rawUrl));
+        const magic = detectImageFormatByMagic(new Uint8Array(buffer));
+        const mime = magic.ext === "jpg" ? "image/jpeg" : "image/" + magic.ext;
+        await validateImagePixels(buffer, mime);
+        const dataUrl = magic.isAvif ? await convertAvifToPngDataUrl(buffer) : `data:${mime};base64,${bufferToBase64(buffer)}`;
+        sendResponse({ ok: true, dataUrl, isPng: magic.isAvif || magic.ext === "png" });
+      } catch (error) {
+        sendResponse({ ok: false, error: error instanceof Error ? error.message : "图片读取失败" });
+      } finally { release?.(); }
     })();
     return true;
   }
@@ -529,14 +438,14 @@ chrome.runtime.onInstalled?.addListener?.(() => {
   enableStickerSidePanel();
   initBilibiliNetRules();
   syncYouTubeNetRules();
-  setTimeout(cleanupOrReplaceNativeNewTabs, 200);
-  setTimeout(cleanupOrReplaceNativeNewTabs, 1000);
+  setTimeout(cleanupOrReplaceBrowserDefaultNewTabs, 200);
+  setTimeout(cleanupOrReplaceBrowserDefaultNewTabs, 1000);
 });
 
 chrome.runtime.onStartup?.addListener?.(() => {
   enableStickerSidePanel();
   initBilibiliNetRules();
   syncYouTubeNetRules();
-  setTimeout(cleanupOrReplaceNativeNewTabs, 200);
-  setTimeout(cleanupOrReplaceNativeNewTabs, 1000);
+  setTimeout(cleanupOrReplaceBrowserDefaultNewTabs, 200);
+  setTimeout(cleanupOrReplaceBrowserDefaultNewTabs, 1000);
 });

@@ -1,6 +1,6 @@
 import { reactive } from "vue";
 
-export const todoistModuleState = reactive({ visible: false, active: false, pendingWrites: 0, session: 0 });
+export const todoistModuleState = reactive({ visible: false, active: false, pendingWrites: 0, session: 0, dataRevision: 0 });
 const pausers = new Set<() => void>();
 export function onTodoistPause(pause: () => void): () => void {
   pausers.add(pause); return () => { pausers.delete(pause); };

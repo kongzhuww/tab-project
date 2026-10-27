@@ -430,7 +430,7 @@ async function bookmarkCurrentTab(tab, targetPage = "\u5E38\u7528\u7F51\u7AD9") 
     return { ok: false, error: error?.message || "\u6536\u85CF\u5931\u8D25" };
   }
 }
-function isNativeNewTab(tab) {
+function isBrowserDefaultNewTab(tab) {
   if (!tab) return false;
   const u = tab.url || tab.pendingUrl || "";
   const title = (tab.title || "").trim();
@@ -444,7 +444,7 @@ function isNativeNewTab(tab) {
   }
   return false;
 }
-async function cleanupOrReplaceNativeNewTabs() {
+async function cleanupOrReplaceBrowserDefaultNewTabs() {
   if (typeof chrome === "undefined" || !chrome.tabs?.query) return;
   try {
     const tabs = await chrome.tabs.query({});
@@ -453,7 +453,7 @@ async function cleanupOrReplaceNativeNewTabs() {
       const u = t.url || t.pendingUrl || "";
       return u.includes(myId) && u.includes("newtab.html");
     });
-    const strayTabs = tabs.filter(isNativeNewTab);
+    const strayTabs = tabs.filter(isBrowserDefaultNewTab);
     if (!strayTabs.length) return;
     let singleNewTab = false;
     try {
@@ -496,11 +496,11 @@ async function cleanupOrReplaceNativeNewTabs() {
 function initTabWatcher() {
   if (typeof chrome === "undefined" || !chrome.tabs?.onCreated) return;
   chrome.tabs.onCreated.addListener(() => {
-    setTimeout(cleanupOrReplaceNativeNewTabs, 300);
+    setTimeout(cleanupOrReplaceBrowserDefaultNewTabs, 300);
   });
   chrome.tabs.onUpdated.addListener((_tabId, changeInfo) => {
     if (changeInfo.status === "complete" || changeInfo.title) {
-      setTimeout(cleanupOrReplaceNativeNewTabs, 300);
+      setTimeout(cleanupOrReplaceBrowserDefaultNewTabs, 300);
     }
   });
 }
@@ -642,6 +642,88 @@ function handleFetchSiteImages(message, sendResponse) {
   return true;
 }
 
+// src/background/media-fetch.ts
+var MAX_IMAGE_BYTES = 12 * 1024 * 1024;
+var MAX_IMAGE_PIXELS = 24 * 1024 * 1024;
+var imageJobs = 0;
+function acquireImageSlot() {
+  if (imageJobs >= 2) throw new Error("\u56FE\u7247\u5904\u7406\u7E41\u5FD9\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5");
+  imageJobs++;
+  return () => {
+    imageJobs--;
+  };
+}
+function mediaUrl(value) {
+  if (typeof value !== "string" || value.length > 8192) throw new Error("\u8D44\u6E90\u5730\u5740\u65E0\u6548");
+  const url = new URL(value);
+  if (!["https:", "http:"].includes(url.protocol) || url.username || url.password) throw new Error("\u8D44\u6E90\u5730\u5740\u65E0\u6548");
+  return url.href;
+}
+async function fetchImageBytes(value, headers) {
+  const url = mediaUrl(value);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 15e3);
+  let reader;
+  try {
+    const response = await fetch(url, { headers, signal: controller.signal, credentials: "omit", redirect: "error", referrerPolicy: "no-referrer" });
+    if (!response.ok) throw new Error(`\u56FE\u7247\u8BFB\u53D6\u5931\u8D25\uFF08HTTP ${response.status}\uFF09`);
+    if (Number(response.headers.get("content-length")) > MAX_IMAGE_BYTES) throw new Error("\u56FE\u7247\u8D85\u8FC7 12 MiB \u9650\u5236");
+    if (!response.body) throw new Error("\u56FE\u7247\u54CD\u5E94\u4E3A\u7A7A");
+    reader = response.body.getReader();
+    const chunks = [];
+    let size = 0;
+    while (true) {
+      const part = await reader.read();
+      if (part.done) break;
+      size += part.value.byteLength;
+      if (size > MAX_IMAGE_BYTES) throw new Error("\u56FE\u7247\u8D85\u8FC7 12 MiB \u9650\u5236");
+      chunks.push(part.value);
+    }
+    if (!size) throw new Error("\u56FE\u7247\u54CD\u5E94\u4E3A\u7A7A");
+    const bytes = new Uint8Array(size);
+    let offset = 0;
+    for (const chunk of chunks) {
+      bytes.set(chunk, offset);
+      offset += chunk.byteLength;
+    }
+    return bytes.buffer;
+  } catch (error) {
+    if (controller.signal.aborted) throw new Error("\u56FE\u7247\u8BFB\u53D6\u8D85\u65F6\uFF0C\u8BF7\u624B\u52A8\u91CD\u8BD5");
+    if (error instanceof TypeError) throw new Error("\u56FE\u7247\u7F51\u7EDC\u8BF7\u6C42\u5931\u8D25\u6216\u53D1\u751F\u91CD\u5B9A\u5411\uFF0C\u672A\u964D\u7EA7\u4E3A HTTP");
+    throw error;
+  } finally {
+    controller.abort();
+    if (reader) {
+      try {
+        await reader.cancel();
+      } catch {
+      }
+      reader.releaseLock();
+    }
+    clearTimeout(timer);
+  }
+}
+async function validateImagePixels(buffer, mime) {
+  const view = new DataView(buffer);
+  let width = 0, height = 0;
+  if (mime === "image/png" && buffer.byteLength >= 24) {
+    width = view.getUint32(16);
+    height = view.getUint32(20);
+  }
+  if (mime === "image/gif" && buffer.byteLength >= 10) {
+    width = view.getUint16(6, true);
+    height = view.getUint16(8, true);
+  }
+  if (width * height > MAX_IMAGE_PIXELS || width > 16384 || height > 16384) throw new Error("\u56FE\u7247\u5C3A\u5BF8\u8FC7\u5927");
+  const bitmap = await createImageBitmap(new Blob([buffer], { type: mime }));
+  try {
+    if (!bitmap.width || !bitmap.height || bitmap.width * bitmap.height > MAX_IMAGE_PIXELS || bitmap.width > 16384 || bitmap.height > 16384)
+      throw new Error("\u56FE\u7247\u5C3A\u5BF8\u8FC7\u5927\uFF08\u6700\u591A 24M \u50CF\u7D20\uFF0C\u5355\u8FB9\u4E0D\u8D85\u8FC7 16384\uFF09");
+  } finally {
+    bitmap.close();
+  }
+}
+
 // src/background/index.ts
 initBilibiliNetRules();
 initNotificationListeners();
@@ -651,9 +733,21 @@ for (const name of ["gmail-inbox-poll", "x-account-poll"]) {
 initTabWatcher();
 initContextMenu();
 if (typeof chrome !== "undefined" && chrome.commands?.onCommand) {
-  chrome.commands.onCommand.addListener((command) => {
-    if (command === "focus-newtab") {
-      void openOrFocusNewTab();
+  chrome.commands.onCommand.addListener((command, tab) => {
+    if (command === "focus-newtab") void openOrFocusNewTab();
+    if (command === "open-side-panel") {
+      const failed = () => {
+        void flashBadge("ERR", "#ef4444");
+        console.warn("[SidePanel] Could not open panel from keyboard command.");
+      };
+      if (Number.isInteger(tab?.windowId) && tab.windowId >= 0) {
+        chrome.sidePanel.open({ windowId: tab.windowId }).catch(failed);
+      } else {
+        chrome.windows.getLastFocused().then((win) => {
+          if (!Number.isInteger(win.id)) throw new Error("No active browser window");
+          return chrome.sidePanel.open({ windowId: win.id });
+        }).catch(failed);
+      }
     }
   });
 }
@@ -700,104 +794,51 @@ function detectImageFormatByMagic(bytes) {
   if (headerStr.includes("ftypavif") || headerStr.includes("ftypavis")) {
     return { ext: "avif", isAvif: true };
   }
-  return { ext: "png", isAvif: false };
+  throw new Error("\u4E0D\u652F\u6301\u7684\u56FE\u7247\u683C\u5F0F");
 }
 async function convertAvifToPngDataUrl(buffer) {
+  const bitmap = await createImageBitmap(new Blob([buffer], { type: "image/avif" }));
   try {
-    const blob = new Blob([buffer], { type: "image/avif" });
-    const bitmap = await createImageBitmap(blob);
+    if (bitmap.width * bitmap.height > MAX_IMAGE_PIXELS || bitmap.width > 16384 || bitmap.height > 16384)
+      throw new Error("\u56FE\u7247\u5C3A\u5BF8\u8FC7\u5927");
     const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
     const ctx = canvas.getContext("2d");
-    if (ctx) {
-      ctx.drawImage(bitmap, 0, 0);
-      bitmap.close();
-      const pngBlob = await canvas.convertToBlob({ type: "image/png" });
-      const pngBuffer = await pngBlob.arrayBuffer();
-      return `data:image/png;base64,${bufferToBase64(pngBuffer)}`;
-    }
-  } catch (_) {
+    if (!ctx) throw new Error("\u56FE\u7247\u8F6C\u6362\u4E0D\u53EF\u7528");
+    ctx.drawImage(bitmap, 0, 0);
+    const pngBlob = await canvas.convertToBlob({ type: "image/png" });
+    if (pngBlob.size > MAX_IMAGE_BYTES) throw new Error("\u8F6C\u6362\u540E\u7684\u56FE\u7247\u8D85\u8FC7 12 MiB \u9650\u5236");
+    return `data:image/png;base64,${bufferToBase64(await pngBlob.arrayBuffer())}`;
+  } finally {
+    bitmap.close();
   }
-  return `data:image/png;base64,${bufferToBase64(buffer)}`;
 }
 async function saveImageToFavoritesFolder(param) {
+  let release;
   try {
-    let finalDataUrl = param.dataUrl;
-    let ext = "png";
-    const stamp = (/* @__PURE__ */ new Date()).toISOString().replace(/[-:TZ.]/g, "").slice(0, 14);
-    const randomSuffix = crypto.randomUUID().slice(0, 6);
-    if (!finalDataUrl && param.url) {
-      const cleanUrl = cleanBiliImageUrl(param.url);
-      try {
-        const headers = {
-          "Accept": "image/gif,image/png,image/jpeg,image/webp,*/*;q=0.8"
-        };
-        if (cleanUrl.includes("hdslb.com") || cleanUrl.includes("bilibili.com")) {
-          headers["Referer"] = "https://www.bilibili.com/";
-        } else if (cleanUrl.includes("qq.com") || cleanUrl.includes("qpic.cn")) {
-          headers["Referer"] = "https://im.qq.com/";
-        }
-        const resp = await fetch(cleanUrl, {
-          headers,
-          referrerPolicy: "no-referrer"
-        });
-        if (resp.ok) {
-          const buffer = await resp.arrayBuffer();
-          const bytes = new Uint8Array(buffer);
-          const magic = detectImageFormatByMagic(bytes);
-          if (magic.isAvif) {
-            finalDataUrl = await convertAvifToPngDataUrl(buffer);
-            ext = "png";
-          } else {
-            ext = magic.ext;
-            const mime = magic.ext === "gif" ? "image/gif" : magic.ext === "jpg" ? "image/jpeg" : magic.ext === "webp" ? "image/webp" : "image/png";
-            finalDataUrl = `data:${mime};base64,${bufferToBase64(buffer)}`;
-          }
-        }
-      } catch (fetchErr) {
-        console.warn("[saveImageToFavoritesFolder] Fetch \u9884\u89E3\u6790\u5931\u8D25\uFF0C\u56DE\u9000\u5230\u539F\u751F\u4E0B\u8F7D\u5F15\u64CE:", fetchErr);
-      }
-      if (!finalDataUrl) {
-        const extMatch = cleanUrl.match(/\.(png|jpe?g|gif|webp|bmp)/i);
-        const fileExt = extMatch ? extMatch[1].toLowerCase() : "jpg";
-        const fileName2 = `${stamp}-${randomSuffix}.${fileExt}`;
-        await chrome.downloads.download({
-          url: cleanUrl,
-          filename: `\u65B0\u6807\u7B7E\u9875/\u6536\u85CF\u5939/${fileName2}`,
-          saveAs: false,
-          conflictAction: "uniquify"
-        });
-        flashBadge("OK", "#10b981");
-        return { ok: true, fileName: fileName2 };
-      }
-    } else if (finalDataUrl) {
-      const base64Part = finalDataUrl.split(",")[1] || "";
-      const rawHeader = atob(base64Part.slice(0, 48));
-      const bytes = new Uint8Array(rawHeader.length);
-      for (let i = 0; i < rawHeader.length; i++) bytes[i] = rawHeader.charCodeAt(i);
-      const magic = detectImageFormatByMagic(bytes);
-      if (magic.isAvif) {
-        const binStr = atob(base64Part);
-        const buf = new Uint8Array(binStr.length);
-        for (let i = 0; i < binStr.length; i++) buf[i] = binStr.charCodeAt(i);
-        finalDataUrl = await convertAvifToPngDataUrl(buf.buffer);
-        ext = "png";
-      } else {
-        ext = magic.ext;
-      }
-    }
-    if (!finalDataUrl) throw new Error("\u672A\u80FD\u83B7\u53D6\u56FE\u7247\u6709\u6548\u6570\u636E");
-    const fileName = `${stamp}-${randomSuffix}.${ext}`;
-    await chrome.downloads.download({
-      url: finalDataUrl,
-      filename: `\u65B0\u6807\u7B7E\u9875/\u6536\u85CF\u5939/${fileName}`,
-      saveAs: false,
-      conflictAction: "uniquify"
-    });
-    flashBadge("OK", "#10b981");
+    release = acquireImageSlot();
+    let buffer;
+    if (param.dataUrl) {
+      if (param.dataUrl.length > Math.ceil(MAX_IMAGE_BYTES / 3) * 4 + 128 || !/^data:image\/(?:png|jpeg|gif|webp|avif);base64,/i.test(param.dataUrl)) throw new Error("\u56FE\u7247\u683C\u5F0F\u65E0\u6548\u6216\u8D85\u8FC7 12 MiB \u9650\u5236");
+      const raw = atob(param.dataUrl.slice(param.dataUrl.indexOf(",") + 1));
+      if (raw.length > MAX_IMAGE_BYTES) throw new Error("\u56FE\u7247\u8D85\u8FC7 12 MiB \u9650\u5236");
+      buffer = Uint8Array.from(raw, (char) => char.charCodeAt(0)).buffer;
+    } else if (param.url) {
+      buffer = await fetchImageBytes(cleanBiliImageUrl(param.url));
+    } else throw new Error("\u56FE\u7247\u5730\u5740\u4E3A\u7A7A");
+    const magic = detectImageFormatByMagic(new Uint8Array(buffer));
+    const mime = magic.ext === "jpg" ? "image/jpeg" : "image/" + magic.ext;
+    await validateImagePixels(buffer, mime);
+    const dataUrl = magic.isAvif ? await convertAvifToPngDataUrl(buffer) : `data:${mime};base64,${bufferToBase64(buffer)}`;
+    const ext = magic.isAvif ? "png" : magic.ext;
+    const fileName = `${(/* @__PURE__ */ new Date()).toISOString().replace(/[-:TZ.]/g, "").slice(0, 14)}-${crypto.randomUUID().slice(0, 6)}.${ext}`;
+    await chrome.downloads.download({ url: dataUrl, filename: `\u65B0\u6807\u7B7E\u9875/\u6536\u85CF\u5939/${fileName}`, saveAs: false, conflictAction: "uniquify" });
+    flashBadge("DL", "#10b981");
     return { ok: true, fileName };
-  } catch (err) {
+  } catch (error) {
     flashBadge("ERR", "#ef4444");
-    return { ok: false, error: err?.message || "\u5199\u5165\u6587\u4EF6\u5931\u8D25" };
+    return { ok: false, error: error instanceof Error ? error.message : "\u56FE\u7247\u4E0B\u8F7D\u672A\u521B\u5EFA" };
+  } finally {
+    release?.();
   }
 }
 globalThis.saveImageToFavoritesFolder = saveImageToFavoritesFolder;
@@ -834,26 +875,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         const { url, fileName } = message;
         if (!url || !fileName) throw new Error("\u7F3A\u5C11\u4E0B\u8F7D\u53C2\u6570");
         await removeLegacyGlobalNetRule();
-        let downloadId = null;
-        try {
-          downloadId = await chrome.downloads.download({
-            url,
-            filename: fileName,
-            saveAs: false,
-            conflictAction: "uniquify"
-          });
-        } catch (downloadErr) {
-          const resp = await fetch(url, { referrerPolicy: "no-referrer" });
-          if (!resp.ok) throw new Error(`\u89C6\u9891\u6D41\u4E0B\u8F7D\u54CD\u5E94\u7801 ${resp.status}`);
-          const buffer = await resp.arrayBuffer();
-          const base64 = bufferToBase64(buffer);
-          downloadId = await chrome.downloads.download({
-            url: `data:video/mp4;base64,${base64}`,
-            filename: fileName,
-            saveAs: false,
-            conflictAction: "uniquify"
-          });
-        }
+        const downloadUrl = mediaUrl(url);
+        const downloadId = await chrome.downloads.download({
+          url: downloadUrl,
+          filename: fileName,
+          saveAs: false,
+          conflictAction: "uniquify"
+        });
         flashBadge("DL", "#10b981");
         return { ok: true, downloadId };
       } catch (err) {
@@ -893,8 +921,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message?.type === "fetchSiteImages") {
     return handleFetchSiteImages(message, sendResponse);
   }
-  if (message?.type === "cleanupNativeTabs") {
-    cleanupOrReplaceNativeNewTabs().then(() => sendResponse({ ok: true }));
+  if (message?.type === "cleanupNativeTabs" || message?.type === "cleanupBrowserDefaultTabs") {
+    cleanupOrReplaceBrowserDefaultNewTabs().then(() => sendResponse({ ok: true }));
     return true;
   }
   if (message?.type === "fetchImageForClipboard") {
@@ -904,38 +932,20 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       return false;
     }
     (async () => {
-      const candidates = [rawUrl];
-      if (rawUrl.startsWith("https://")) {
-        candidates.push(rawUrl.replace(/^https:\/\//i, "http://"));
-      } else if (rawUrl.startsWith("http://")) {
-        candidates.push(rawUrl.replace(/^http:\/\//i, "https://"));
+      let release;
+      try {
+        release = acquireImageSlot();
+        const buffer = await fetchImageBytes(cleanBiliImageUrl(rawUrl));
+        const magic = detectImageFormatByMagic(new Uint8Array(buffer));
+        const mime = magic.ext === "jpg" ? "image/jpeg" : "image/" + magic.ext;
+        await validateImagePixels(buffer, mime);
+        const dataUrl = magic.isAvif ? await convertAvifToPngDataUrl(buffer) : `data:${mime};base64,${bufferToBase64(buffer)}`;
+        sendResponse({ ok: true, dataUrl, isPng: magic.isAvif || magic.ext === "png" });
+      } catch (error) {
+        sendResponse({ ok: false, error: error instanceof Error ? error.message : "\u56FE\u7247\u8BFB\u53D6\u5931\u8D25" });
+      } finally {
+        release?.();
       }
-      for (const curUrl of candidates) {
-        try {
-          const cleanUrl = cleanBiliImageUrl(curUrl);
-          const resp = await fetch(cleanUrl, {
-            referrerPolicy: "no-referrer"
-          });
-          if (!resp.ok) continue;
-          const buffer = await resp.arrayBuffer();
-          const bytes = new Uint8Array(buffer);
-          const magic = detectImageFormatByMagic(bytes);
-          let finalDataUrl = "";
-          let isPng = false;
-          if (magic.isAvif) {
-            finalDataUrl = await convertAvifToPngDataUrl(buffer);
-            isPng = true;
-          } else {
-            isPng = magic.ext === "png";
-            const mime = magic.ext === "gif" ? "image/gif" : magic.ext === "jpg" ? "image/jpeg" : magic.ext === "webp" ? "image/webp" : "image/png";
-            finalDataUrl = `data:${mime};base64,${bufferToBase64(buffer)}`;
-          }
-          sendResponse({ ok: true, dataUrl: finalDataUrl, isPng });
-          return;
-        } catch {
-        }
-      }
-      sendResponse({ ok: false, error: "\u56FE\u7247\u62C9\u53D6\u5931\u8D25" });
     })();
     return true;
   }
@@ -1065,13 +1075,13 @@ chrome.runtime.onInstalled?.addListener?.(() => {
   enableStickerSidePanel();
   initBilibiliNetRules();
   syncYouTubeNetRules();
-  setTimeout(cleanupOrReplaceNativeNewTabs, 200);
-  setTimeout(cleanupOrReplaceNativeNewTabs, 1e3);
+  setTimeout(cleanupOrReplaceBrowserDefaultNewTabs, 200);
+  setTimeout(cleanupOrReplaceBrowserDefaultNewTabs, 1e3);
 });
 chrome.runtime.onStartup?.addListener?.(() => {
   enableStickerSidePanel();
   initBilibiliNetRules();
   syncYouTubeNetRules();
-  setTimeout(cleanupOrReplaceNativeNewTabs, 200);
-  setTimeout(cleanupOrReplaceNativeNewTabs, 1e3);
+  setTimeout(cleanupOrReplaceBrowserDefaultNewTabs, 200);
+  setTimeout(cleanupOrReplaceBrowserDefaultNewTabs, 1e3);
 });

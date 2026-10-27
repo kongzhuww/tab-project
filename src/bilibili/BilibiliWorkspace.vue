@@ -23,6 +23,23 @@ import ChatShareMenu from "../chat/ChatShareMenu.vue";
 import type { ChatShareTarget } from "../chat/private-chat-client";
 import { chatModuleState } from "../chat/chat-state";
 
+const isSeriesNameError = ref(false);
+
+function handleSaveSeries() {
+  const name = biliFavoritesState.radioSeriesName?.trim();
+  if (!name) {
+    isSeriesNameError.value = true;
+    const seriesInput = document.getElementById("bili-radio-name") as HTMLInputElement | null;
+    if (seriesInput) {
+      seriesInput.focus();
+    }
+    notifications.fetch("哔哩哔哩电台", "请先在输入框中填写系列名称后再保存");
+    return;
+  }
+  isSeriesNameError.value = false;
+  dispatch("radio-save", { name });
+}
+
 async function handleRenameCurrentSeries() {
   const seriesInput = document.getElementById("bili-radio-name") as HTMLInputElement | null;
   if (seriesInput) {
@@ -1193,9 +1210,11 @@ function onRadioVideoDragStart(event: DragEvent, video: { bvid: string; title: s
                     id="bili-radio-name"
                     v-model="biliFavoritesState.radioSeriesName"
                     maxlength="48"
-                    placeholder="给系列取名（不填则按收藏夹命名）"
+                    :class="{ 'has-error': isSeriesNameError }"
+                    :placeholder="isSeriesNameError ? '⚠️ 请在此输入系列名称后再保存！' : '请输入系列名称（必填）'"
                     autocomplete="off"
-                    @keydown.enter.prevent="dispatch('radio-save', { name: biliFavoritesState.radioSeriesName })"
+                    @input="isSeriesNameError = false"
+                    @keydown.enter.prevent="handleSaveSeries"
                   />
                   <!-- 操作按钮组：保存系列、重命名、分享到海狸聊天室 -->
                   <div class="bili-radio-btn-group">
@@ -1203,7 +1222,7 @@ function onRadioVideoDragStart(event: DragEvent, video: { bvid: string; title: s
                       id="bili-radio-save"
                       type="button"
                       title="保存当前队列为系列"
-                      @click="dispatch('radio-save', { name: biliFavoritesState.radioSeriesName })"
+                      @click="handleSaveSeries"
                     >
                       💾 保存系列
                     </button>

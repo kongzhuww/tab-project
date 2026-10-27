@@ -3,6 +3,8 @@
  * 封装 B站用户状态、自建/合集/追番/稍后再看资源路由、收藏夹树拓扑、视频移动/取消收藏及剧场字幕
  */
 
+import { playbackDeadline } from "../bilibili/playback-request";
+
 declare const chrome: any;
 
 export interface BiliUserNav {
@@ -632,12 +634,12 @@ export class BilibiliService {
     });
 
     if (!res.ok) {
-      throw new Error(`Bilibili API 请求失败 [${res.status}]: ${res.statusText}`);
+      throw Object.assign(new Error(`Bilibili API 请求失败 [${res.status}]: ${res.statusText}`), { status: res.status });
     }
 
     const json = await res.json();
     if (json.code !== 0 && json.code !== undefined) {
-      throw new Error(json.message || json.msg || `Bilibili 接口返回错误码 ${json.code}`);
+      throw Object.assign(new Error(json.message || json.msg || `Bilibili 接口返回错误码 ${json.code}`), { code: json.code });
     }
 
     return json.data !== undefined ? json.data : json;
@@ -1128,81 +1130,196 @@ export class BilibiliService {
   public async fetchPlayStream(
     bvid: string,
     cid: number | string,
-    preferredQn = 64
+    preferredQn = 64,
+    parentSignal?: AbortSignal
   ): Promise<{ sources: string[]; quality: number; acceptQuality: number[]; acceptDescription: string[] }> {
-    const qnQueue = Array.from(new Set([preferredQn, 64, 32, 16]));
-    let lastData: any = null;
-    let validSources: string[] = [];
-    let resolvedQuality = preferredQn;
+    const deadline = playbackDeadline(parentSignal, 18000);
+    const signal = deadline.signal;
+    const request = async (url: string) => {
+      signal.throwIfAborted();
+      const attempt = playbackDeadline(signal, 5000);
+      try { return await this.api<any>(url, { signal: attempt.signal }); }
+      finally { attempt.dispose(); }
+    };
+    const shouldStop = (error: any) => {
+      signal.throwIfAborted();
+      if ([401, 403, 412, 429].includes(error?.status) || [-101, -111, -352, -412].includes(error?.code)) throw error;
+      if (error?.name === "TimeoutError" || error?.name === "AbortError" || error instanceof TypeError) throw error;
+    };
+    try {
+      signal.throwIfAborted();
+      const qnQueue = Array.from(new Set([preferredQn, 64, 32, 16]));
+      let lastData: any = null;
+      let validSources: string[] = [];
+      let resolvedQuality = preferredQn;
 
-    const extractSources = (data: any): string[] => {
-      if (!data) return [];
-      const durl = Array.isArray(data.durl) ? data.durl : (Array.isArray(data.result?.durl) ? data.result.durl : []);
-      const urls: string[] = [];
-      for (const item of durl) {
-        if (item?.url) urls.push(String(item.url));
-        if (Array.isArray(item?.backup_url)) {
-          for (const b of item.backup_url) {
-            if (b) urls.push(String(b));
+      const extractSources = (data: any): string[] => {
+        if (!data) return [];
+        const durl = Array.isArray(data.durl) ? data.durl : (Array.isArray(data.result?.durl) ? data.result.durl : []);
+        const urls: string[] = [];
+        // Later durl entries are sequential segments, not mirror URLs for the first segment.
+        for (const item of durl.slice(0, 1)) {
+          if (item?.url) urls.push(String(item.url));
+          if (Array.isArray(item?.backup_url)) {
+            for (const b of item.backup_url) {
+              if (b) urls.push(String(b));
+            }
           }
         }
-      }
-      return Array.from(new Set(urls.filter(Boolean))).map((u) => u.replace(/^http:/, "https:"));
-    };
+        return Array.from(new Set(urls.filter(Boolean).map((u) => u.replace(/^http:/, "https:"))))
+          .filter(u => { try { const url = new URL(u); return url.protocol === "https:" && !url.username && !url.password; } catch { return false; } });
+      };
 
-    // 1. 常规接口尝试 (逐级清晰度重试，禁用 fourk 避免权限阻断)
-    for (const qn of qnQueue) {
-      try {
-        const idParam = bvid ? `bvid=${encodeURIComponent(bvid)}` : "";
-        const play = await this.api<any>(
-          `https://api.bilibili.com/x/player/playurl?${idParam}&cid=${cid}&qn=${qn}&fnval=1&fourk=0&platform=html5&high_quality=1`
-        );
-        const sources = extractSources(play);
-        if (sources.length > 0) {
-          lastData = play;
-          validSources = sources;
-          resolvedQuality = Number(play?.quality || qn);
-          break;
-        }
-      } catch {
-        // 继续下一清晰度重试
-      }
-    }
-
-    // 2. 如果常规 playurl 未能提取到直链，尝试使用 WBI 签名请求
-    if (!validSources.length) {
-      for (const qn of [preferredQn, 64, 32]) {
+      // 1. 常规接口尝试 (逐级清晰度重试，禁用 fourk 避免权限阻断)
+      for (const qn of qnQueue) {
         try {
-          const { ik, sk } = await this.getWbiKeys();
-          const params: Record<string, any> = { cid, qn, fnval: 1, fourk: 0 };
-          if (bvid) params.bvid = bvid;
-          const { signedQuery } = calculateWbiSign(params, ik, sk);
-          const wbiPlay = await this.api<any>(
-            `https://api.bilibili.com/x/player/wbi/playurl?${signedQuery}`
+          const idParam = bvid ? `bvid=${encodeURIComponent(bvid)}` : "";
+          const play = await request(
+            `https://api.bilibili.com/x/player/playurl?${idParam}&cid=${cid}&qn=${qn}&fnval=1&fourk=0&platform=html5&high_quality=1`
           );
-          const sources = extractSources(wbiPlay);
+          const sources = extractSources(play);
           if (sources.length > 0) {
-            lastData = wbiPlay;
+            lastData = play;
             validSources = sources;
-            resolvedQuality = Number(wbiPlay?.quality || qn);
+            resolvedQuality = Number(play?.quality || qn);
             break;
           }
-        } catch {
-          // 忽略并继续
+        } catch (error) {
+          shouldStop(error);
+          // 继续下一清晰度重试
         }
       }
-    }
 
-    if (!validSources.length) {
-      throw new Error("未能获取到有效视频直链播放流");
-    }
+      // 2. 如果常规 playurl 未能提取到直链，尝试使用 WBI 签名请求
+      if (!validSources.length) {
+        for (const qn of Array.from(new Set([preferredQn, 64, 32]))) {
+          try {
+            const signing = playbackDeadline(signal, 5000);
+            let keys: { ik: string; sk: string };
+            try { keys = await this.getWbiKeys(signing.signal); }
+            finally { signing.dispose(); }
+            const { ik, sk } = keys;
+            const params: Record<string, any> = { cid, qn, fnval: 1, fourk: 0 };
+            if (bvid) params.bvid = bvid;
+            const { signedQuery } = calculateWbiSign(params, ik, sk);
+            const wbiPlay = await request(
+              `https://api.bilibili.com/x/player/wbi/playurl?${signedQuery}`
+            );
+            const sources = extractSources(wbiPlay);
+            if (sources.length > 0) {
+              lastData = wbiPlay;
+              validSources = sources;
+              resolvedQuality = Number(wbiPlay?.quality || qn);
+              break;
+            }
+          } catch (error) {
+            shouldStop(error);
+            // 忽略并继续
+          }
+        }
+      }
 
-    return {
-      sources: validSources,
-      quality: resolvedQuality,
-      acceptQuality: lastData?.accept_quality || [80, 64, 32, 16],
-      acceptDescription: lastData?.accept_description || ["1080P 高清", "720P 高清", "480P 清晰", "360P 流畅"]
+      if (!validSources.length) {
+        throw new Error("未能获取到有效视频直链播放流");
+      }
+
+      return {
+        sources: validSources,
+        quality: resolvedQuality,
+        acceptQuality: lastData?.accept_quality || [80, 64, 32, 16],
+        acceptDescription: lastData?.accept_description || ["1080P 高清", "720P 高清", "480P 清晰", "360P 流畅"]
+      };
+    } finally { deadline.dispose(); }
+  }
+
+  /**
+   * 获取音频流：优先提取 DASH 纯音频流 (M4A，体积仅 ~3MB，彻底消除视频冗余与限速)，若无纯音频则降级至 360P 流畅视频流 (极小体积保底)
+   */
+  public async fetchAudioStream(
+    bvid: string,
+    cid: number | string,
+    parentSignal?: AbortSignal
+  ): Promise<{ sources: string[]; isPureAudio: boolean }> {
+    const deadline = playbackDeadline(parentSignal, 18000);
+    const signal = deadline.signal;
+    const request = async (url: string) => {
+      signal.throwIfAborted();
+      const attempt = playbackDeadline(signal, 5000);
+      try { return await this.api<any>(url, { signal: attempt.signal }); }
+      finally { attempt.dispose(); }
     };
+    const shouldStop = (error: any) => {
+      signal.throwIfAborted();
+      if ([401, 403, 412, 429].includes(error?.status) || [-101, -111, -352, -412].includes(error?.code)) throw error;
+      if (error?.name === "TimeoutError" || error?.name === "AbortError" || error instanceof TypeError) throw error;
+    };
+
+    const extractDashAudio = (data: any): string[] => {
+      const dash = data?.dash || data?.result?.dash;
+      const audioList = Array.isArray(dash?.audio) ? dash.audio : [];
+      if (!audioList.length) return [];
+      const sorted = [...audioList].sort((a, b) => Number(b?.id || 0) - Number(a?.id || 0));
+      const urls: string[] = [];
+      for (const item of sorted) {
+        if (item?.baseUrl) urls.push(String(item.baseUrl));
+        if (item?.base_url) urls.push(String(item.base_url));
+        if (Array.isArray(item?.backupUrl)) {
+          for (const b of item.backupUrl) if (b) urls.push(String(b));
+        }
+        if (Array.isArray(item?.backup_url)) {
+          for (const b of item.backup_url) if (b) urls.push(String(b));
+        }
+      }
+      return Array.from(new Set(urls.filter(Boolean).map((u) => u.replace(/^http:/, "https:"))))
+        .filter((u) => {
+          try {
+            const url = new URL(u);
+            return url.protocol === "https:" && !url.username && !url.password;
+          } catch { return false; }
+        });
+    };
+
+    try {
+      signal.throwIfAborted();
+      // 1. 尝试常规 playurl 获取 DASH 纯音频 (fnval=16)
+      try {
+        const idParam = bvid ? `bvid=${encodeURIComponent(bvid)}` : "";
+        const play = await request(
+          `https://api.bilibili.com/x/player/playurl?${idParam}&cid=${cid}&qn=16&fnval=16&fourk=0&platform=html5`
+        );
+        const dashSources = extractDashAudio(play);
+        if (dashSources.length > 0) {
+          return { sources: dashSources, isPureAudio: true };
+        }
+      } catch (error) {
+        shouldStop(error);
+      }
+
+      // 2. 尝试 WBI 签名请求 DASH 纯音频 (fnval=16)
+      try {
+        const signing = playbackDeadline(signal, 5000);
+        let keys: { ik: string; sk: string };
+        try { keys = await this.getWbiKeys(signing.signal); }
+        finally { signing.dispose(); }
+        const { ik, sk } = keys;
+        const params: Record<string, any> = { cid, qn: 16, fnval: 16, fourk: 0 };
+        if (bvid) params.bvid = bvid;
+        const { signedQuery } = calculateWbiSign(params, ik, sk);
+        const wbiPlay = await request(`https://api.bilibili.com/x/player/wbi/playurl?${signedQuery}`);
+        const dashSources = extractDashAudio(wbiPlay);
+        if (dashSources.length > 0) {
+          return { sources: dashSources, isPureAudio: true };
+        }
+      } catch (error) {
+        shouldStop(error);
+      }
+
+      // 3. 降级：DASH 纯音频不可用时，获取 360P / 480P MP4 视频流（~5-8MB 最小开销保底）
+      const stream = await this.fetchPlayStream(bvid, cid, 16, signal);
+      return { sources: stream.sources, isPureAudio: false };
+    } finally {
+      deadline.dispose();
+    }
   }
 
   /**
@@ -1226,7 +1343,8 @@ export class BilibiliService {
       danmaku?: number;
       likes?: number;
     },
-    preferredPage = 1
+    preferredPage = 1,
+    parentSignal?: AbortSignal
   ): Promise<BiliPlayStreamResult> {
     if (video.cachedSourceUrl) {
       return {
@@ -1260,55 +1378,71 @@ export class BilibiliService {
     const cleanBvid = rawBvid.startsWith("BV") ? rawBvid : "";
     const cleanAid = rawAid.replace(/^av/i, "") || (!rawBvid.startsWith("BV") ? rawBvid.replace(/^av/i, "") : "");
     const queryParam = cleanBvid ? `bvid=${encodeURIComponent(cleanBvid)}` : `aid=${encodeURIComponent(cleanAid)}`;
-    let data: any = null;
+    const deadline = playbackDeadline(parentSignal, 20000);
+    const signal = deadline.signal;
     try {
-      data = await this.api<any>(`https://api.bilibili.com/x/web-interface/view?${queryParam}`);
-    } catch {
-      // 容错处理
-    }
+      signal.throwIfAborted();
+      const early = video.cid && cleanBvid && preferredPage === 1
+        ? this.fetchPlayStream(cleanBvid, video.cid, Number(video.preferredQuality || 64), signal)
+            .then(value => ({ value, error: null }), error => ({ value: null, error }))
+        : null;
+      let data: any = null;
+      try {
+        const details = playbackDeadline(signal, 6000);
+        try { data = await this.api<any>(`https://api.bilibili.com/x/web-interface/view?${queryParam}`, { signal: details.signal }); }
+        finally { details.dispose(); }
+      } catch {
+        signal.throwIfAborted();
+        // A supplied CID remains usable if optional metadata fails.
+      }
 
-    const resolvedBvid = data?.bvid || "";
-    const bvid = resolvedBvid.startsWith("BV") ? resolvedBvid : (cleanBvid || "");
-    const rawPages: any[] = Array.isArray(data?.pages) ? data.pages : [];
-    const pages: BiliVideoPage[] = rawPages.map((p: any) => ({
-      cid: p.cid,
-      page: p.page,
-      part: p.part || `第${p.page}集`,
-      duration: p.duration || 0
-    }));
+      const resolvedBvid = data?.bvid || "";
+      const bvid = resolvedBvid.startsWith("BV") ? resolvedBvid : (cleanBvid || "");
+      const rawPages: any[] = Array.isArray(data?.pages) ? data.pages : [];
+      const pages: BiliVideoPage[] = rawPages.map((p: any) => ({
+        cid: p.cid,
+        page: p.page,
+        part: p.part || `第${p.page}集`,
+        duration: p.duration || 0
+      }));
 
-    const targetPageIdx = pages.findIndex((p) => p.page === preferredPage);
-    const activePageObj = targetPageIdx >= 0 ? pages[targetPageIdx] : (pages[0] || null);
-    const activeCid = activePageObj?.cid || data?.cid || video.cid;
-    if (!activeCid) {
-      throw new Error("无法获取视频 CID 标识");
-    }
+      const targetPageIdx = pages.findIndex((p) => p.page === preferredPage);
+      const activePageObj = targetPageIdx >= 0 ? pages[targetPageIdx] : (pages[0] || null);
+      const activeCid = activePageObj?.cid || data?.cid || video.cid;
+      if (!activeCid) {
+        throw new Error("无法获取视频 CID 标识");
+      }
 
-    const initialQn = Number(video.preferredQuality || 64);
-    const streamInfo = await this.fetchPlayStream(bvid, activeCid, initialQn);
+      const initialQn = Number(video.preferredQuality || 64);
+      const earlyResult = early && String(activeCid) === String(video.cid) ? await early : null;
+      signal.throwIfAborted();
+      const streamInfo = earlyResult && String(activeCid) === String(video.cid)
+        ? earlyResult.value || (() => { throw earlyResult.error; })()
+        : await this.fetchPlayStream(bvid, activeCid, initialQn, signal);
 
-    return {
-      title: data?.title || video.title || bvid,
-      poster: String(data?.pic || video.cover || "").replace(/^http:/, "https:"),
-      sources: streamInfo.sources,
-      aid: data?.aid || video.aid || null,
-      bvid,
-      cid: activeCid || null,
-      owner: data?.owner?.name || video.owner || video.author || "UP主",
-      ownerFace: data?.owner?.face ? String(data.owner.face).replace(/^http:/, "https:") : (video.ownerFace || video.face || ""),
-      ownerMid: data?.owner?.mid || null,
-      pubdate: data?.pubdate || 0,
-      desc: data?.desc || video.desc || "暂无简介",
-      views: data?.stat?.view || video.views || 0,
-      danmaku: data?.stat?.danmaku || video.danmaku || 0,
-      likes: data?.stat?.like || video.likes || 0,
-      currentQuality: streamInfo.quality,
-      acceptQuality: streamInfo.acceptQuality,
-      acceptDescription: streamInfo.acceptDescription,
-      pages,
-      currentPage: activePageObj?.page || 1,
-      partTitle: activePageObj?.part || ""
-    };
+      return {
+        title: data?.title || video.title || bvid,
+        poster: String(data?.pic || video.cover || "").replace(/^http:/, "https:"),
+        sources: streamInfo.sources,
+        aid: data?.aid || video.aid || null,
+        bvid,
+        cid: activeCid || null,
+        owner: data?.owner?.name || video.owner || video.author || "UP主",
+        ownerFace: data?.owner?.face ? String(data.owner.face).replace(/^http:/, "https:") : (video.ownerFace || video.face || ""),
+        ownerMid: data?.owner?.mid || null,
+        pubdate: data?.pubdate || 0,
+        desc: data?.desc || video.desc || "暂无简介",
+        views: data?.stat?.view || video.views || 0,
+        danmaku: data?.stat?.danmaku || video.danmaku || 0,
+        likes: data?.stat?.like || video.likes || 0,
+        currentQuality: streamInfo.quality,
+        acceptQuality: streamInfo.acceptQuality,
+        acceptDescription: streamInfo.acceptDescription,
+        pages,
+        currentPage: activePageObj?.page || 1,
+        partTitle: activePageObj?.part || ""
+      };
+    } finally { deadline.dispose(); }
   }
 
   /**

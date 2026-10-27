@@ -1,10 +1,13 @@
 import { reactive } from "vue";
+import { PlaybackSession } from "./playback-request";
 import {
   bilibiliService,
   getBiliQualityShortLabel,
   type BiliVideoPage,
   type BiliDanmakuItem
 } from "../services/bilibili.service";
+
+const playbackSession = new PlaybackSession();
 
 export interface BiliMiniPlayerComment {
   id: string | number;
@@ -45,6 +48,7 @@ export interface BiliMiniPlayerState {
 
   // 播放流及控制
   videoSrc: string;
+  sourceUrls: string[];
   iframeSrc: string;
   useIframe: boolean;
   isPlaying: boolean;
@@ -104,6 +108,7 @@ const defaultState: BiliMiniPlayerState = {
   description: "",
 
   videoSrc: "",
+  sourceUrls: [],
   iframeSrc: "",
   useIframe: false,
   isPlaying: false,
@@ -213,6 +218,7 @@ export const biliMiniPlayerController = {
       return;
     }
 
+    const signal = playbackSession.start();
     // 先释放上一个本地文件的 Object URL，再切换视频源。
     releaseCachedObjectUrl();
     // 重置状态
@@ -229,6 +235,7 @@ export const biliMiniPlayerController = {
     biliMiniPlayerState.authorMid = videoPayload.mid ? String(videoPayload.mid) : "";
     biliMiniPlayerState.authorFace = videoPayload.authorFace || "";
     biliMiniPlayerState.videoSrc = "";
+    biliMiniPlayerState.sourceUrls = [];
     biliMiniPlayerState.iframeSrc = "";
     biliMiniPlayerState.useIframe = false;
     biliMiniPlayerState.currentTime = 0;
@@ -263,7 +270,8 @@ export const biliMiniPlayerController = {
         title: videoPayload.title,
         cover: videoPayload.cover,
         preferredQuality: biliMiniPlayerState.currentQuality
-      });
+      }, 1, signal);
+      signal.throwIfAborted();
 
       biliMiniPlayerState.title = streamResult.title || videoPayload.title || bvid;
       biliMiniPlayerState.cover = streamResult.poster || videoPayload.cover || "";
@@ -295,6 +303,7 @@ export const biliMiniPlayerController = {
 
       // 播放源
       if (streamResult.sources && streamResult.sources.length) {
+        biliMiniPlayerState.sourceUrls = streamResult.sources;
         biliMiniPlayerState.videoSrc = streamResult.sources[0];
         biliMiniPlayerState.isPlaying = true;
         // 若弹幕开关已开启，自动静默预加载弹幕
@@ -305,10 +314,11 @@ export const biliMiniPlayerController = {
         throw new Error("未能获取到直链源");
       }
     } catch (err: any) {
+      if (signal.aborted) return;
       biliMiniPlayerState.errorMsg = err?.message || "未能获取到视频播放流";
       notifyToast(`视频加载未完成：${biliMiniPlayerState.errorMsg}`, true);
     } finally {
-      biliMiniPlayerState.isLoading = false;
+      if (!signal.aborted) biliMiniPlayerState.isLoading = false;
     }
   },
 
@@ -354,18 +364,24 @@ export const biliMiniPlayerController = {
 
     biliMiniPlayerState.currentPageIndex = index;
     biliMiniPlayerState.cid = targetPage.cid;
+    biliMiniPlayerState.videoSrc = "";
+    biliMiniPlayerState.sourceUrls = [];
     biliMiniPlayerState.isLoading = true;
     biliMiniPlayerState.errorMsg = "";
     biliMiniPlayerState.danmakuList = [];
     biliMiniPlayerState.danmakuLoading = false;
 
+    const signal = playbackSession.start();
     try {
       const streamInfo = await bilibiliService.fetchPlayStream(
         biliMiniPlayerState.bvid,
         targetPage.cid,
-        biliMiniPlayerState.currentQuality
+        biliMiniPlayerState.currentQuality,
+        signal
       );
+      signal.throwIfAborted();
       if (streamInfo.sources?.length) {
+        biliMiniPlayerState.sourceUrls = streamInfo.sources;
         biliMiniPlayerState.videoSrc = streamInfo.sources[0];
         biliMiniPlayerState.currentTime = 0;
         biliMiniPlayerState.isPlaying = true;
@@ -376,10 +392,11 @@ export const biliMiniPlayerController = {
         throw new Error("获取分P视频流失败");
       }
     } catch (err: any) {
+      if (signal.aborted) return;
       biliMiniPlayerState.errorMsg = err?.message || "切换选集失败";
       notifyToast(`分P切换失败：${biliMiniPlayerState.errorMsg}`, true);
     } finally {
-      biliMiniPlayerState.isLoading = false;
+      if (!signal.aborted) biliMiniPlayerState.isLoading = false;
     }
   },
 
@@ -393,13 +410,17 @@ export const biliMiniPlayerController = {
     biliMiniPlayerState.isLoading = true;
     const curTime = biliMiniPlayerState.currentTime;
 
+    const signal = playbackSession.start();
     try {
       const streamInfo = await bilibiliService.fetchPlayStream(
         biliMiniPlayerState.bvid,
         biliMiniPlayerState.cid,
-        qn
+        qn,
+        signal
       );
+      signal.throwIfAborted();
       if (streamInfo.sources?.length) {
+        biliMiniPlayerState.sourceUrls = streamInfo.sources;
         biliMiniPlayerState.videoSrc = streamInfo.sources[0];
         biliMiniPlayerState.currentQuality = streamInfo.quality;
         biliMiniPlayerState.currentTime = curTime;
@@ -407,9 +428,10 @@ export const biliMiniPlayerController = {
         notifyToast(`已切换清晰度为 ${getBiliQualityShortLabel(qn)}`);
       }
     } catch (err: any) {
+      if (signal.aborted) return;
       notifyToast(`清晰度切换失败：${err?.message || "网络异常"}`, true);
     } finally {
-      biliMiniPlayerState.isLoading = false;
+      if (!signal.aborted) biliMiniPlayerState.isLoading = false;
     }
   },
 
@@ -437,6 +459,9 @@ export const biliMiniPlayerController = {
    * 关闭播放器
    */
   close() {
+    playbackSession.cancel();
+    biliMiniPlayerState.isLoading = false;
+    biliMiniPlayerState.sourceUrls = [];
     releaseCachedObjectUrl();
     biliMiniPlayerState.isOpen = false;
     biliMiniPlayerState.isPlaying = false;

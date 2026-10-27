@@ -37,16 +37,120 @@ let queuePlayback: Pick<QueueOptions, "isCurrent" | "autoplay" | "onReady"> = {}
 let generation = 0;
 let playbackError = "";
 
+let failoverTimer: ReturnType<typeof setInterval> | null = null;
+let currentTrackSources: string[] = [];
+let triedTrackSources = new Set<string>();
+let pendingResumePosition: { time: number; paused: boolean } | null = null;
+let lastProgressTime = 0;
+let lastProgressTimestamp = Date.now();
+let lastBufferEnd = 0;
+
+function stopFailoverWatchdog(): void {
+  if (failoverTimer !== null) {
+    clearInterval(failoverTimer);
+    failoverTimer = null;
+  }
+}
+
+function advanceFailover(reason: string): void {
+  const media = audio;
+  if (!media || !active || !track) return;
+  const nextUrl = currentTrackSources.find((u) => !triedTrackSources.has(u) && /^https?:\/\//i.test(u));
+  if (!nextUrl || triedTrackSources.size >= 3) {
+    stopFailoverWatchdog();
+    playbackError = "音频连接中断，已尝试所有备用线路";
+    syncTape();
+    return;
+  }
+
+  triedTrackSources.add(nextUrl);
+  pendingResumePosition = {
+    time: Number.isFinite(media.currentTime) ? media.currentTime : 0,
+    paused: media.paused
+  };
+  playbackError = "网络波动，正在切换备用线路…";
+  syncTape();
+  media.src = nextUrl;
+  media.load();
+  if (!pendingResumePosition.paused) {
+    void media.play().catch(() => {});
+  }
+}
+
+function startFailoverWatchdog(): void {
+  stopFailoverWatchdog();
+  lastProgressTimestamp = Date.now();
+  lastProgressTime = audio?.currentTime || 0;
+  lastBufferEnd = audio?.buffered.length ? audio.buffered.end(audio.buffered.length - 1) : 0;
+
+  failoverTimer = setInterval(() => {
+    const media = audio;
+    if (!media || !active || media.paused || media.ended) {
+      lastProgressTimestamp = Date.now();
+      return;
+    }
+    const curTime = media.currentTime;
+    const bufEnd = media.buffered.length ? media.buffered.end(media.buffered.length - 1) : 0;
+    if (curTime !== lastProgressTime || bufEnd > lastBufferEnd) {
+      lastProgressTimestamp = Date.now();
+      lastProgressTime = curTime;
+      lastBufferEnd = bufEnd;
+      if (playbackError === "网络波动，正在切换备用线路…") {
+        playbackError = "";
+        syncTape();
+      }
+      return;
+    }
+    // 停滞检测：如果正在播放但连续 8 秒既无进度推进也无缓冲增加，且就绪度不足
+    if (Date.now() - lastProgressTimestamp >= 8000 && media.readyState < 3) {
+      advanceFailover("缓冲停滞超时 (8s)");
+    }
+  }, 1000);
+}
+
+function onAudioTimeUpdate(): void {
+  if (audio) {
+    lastProgressTimestamp = Date.now();
+    lastProgressTime = audio.currentTime;
+    if (playbackError === "网络波动，正在切换备用线路…") {
+      playbackError = "";
+    }
+  }
+  syncTape();
+}
+
+function onAudioLoadedMetadata(): void {
+  const media = audio;
+  if (media && pendingResumePosition) {
+    const resume = pendingResumePosition;
+    pendingResumePosition = null;
+    if (resume.time > 0 && resume.time < (media.duration || Infinity)) {
+      try { media.currentTime = resume.time; } catch {}
+    }
+    if (!resume.paused) {
+      void media.play().catch(() => {});
+    }
+  }
+  syncTape();
+}
+
+function onAudioError(): void {
+  if (active && audio?.error) {
+    advanceFailover(`音频解码或网络错误 [代码: ${audio.error.code}]`);
+  }
+}
+
 function getAudio(): HTMLAudioElement {
   if (audio) return audio;
   audio = new Audio();
   audio.id = "bili-radio-audio";
-  audio.crossOrigin = "anonymous";
+  audio.preload = "auto";
   audio.addEventListener("ended", () => { void playIndex(index + 1); });
-  audio.addEventListener("timeupdate", syncTape);
+  audio.addEventListener("timeupdate", onAudioTimeUpdate);
   audio.addEventListener("play", syncTape);
   audio.addEventListener("pause", syncTape);
-  audio.addEventListener("loadedmetadata", syncTape);
+  audio.addEventListener("loadedmetadata", onAudioLoadedMetadata);
+  audio.addEventListener("error", onAudioError);
   return audio;
 }
 
@@ -85,7 +189,7 @@ async function resolveTrack(item: Track): Promise<Track> {
   if (item.streamUrl || item.url) return item;
   const view = await bilibiliService.getVideoView(item.bvid);
   if (!view?.cid) throw new Error("视频信息不可用");
-  const stream = await bilibiliService.fetchPlayStream(item.bvid, view.cid, 64);
+  const stream = await bilibiliService.fetchAudioStream(item.bvid, view.cid);
   if (!stream.sources.length) throw new Error("没有取得视频播放地址");
   return {
     ...item,
@@ -107,15 +211,21 @@ async function playIndex(nextIndex: number): Promise<void> {
   loading = true;
   active = true;
   playbackError = "";
+  stopFailoverWatchdog();
+  pendingResumePosition = null;
   getAudio().pause();
   syncTape();
   try {
     const next = resolver ? await resolver(items[index]) : await resolveTrack(items[index]);
     if (current !== generation || playback.isCurrent?.() === false) return;
     track = next;
-    const url = next.streamUrl || next.url || next.streamUrls?.[0];
+    const sources = next.streamUrls?.length ? next.streamUrls : (next.streamUrl || next.url ? [next.streamUrl || next.url!] : []);
+    const url = sources[0];
     if (!url) throw new Error("没有取得视频播放地址");
+    currentTrackSources = sources;
+    triedTrackSources = new Set<string>([url]);
     getAudio().src = url;
+    startFailoverWatchdog();
     playback.onReady?.(getAudio());
     if (playback.autoplay !== false) void getAudio().play().catch((error: unknown) => console.warn("[BiliRadio] 播放失败", error));
     if (next.bvid && !next.cues?.length) {

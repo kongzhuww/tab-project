@@ -1,6 +1,7 @@
 <template>
   <div id="todoist-workspace-body" class="todoist-workspace-body" @click="closeAllPopovers">
     <p v-if="state.moveError && state.moveMessage" class="todoist-move-status error" role="alert">{{ state.moveMessage }}</p>
+    <p v-if="state.emptyText && state.columns.length > 0 && !state.loading" class="todoist-move-status error" role="status">{{ state.emptyText }} 已显示的任务保留。</p>
     <!-- 加载中或全屏空态提示 -->
     <p v-if="state.loading && state.columns.length === 0" class="todoist-empty">加载中…</p>
     <p v-else-if="state.emptyText && state.columns.length === 0" class="todoist-empty">{{ state.emptyText }}</p>

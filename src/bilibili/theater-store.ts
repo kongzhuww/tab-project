@@ -1,9 +1,12 @@
 import { reactive } from "vue";
+import { PlaybackSession } from "./playback-request";
 import {
   bilibiliService,
   getBiliQualityFullLabel,
   type BiliVideoPage
 } from "../services/bilibili.service";
+
+const playbackSession = new PlaybackSession();
 
 export interface BiliCommentItem {
   id: string | number;
@@ -40,6 +43,7 @@ export interface BiliTheaterState {
   openBiliUrl: string;
   cover: string;
   videoSrc: string;
+  sourceUrls: string[];
   iframeSrc: string;
   useIframe: boolean;
   canDirectPlay: boolean;
@@ -75,6 +79,7 @@ const state = reactive<BiliTheaterState>({
   openBiliUrl: "",
   cover: "",
   videoSrc: "",
+  sourceUrls: [],
   iframeSrc: "",
   useIframe: false,
   canDirectPlay: false,
@@ -145,6 +150,7 @@ export const biliTheaterController = {
     video: {
       bvid?: string;
       aid?: string | number;
+      cid?: string | number;
       title?: string;
       cover?: string;
       author?: string;
@@ -153,6 +159,7 @@ export const biliTheaterController = {
     },
     preferredPage = 1
   ) {
+    const signal = playbackSession.start();
     // 暂停其他可能正在播放的媒体
     if (typeof document !== "undefined") {
       document.querySelectorAll("video, audio").forEach((m) => {
@@ -171,9 +178,13 @@ export const biliTheaterController = {
     state.cover = (video.cover || "").replace(/^http:/, "https:");
     state.openBiliUrl = targetUrl;
     state.videoSrc = "";
+    state.sourceUrls = [];
     state.iframeSrc = "";
     state.useIframe = false;
     state.canDirectPlay = false;
+    state.cid = "";
+    state.pages = [];
+    state.acceptQualities = [];
     state.comments = [];
     state.commentsPage = 1;
     state.commentsLoading = true;
@@ -188,8 +199,10 @@ export const biliTheaterController = {
 
     // 1. 尝试解析 HTML5 直链视频流
     try {
-      const stream = await bilibiliService.resolvePlayStream(video, preferredPage);
+      const stream = await bilibiliService.resolvePlayStream(video, preferredPage, signal);
+      signal.throwIfAborted();
       if (stream.sources && stream.sources.length) {
+        state.sourceUrls = stream.sources;
         state.videoSrc = stream.sources[0];
         state.cid = stream.cid || "";
         state.aid = String(stream.aid || state.aid);
@@ -205,11 +218,11 @@ export const biliTheaterController = {
       } else {
         throw new Error("无可用直链源");
       }
-    } catch {
-      // 降级使用 iframe 官方内嵌播放器
-      state.useIframe = true;
+    } catch (error: any) {
+      if (signal.aborted) return;
       state.canDirectPlay = false;
-      state.iframeSrc = `https://player.bilibili.com/player.html?bvid=${encodeURIComponent(bvid)}&autoplay=1&danmaku=0&high_quality=1`;
+      state.commentsLoading = false;
+      notifyToast(error?.message || "视频加载失败，请手动重试或在B站打开", true);
     }
 
     // 2. 异步并行加载评论与字幕
@@ -230,6 +243,8 @@ export const biliTheaterController = {
   },
 
   close() {
+    playbackSession.cancel();
+    state.sourceUrls = [];
     state.isOpen = false;
     state.videoSrc = "";
     state.iframeSrc = "";
@@ -241,6 +256,10 @@ export const biliTheaterController = {
       }
     }
     this.dispatch("close");
+  },
+
+  playbackFailed() {
+    notifyToast("视频源加载失败，备用地址已用尽，请重新打开视频或在B站播放", true);
   },
 
   togglePlayerMode() {
@@ -256,11 +275,14 @@ export const biliTheaterController = {
    */
   async switchQuality(qn: number) {
     if (!state.bvid || !state.cid) return;
+    const signal = playbackSession.start();
     try {
       const videoEl = document.getElementById("bili-theater-video") as HTMLVideoElement | null;
       const curTime = videoEl?.currentTime || 0;
-      const streamInfo = await bilibiliService.fetchPlayStream(state.bvid, state.cid, qn);
+      const streamInfo = await bilibiliService.fetchPlayStream(state.bvid, state.cid, qn, signal);
+      signal.throwIfAborted();
       if (streamInfo.sources && streamInfo.sources.length) {
+        state.sourceUrls = streamInfo.sources;
         state.videoSrc = streamInfo.sources[0];
         state.currentQuality = streamInfo.quality;
         if (videoEl) {
@@ -270,6 +292,7 @@ export const biliTheaterController = {
         notifyToast(`已切换至清晰度：${getBiliQualityFullLabel(qn)}`);
       }
     } catch (e: any) {
+      if (signal.aborted) return;
       notifyToast(`清晰度切换失败：${e?.message || "网络异常"}`, true);
     }
   },

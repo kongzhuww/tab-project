@@ -50,6 +50,7 @@ let actionCallback: AiActionCallback | null = null;
 let rpcBusy = false;
 let pollTimer: ReturnType<typeof setTimeout> | null = null;
 
+/** 历史兼容存根：旧版 Native Host AI 桥接已退役，当前为纯前端降级与海狸聊天室分流 */
 async function nativeRpc(op: string, _extra: Record<string, any> = {}): Promise<any> {
   if (op === "poll") return { state: "ready", model: state.model };
   if (op === "connect") return { state: "ready", model: state.model };

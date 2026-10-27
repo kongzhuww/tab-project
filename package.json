@@ -1,9 +1,9 @@
 {
   "name": "tab-project",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "private": true,
   "type": "module",
-  "description": "LogicWeaver desktop Chromium browser extension with Vue UI",
+  "description": "tab-project-next desktop Chromium browser extension with Vue UI",
   "scripts": {
     "build": "npm run ui:build",
     "clean:chunks": "node scripts/clean-chunks.mjs",

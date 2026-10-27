@@ -11,8 +11,13 @@ import { bilibiliChannelService } from "../services/bilibili-channel.service";
 import { formatBiliCompactNumber } from "./channel-format";
 import BiliRichText from "./BiliRichText.vue";
 import { images } from "../sdk/images";
+import { useVideoFailover } from "./use-video-failover";
 
 const videoRef = ref<HTMLVideoElement | null>(null);
+useVideoFailover(state, videoRef, () => {
+  state.errorMsg = "视频源加载失败，备用地址已用尽，请重新获取视频流";
+  state.isPlaying = false;
+});
 const playerRef = ref<HTMLElement | null>(null);
 
 // UP 主粉丝数与关注状态管理
@@ -377,8 +382,9 @@ watch(
 watch(
   () => [state.videoSrc, state.bvid],
   async ([newSrc, bvid]) => {
-    if (newSrc && videoRef.value && bvid) {
+    if (newSrc && bvid) {
       await nextTick();
+      if (!videoRef.value || state.videoSrc !== newSrc || state.bvid !== bvid) return;
       videoRef.value.playbackRate = state.playbackRate;
       videoRef.value.play().catch(() => {});
       void attachBiliPlaybackSync({ bvid: state.bvid, title: state.title, cover: state.cover }, videoRef.value);

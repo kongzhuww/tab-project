@@ -1,0 +1,28 @@
+Make your new tab a personal workspace with tab-project.
+
+Keep frequently used websites, browser bookmarks and everyday tools close at hand, with a customizable layout and light, paper-inspired and dark themes.
+
+FEATURES
+- Organize website shortcuts into groups and nested folders.
+- Browse, search and manage browser bookmarks.
+- Use the clock, configurable motto, city weather and search shortcuts.
+- Switch between workspaces and tools from the dock.
+- Connect Todoist to view and manage tasks and configure reminders.
+- Browse GitHub starred repositories, read repository information and link repository work with tasks.
+- Organize Bilibili favorites and explore supported video and subtitle tools.
+- Read AI news and compare model pricing information.
+- Access supported NetEase Cloud Music and Monster Siren music features.
+- Use side-panel tools to save the current page and collect selected page images.
+- Optionally enable the experimental chat component and connect your own compatible chat server. Chat is disabled by default.
+
+ACCOUNTS AND OPTIONAL SERVICES
+Some tools need an existing third-party account, an access token, an API key or a compatible service configured by the user. Network access, service availability, subscriptions and API charges are governed by the relevant provider. Optional tools may be enabled or disabled in the extension.
+
+DATA AND PERMISSIONS
+Settings and content are primarily stored in your browser. Connected tools send the information needed for their functions to the corresponding services. Configuration backups may contain sensitive credentials; keep backup files private. Browser permissions support bookmark and tab management, page tools, connected services, reminders, downloads and clipboard actions.
+
+Review the privacy policy for details about data processing, third-party services, backups, deleting data and revoking authorization:
+https://logicweaver.me/privacy
+
+Support: support@logicweaver.me
+Source project: https://github.com/kongzhuww/tab-project-next

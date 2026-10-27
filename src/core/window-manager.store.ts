@@ -646,7 +646,6 @@ if (typeof document !== "undefined" && typeof window !== "undefined") {
     if (shortcutCaptureState.active || event.defaultPrevented || event.isComposing) return;
     const key = String(event.key || "").toLowerCase();
     const isEsc = key === "escape";
-    const isAltW = event.altKey && key === "w";
     const isCmdW = (event.metaKey || event.ctrlKey) && key === "w";
 
     if (isEsc) {
@@ -681,7 +680,7 @@ if (typeof document !== "undefined" && typeof window !== "undefined") {
       return;
     }
 
-    if (!isAltW && !isCmdW) return;
+    if (!isCmdW) return;
 
     if (state.activeId && isWindowVisible(state.activeId)) {
       event.preventDefault();

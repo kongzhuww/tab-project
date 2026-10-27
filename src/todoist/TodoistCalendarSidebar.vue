@@ -159,7 +159,10 @@ import {
 } from "./calendar-sidebar-store";
 import { todoistInspectorController } from "./inspector-store";
 
+import { useTaskInvalidation } from "./use-task-invalidation";
 const state = todoistCalendarSidebarState;
+useTaskInvalidation(() => todoistModuleState.active, () => todoistCalendarSidebarController.invalidateReads(),
+  () => todoistCalendarSidebarController.loadTodosForDate(state.selectedDate, true));
 onUnmounted(() => todoistCalendarSidebarController.cancelReads());
 
 watch(() => [todoistModuleState.active, todoistModuleState.pendingWrites] as const, ([active, writes], previous) => {

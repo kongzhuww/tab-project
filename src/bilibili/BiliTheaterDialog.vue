@@ -54,7 +54,7 @@
           id="bili-theater-close"
           class="bili-theater-btn close"
           type="button"
-          title="关闭 (Esc / Alt+W / Q)"
+          title="关闭 (Esc / Q)"
           @click="handleClose"
         >
           ✕
@@ -66,6 +66,7 @@
         <div class="bili-theater-player-box">
           <video
             id="bili-theater-video"
+            ref="videoRef"
             class="bili-theater-video"
             controls
             autoplay
@@ -250,11 +251,15 @@
 </template>
 
 <script setup lang="ts">
+import { ref } from "vue";
+import { useVideoFailover } from "./use-video-failover";
 import { biliTheaterController } from "./theater-store";
 import BiliRichText from "./BiliRichText.vue";
 
 // B站剧场响应式状态
 const state = biliTheaterController.state;
+const videoRef = ref<HTMLVideoElement | null>(null);
+useVideoFailover(state, videoRef, () => biliTheaterController.playbackFailed());
 
 // 关闭剧场视窗
 function handleClose() {

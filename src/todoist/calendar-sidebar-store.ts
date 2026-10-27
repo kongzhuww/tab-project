@@ -1,4 +1,5 @@
 import { reactive } from "vue";
+import { todoistErrorText } from "./api-error";
 import { todoistModuleState, withTodoistWrite } from "./module-state";
 import { todoistService, isTodoistTaskCompleted } from "../services/todoist.service";
 import { todoistTaskListState, todoistTaskListController } from "./task-list-store";
@@ -108,6 +109,7 @@ function projectTasks() {
 export const todoistCalendarSidebarController = {
   state: todoistCalendarSidebarState,
   cancelReads: cancelTodoistDateReads,
+  invalidateReads() { cancelTodoistDateReads(); savedAt = 0; history.clear(); reopenedIds.clear(); },
   setCollapsed(collapsed: boolean) { todoistCalendarSidebarState.collapsed = collapsed; },
   toggleCollapsed() {
     this.setCollapsed(!todoistCalendarSidebarState.collapsed);
@@ -160,16 +162,13 @@ export const todoistCalendarSidebarController = {
           if (history.size > 42) history.delete(history.keys().next().value!);
         } catch (error) {
           if (current()) {
-            const code = error instanceof Error ? error.message.match(/^Todoist API 请求失败 \((\d{3})\)$/)?.[1] : undefined;
-            todoistCalendarSidebarState.emptyText = code === "401" || code === "403"
-              ? `完成历史读取失败（HTTP ${code}），请检查 Todoist 账户或接口访问权限；现有任务保留。`
-              : `完成历史读取失败${code ? `（HTTP ${code}）` : ""}；现有任务保留，可重试读取。`;
+            todoistCalendarSidebarState.emptyText = "完成历史：" + todoistErrorText(error) + " 现有任务保留。";
           }
         }
       }
       if (current()) projectTasks();
-    } catch {
-      if (current()) todoistCalendarSidebarState.emptyText = "任务读取失败，请检查 Todoist 连接后刷新；当前日期的已有数据保留。";
+    } catch (error) {
+      if (current()) todoistCalendarSidebarState.emptyText = todoistErrorText(error) + " 当前日期的已有数据保留。";
     } finally {
       if (current()) todoistCalendarSidebarState.todoLoading = false;
       if (dateAbort === request) dateAbort = undefined;

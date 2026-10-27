@@ -59,6 +59,13 @@ export function detachBiliPlaybackSync(media: HTMLMediaElement): void {
 }
 
 export async function attachBiliPlaybackSync(video: PlaybackVideo, media: HTMLMediaElement): Promise<void> {
+  const existing = states.get(media);
+  if (existing?.video.bvid === video.bvid) {
+    // Source watchers and play events can both bind the same media; keep its in-flight subtitle read.
+    existing.video = video;
+    if (active === media) updateLyrics();
+    return;
+  }
   detachBiliPlaybackSync(media);
   const state: PlaybackState = { video, media, cues: [], cueIndex: -1 };
   states.set(media, state);

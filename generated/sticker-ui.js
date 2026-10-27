@@ -1,5 +1,5 @@
 import { d as D, C as F, y as M, o as n, e as a, f as o, g as d, D as v, t as h, F as g, h as P, u as y, B as V, E as w, b as p, O as z } from "./chunks/vendor-vue-DokqDua_.js";
-import { S as L } from "./chunks/StickerBoard-i35nS9AK.js";
+import { S as L } from "./chunks/StickerBoard-BeWjK9Tb.js";
 import { b as f, w as $ } from "./chunks/InlineEditStatus.vue_vue_type_style_index_0_scoped_28642927_lang-ChQUbu-A.js";
 import { g as b, i as S, s as H } from "./chunks/quick-links-export.service-bmE4-0fH.js";
 import { _ as O } from "./chunks/_plugin-vue_export-helper-CHgC5LLL.js";
@@ -18,7 +18,7 @@ const Q = { class: "sticker-app" }, U = {
 }, K = ["title", "onClick"], R = ["src"], X = ["hidden"], Y = /* @__PURE__ */ D({
   __name: "StickerStandalone",
   setup(tt) {
-    const T = w(() => import("./chunks/SettingsDialog-vqZZbcep.js")), B = w(() => import("./chunks/AppPromptModal-BeukD1Gs.js")), k = document.body.dataset.mode === "sidepanel", l = p([]), i = p("等待扫描"), u = p(""), _ = p(!1);
+    const T = w(() => import("./chunks/SettingsDialog-B44V0WB7.js")), B = w(() => import("./chunks/AppPromptModal-BeukD1Gs.js")), k = document.body.dataset.mode === "sidepanel", l = p([]), i = p("等待扫描"), u = p(""), _ = p(!1);
     let m = 0;
     function r(s, e = !1) {
       u.value = s, _.value = e, clearTimeout(m), m = window.setTimeout(() => {

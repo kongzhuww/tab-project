@@ -9,7 +9,7 @@
 > **最新默认行为**：聊天室为实验性组件，默认关闭，只能在商店逐项启用；关闭时不自动同步、读取服务房间或补发，保留配置/历史/凭据，不把已经提交的请求假称撤回。Alt+E / Alt+Q 仅列出已注册且已启用的组件，不恢复退役工具。工作台不预置演示视频或恢复自动播放，必须可见且用户本页主动点击后才创建iframe，切走销毁播放器。
 
 > **面向 AI 助手与开发者的核心准则**：在当前仓库执行任何开发、重构或调试时，必须严格遵守本规范。
-> 先用 [docs/CURRENT_STATE.md](docs/CURRENT_STATE.md) 定位现行入口；[docs/MODULE_INDEX.md](docs/MODULE_INDEX.md) 同时包含索引与历史台账，历史演进记录另见 [docs/REPOSITORY_CLEANUP_REVIEW.md](docs/REPOSITORY_CLEANUP_REVIEW.md)。
+> 先用 [docs/CURRENT_STATE.md](docs/CURRENT_STATE.md) 定位现行入口；现行模块架构见 [docs/MODULE_INDEX.md](docs/MODULE_INDEX.md)，历史演进与迁移台账已归档至 [docs/history/](docs/history/README.md)。
 > 索引和历史记录可能保留旧模块、旧入口及阶段性方案；判断当前行为必须核对现行源码与用户最新要求，不能凭旧记录恢复已移除的功能。
 
 ---
@@ -60,7 +60,7 @@
 | **桌宠快捷栏（已移除）** | 无入口 | 新仓库按用户要求整套删除，严禁恢复 |
 | **监控快捷栏（已移除）** | 无入口 | 原 `AgentLaunchers.vue` 与专属服务探针已彻底移除，严禁恢复 |
 | **设置** | `src/settings/SettingsDialog.vue` / `SettingsView.vue` | 顶栏右上角设置齿轮按钮及非模态设置面板 |
-| **主题** | `src/layout/AppTopBar.vue` (`#theme-toggle`) | 顶栏最右上角主题切换按钮（Light / Lonetrail / Dark） |
+| **主题** | `src/layout/AppTopBar.vue` (`#theme-toggle`) | 顶栏最右上角主题切换按钮（白天 light / 夜晚 dark / 终末地 endfield / 孤星 lonetrail） |
 
 ### 3.2 首屏展台区（Hero Launcher）
 | 用户口令 | 对应源码文件 | 作用位置与说明 |
@@ -262,7 +262,8 @@
 ### 8.1 默认白色主题，不混淆启动动画
 
 - 用户偏好白色的**明亮（`light`）主题**。`src/theme/theme-init.ts` 与 `src/layout/AppTopBar.vue` 在没有已保存偏好时均默认 `light`；不要将默认改成米纸色或暗色，也不要为此覆盖所有用户已保存的主题。
-- 顶栏主题按钮 `#theme-toggle` 可切换并保存页面主题。`lonetrail` 是孤星风格页面主题；`rhinelab` 是独立的“莱茵生命”启动动画选项，**启动动画与页面主题不是同一设置**。
+- 顶栏主题按钮 `#theme-toggle` 循环切换 4 套正式界面主题：白天模式 (`light`)、夜晚模式 (`dark`)、终末地风格 (`endfield`)、孤星风格 (`lonetrail`)。旧版本中曾使用 Lone Trail / Endfield 等名称，当前主题键以源码为准。
+- 独立开机启动动画由 `startupAnimationStyle` 控制：莱茵生命 (`rhinelab`) 与终末地 (`endfield`)，**启动动效与页面主题不是同一设置**。
 - 用户看到不同颜色时先区分已保存主题、首帧初始化和启动动画，不要用硬编码白色绕过主题 CSS 变量。
 
 ### 8.2 GitHub / todoist 未配置时的引导
@@ -271,6 +272,12 @@
 - **GitHub**：仅在 Star 收藏且确认用户名与 Token 均未配置时显示引导；用户名即可读取公开 Star，**Token 可选**。按钮打开现有模块设置；趋势榜单和 Awesome 不应被账号引导一起封锁。
 - **todoist**：确认缺少 Token 后显示引导，提供模块设置与获取 Token 的链接。`TodoistAccountSettings.vue` 保存 Token 后通过 `account-saved` 通知工作台加载任务；不要要求用户重开整个插件才生效。
 - 配置状态使用显式 `accountConfigured: boolean | null`：`null` 为尚未确认，`false` 才是未配置。存储读取失败、Token 无效、401/403、网络错误和“配置完整但没有内容”不能统统归为未配置；保留原有错误反馈，绝不打印 Token 排查。
+
+### 浏览器侧边栏与快捷键
+
+- 用户确认Alt+W用于浏览器右侧侧边栏（sidepanel.html），不是新标签页内的书签面板。manifest的open-side-panel命令建议Alt+W，后台在用户命令手势中打开；不再用Alt+W关闭窗口、工作区或轮盘。
+- 浏览器级绑定从chrome.commands.getAll读取，在Edge/Chrome的extensions/shortcuts页面修改；不要假称页面录制框可改浏览器级命令，或把manifest建议键当作实际绑定。设置提供实际按键展示和浏览器管理入口；页面书签面板保留独立录制配置。
+- manifest命令变更须用户重载扩展后验收；未分配或冲突时由用户在浏览器管理页调整，不自动改用户已有绑定或启动浏览器。
 
 ### GitHub 收藏状态提示位置
 

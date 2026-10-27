@@ -16,7 +16,7 @@ export interface ShortcutTool {
 export const AVAILABLE_SHORTCUT_TOOLS: readonly ShortcutTool[] = [
   { id: "nav-wheel", label: "导航轮盘", defaultKey: "Alt+E", group: "navigation" },
   { id: "toolbox", label: "工具轮盘", defaultKey: "Alt+Q", group: "navigation" },
-  { id: "bookmarks", label: "书签侧栏", defaultKey: "Alt+K", group: "navigation" },
+  { id: "bookmarks", label: "书签面板（新标签页内）", defaultKey: "Alt+K", group: "navigation" },
   { id: "settings", label: "设置", defaultKey: "Alt+,", group: "navigation" },
   { id: "search", label: "聚焦搜索栏", defaultKey: "/", group: "navigation" },
   { id: "todoist", label: "todoist 任务看板", defaultKey: "Alt+D", group: "components", moduleId: "todoist" },

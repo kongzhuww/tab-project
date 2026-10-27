@@ -145,7 +145,7 @@ async function handleCopy() {
         id="aihot-viewer-close"
         class="aihot-viewer-close"
         type="button"
-        title="关闭 (Esc / Alt+W / Q)"
+        title="关闭 (Esc / Q)"
         @click="handleClose"
       >
         ✕

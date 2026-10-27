@@ -46,11 +46,6 @@
         </div>
       </header>
 
-      <div v-if="state.favoriteMessage || state.favoritesNeedsReview" class="muted small" role="status">
-        {{ state.favoriteMessage }}
-        <button type="button" :disabled="state.favoritesBusy || state.favoritesLoading" @click="handleReloadFavorites">重读收藏</button>
-      </div>
-
       <!-- 左右双栏结构（B站收藏夹风格） -->
       <div class="yt-layout-body">
         <!-- 左侧边栏 -->
@@ -83,7 +78,7 @@
                 <span class="yt-nav-btn-icon">✨</span>
                 <div class="yt-nav-btn-text">
                   <strong>个性推荐</strong>
-                  <small>算法流 · 18个换一批</small>
+                  <small>猜你喜欢 · 每次刷新</small>
                 </div>
               </div>
               <span class="yt-nav-btn-badge">FOR YOU</span>
@@ -653,7 +648,7 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: space-between;
   padding: 10px 12px;
-  border-radius: 10px;
+  border-radius: 12px;
   border: 1px solid var(--border, rgba(0, 0, 0, 0.08));
   background: var(--panel, #f8fafc);
   color: var(--text, #1e293b);
@@ -662,10 +657,16 @@ onBeforeUnmount(() => {
   text-align: left;
 }
 
-.yt-sidebar-nav-btn:hover {
+.yt-sidebar-nav-btn.yt-nav-fav:hover {
   transform: translateY(-1px);
-  border-color: #ff0000;
-  box-shadow: 0 4px 12px rgba(255, 0, 0, 0.1);
+  border-color: #e11d48;
+  box-shadow: 0 4px 12px rgba(225, 29, 72, 0.12);
+}
+
+.yt-sidebar-nav-btn.yt-nav-rec:hover {
+  transform: translateY(-1px);
+  border-color: #8b5cf6;
+  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.16);
 }
 
 .yt-nav-fav.on {
@@ -674,10 +675,15 @@ onBeforeUnmount(() => {
   box-shadow: 0 4px 14px rgba(225, 29, 72, 0.18) !important;
 }
 
+.yt-nav-rec {
+  border-color: rgba(139, 92, 246, 0.28);
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.08), rgba(139, 92, 246, 0.02));
+}
+
 .yt-nav-rec.on {
-  border-color: #ff0000 !important;
-  background: linear-gradient(135deg, rgba(255, 0, 0, 0.12), rgba(255, 0, 0, 0.04)) !important;
-  box-shadow: 0 4px 14px rgba(255, 0, 0, 0.18) !important;
+  border-color: #8b5cf6 !important;
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.18), rgba(139, 92, 246, 0.06)) !important;
+  box-shadow: 0 4px 14px rgba(139, 92, 246, 0.22) !important;
 }
 
 .yt-nav-btn-main {
@@ -714,13 +720,16 @@ onBeforeUnmount(() => {
 }
 
 .yt-nav-btn-badge {
-  font-size: 8px;
+  font-size: 9px;
   font-weight: 800;
   letter-spacing: 0.5px;
-  padding: 2px 6px;
-  border-radius: 4px;
+  padding: 2.5px 8px;
+  border-radius: 9999px;
   background: var(--border, rgba(0, 0, 0, 0.1));
   color: var(--muted, #64748b);
+  white-space: nowrap;
+  flex-shrink: 0;
+  line-height: 1.2;
 }
 
 .yt-nav-fav.on .yt-nav-btn-badge {
@@ -728,9 +737,18 @@ onBeforeUnmount(() => {
   color: #ffffff;
 }
 
-.yt-nav-rec.on .yt-nav-btn-badge {
-  background: #ff0000;
+.yt-nav-rec .yt-nav-btn-badge {
+  background: #8b5cf6;
   color: #ffffff;
+  font-size: 9.5px;
+  padding: 3px 9px;
+  box-shadow: 0 2px 6px rgba(139, 92, 246, 0.35);
+}
+
+.yt-nav-rec.on .yt-nav-btn-badge {
+  background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(124, 58, 237, 0.45);
 }
 
 /* 分组 Hub 导航条 (B站收藏夹风格) */

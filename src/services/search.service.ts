@@ -10,6 +10,7 @@ import {
   type SearchSuggestionItem
 } from "../search/store";
 import { pluginSlots } from "../sdk/slots";
+import { rankWebCandidates, searchUrlKey, type WebCandidate } from "../search/web-ranking";
 import { neteaseService } from "./netease.service";
 import { launcherService } from "./launcher.service";
 import { bookmarksService } from "./bookmarks.service";
@@ -26,7 +27,6 @@ import {
 declare const chrome: any;
 
 export type WebSearchScope = "all" | "bookmarks" | "launcher";
-export const WEB_SEARCH_SCOPES: WebSearchScope[] = ["all", "bookmarks", "launcher"];
 
 export const SEARCH_MODE_KEY = "logicweaverLauncherSearchMode";
 export const SEARCH_MODES: SearchMode[] = ["web", "bilibili", "github", "netease", "qcc"];
@@ -118,12 +118,9 @@ const SEARCH_HISTORY_STORAGE_KEY = "logicweaver_search_click_history";
 export class SearchService {
   private static instance: SearchService;
   private currentMode: SearchMode = "web";
-  private scope: WebSearchScope = "all";
-  public get webScope(): WebSearchScope { return this.scope; }
-  public set webScope(value: WebSearchScope) {
-    if (value === this.scope) return;
-    this.clearSuggestions();
-    this.scope = value;
+  public get webScope(): WebSearchScope {
+    const query = searchState.query.trim();
+    return /^\/bm[\s:]/i.test(query) ? "bookmarks" : /^\/sites[\s:]/i.test(query) ? "launcher" : "all";
   }
   private suggestionEpoch = 0;
   private suggestTimer: number = 0;
@@ -151,7 +148,9 @@ export class SearchService {
         if (raw) {
           const parsed = JSON.parse(raw);
           if (Array.isArray(parsed)) {
-            this.clickHistory = parsed;
+            this.clickHistory = parsed.filter((item: any) => item && typeof item.url === "string" &&
+              typeof item.title === "string" && searchUrlKey(item.url) && Number.isFinite(item.visitedAt))
+              .sort((a, b) => b.visitedAt - a.visitedAt).slice(0, 30);
           }
         }
       } catch {}
@@ -159,7 +158,7 @@ export class SearchService {
   }
 
   public recordSearchClick(item: { url: string; title: string; iconSrc?: string; badge?: any }): void {
-    if (!item.url || item.url.startsWith("javascript:")) return;
+    if (!item.url || !searchUrlKey(item.url)) return;
     const cleanUrl = item.url.trim();
     // 过滤掉已有记录，置于数组最前方
     this.clickHistory = this.clickHistory.filter(h => h.url !== cleanUrl);
@@ -239,12 +238,6 @@ export class SearchService {
     this.setMode(nextSlot.id);
   }
 
-  public cycleWebScope(): WebSearchScope {
-    const idx = WEB_SEARCH_SCOPES.indexOf(this.webScope);
-    this.webScope = WEB_SEARCH_SCOPES[(idx + 1) % WEB_SEARCH_SCOPES.length];
-    return this.webScope;
-  }
-
   public scheduleSuggestions(query: string): void {
     clearTimeout(this.suggestTimer);
     this.abortController?.abort();
@@ -252,8 +245,11 @@ export class SearchService {
     const q = query.trim();
     if (!q) {
       this.clearSuggestions();
+      if (this.currentMode === "web") void this.loadWebRecentRecommendations();
       return;
     }
+    // Do not leave an old history row clickable during the search debounce.
+    searchController.setSuggestions([]);
 
     this.suggestTimer = window.setTimeout(() => {
       void this.fetchSuggestions(q);
@@ -261,6 +257,10 @@ export class SearchService {
   }
 
   public handleFocus(): void {
+    if (searchState.query.trim()) {
+      if (this.currentMode === "web") this.scheduleSuggestions(searchState.query);
+      return;
+    }
     if (!searchState.query.trim()) {
       if (this.currentMode === "web") {
         void this.loadWebRecentRecommendations(true);
@@ -283,107 +283,22 @@ export class SearchService {
     searchController.setSuggestions([]);
   }
 
-  public async loadWebRecentRecommendations(force = false): Promise<void> {
-    const epoch = this.suggestionEpoch;
-    const suggestions: SearchSuggestionItem[] = [];
-    const seenUrls = new Set<string>();
-
-    // 0. 🔥 最高优先级：真实点击足迹（用户在搜索下拉/推荐中真实点击过的网站）
-    if (this.clickHistory.length > 0) {
-      for (const h of this.clickHistory) {
-        if (!h.url || seenUrls.has(h.url)) continue;
-        seenUrls.add(h.url);
-        let iconSrc = h.iconSrc;
-        if (!iconSrc) {
-          try {
-            if (typeof chrome !== "undefined" && chrome?.runtime?.getURL) {
-              iconSrc = chrome.runtime.getURL(`_favicon/?pageUrl=${encodeURIComponent(h.url)}&size=32`);
-            }
-          } catch {}
-        }
-        suggestions.push({
-          id: `hist_${encodeURIComponent(h.url)}`,
-          title: h.title,
-          meta: h.url,
-          url: h.url,
-          iconSrc: iconSrc || undefined,
-          badge: {
-            className: h.sourceType === "bookmark" ? "badge-bookmark" : h.sourceType === "launcher" ? "badge-launcher" : "badge-bing",
-            text: h.sourceType === "bookmark" ? "历史书签" : h.sourceType === "launcher" ? "历史网站" : "历史访问",
-            icon: "🕒"
-          }
-        });
-        if (suggestions.length >= 10) break;
-      }
-    }
-
-    // 1. 若历史记录尚不足 10 条，从真实常用网站中补充
-    if (suggestions.length < 10) {
-      try {
-        const launcherLinks = launcherService.getState().links || [];
-        for (const link of launcherLinks) {
-          if (!link.url || seenUrls.has(link.url)) continue;
-          seenUrls.add(link.url);
-          let iconSrc = launcherService.getCachedIcon(link.url) || link.customIcon || link.icon || "";
-          if (!iconSrc) {
-            try {
-              if (typeof chrome !== "undefined" && chrome?.runtime?.getURL) {
-                iconSrc = chrome.runtime.getURL(`_favicon/?pageUrl=${encodeURIComponent(link.url)}&size=32`);
-              }
-            } catch {}
-          }
-          suggestions.push({
-            id: `recent_launcher_${link.id}`,
-            title: link.title || link.url,
-            meta: link.url,
-            url: link.url,
-            iconSrc: iconSrc || undefined,
-            badge: { className: "badge-launcher", text: "常用网站", icon: "⭐" }
-          });
-          if (suggestions.length >= 10) break;
-        }
-      } catch {}
-    }
-
-    // 2. 若仍不足 10 条，从浏览器真实最近添加的书签补充
-    if (suggestions.length < 10) {
-      try {
-        if (typeof chrome !== "undefined" && chrome.bookmarks?.getRecent) {
-          const recentBookmarks = await new Promise<any[]>((resolve) => {
-            chrome.bookmarks.getRecent(10, (items: any) => resolve(items || []));
-          });
-          const ignored = await bookmarksService.getIgnoredFolders();
-          await bookmarksService.ensureBookmarkData();
-          const folderMap = bookmarksService.getBookmarkFolderMap();
-
-          for (const b of recentBookmarks) {
-            if (!b.url || b.url.startsWith("javascript:") || seenUrls.has(b.url)) continue;
-            if (bookmarksService.isBookmarkIgnored(b, ignored, folderMap)) continue;
-            seenUrls.add(b.url);
-            let iconSrc = "";
-            try {
-              if (chrome?.runtime?.getURL) {
-                iconSrc = chrome.runtime.getURL(`_favicon/?pageUrl=${encodeURIComponent(b.url)}&size=32`);
-              }
-            } catch {}
-            suggestions.push({
-              id: `recent_bm_${b.id}`,
-              title: b.title || b.url,
-              meta: b.url,
-              url: b.url,
-              iconSrc: iconSrc || undefined,
-              badge: { className: "badge-bookmark", text: "最近书签", icon: "🔖" }
-            });
-            if (suggestions.length >= 10) break;
-          }
-        }
-      } catch {}
-    }
-
-    if (epoch === this.suggestionEpoch && !searchState.query.trim() && this.currentMode === "web") {
-      searchController.setSuggestions(suggestions);
-      searchController.setSuggestionsVisible(true);
-    }
+  public async loadWebRecentRecommendations(_force = false): Promise<void> {
+    if (this.currentMode !== "web" || searchState.query.trim()) return;
+    this.initHistory();
+    const seen = new Set<string>();
+    const suggestions = this.clickHistory.flatMap(h => {
+      const key = searchUrlKey(h.url);
+      if (!key || seen.has(key)) return [];
+      seen.add(key);
+      return [{
+        id: `hist_${encodeURIComponent(key)}`, title: h.title, meta: h.url, url: h.url,
+        iconSrc: typeof h.iconSrc === "string" ? h.iconSrc : undefined,
+        badge: { className: h.sourceType === "bookmark" ? "badge-bookmark" : h.sourceType === "launcher" ? "badge-launcher" : "badge-bing",
+          text: h.sourceType === "bookmark" ? "历史书签" : h.sourceType === "launcher" ? "历史网站" : "历史访问", icon: "🕒" }
+      }];
+    }).slice(0, 10);
+    searchController.setSuggestions(suggestions);
   }
 
   public async loadNeteaseRecentRecommendations(force = false): Promise<void> {
@@ -441,12 +356,10 @@ export class SearchService {
 
       if (trimmed.startsWith("/bm ") || trimmed.startsWith("/bm:")) {
         const kw = trimmed.replace(/^\/bm[\s:]*/i, "");
-        this.webScope = "bookmarks";
-        await this.fetchWebSuggestions(kw, signal);
+        await this.fetchWebSuggestions(kw, signal, "bookmarks");
       } else if (trimmed.startsWith("/sites ") || trimmed.startsWith("/sites:")) {
         const kw = trimmed.replace(/^\/sites[\s:]*/i, "");
-        this.webScope = "launcher";
-        await this.fetchWebSuggestions(kw, signal);
+        await this.fetchWebSuggestions(kw, signal, "launcher");
       } else if (this.currentMode === "bilibili") {
         await this.fetchBilibiliSuggestions(query, signal);
       } else if (this.currentMode === "github") {
@@ -734,121 +647,71 @@ export class SearchService {
     } catch {}
   }
 
-  private async fetchWebSuggestions(keyword: string, signal: AbortSignal): Promise<void> {
-    const suggestions: SearchSuggestionItem[] = [];
-    const lowerKw = keyword.toLowerCase().trim();
-    if (!lowerKw) {
-      searchController.setSuggestions([]);
-      return;
-    }
-
-    const seenUrls = new Set<string>();
-
-    // 1. 搜索全部常用网站 (Launcher Links) - 仅在 all 或 launcher 范围下检索
-    if (this.webScope === "all" || this.webScope === "launcher") {
-      try {
-        const launcherLinks = launcherService.getState().links || [];
-        const matchedLauncher = launcherLinks.filter((link) => {
-          const title = (link.title || "").toLowerCase();
-          const url = (link.url || "").toLowerCase();
-          return title.includes(lowerKw) || url.includes(lowerKw);
+  private async fetchWebSuggestions(keyword: string, signal: AbortSignal, scope: WebSearchScope = "all"): Promise<void> {
+    if (!keyword.trim() || signal.aborted) return;
+    const candidates: WebCandidate[] = [];
+    const iconFor = (url: string) => {
+      try { return chrome.runtime.getURL(`_favicon/?pageUrl=${encodeURIComponent(url)}&size=32`); } catch { return undefined; }
+    };
+    const publish = () => {
+      if (signal.aborted) return;
+      const suggestions = rankWebCandidates(keyword, candidates);
+      if (scope === "all") {
+        const engine = getActiveSearchEngine();
+        suggestions.push({
+          id: `${engine.id}-${keyword}`, title: `${engine.shortName} 搜索 “${keyword}”`,
+          meta: `按 Enter 默认使用 ${engine.name} 检索`, url: engine.buildUrl(keyword),
+          badge: { className: engine.badgeClass, text: engine.shortName, icon: "⌕" }
         });
-
-        for (const link of matchedLauncher) {
-          if (!link.url || seenUrls.has(link.url)) continue;
-          seenUrls.add(link.url);
-          let iconSrc = launcherService.getCachedIcon(link.url) || link.customIcon || link.icon || "";
-          if (!iconSrc) {
-            try {
-              if (typeof chrome !== "undefined" && chrome?.runtime?.getURL) {
-                iconSrc = chrome.runtime.getURL(`_favicon/?pageUrl=${encodeURIComponent(link.url)}&size=32`);
-              }
-            } catch {}
-          }
-          suggestions.push({
-            id: `launcher_${link.id}`,
-            title: link.title || link.url,
-            meta: link.url,
-            url: link.url,
-            iconSrc: iconSrc || undefined,
-            badge: { className: "badge-launcher", text: "常用网站", icon: "⭐" }
-          });
-        }
-      } catch {}
+      }
+      searchController.setSuggestions(suggestions);
+    };
+    if (scope === "all") {
+      this.initHistory();
+      for (const h of this.clickHistory) candidates.push({
+        source: "history", visitedAt: h.visitedAt,
+        item: { id: `hist_${encodeURIComponent(h.url)}`, title: h.title, meta: h.url, url: h.url,
+          iconSrc: typeof h.iconSrc === "string" ? h.iconSrc : iconFor(h.url),
+          badge: { className: "badge-bing", text: "历史", icon: "🕒" } }
+      });
     }
-
-    // 2. 搜索全部书签 (Bookmarks) - 仅在 all 或 bookmarks 范围下检索，并过滤排除的书签文件夹
-    if (
-      (this.webScope === "all" || this.webScope === "bookmarks") &&
-      typeof chrome !== "undefined" &&
-      chrome.bookmarks?.search
-    ) {
+    if (scope === "all" || scope === "launcher") {
+      for (const link of launcherService.getState().links || []) {
+        if (!link.url) continue;
+        candidates.push({ source: "launcher", item: {
+          id: `launcher_${link.id}`, title: link.title || link.url, meta: link.url, url: link.url,
+          iconSrc: launcherService.getCachedIcon(link.url) || link.customIcon || link.icon || iconFor(link.url),
+          badge: { className: "badge-launcher", text: "常用网站", icon: "⭐" }
+        } });
+      }
+    }
+    publish(); // History and saved sites are usable while the bookmark worker runs.
+    if ((scope === "all" || scope === "bookmarks") && typeof chrome !== "undefined" && chrome.bookmarks?.search) {
       try {
-        // 🚀 优先通过独立多核 Web Worker 执行拼音分词与加权索引模糊检索
-        let bookmarks = await bookmarksService.searchBookmarksViaWorker(keyword, 25, signal);
+        let bookmarks = await bookmarksService.searchBookmarksViaWorker(keyword, 100, signal);
         if (signal.aborted) return;
-        if (bookmarks === null) {
-          // Only failures fall back. A valid empty result must not trigger another search.
-          bookmarks = await chrome.bookmarks.search(keyword);
-        }
+        if (bookmarks === null) bookmarks = await chrome.bookmarks.search(keyword);
         if (signal.aborted) return;
         const ignored = await bookmarksService.getIgnoredFolders();
-        if (signal.aborted) return;
         await bookmarksService.ensureBookmarkData();
         if (signal.aborted) return;
         const folderMap = bookmarksService.getBookmarkFolderMap();
-
-        const valid = (bookmarks || []).filter((b: any) => {
-          if (!b.url || b.url.startsWith("javascript:")) return false;
-          if (bookmarksService.isBookmarkIgnored(b, ignored, folderMap)) return false;
-          return true;
-        });
-
-        for (const b of valid) {
-          if (seenUrls.has(b.url)) continue;
-          seenUrls.add(b.url);
-          let iconSrc = "";
-          try {
-            if (chrome?.runtime?.getURL) {
-              iconSrc = chrome.runtime.getURL(`_favicon/?pageUrl=${encodeURIComponent(b.url)}&size=32`);
-            }
-          } catch {}
-          suggestions.push({
-            id: `bm_${b.id}`,
-            title: b.title || b.url,
-            meta: b.url,
-            url: b.url,
-            iconSrc: iconSrc || undefined,
-            badge: { className: "badge-bookmark", text: "书签", icon: "🔖" }
-          });
+        for (const bookmark of bookmarks || []) {
+          if (!bookmark.url || bookmarksService.isBookmarkIgnored(bookmark, ignored, folderMap)) continue;
+          candidates.push({ source: "bookmark", fuzzyMatch: true, item: {
+            id: `bm_${bookmark.id}`, title: bookmark.title || bookmark.url, meta: bookmark.url, url: bookmark.url,
+            iconSrc: iconFor(bookmark.url), badge: { className: "badge-bookmark", text: "书签", icon: "🔖" }
+          } });
         }
-      } catch {}
+      } catch { /* Keep already available history and sites; cancellation is checked before publishing. */ }
     }
-
-    // 4. 默认搜索引擎检索直达项：仅在“全部”模式下附加
-    if (this.webScope === "all") {
-      const engine = getActiveSearchEngine();
-      suggestions.push({
-        id: `${engine.id}-${keyword}`,
-        title: `${engine.shortName} 搜索 “${keyword}”`,
-        meta: `按 Enter 默认使用 ${engine.name} 检索`,
-        url: engine.buildUrl(keyword),
-        badge: { className: engine.badgeClass, text: engine.shortName, icon: "⌕" }
-      });
-    }
-
     if (signal.aborted) return;
-    searchController.setSuggestions(suggestions);
-    // Built-in results stay usable while plugins run; narrow scopes do not invoke plugins.
-    if (this.webScope !== "all") return;
-    const pluginSuggestions = await pluginSlots.querySearchProviders(keyword, signal);
+    publish();
+    if (scope !== "all") return;
+    const extra = await pluginSlots.querySearchProviders(keyword, signal);
     if (signal.aborted) return;
-    const urls = new Set(suggestions.map(item => item.url));
-    const extra = pluginSuggestions.filter(item => {
-      if (urls.has(item.url)) return false;
-      urls.add(item.url); return true;
-    });
-    if (extra.length) searchController.setSuggestions([...suggestions, ...extra]);
+    for (const item of extra) candidates.push({ item, source: "plugin", fuzzyMatch: true });
+    if (extra.length) publish();
   }
 
   public async loadQccRecommendations(force = false): Promise<void> {

@@ -1,5 +1,5 @@
 import { d as Tt, C as $t, y as It, o as l, e as i, f as s, t as r, u as xt, B as g, l as k, z as U, F as E, h as M, g as C, k as F, i as L, n as Q, b as u, s as at, G as Ut, O as Lt } from "./chunks/vendor-vue-DokqDua_.js";
-import { t as T } from "./chunks/todoist.service-7bvn-_sx.js";
+import { t as T } from "./chunks/todoist.service-CJhh6PtZ.js";
 import { i as lt, g as St, s as it, l as Dt, t as jt } from "./chunks/quick-links-export.service-bmE4-0fH.js";
 import { _ as Pt } from "./chunks/_plugin-vue_export-helper-CHgC5LLL.js";
 /* empty css                       */

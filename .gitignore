@@ -53,6 +53,7 @@ __pycache__/
 
 # 临时日志与打包发布包
 *.log
+*.zip
 releases/
 dist/
 dist-extension/

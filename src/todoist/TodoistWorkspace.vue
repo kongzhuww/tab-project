@@ -24,6 +24,7 @@ import { notificationController } from "../notifications/store";
 import { getDockModuleTransition } from "../modules/registry";
 import { fullscreenCardState } from "../core/fullscreen-card-state";
 import { hideRegisteredCard } from "../core/fullscreen-card-state";
+import { useTaskInvalidation } from "./use-task-invalidation";
 const taskNavigationMounted = ref(false);
 const TodoistAccountSettings = defineAsyncComponent(() => import("./TodoistAccountSettings.vue"));
 const accountSettingsOpen = ref(false);
@@ -33,6 +34,8 @@ const isFullscreen = ref(false);
 const active = computed(() => todoistModuleState.visible && pageVisible.value);
 todoistModuleState.session++;
 todoistModuleState.active = active.value;
+useTaskInvalidation(() => active.value && !todoistTaskListState.movingTaskId,
+  cancelTodoistWorkspaceReads, () => todoistTaskListController.loadWorkspace(undefined, undefined, true));
 let firstRequested = false;
 const accountSettingsButton = ref<HTMLElement | null>(null);
 

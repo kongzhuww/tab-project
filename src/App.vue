@@ -1,4 +1,5 @@
 <template>
+  <!-- 根 DOM 挂载点：保留 logicweaver-spa-root 内部 ID/类名以严格兼容全站 CSS 样式选择器；用户可见标题均已统一为 tab-project-next -->
   <div id="logicweaver-spa-root" class="logicweaver-spa-root" :data-active-workspace="activeWorkspaceId || ''">
     <!-- 纯血 SPA 统一单根声明式布局树 (Declarative Layout Architecture) -->
     <!-- 0. 新用户开箱视角预览全局悬浮条 -->
@@ -184,6 +185,7 @@ onMounted(() => {
     if (typeof chrome !== "undefined" && chrome?.runtime?.sendMessage) {
       setTimeout(() => {
         try {
+          // 历史兼容命名 cleanupNativeTabs 指浏览器自带默认空白标签页（edge://newtab / chrome://newtab），不代表 Native Host 功能仍存在
           chrome.runtime.sendMessage({ type: "cleanupNativeTabs" }, () => {
             void chrome.runtime?.lastError;
           });

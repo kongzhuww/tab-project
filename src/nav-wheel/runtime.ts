@@ -102,7 +102,7 @@ function onMouseDown(event: MouseEvent): void {
 function onAuxClick(event: MouseEvent): void { if (event.button === 1) event.preventDefault(); }
 function onKeyDown(event: KeyboardEvent): void {
   if (!navWheelState.isExpanded || shortcutCaptureState.active) return;
-  if (event.key === "Escape" || (event.altKey && event.key.toLowerCase() === "w")) {
+  if (event.key === "Escape") {
     event.preventDefault(); event.stopPropagation();
     if (navWheelState.mode === "shortcuts") setMode("main");
     else close();

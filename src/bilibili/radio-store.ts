@@ -326,14 +326,11 @@ export const biliRadioController = {
       return;
     }
 
-    let title = name.trim();
+    const title = (name || biliFavoritesState.radioSeriesName || "").trim();
     if (!title) {
-      if (biliFavoritesState.radioSeriesName.trim()) {
-        title = biliFavoritesState.radioSeriesName.trim();
-      } else {
-        const curFolder = biliFavoritesState.radioFolders.find((f) => f.id === biliFavoritesState.radioActiveFolderId);
-        title = curFolder ? `${curFolder.title}系列` : `电台系列 (${biliFavoritesState.radioQueue.length} 首)`;
-      }
+      biliFavoritesState.radioError = "保存失败：系列名称不能为空，请输入系列名称";
+      notificationController.fetch("哔哩哔哩电台", "保存失败：请先输入系列名称后再保存");
+      return;
     }
 
     const items = biliFavoritesState.radioQueue.map((item) => ({ ...item }));
@@ -371,3 +368,15 @@ export const biliRadioController = {
     }
   }
 };
+
+if (typeof window !== "undefined") {
+  window.addEventListener("logicweaver:sync-restored", () => {
+    void (async () => {
+      try {
+        biliFavoritesState.radioSeries = normalizeSavedSeries(await readSavedSeries());
+      } catch (e) {
+        console.warn("[BiliRadio] 云同步恢复系列重载失败", e);
+      }
+    })();
+  });
+}
