@@ -7,6 +7,10 @@
 <p align="center"><strong>以浏览器新标签页为核心的个人生产力工作台</strong></p>
 
 <p align="center">
+  <a href="README_en.md">English</a> · <strong>简体中文</strong>
+</p>
+
+<p align="center">
   <a href="https://github.com/kongzhuww/tab-project/releases/latest">下载最新版本</a> ·
   <a href="CHANGELOG.md">更新日志</a> ·
   <a href="#快速指引如何选择适合你的路径">快速起步</a> ·
