@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from "vue";
-import { myReposState, myReposController, sanitizeGitHubTopic, type MyRepoItem } from "./my-repos-store";
+import { ref, computed, onMounted, onUnmounted, watch } from "vue";
+import { myReposState, myReposController, type MyRepoItem } from "./my-repos-store";
 
 const props = defineProps<{
   active?: boolean;
@@ -11,12 +11,18 @@ const isCreatingTopic = ref(false);
 const activeMenuColumn = ref<string | null>(null);
 const renameTopicInput = ref("");
 const renamingColumnTopic = ref<string | null>(null);
-const activeAddRepoColumnTopic = ref<string | null>(null);
 
-// 内存直接绑定的拖拽状态（绝不依赖 dataTransfer 序列化，100% 可靠）
+// 看板横向滚动容器引用
+const boardViewportRef = ref<HTMLElement | null>(null);
+
+// 内存直接绑定的拖拽状态
 const activeDragRepo = ref<MyRepoItem | null>(null);
 const activeDragFromTopic = ref<string | null>(null);
 const hoverTargetColumn = ref<string | null>(null);
+
+// 边缘自动滚动状态
+let autoScrollRaf: number | null = null;
+let autoScrollVelocity = 0;
 
 // 提取所有活跃的 Topic 列：包含用户自定义的 topic 和仓库中现有的 topics
 const activeTopicColumns = computed(() => {
@@ -53,11 +59,6 @@ const defaultColumnRepos = computed(() => {
 // 获取属于特定 Topic 列的仓库
 function getReposForTopic(topic: string): MyRepoItem[] {
   return filteredRepos.value.filter(r => r.topics.includes(topic));
-}
-
-// 可选添加到指定 Topic 的备选仓库
-function getCandidateReposForTopic(topic: string): MyRepoItem[] {
-  return myReposState.repos.filter(r => !r.topics.includes(topic));
 }
 
 // 新建 Topic 板块
@@ -97,20 +98,80 @@ async function handleDeleteTopic(topic: string) {
   await myReposController.deleteTopicColumn(topic);
 }
 
-// 添加仓库到指定 Topic
-async function handleAddRepoToTopic(repo: MyRepoItem, topic: string) {
-  await myReposController.addRepoToTopic(repo, topic);
-  activeAddRepoColumnTopic.value = null;
-}
-
 // 从指定 Topic 移除仓库
 async function handleRemoveRepoFromTopic(repo: MyRepoItem, topic: string) {
   await myReposController.removeRepoFromTopic(repo, topic);
 }
 
 // -------------------------------------------------------------
-// 原生极简且 100% 稳定的 HTML5 拖拽（恢复上版本清爽结构）
+// 横向滚动与拖拽交互逻辑（支持 Shift+滚轮、拖拽中直接滚轮、触边自动滚动）
 // -------------------------------------------------------------
+
+function onViewportWheel(event: WheelEvent) {
+  const vp = boardViewportRef.value;
+  if (!vp) return;
+  // 按住 Shift 滚轮，或者拖拽卡片中滚轮，或者触摸板横向滑动
+  if (event.shiftKey || activeDragRepo.value || Math.abs(event.deltaX) > 0) {
+    event.preventDefault();
+    const delta = event.deltaX !== 0 ? event.deltaX : event.deltaY;
+    vp.scrollLeft += delta;
+  }
+}
+
+// 拖拽过程中，全局监听鼠标滚轮，让用户随时可以通过滚轮平滑横向滚动看板
+function onWindowWheelWhileDragging(event: WheelEvent) {
+  if (!activeDragRepo.value || !boardViewportRef.value) return;
+  event.preventDefault();
+  const delta = event.deltaX !== 0 ? event.deltaX : event.deltaY;
+  boardViewportRef.value.scrollLeft += delta * 1.2;
+}
+
+function startAutoScroll() {
+  if (autoScrollRaf !== null) return;
+  const step = () => {
+    if (boardViewportRef.value && autoScrollVelocity !== 0) {
+      boardViewportRef.value.scrollLeft += autoScrollVelocity;
+      autoScrollRaf = requestAnimationFrame(step);
+    } else {
+      stopAutoScroll();
+    }
+  };
+  autoScrollRaf = requestAnimationFrame(step);
+}
+
+function stopAutoScroll() {
+  if (autoScrollRaf !== null) {
+    cancelAnimationFrame(autoScrollRaf);
+    autoScrollRaf = null;
+  }
+  autoScrollVelocity = 0;
+}
+
+function checkEdgeAutoScroll(clientX: number) {
+  if (!activeDragRepo.value || !boardViewportRef.value) return;
+  const rect = boardViewportRef.value.getBoundingClientRect();
+  const threshold = 100;
+
+  if (clientX > rect.right - threshold) {
+    // 接近右边缘，向右滚动
+    const ratio = Math.min(1, Math.max(0.1, (clientX - (rect.right - threshold)) / threshold));
+    autoScrollVelocity = Math.round(ratio * 20);
+    startAutoScroll();
+  } else if (clientX < rect.left + threshold) {
+    // 接近左边缘，向左滚动
+    const ratio = Math.min(1, Math.max(0.1, ((rect.left + threshold) - clientX) / threshold));
+    autoScrollVelocity = -Math.round(ratio * 20);
+    startAutoScroll();
+  } else {
+    stopAutoScroll();
+  }
+}
+
+function onViewportDragOver(event: DragEvent) {
+  if (!activeDragRepo.value) return;
+  event.preventDefault();
+  checkEdgeAutoScroll(event.clientX);
+}
 
 function onDragStart(event: DragEvent, repo: MyRepoItem, fromTopic: string) {
   activeDragRepo.value = repo;
@@ -119,12 +180,15 @@ function onDragStart(event: DragEvent, repo: MyRepoItem, fromTopic: string) {
     event.dataTransfer.effectAllowed = "move";
     event.dataTransfer.setData("text/plain", `${repo.id}:${fromTopic}`);
   }
+  window.addEventListener("wheel", onWindowWheelWhileDragging, { passive: false });
 }
 
 function onDragEnd() {
   activeDragRepo.value = null;
   activeDragFromTopic.value = null;
   hoverTargetColumn.value = null;
+  stopAutoScroll();
+  window.removeEventListener("wheel", onWindowWheelWhileDragging);
 }
 
 function onDragOver(event: DragEvent, columnId: string) {
@@ -132,6 +196,7 @@ function onDragOver(event: DragEvent, columnId: string) {
   event.preventDefault();
   if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
   hoverTargetColumn.value = columnId;
+  checkEdgeAutoScroll(event.clientX);
 }
 
 function onDragLeave(event: DragEvent, columnId: string) {
@@ -197,6 +262,11 @@ onMounted(() => {
     void myReposController.load();
   }
 });
+
+onUnmounted(() => {
+  window.removeEventListener("wheel", onWindowWheelWhileDragging);
+  stopAutoScroll();
+});
 </script>
 
 <template>
@@ -250,7 +320,12 @@ onMounted(() => {
     </div>
 
     <!-- 看板横向多列滚动区 -->
-    <div class="board-viewport">
+    <div
+      ref="boardViewportRef"
+      class="board-viewport"
+      @wheel="onViewportWheel"
+      @dragover="onViewportDragOver"
+    >
       <div class="board-columns-track">
         
         <!-- 1. 左侧第一列：默认板块 (未分配 Topic / 基础列表) -->
@@ -375,41 +450,6 @@ onMounted(() => {
             </div>
           </header>
 
-          <!-- 添加仓库内嵌按钮 -->
-          <div class="column-add-wrap">
-            <button
-              v-if="activeAddRepoColumnTopic !== topic"
-              type="button"
-              class="btn-column-add"
-              @click="activeAddRepoColumnTopic = topic"
-            >
-              ＋ 添加仓库到此 Topic
-            </button>
-
-            <!-- 选仓库下拉面板 -->
-            <div v-else class="add-repo-picker">
-              <div class="picker-head">
-                <span>选择要加入 #{{ topic }} 的仓库：</span>
-                <button type="button" class="picker-close" @click="activeAddRepoColumnTopic = null">✕</button>
-              </div>
-              <div class="picker-list">
-                <button
-                  v-for="cand in getCandidateReposForTopic(topic)"
-                  :key="cand.id"
-                  type="button"
-                  class="picker-repo-item"
-                  @click="handleAddRepoToTopic(cand, topic)"
-                >
-                  <span class="cand-name">{{ cand.name }}</span>
-                  <span class="cand-visibility">{{ cand.isPrivate ? '私有' : '公开' }}</span>
-                </button>
-                <div v-if="!getCandidateReposForTopic(topic).length" class="picker-empty">
-                  全部仓库均已加入此 Topic
-                </div>
-              </div>
-            </div>
-          </div>
-
           <div class="column-cards-scroll">
             <div
               v-for="repo in getReposForTopic(topic)"
@@ -467,7 +507,7 @@ onMounted(() => {
             </div>
 
             <div v-if="!getReposForTopic(topic).length" class="empty-column-placeholder">
-              <span>暂无项目，可从左侧拖拽或点击上方添加</span>
+              <span>暂无项目，可从其他列拖拽至此</span>
             </div>
           </div>
         </section>
@@ -656,6 +696,7 @@ onMounted(() => {
   overflow-x: auto;
   overflow-y: hidden;
   padding: 16px 20px;
+  scroll-behavior: smooth;
 }
 
 .board-columns-track {
@@ -835,113 +876,11 @@ onMounted(() => {
   color: var(--muted, #64748b);
 }
 
-/* ＋ 添加仓库区 */
-.column-add-wrap {
-  padding: 8px 12px 4px;
-  position: relative;
-}
-
-.btn-column-add {
-  width: 100%;
-  padding: 6px 10px;
-  font-size: 11.5px;
-  color: var(--muted, #64748b);
-  background: var(--surface-hover, rgba(0, 0, 0, 0.02));
-  border: 1px dashed var(--border, rgba(0, 0, 0, 0.12));
-  border-radius: 6px;
-  cursor: pointer;
-  transition: all 0.15s ease;
-  text-align: center;
-}
-
-.btn-column-add:hover {
-  background: var(--surface-hover, rgba(0, 0, 0, 0.05));
-  color: #0284c7;
-  border-color: #0284c7;
-}
-
-.add-repo-picker {
-  background: var(--panel, #ffffff);
-  border: 1px solid var(--border, rgba(0, 0, 0, 0.15));
-  border-radius: 8px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
-  padding: 8px;
-  position: absolute;
-  top: 100%;
-  left: 10px;
-  right: 10px;
-  z-index: 60;
-  max-height: 220px;
-  display: flex;
-  flex-direction: column;
-}
-
-.picker-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--muted, #64748b);
-  margin-bottom: 6px;
-}
-
-.picker-close {
-  background: none;
-  border: none;
-  cursor: pointer;
-  color: var(--muted, #94a3b8);
-}
-
-.picker-list {
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.picker-repo-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 6px 8px;
-  border: none;
-  background: var(--surface-hover, rgba(0, 0, 0, 0.02));
-  border-radius: 4px;
-  cursor: pointer;
-  text-align: left;
-}
-
-.picker-repo-item:hover {
-  background: #f0f9ff;
-  color: #0284c7;
-}
-
-.cand-name {
-  font-size: 11.5px;
-  font-weight: 500;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.cand-visibility {
-  font-size: 9.5px;
-  color: var(--muted, #94a3b8);
-}
-
-.picker-empty {
-  font-size: 11px;
-  color: var(--muted, #94a3b8);
-  text-align: center;
-  padding: 12px;
-}
-
 /* 卡片滚动列表 */
 .column-cards-scroll {
   flex: 1;
   overflow-y: auto;
-  padding: 8px 12px 14px;
+  padding: 10px 12px 14px;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -974,7 +913,7 @@ onMounted(() => {
 }
 
 .repo-card.card-dragging {
-  opacity: 0.4;
+  opacity: 0.35;
   border-style: dashed;
   border-color: #0284c7;
 }
