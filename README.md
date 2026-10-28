@@ -1,4 +1,4 @@
-# tab-project-next
+# tab-project
 
 <p align="center">
   <img src="assets/icon-128.png" alt="tab-project" width="80" height="80" />
@@ -7,7 +7,7 @@
 <p align="center"><strong>以浏览器新标签页为核心的个人生产力工作台</strong></p>
 
 <p align="center">
-  <a href="https://github.com/kongzhuww/tab-project-next/releases/latest">下载最新版本</a> ·
+  <a href="https://github.com/kongzhuww/tab-project/releases/latest">下载最新版本</a> ·
   <a href="CHANGELOG.md">更新日志</a> ·
   <a href="#快速指引如何选择适合你的路径">快速起步</a> ·
   <a href="#安装">安装指南</a> ·
