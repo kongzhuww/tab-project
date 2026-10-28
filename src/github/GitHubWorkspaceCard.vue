@@ -11,6 +11,7 @@ import GitHubRepositories from "./GitHubRepositories.vue";
 import GitHubBatchBar from "./GitHubBatchBar.vue";
 import GitHubTrending from "./GitHubTrending.vue";
 import GitHubAwesome from "./GitHubAwesome.vue";
+import GitHubMyRepos from "./GitHubMyRepos.vue";
 const GitHubSettingsModal = defineAsyncComponent(() => import("./GitHubSettingsModal.vue"));
 import { gitHubService, type GitHubSearchRule } from "../services/github.service";
 import { fullscreenCardState } from "../core/fullscreen-card-state";
@@ -22,7 +23,7 @@ let initialVersion = 0, initialized = false;
 let repositoryReadScope: AbortController | undefined;
 const initialError = ref("");
 
-type GitHubChannel = "stars" | "trending" | "awesome";
+type GitHubChannel = "stars" | "trending" | "awesome" | "repos";
 const activeChannel = ref<GitHubChannel>("stars");
 watch(() => active.value && activeChannel.value === "stars", visible => gitHubService.setAiViewActive(visible), { immediate: true, flush: "sync" });
 const isChannelsCollapsed = ref(false);
@@ -287,6 +288,27 @@ onBeforeUnmount(() => { gitHubService.setAiViewActive(false); ++initialVersion; 
                 <span class="fo-sidebar-sub-badge" style="background: linear-gradient(135deg, #6366f1, #a855f7);">AWESOME</span>
               </button>
             </div>
+
+            <!-- 频道 4: 我的仓库 -->
+            <div class="fo-sidebar-sub-wrap fo-sidebar-repos-wrap">
+              <button
+                id="gh-sidebar-repos-btn"
+                type="button"
+                class="fo-sidebar-sub-btn"
+                :class="{ on: activeChannel === 'repos' }"
+                title="查看与管理我的仓库及 Topic 看板"
+                @click="switchChannel('repos')"
+              >
+                <div class="fo-sidebar-sub-main">
+                  <span class="fo-sidebar-sub-icon">📦</span>
+                  <div class="fo-sidebar-sub-text">
+                    <strong>我的仓库</strong>
+                    <small>个人项目 · Topic 看板</small>
+                  </div>
+                </div>
+                <span class="fo-sidebar-sub-badge" style="background: linear-gradient(135deg, #0284c7, #0ea5e9);">REPOS</span>
+              </button>
+            </div>
           </div>
 
           <!-- 2. 文件夹列表 -->
@@ -341,6 +363,11 @@ onBeforeUnmount(() => { gitHubService.setAiViewActive(false); ++initialVersion; 
           <!-- 视图 C: Awesome 专区 -->
           <template v-else-if="activeChannel === 'awesome'">
             <GitHubAwesome />
+          </template>
+
+          <!-- 视图 D: 我的仓库 (Topic 看板) -->
+          <template v-else-if="activeChannel === 'repos'">
+            <GitHubMyRepos :active="active && activeChannel === 'repos'" />
           </template>
         </section>
       </div>

@@ -56,7 +56,7 @@
 | :--- | :--- | :--- |
 | **todoist** | `src/todoist/TodoistWorkspace.vue` | 待办任务看板：0ms 本地离线直出；按 GitHub 关联仓库自动分层排版；支持任务日历与任务详情抽屉；跨页面缓存失效实时同步。 |
 | **b站插件** | `src/bilibili/BilibiliWorkspace.vue` | B站双栏收藏夹整理、AI 字幕提取、刹那观察室订阅视频、小窗播放与电台系列管理。电台优先抓取 DASH 纯音频流（M4A，~3MB），防盗链与 8 秒卡顿自动切备用 CDN 源。 |
-| **github插件** | `src/github/GitHubWorkspaceCard.vue` | GitHub Star 仓库深度检索、资源专区、开阔式 Markdown README 阅读与一键创建关联 Todoist 任务。 |
+| **github插件** | `src/github/GitHubWorkspaceCard.vue`<br>`src/github/GitHubMyRepos.vue` | GitHub 工作区：Star 仓库深度检索、资源专区、开阔式 Markdown README 阅读与一键创建关联待办；**「我的仓库」** Todoist 风格看板（默认板块与 Topic 多列聚合、就地拖拽归类、重命名与远端 GitHub Topics 实时同步）。 |
 | **ai hot插件** | `src/aihot/AihotFeed.vue`<br>`src/viewers/AihotViewer.vue` | 每日精选 AI 资讯热榜与沉浸式阅读器。 |
 | **模型插件** | `src/pricing/ModelPricingCard.vue` | 全网主流大模型 Token 价格雷达与性价比对比。 |
 | **youtube插件** | `src/youtube/YouTubeCard.vue` | YouTube 频道订阅、个性推荐（紫色胶囊卡片）与视频播放。 |
@@ -93,7 +93,7 @@
 ### 6.2 核心数据服务 (`src/services/`)
 * **`bilibili.service.ts` / `bilibili-channel.service.ts`**：B站 API 门面、WBI 鉴权、DASH 纯音频获取与视频流分发。
 * **`todoist.service.ts`**：Todoist REST API 封装、结构化错误与限流冷却重试控制。
-* **`github.service.ts`**：GitHub Star 仓库同步、分类缓存、本地轻量零消耗检索。
+* **`github.service.ts` / `my-repos-store.ts`**：GitHub Star 仓库同步、分类缓存、个人仓库读取与 GitHub Topics 远端实时同步更新。
 * **`webdav.service.ts` / `sync.service.ts`**：WebDAV 协议客户端、备份白名单与本地数据快照序列化。
 * **`launcher.service.ts`**：常用网站与大文件夹本地持久化存储（带内存镜像与快速检索）。
 * **`bookmarks.service.ts`**：Chrome 原生书签树遍历与 Web Worker 拼音/模糊全文分流搜索。
