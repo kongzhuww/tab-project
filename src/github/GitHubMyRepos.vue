@@ -1,27 +1,24 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch } from "vue";
+import { ref, computed, onMounted, watch } from "vue";
 import { myReposState, myReposController, sanitizeGitHubTopic, type MyRepoItem } from "./my-repos-store";
 
 const props = defineProps<{
   active?: boolean;
 }>();
 
-// 搜索与新建
 const newTopicInput = ref("");
 const isCreatingTopic = ref(false);
-
-// 板块菜单与重命名状态
 const activeMenuColumn = ref<string | null>(null);
 const renameTopicInput = ref("");
 const renamingColumnTopic = ref<string | null>(null);
 const activeAddRepoColumnTopic = ref<string | null>(null);
 
-// 拖拽核心状态（对齐 Todoist useTodoistBoardDrag 逻辑）
-const draggingRepoId = ref<number | null>(null);
-const dragSourceTopic = ref<string | null>(null);
-const dragOverColumnId = ref<string | null>(null);
+// 内存直接绑定的拖拽状态（绝不依赖 dataTransfer 序列化，100% 可靠）
+const activeDragRepo = ref<MyRepoItem | null>(null);
+const activeDragFromTopic = ref<string | null>(null);
+const hoverTargetColumn = ref<string | null>(null);
 
-// 活跃 Topic 列：合并自定义列与已有仓库 topics
+// 提取所有活跃的 Topic 列：包含用户自定义的 topic 和仓库中现有的 topics
 const activeTopicColumns = computed(() => {
   const set = new Set<string>(myReposState.customTopicNames);
   for (const r of myReposState.repos) {
@@ -44,7 +41,7 @@ const filteredRepos = computed(() => {
   );
 });
 
-// 左侧“默认板块”中的仓库：没有当前任何活跃 Topic 的项目（基础池）
+// 左侧“默认板块”中的仓库：没有打任何已知活跃 Topic 的仓库，或未分类
 const defaultColumnRepos = computed(() => {
   const topicsSet = new Set(activeTopicColumns.value);
   return filteredRepos.value.filter(r => {
@@ -112,90 +109,62 @@ async function handleRemoveRepoFromTopic(repo: MyRepoItem, topic: string) {
 }
 
 // -------------------------------------------------------------
-// 类似 Todoist 的平滑拖拽实现 (Drag and Drop Architecture)
+// 原生极简且 100% 稳定的 HTML5 拖拽（恢复上版本清爽结构）
 // -------------------------------------------------------------
 
-function onTaskDragStart(event: DragEvent, repo: MyRepoItem, sourceTopic: string) {
-  if (myReposState.syncingTopic) {
-    event.preventDefault();
-    return;
-  }
-  draggingRepoId.value = repo.id;
-  dragSourceTopic.value = sourceTopic;
-
+function onDragStart(event: DragEvent, repo: MyRepoItem, fromTopic: string) {
+  activeDragRepo.value = repo;
+  activeDragFromTopic.value = fromTopic;
   if (event.dataTransfer) {
     event.dataTransfer.effectAllowed = "move";
-    event.dataTransfer.setData("application/x-my-repo-id", String(repo.id));
-    event.dataTransfer.setData("application/x-from-topic", sourceTopic);
-
-    // 精确抓取点视觉
-    const cardEl = event.currentTarget as HTMLElement | null;
-    if (cardEl) {
-      const rect = cardEl.getBoundingClientRect();
-      event.dataTransfer.setDragImage(
-        cardEl,
-        Math.max(0, Math.min(rect.width, event.clientX - rect.left)),
-        Math.max(0, Math.min(rect.height, event.clientY - rect.top))
-      );
-    }
+    event.dataTransfer.setData("text/plain", `${repo.id}:${fromTopic}`);
   }
 }
 
-function onTaskDragEnd() {
-  draggingRepoId.value = null;
-  dragSourceTopic.value = null;
-  dragOverColumnId.value = null;
+function onDragEnd() {
+  activeDragRepo.value = null;
+  activeDragFromTopic.value = null;
+  hoverTargetColumn.value = null;
 }
 
-function onColDragOver(event: DragEvent, columnId: string) {
-  if (!draggingRepoId.value) return;
+function onDragOver(event: DragEvent, columnId: string) {
+  if (!activeDragRepo.value) return;
   event.preventDefault();
-  event.stopPropagation();
   if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
-  dragOverColumnId.value = columnId;
+  hoverTargetColumn.value = columnId;
 }
 
-function onColDragLeave(event: DragEvent, columnId: string) {
-  const currentTarget = event.currentTarget as HTMLElement | null;
-  const relatedTarget = event.relatedTarget as Node | null;
-  if (currentTarget?.contains(relatedTarget)) return;
-  if (dragOverColumnId.value === columnId) {
-    dragOverColumnId.value = null;
+function onDragLeave(event: DragEvent, columnId: string) {
+  const cur = event.currentTarget as HTMLElement | null;
+  const rel = event.relatedTarget as Node | null;
+  if (cur?.contains(rel)) return;
+  if (hoverTargetColumn.value === columnId) {
+    hoverTargetColumn.value = null;
   }
 }
 
-async function onColDrop(event: DragEvent, targetColumnId: string) {
+async function onDropToTopic(event: DragEvent, targetTopic: string) {
   event.preventDefault();
-  event.stopPropagation();
+  const repo = activeDragRepo.value;
+  const fromTopic = activeDragFromTopic.value;
+  onDragEnd();
 
-  const repoId = draggingRepoId.value;
-  const fromTopic = dragSourceTopic.value;
-  onTaskDragEnd();
-
-  if (!repoId) return;
-  const repo = myReposState.repos.find(r => r.id === repoId);
   if (!repo) return;
 
-  // 1. 拖回到左侧默认板块
-  if (targetColumnId === "default") {
+  if (targetTopic === "default") {
+    // 拖回默认板块：从原 topic 移除
     if (fromTopic && fromTopic !== "default") {
       await myReposController.removeRepoFromTopic(repo, fromTopic);
     }
-    return;
-  }
-
-  // 2. 拖放到具体的某个 Topic 板块
-  const targetTopic = targetColumnId;
-  if (fromTopic === targetTopic) return;
-
-  if (fromTopic && fromTopic !== "default") {
-    // 从旧 Topic 移到新 Topic：将旧 Topic 替换为新 Topic 并提交
-    const nextTopics = repo.topics.filter(t => t !== fromTopic);
-    if (!nextTopics.includes(targetTopic)) nextTopics.push(targetTopic);
-    await myReposController.syncRepoTopics(repo, nextTopics);
   } else {
-    // 从默认板块加入新 Topic
-    await myReposController.addRepoToTopic(repo, targetTopic);
+    // 拖到新 topic 板块
+    if (fromTopic && fromTopic !== "default" && fromTopic !== targetTopic) {
+      const next = repo.topics.filter(t => t !== fromTopic);
+      if (!next.includes(targetTopic)) next.push(targetTopic);
+      await myReposController.syncRepoTopics(repo, next);
+    } else {
+      await myReposController.addRepoToTopic(repo, targetTopic);
+    }
   }
 }
 
@@ -213,14 +182,6 @@ function formatDate(iso: string): string {
   }
 }
 
-function closeMenusOnClickOutside(e: MouseEvent) {
-  const target = e.target as HTMLElement | null;
-  if (!target?.closest(".column-actions") && !target?.closest(".column-add-wrap")) {
-    activeMenuColumn.value = null;
-    activeAddRepoColumnTopic.value = null;
-  }
-}
-
 watch(
   () => props.active,
   (visible) => {
@@ -232,15 +193,9 @@ watch(
 );
 
 onMounted(() => {
-  window.addEventListener("click", closeMenusOnClickOutside);
   if (props.active && !myReposState.repos.length) {
     void myReposController.load();
   }
-});
-
-onUnmounted(() => {
-  window.removeEventListener("click", closeMenusOnClickOutside);
-  onTaskDragEnd();
 });
 </script>
 
@@ -294,17 +249,17 @@ onUnmounted(() => {
       <button type="button" @click="myReposController.load(true)">重试</button>
     </div>
 
-    <!-- 看板横向多列滚动视口 -->
+    <!-- 看板横向多列滚动区 -->
     <div class="board-viewport">
       <div class="board-columns-track">
         
         <!-- 1. 左侧第一列：默认板块 (未分配 Topic / 基础列表) -->
         <section
           class="board-column default-column"
-          :class="{ 'is-drag-over': dragOverColumnId === 'default' }"
-          @dragover="onColDragOver($event, 'default')"
-          @dragleave="onColDragLeave($event, 'default')"
-          @drop="onColDrop($event, 'default')"
+          :class="{ 'drop-active': hoverTargetColumn === 'default' }"
+          @dragover="onDragOver($event, 'default')"
+          @dragleave="onDragLeave($event, 'default')"
+          @drop="onDropToTopic($event, 'default')"
         >
           <header class="column-header">
             <div class="column-title-group">
@@ -318,24 +273,15 @@ onUnmounted(() => {
           </header>
 
           <div class="column-cards-scroll">
-            <!-- 拖拽放置指示槽 -->
-            <div
-              v-if="dragOverColumnId === 'default' && draggingRepoId"
-              class="drag-drop-placeholder"
-            >
-              <span>📥 拖放到此处（移回未分类默认板块）</span>
-            </div>
-
             <div
               v-for="repo in defaultColumnRepos"
               :key="repo.id"
               class="repo-card"
-              :class="{ 'is-dragging': draggingRepoId === repo.id }"
+              :class="{ 'card-dragging': activeDragRepo?.id === repo.id }"
               draggable="true"
-              @dragstart="onTaskDragStart($event, repo, 'default')"
-              @dragend="onTaskDragEnd"
+              @dragstart="onDragStart($event, repo, 'default')"
+              @dragend="onDragEnd"
             >
-              <div class="card-drag-indicator"></div>
               <div class="repo-card-head">
                 <span class="repo-name" :title="repo.fullName" @click="openRepoUrl(repo.htmlUrl)">
                   {{ repo.name }}
@@ -369,8 +315,8 @@ onUnmounted(() => {
               </div>
             </div>
 
-            <div v-if="!defaultColumnRepos.length && dragOverColumnId !== 'default'" class="empty-column-placeholder">
-              <span>暂无未分类项目，拖拽卡片可移回此处</span>
+            <div v-if="!defaultColumnRepos.length" class="empty-column-placeholder">
+              <span>暂无未分类仓库</span>
             </div>
           </div>
         </section>
@@ -380,10 +326,10 @@ onUnmounted(() => {
           v-for="topic in activeTopicColumns"
           :key="topic"
           class="board-column topic-column"
-          :class="{ 'is-drag-over': dragOverColumnId === topic }"
-          @dragover="onColDragOver($event, topic)"
-          @dragleave="onColDragLeave($event, topic)"
-          @drop="onColDrop($event, topic)"
+          :class="{ 'drop-active': hoverTargetColumn === topic }"
+          @dragover="onDragOver($event, topic)"
+          @dragleave="onDragLeave($event, topic)"
+          @drop="onDropToTopic($event, topic)"
         >
           <header class="column-header">
             <!-- 正常标题显示 -->
@@ -414,13 +360,13 @@ onUnmounted(() => {
                 type="button"
                 class="col-more-btn"
                 title="板块操作（重命名 / 删除）"
-                @click.stop="activeMenuColumn = activeMenuColumn === topic ? null : topic"
+                @click="activeMenuColumn = activeMenuColumn === topic ? null : topic"
               >•••</button>
 
               <!-- 气泡弹出菜单 -->
-              <div v-if="activeMenuColumn === topic" class="col-popover-menu" @click.stop>
+              <div v-if="activeMenuColumn === topic" class="col-popover-menu">
                 <button type="button" class="menu-item" @click="startRenameTopic(topic)">
-                  ✏️ 重命名 Topic 并同步远端
+                  ✏️ 重命名 Topic 并同步
                 </button>
                 <button type="button" class="menu-item danger" @click="handleDeleteTopic(topic)">
                   🗑️ 删除板块并从远端移除
@@ -429,19 +375,19 @@ onUnmounted(() => {
             </div>
           </header>
 
-          <!-- ＋ 添加仓库按钮 -->
+          <!-- 添加仓库内嵌按钮 -->
           <div class="column-add-wrap">
             <button
               v-if="activeAddRepoColumnTopic !== topic"
               type="button"
               class="btn-column-add"
-              @click.stop="activeAddRepoColumnTopic = topic"
+              @click="activeAddRepoColumnTopic = topic"
             >
               ＋ 添加仓库到此 Topic
             </button>
 
             <!-- 选仓库下拉面板 -->
-            <div v-else class="add-repo-picker" @click.stop>
+            <div v-else class="add-repo-picker">
               <div class="picker-head">
                 <span>选择要加入 #{{ topic }} 的仓库：</span>
                 <button type="button" class="picker-close" @click="activeAddRepoColumnTopic = null">✕</button>
@@ -465,24 +411,15 @@ onUnmounted(() => {
           </div>
 
           <div class="column-cards-scroll">
-            <!-- 拖拽放置指示槽 -->
-            <div
-              v-if="dragOverColumnId === topic && draggingRepoId"
-              class="drag-drop-placeholder active-placeholder"
-            >
-              <span>📥 拖放到此处（同步添加 #{{ topic }}）</span>
-            </div>
-
             <div
               v-for="repo in getReposForTopic(topic)"
               :key="repo.id"
               class="repo-card"
-              :class="{ 'is-dragging': draggingRepoId === repo.id }"
+              :class="{ 'card-dragging': activeDragRepo?.id === repo.id }"
               draggable="true"
-              @dragstart="onTaskDragStart($event, repo, topic)"
-              @dragend="onTaskDragEnd"
+              @dragstart="onDragStart($event, repo, topic)"
+              @dragend="onDragEnd"
             >
-              <div class="card-drag-indicator topic-indicator"></div>
               <div class="repo-card-head">
                 <span class="repo-name" :title="repo.fullName" @click="openRepoUrl(repo.htmlUrl)">
                   {{ repo.name }}
@@ -529,7 +466,7 @@ onUnmounted(() => {
               </div>
             </div>
 
-            <div v-if="!getReposForTopic(topic).length && dragOverColumnId !== topic" class="empty-column-placeholder">
+            <div v-if="!getReposForTopic(topic).length" class="empty-column-placeholder">
               <span>暂无项目，可从左侧拖拽或点击上方添加</span>
             </div>
           </div>
@@ -609,7 +546,7 @@ onUnmounted(() => {
 
 .count-pill {
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 500;
   padding: 2px 8px;
   background: var(--surface-hover, rgba(0, 0, 0, 0.05));
   border: 1px solid var(--border, rgba(0, 0, 0, 0.1));
@@ -619,7 +556,7 @@ onUnmounted(() => {
 
 .sync-status {
   font-size: 12px;
-  color: #0284c7;
+  color: var(--muted, #64748b);
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -730,9 +667,9 @@ onUnmounted(() => {
 
 /* 列基础容器 */
 .board-column {
-  width: 295px;
-  min-width: 295px;
-  max-width: 295px;
+  width: 290px;
+  min-width: 290px;
+  max-width: 290px;
   height: 100%;
   display: flex;
   flex-direction: column;
@@ -742,14 +679,18 @@ onUnmounted(() => {
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
   flex-shrink: 0;
   position: relative;
-  transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
 }
 
-/* 拖拽悬停高亮态（对齐 Todoist 看板高光） */
-.board-column.is-drag-over {
+/* 拖拽悬停反馈 */
+.board-column.drop-active {
   border-color: #0284c7 !important;
-  background: var(--surface-hover, rgba(2, 132, 199, 0.04)) !important;
-  box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.2), 0 8px 24px rgba(2, 132, 199, 0.08);
+  background: rgba(2, 132, 199, 0.04) !important;
+}
+
+.default-column {
+  background: var(--surface, #f8fafc);
+  border-color: var(--border, rgba(0, 0, 0, 0.1));
 }
 
 .column-header {
@@ -786,8 +727,8 @@ onUnmounted(() => {
 
 .column-title {
   margin: 0;
-  font-size: 13.5px;
-  font-weight: 700;
+  font-size: 13px;
+  font-weight: 600;
   color: var(--heading, #0f172a);
   white-space: nowrap;
   overflow: hidden;
@@ -795,12 +736,8 @@ onUnmounted(() => {
 }
 
 .badge-count {
-  font-size: 10.5px;
-  font-weight: 700;
-  background: var(--surface-hover, rgba(0, 0, 0, 0.06));
+  font-size: 11px;
   color: var(--muted, #64748b);
-  border-radius: 999px;
-  padding: 1px 6px;
   margin-left: 2px;
 }
 
@@ -832,10 +769,10 @@ onUnmounted(() => {
   background: var(--panel, #ffffff);
   border: 1px solid var(--border, rgba(0, 0, 0, 0.12));
   border-radius: 8px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
   padding: 4px;
   z-index: 50;
-  min-width: 175px;
+  min-width: 170px;
 }
 
 .menu-item {
@@ -908,10 +845,9 @@ onUnmounted(() => {
   width: 100%;
   padding: 6px 10px;
   font-size: 11.5px;
-  font-weight: 500;
   color: var(--muted, #64748b);
   background: var(--surface-hover, rgba(0, 0, 0, 0.02));
-  border: 1px dashed var(--border, rgba(0, 0, 0, 0.14));
+  border: 1px dashed var(--border, rgba(0, 0, 0, 0.12));
   border-radius: 6px;
   cursor: pointer;
   transition: all 0.15s ease;
@@ -1009,82 +945,44 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  min-height: 80px;
 }
 
-/* 拖拽放置预览槽（仿 Todoist 插入条） */
-.drag-drop-placeholder {
-  padding: 14px 10px;
-  border: 2px dashed #0284c7;
-  background: rgba(2, 132, 199, 0.08);
-  border-radius: 8px;
-  text-align: center;
-  font-size: 11.5px;
-  font-weight: 600;
-  color: #0284c7;
-  animation: pulse 1.2s infinite;
-}
-
-@keyframes pulse {
-  0%, 100% { opacity: 0.8; }
-  50% { opacity: 1; }
-}
-
-/* 仓库卡片样式（深度对齐 Todoist Task Card 质感） */
+/* 仓库卡片基础样式：设置 flex-shrink: 0 彻底防止卡片被纵向挤压压缩 */
 .repo-card {
+  flex-shrink: 0;
   background: var(--surface, #ffffff);
   border: 1px solid var(--border, rgba(0, 0, 0, 0.08));
   border-radius: 8px;
   padding: 10px 12px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
   cursor: grab;
-  transition: all 0.15s ease;
+  transition: transform 0.12s ease, box-shadow 0.12s ease, opacity 0.12s ease;
   display: flex;
   flex-direction: column;
   gap: 6px;
-  position: relative;
-  overflow: hidden;
+  box-sizing: border-box;
 }
 
 .repo-card:hover {
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.07);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
   border-color: var(--border-strong, rgba(0, 0, 0, 0.18));
-  transform: translateY(-2px);
+  transform: translateY(-1px);
 }
 
 .repo-card:active {
   cursor: grabbing;
 }
 
-/* 正在拖拽中的卡片（Todoist 半透明位移态） */
-.repo-card.is-dragging {
-  opacity: 0.35;
+.repo-card.card-dragging {
+  opacity: 0.4;
   border-style: dashed;
   border-color: #0284c7;
-  transform: scale(0.97);
-}
-
-/* 左侧装饰指示线 */
-.card-drag-indicator {
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 3.5px;
-  background: #94a3b8;
-  border-top-left-radius: 8px;
-  border-bottom-left-radius: 8px;
-}
-
-.card-drag-indicator.topic-indicator {
-  background: #0284c7;
 }
 
 .repo-card-head {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding-left: 2px;
 }
 
 .repo-name {
@@ -1131,14 +1029,12 @@ onUnmounted(() => {
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
-  padding-left: 2px;
 }
 
 .repo-topics-row {
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
-  padding-left: 2px;
 }
 
 .topic-chip {
@@ -1177,7 +1073,6 @@ onUnmounted(() => {
   font-size: 10.5px;
   color: var(--muted, #94a3b8);
   margin-top: 2px;
-  padding-left: 2px;
 }
 
 .meta-left {
