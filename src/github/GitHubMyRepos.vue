@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import { myReposState, myReposController, type MyRepoItem } from "./my-repos-store";
+import { useContextMenu } from "../sdk/interactions";
+import { notifications } from "../sdk/notifications";
 
 const props = defineProps<{
   active?: boolean;
@@ -23,6 +25,119 @@ const hoverTargetColumn = ref<string | null>(null);
 // 边缘自动滚动状态
 let autoScrollRaf: number | null = null;
 let autoScrollVelocity = 0;
+
+// -------------------------------------------------------------
+// 右键上下文菜单交互（仿书签移动菜单与二级子菜单）
+// -------------------------------------------------------------
+const repoContextMenu = ref<{
+  visible: boolean;
+  x: number;
+  y: number;
+  repo: MyRepoItem | null;
+  fromTopic: string | null;
+}>({
+  visible: false,
+  x: 0,
+  y: 0,
+  repo: null,
+  fromTopic: null
+});
+
+function closeContextMenu() {
+  repoContextMenu.value.visible = false;
+}
+
+const { menuRef: contextMenuRef, style: contextMenuStyle } = useContextMenu({
+  visible: () => repoContextMenu.value.visible,
+  anchor: () => ({ x: repoContextMenu.value.x, y: repoContextMenu.value.y }),
+  dismiss: closeContextMenu
+});
+
+// 判断二级子菜单是否靠近右边缘需要向左翻转
+const isSubmenuFlip = computed(() => {
+  if (typeof window === "undefined") return false;
+  return repoContextMenu.value.x + 360 > window.innerWidth;
+});
+
+function handleOpenContextMenu(e: MouseEvent, repo: MyRepoItem, fromTopic: string) {
+  e.preventDefault();
+  e.stopPropagation();
+  repoContextMenu.value = {
+    visible: true,
+    x: e.clientX,
+    y: e.clientY,
+    repo,
+    fromTopic
+  };
+}
+
+async function handleMoveToDefault() {
+  const repo = repoContextMenu.value.repo;
+  const fromTopic = repoContextMenu.value.fromTopic;
+  closeContextMenu();
+  if (!repo) return;
+
+  if (fromTopic && fromTopic !== "default") {
+    await myReposController.removeRepoFromTopic(repo, fromTopic);
+  } else if (repo.topics.length) {
+    await myReposController.syncRepoTopics(repo, []);
+  }
+}
+
+async function handleMoveToTopic(targetTopic: string) {
+  const repo = repoContextMenu.value.repo;
+  const fromTopic = repoContextMenu.value.fromTopic;
+  closeContextMenu();
+  if (!repo) return;
+
+  if (fromTopic && fromTopic !== "default" && fromTopic !== targetTopic) {
+    const next = repo.topics.filter(t => t !== fromTopic);
+    if (!next.includes(targetTopic)) next.push(targetTopic);
+    await myReposController.syncRepoTopics(repo, next);
+  } else {
+    await myReposController.addRepoToTopic(repo, targetTopic);
+  }
+}
+
+async function handleCopyRepoUrl() {
+  const repo = repoContextMenu.value.repo;
+  closeContextMenu();
+  if (!repo) return;
+  try {
+    await navigator.clipboard.writeText(repo.htmlUrl);
+    notifications.show({
+      appName: "GitHub",
+      title: "已复制链接",
+      message: `已复制 ${repo.name} 仓库链接`
+    });
+  } catch {}
+}
+
+async function handleCopyCloneCommand() {
+  const repo = repoContextMenu.value.repo;
+  closeContextMenu();
+  if (!repo) return;
+  try {
+    const cmd = `git clone ${repo.htmlUrl}.git`;
+    await navigator.clipboard.writeText(cmd);
+    notifications.show({
+      appName: "GitHub",
+      title: "已复制克隆命令",
+      message: cmd
+    });
+  } catch {}
+}
+
+function handleOpenInGitHub() {
+  const repo = repoContextMenu.value.repo;
+  closeContextMenu();
+  if (!repo) return;
+  openRepoUrl(repo.htmlUrl);
+}
+
+// -------------------------------------------------------------
+// 数据过滤与计算
+// -------------------------------------------------------------
 
 // 提取所有活跃的 Topic 列：包含用户自定义的 topic 和仓库中现有的 topics
 const activeTopicColumns = computed(() => {
@@ -174,6 +289,7 @@ function onViewportDragOver(event: DragEvent) {
 }
 
 function onDragStart(event: DragEvent, repo: MyRepoItem, fromTopic: string) {
+  closeContextMenu();
   activeDragRepo.value = repo;
   activeDragFromTopic.value = fromTopic;
   if (event.dataTransfer) {
@@ -266,6 +382,7 @@ onMounted(() => {
 onUnmounted(() => {
   window.removeEventListener("wheel", onWindowWheelWhileDragging);
   stopAutoScroll();
+  closeContextMenu();
 });
 </script>
 
@@ -356,6 +473,7 @@ onUnmounted(() => {
               draggable="true"
               @dragstart="onDragStart($event, repo, 'default')"
               @dragend="onDragEnd"
+              @contextmenu="handleOpenContextMenu($event, repo, 'default')"
             >
               <div class="repo-card-head">
                 <span class="repo-name" :title="repo.fullName" @click="openRepoUrl(repo.htmlUrl)">
@@ -459,6 +577,7 @@ onUnmounted(() => {
               draggable="true"
               @dragstart="onDragStart($event, repo, topic)"
               @dragend="onDragEnd"
+              @contextmenu="handleOpenContextMenu($event, repo, topic)"
             >
               <div class="repo-card-head">
                 <span class="repo-name" :title="repo.fullName" @click="openRepoUrl(repo.htmlUrl)">
@@ -542,6 +661,91 @@ onUnmounted(() => {
 
       </div>
     </div>
+
+    <!-- 右键卡片上下文菜单 (带二级移动子菜单) -->
+    <Teleport to="body">
+      <div
+        v-if="repoContextMenu.visible && repoContextMenu.repo"
+        ref="contextMenuRef"
+        class="repo-context-menu"
+        :style="contextMenuStyle"
+        role="menu"
+        @click.stop
+      >
+        <!-- 1. 移动到分组 (悬停展开二级菜单) -->
+        <div class="ctx-submenu-wrap">
+          <button type="button" class="ctx-item has-submenu">
+            <span class="ctx-item-left">
+              <span class="ctx-icon">📁</span>
+              <span>移动到分组</span>
+            </span>
+            <span class="ctx-arrow">›</span>
+          </button>
+
+          <!-- 二级子菜单 -->
+          <div class="ctx-submenu" :class="{ 'flip-left': isSubmenuFlip }">
+            <!-- 设为未分类 -->
+            <button
+              type="button"
+              class="ctx-item is-default-item"
+              @click="handleMoveToDefault"
+            >
+              <span class="ctx-item-left">
+                <span v-if="!repoContextMenu.repo.topics.length" class="ctx-check">✓</span>
+                <span class="ctx-plus">＋</span>
+                <span>设为未分类（移入默认板块）</span>
+              </span>
+            </button>
+
+            <div class="ctx-divider"></div>
+
+            <!-- 各个 Topic 分组 -->
+            <button
+              v-for="topic in activeTopicColumns"
+              :key="topic"
+              type="button"
+              class="ctx-item"
+              @click="handleMoveToTopic(topic)"
+            >
+              <span class="ctx-item-left">
+                <span v-if="repoContextMenu.repo.topics.includes(topic)" class="ctx-check">✓</span>
+                <span v-else class="ctx-icon">📁</span>
+                <span>{{ topic }}</span>
+              </span>
+            </button>
+          </div>
+        </div>
+
+        <div class="ctx-divider"></div>
+
+        <!-- 2. 复制仓库链接 -->
+        <button type="button" class="ctx-item" @click="handleCopyRepoUrl">
+          <span class="ctx-item-left">
+            <span class="ctx-icon">📋</span>
+            <span>复制仓库链接</span>
+          </span>
+        </button>
+
+        <!-- 3. 复制克隆命令 -->
+        <button type="button" class="ctx-item" @click="handleCopyCloneCommand">
+          <span class="ctx-item-left">
+            <span class="ctx-icon">💻</span>
+            <span>复制克隆命令</span>
+          </span>
+        </button>
+
+        <div class="ctx-divider"></div>
+
+        <!-- 4. 在 GitHub 打开 -->
+        <button type="button" class="ctx-item" @click="handleOpenInGitHub">
+          <span class="ctx-item-left">
+            <span class="ctx-icon">↗</span>
+            <span>在 GitHub 打开</span>
+          </span>
+        </button>
+      </div>
+    </Teleport>
+
   </div>
 </template>
 
@@ -1139,5 +1343,124 @@ onUnmounted(() => {
   border-radius: 6px;
   font-size: 11.5px;
   cursor: pointer;
+}
+
+/* ------------------------------------------------------------- */
+/* 右键卡片上下文菜单样式（适配系统明暗主题与多级子菜单） */
+/* ------------------------------------------------------------- */
+.repo-context-menu {
+  position: fixed;
+  z-index: 99999;
+  min-width: 175px;
+  background: var(--panel, #ffffff);
+  color: var(--text, #1e293b);
+  border: 1px solid var(--border, rgba(0, 0, 0, 0.12));
+  border-radius: 8px;
+  padding: 5px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.12);
+  user-select: none;
+}
+
+.ctx-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 7px 10px;
+  font-size: 12.5px;
+  color: var(--text, #334155);
+  border-radius: 5px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  transition: background-color 0.1s ease;
+  box-sizing: border-box;
+}
+
+.ctx-item:hover,
+.ctx-submenu-wrap:hover > .ctx-item {
+  background: var(--surface-hover, rgba(0, 0, 0, 0.05));
+  color: var(--heading, #0f172a);
+}
+
+.ctx-item-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ctx-icon {
+  font-size: 13px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.ctx-plus {
+  font-size: 13px;
+  font-weight: bold;
+  color: #0284c7;
+  margin-right: 2px;
+}
+
+.ctx-arrow {
+  font-size: 12px;
+  color: var(--muted, #94a3b8);
+  margin-left: 12px;
+  flex-shrink: 0;
+}
+
+.ctx-divider {
+  height: 1px;
+  background: var(--border, rgba(0, 0, 0, 0.08));
+  margin: 4px 2px;
+}
+
+/* 子菜单浮动层容器 */
+.ctx-submenu-wrap {
+  position: relative;
+}
+
+.ctx-submenu {
+  display: none;
+  position: absolute;
+  top: -4px;
+  left: calc(100% + 2px);
+  min-width: 190px;
+  max-height: 280px;
+  overflow-y: auto;
+  background: var(--panel, #ffffff);
+  border: 1px solid var(--border, rgba(0, 0, 0, 0.12));
+  border-radius: 8px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+  padding: 5px;
+  z-index: 100000;
+}
+
+.ctx-submenu.flip-left {
+  left: auto;
+  right: calc(100% + 2px);
+}
+
+.ctx-submenu-wrap:hover > .ctx-submenu {
+  display: block;
+}
+
+/* 子菜单项样式 */
+.ctx-item.is-default-item {
+  color: #0284c7;
+  font-weight: 500;
+}
+
+.ctx-check {
+  color: #0284c7;
+  font-weight: bold;
+  font-size: 12px;
+  margin-right: 2px;
+  flex-shrink: 0;
 }
 </style>
