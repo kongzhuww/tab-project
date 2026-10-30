@@ -173,9 +173,21 @@ watch(() => fullscreenCardState.activeId, (id) => {
 onMounted(() => {
   if (typeof document !== "undefined") {
     document.body.dataset.spa = "1";
-    document.body.classList.remove("is-starting");
-    const loader = document.getElementById("endfield-loader");
-    if (loader) loader.remove();
+    // 只有在开屏动画未激活时（默认状态），才直接在 mounted 清除 loader，保持 0ms 秒开；
+    // 若开启了开屏动画，等待其完整演播完毕、触发 logicweaver:intro-complete 事件后再优雅退场与清理！
+    const isIntroActive = !document.documentElement.classList.contains("skip-endfield-loader") &&
+      document.body.classList.contains("is-starting");
+    if (!isIntroActive) {
+      document.body.classList.remove("is-starting");
+      const loader = document.getElementById("endfield-loader");
+      if (loader) loader.remove();
+    } else {
+      window.addEventListener("logicweaver:intro-complete", () => {
+        document.body.classList.remove("is-starting");
+        const loader = document.getElementById("endfield-loader");
+        if (loader) loader.remove();
+      }, { once: true });
+    }
   }
 
   try {

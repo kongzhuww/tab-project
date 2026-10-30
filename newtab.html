@@ -46,10 +46,12 @@
         document.documentElement.setAttribute("data-theme", t);
         const animSetting = localStorage.getItem("showStartupAnimation");
         const loaderSetting = localStorage.getItem("logicweaverEndfieldLoader");
-        if (animSetting === "0" || animSetting === "false" || loaderSetting === "0" || loaderSetting === "false") {
+        // 默认不启用：只有显式为 "1" 或 "true" 时才启用开屏动画
+        const isAnimEnabled = (animSetting === "1" || animSetting === "true" || loaderSetting === "1" || loaderSetting === "true") && !activeCard;
+        if (!isAnimEnabled) {
           document.documentElement.classList.add("skip-endfield-loader");
         } else {
-          const startupStyle = localStorage.getItem("startupAnimationStyle") || localStorage.getItem("logicweaverStartupStyle") || "rhinelab";
+          const startupStyle = localStorage.getItem("startupAnimationStyle") || localStorage.getItem("logicweaverStartupStyle") || "endfield";
           document.documentElement.dataset.startupStyle = startupStyle;
         }
         const displaySize = localStorage.getItem("logicweaverDisplaySize") || "auto";
@@ -79,9 +81,11 @@
         } else {
           var s = localStorage.getItem("showStartupAnimation");
           var l = localStorage.getItem("logicweaverEndfieldLoader");
-          var skip = s === "0" || s === "false" || l === "0" || l === "false" || document.documentElement.classList.contains("skip-endfield-loader");
-          if (skip) {
+          var isAnimEnabled = (s === "1" || s === "true" || l === "1" || l === "true") && !document.documentElement.classList.contains("skip-endfield-loader");
+          if (!isAnimEnabled) {
             document.documentElement.classList.add("skip-endfield-loader");
+            var loader = document.getElementById("endfield-loader");
+            if (loader) loader.remove();
           } else {
             document.body.classList.add("is-starting");
           }

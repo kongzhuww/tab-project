@@ -148,6 +148,7 @@ declare global {
 
 export function installGlobalControllers(commands: CommandRegistry, features: FeatureRegistry): void {
   window.LogicWeaverIntro = introController;
+  (window as any).LogicWeaverStartupIntro = introController;
   window.LogicWeaverNotifications = notificationController;
   window.LogicWeaverWindowManager = windowManagerController;
   window.LogicWeaverWindowTabs = windowManagerController as unknown as typeof window.LogicWeaverWindowTabs;

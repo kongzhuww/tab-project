@@ -1147,7 +1147,7 @@ const defaultForm: SettingsConfig = {
   showNavBall: false,
   showBookmarkPanel: true,
   showBookmarkFoldersTop: false,
-  showStartupAnimation: true,
+  showStartupAnimation: false,
   startupAnimationStyle: "endfield",
   searchEngine: "bing",
   singleNewTab: false,

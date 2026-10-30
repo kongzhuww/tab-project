@@ -9,13 +9,15 @@
 
     const animSetting = localStorage.getItem("showStartupAnimation");
     const loaderSetting = localStorage.getItem("logicweaverEndfieldLoader");
-    if (animSetting === "0" || animSetting === "false" || loaderSetting === "0" || loaderSetting === "false") {
+    // 默认不启用：只有显式为 "1" 或 "true" 时才启用开屏动画
+    const isAnimEnabled = animSetting === "1" || animSetting === "true" || loaderSetting === "1" || loaderSetting === "true";
+    if (!isAnimEnabled) {
       document.documentElement.classList.add("skip-endfield-loader");
     } else {
       const startupStyle =
         localStorage.getItem("startupAnimationStyle") ||
         localStorage.getItem("logicweaverStartupStyle") ||
-        "rhinelab";
+        "endfield";
       document.documentElement.dataset.startupStyle = startupStyle;
     }
     const displaySize = localStorage.getItem("logicweaverDisplaySize") || "auto";

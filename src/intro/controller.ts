@@ -4,6 +4,8 @@ export interface IntroController {
   update(percent: number, status?: string): void;
   finish(status?: string, forced?: boolean): void;
   skip(status?: string): void;
+  notifyBootReady(): void;
+  playIntro(options?: { style?: "endfield" | "rhinelab"; force?: boolean }): void;
   readonly enabled: boolean;
   readonly finished: boolean;
 }
@@ -20,23 +22,25 @@ interface IntroState {
 }
 
 const startupStyle = localStorage.getItem("startupAnimationStyle") || localStorage.getItem("logicweaverStartupStyle") || "endfield";
-const isAnimDisabled = (() => {
+// 默认不启用：只有显式为 "1" 或 "true" 才启用开屏动画
+const isAnimEnabled = (() => {
   try {
     const s = localStorage.getItem("showStartupAnimation");
     const l = localStorage.getItem("logicweaverEndfieldLoader");
-    return s === "0" || s === "false" || l === "0" || l === "false" || document.documentElement.classList.contains("skip-endfield-loader");
+    return (s === "1" || s === "true" || l === "1" || l === "true") &&
+      !document.documentElement.classList.contains("skip-endfield-loader");
   } catch {
     return false;
   }
 })();
 
 const state = reactive<IntroState>({
-  enabled: !isAnimDisabled,
+  enabled: isAnimEnabled,
   style: startupStyle === "rhinelab" ? "rhinelab" : "endfield",
   renderedProgress: 4,
   targetProgress: 4,
   status: "CORE SHELL...",
-  finished: isAnimDisabled,
+  finished: !isAnimEnabled,
   exiting: false,
   forced: false
 });
@@ -46,6 +50,8 @@ let from = 4;
 let animationStartedAt = performance.now();
 let animationDuration = 0;
 let finishHandler: ((forced: boolean) => void) | null = null;
+let sequenceStarted = false;
+let bootReady = false;
 
 function paint(now: number): void {
   const elapsed = now - animationStartedAt;
@@ -84,11 +90,63 @@ function skip(status = "KEYBOARD SKIP"): void {
   finish(status, true);
 }
 
+function notifyBootReady(): void {
+  bootReady = true;
+  if (!state.enabled) {
+    finish("BOOT COMPLETE", true);
+  }
+}
+
+/**
+ * 完整演播序列 (展示完全再进入)：
+ * 阶段 1 (0ms ~ 380ms): 4% -> 38% 核心初始化
+ * 阶段 2 (380ms ~ 880ms): 38% -> 76% 运行时装配
+ * 阶段 3 (880ms ~ 1350ms): 76% -> 100% 满格就绪
+ * 阶段 4 (1350ms ~ 1650ms): 100% 满格状态饱满定格 300ms 完整展示 Logo 与动效
+ * 阶段 5 (1650ms): 触发平滑擦除退出并通知进入首页
+ */
+export function startIntroSequence(): void {
+  if (!state.enabled || state.finished || sequenceStarted) return;
+  sequenceStarted = true;
+
+  update(38, "INITIALIZING CORE SHELL...");
+
+  setTimeout(() => {
+    if (state.finished) return;
+    update(76, "SYNTHESIZING RUNTIME...");
+  }, 400);
+
+  setTimeout(() => {
+    if (state.finished) return;
+    update(100, state.style === "rhinelab" ? "ID CONFIRMED : JOYCE MOORE" : "TERRA LINK READY / 终端就绪");
+  }, 900);
+
+  setTimeout(() => {
+    if (state.finished) return;
+    finish("BOOT COMPLETE / 首页就绪", false);
+  }, 1650);
+}
+
+if (isAnimEnabled) {
+  startIntroSequence();
+}
+
 export const introState = readonly(state);
 export const introController: IntroController = Object.freeze({
   update,
   finish,
   skip,
+  notifyBootReady,
+  playIntro(options?: { style?: "endfield" | "rhinelab"; force?: boolean }) {
+    if (options?.style) (state as any).style = options.style;
+    state.enabled = true;
+    state.finished = false;
+    state.forced = Boolean(options?.force);
+    state.renderedProgress = 4;
+    state.targetProgress = 4;
+    sequenceStarted = false;
+    startIntroSequence();
+  },
   get enabled() { return state.enabled; },
   get finished() { return state.finished; }
 });
