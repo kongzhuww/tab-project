@@ -1,11 +1,11 @@
-import { readonly, reactive } from "vue";
+import { readonly, reactive, createApp } from "vue";
 
 export interface IntroController {
   update(percent: number, status?: string): void;
   finish(status?: string, forced?: boolean): void;
   skip(status?: string): void;
   notifyBootReady(): void;
-  playIntro(options?: { style?: "endfield" | "rhinelab"; force?: boolean }): void;
+  playIntro(options?: { style?: "endfield" | "rhinelab"; force?: boolean }): Promise<void>;
   readonly enabled: boolean;
   readonly finished: boolean;
 }
@@ -137,14 +137,42 @@ export const introController: IntroController = Object.freeze({
   finish,
   skip,
   notifyBootReady,
-  playIntro(options?: { style?: "endfield" | "rhinelab"; force?: boolean }) {
+  async playIntro(options?: { style?: "endfield" | "rhinelab"; force?: boolean }) {
     if (options?.style) (state as any).style = options.style;
+    if (typeof document !== "undefined") {
+      document.documentElement.dataset.startupStyle = state.style;
+      document.documentElement.classList.remove("skip-endfield-loader");
+      document.body.classList.add("is-starting");
+    }
     state.enabled = true;
     state.finished = false;
     state.forced = Boolean(options?.force);
     state.renderedProgress = 4;
     state.targetProgress = 4;
     sequenceStarted = false;
+
+    // 检查是否有现有 DOM 节点；若已进入新标签页，动态创建全屏容器以供预览
+    if (typeof document !== "undefined") {
+      let mountEl = document.getElementById("endfield-loader");
+      if (!mountEl) {
+        mountEl = document.createElement("div");
+        mountEl.id = "endfield-loader";
+        mountEl.className = "endfield-loader notranslate";
+        document.body.appendChild(mountEl);
+
+        const { default: IntroComp } = await import("./IntroAnimation.vue");
+        const app = createApp(IntroComp);
+        const onComplete = () => {
+          window.removeEventListener("logicweaver:intro-complete", onComplete);
+          app.unmount();
+          mountEl?.remove();
+          document.body.classList.remove("is-starting");
+        };
+        window.addEventListener("logicweaver:intro-complete", onComplete, { once: true });
+        app.mount(mountEl);
+      }
+    }
+
     startIntroSequence();
   },
   get enabled() { return state.enabled; },

@@ -93,6 +93,7 @@ function onKeydown(event: KeyboardEvent): void {
 }
 
 onMounted(() => {
+  document.documentElement.dataset.startupStyle = introState.style;
   document.documentElement.style.setProperty("--rhine-scale", rhineScale.value);
   window.addEventListener("resize", onResize, { passive: true });
   window.addEventListener("keydown", onKeydown, true);

@@ -1,5 +1,5 @@
-import { d as w, o as b, e as f, f as o, m, l as v, n as y, B, t as U, g as x, b as l, O as D } from "./chunks/vendor-vue-DokqDua_.js";
-const I = { class: "card" }, C = {
+import { d as w, o as b, f, g as o, n as m, m as v, p as y, C as U, t as x, h as B, b as l, c as D } from "./chunks/vendor-vue-wIH4jcna.js";
+const C = { class: "card" }, I = {
   class: "step-box",
   style: { background: "rgba(99,102,241,.06)", "border-color": "rgba(99,102,241,.25)" }
 }, $ = { class: "bridge-form" }, V = ["disabled"], j = ["disabled"], A = /* @__PURE__ */ w({
@@ -52,7 +52,7 @@ B站 UID: ${e.biliUserMid || "未配置"}
         i.value = !1;
       }
     }
-    return (e, t) => (b(), f("div", I, [
+    return (e, t) => (b(), f("div", C, [
       t[6] || (t[6] = o("div", { style: { "font-size": "44px", "margin-bottom": "8px" } }, "📲 ⇄ 💻", -1)),
       t[7] || (t[7] = o("h1", null, "电脑配置过继到手机 App", -1)),
       t[8] || (t[8] = o("p", null, "这是单独的凭据过继功能，不是普通备份。点击直推会把下方手动填写的 Token / UID 明文送到本机同步池，再供手机接收；仅在你信任此服务时使用。", -1)),
@@ -63,7 +63,7 @@ B站 UID: ${e.biliUserMid || "未配置"}
         o("br"),
         m(" 如确需过继，可在下方明确填写并直推，再到手机接收；这里不会自动读取模块凭据。 ")
       ], -1)),
-      o("div", C, [
+      o("div", I, [
         t[4] || (t[4] = o("b", null, "直接填写并推送到手机", -1)),
         t[5] || (t[5] = o("br", null, null, -1)),
         o("div", $, [
@@ -104,10 +104,10 @@ B站 UID: ${e.biliUserMid || "未配置"}
       }, "🔍 检查当前电脑同步池状态", 8, j),
       u.value ? (b(), f("div", {
         key: 0,
-        class: B(["status", d.value]),
+        class: U(["status", d.value]),
         role: "status",
         "aria-live": "polite"
-      }, U(u.value), 3)) : x("", !0)
+      }, x(u.value), 3)) : B("", !0)
     ]));
   }
 }), k = document.getElementById("vue-sync-bridge-root");

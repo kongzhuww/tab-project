@@ -176,12 +176,14 @@
     <div id="app-toast" class="app-toast" hidden></div>
     <div id="mobile-transfer-toast-container" class="mobile-transfer-toast-container" aria-live="polite"></div>
     <script>
-      // 容灾双保险：超时自动移除开屏遮罩，确保首屏以最快速度绝对可见
+      // 容灾保险：仅在极端异常未触发完成事件时兜底释放，正常流程由开屏动画播完后自行退出
       setTimeout(function() {
-        document.body.classList.remove("is-starting");
-        var loader = document.getElementById("endfield-loader");
-        if (loader) loader.remove();
-      }, 180);
+        if (document.body.classList.contains("is-starting")) {
+          document.body.classList.remove("is-starting");
+          var loader = document.getElementById("endfield-loader");
+          if (loader) loader.remove();
+        }
+      }, 6000);
     </script>
     <!-- 纯血 Vue 3 SPA 唯一单根入口模块 -->
     <script type="module" src="generated/vue-ui.js"></script>
