@@ -129,6 +129,26 @@ export function startIntroSequence(): void {
 
 if (isAnimEnabled) {
   startIntroSequence();
+} else if (typeof chrome !== "undefined" && chrome?.storage?.local) {
+  try {
+    chrome.storage.local.get(["showStartupAnimation", "startupAnimationStyle"], (res) => {
+      if (res && res.showStartupAnimation !== undefined) {
+        const isEnabled = Boolean(res.showStartupAnimation);
+        try {
+          localStorage.setItem("showStartupAnimation", isEnabled ? "1" : "0");
+          localStorage.setItem("logicweaverEndfieldLoader", isEnabled ? "1" : "0");
+          if (res.startupAnimationStyle) {
+            localStorage.setItem("startupAnimationStyle", String(res.startupAnimationStyle));
+            localStorage.setItem("logicweaverStartupStyle", String(res.startupAnimationStyle));
+          }
+        } catch {}
+        // 若 localStorage 之前缺失导致本次未自动开始，但实际配置已开启，立即平滑呈现完整演播！
+        if (isEnabled && !state.enabled) {
+          void introController.playIntro({ style: res.startupAnimationStyle || state.style });
+        }
+      }
+    });
+  } catch {}
 }
 
 export const introState = readonly(state);

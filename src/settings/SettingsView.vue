@@ -115,7 +115,7 @@
             <div class="field full-width" style="margin-top: 8px;">
               <label>开屏动画风格 <em>STARTUP STYLE</em></label>
               <div style="display:flex;gap:10px;align-items:center;">
-                <select v-model="form.startupAnimationStyle" style="flex:1;" @change="saveImmediate('startupAnimationStyle')">
+                <select v-model="form.startupAnimationStyle" style="flex:1;" @change="handleStartupStyleChange">
                   <option value="endfield">终末地 (Endfield) · 工业高能黑黄动效</option>
                   <option value="rhinelab">莱茵生命 (Rhine Lab) · 科研终端科技动效 (Joyce Moore)</option>
                 </select>
@@ -130,7 +130,7 @@
                   <b>开屏启动动画</b>
                   <small>新标签页启动进度与品牌动画</small>
                 </span>
-                <input v-model="form.showStartupAnimation" type="checkbox" @change="saveImmediate('showStartupAnimation')" />
+                <input v-model="form.showStartupAnimation" type="checkbox" @change="handleToggleStartupAnimation" />
                 <i class="switch"></i>
               </label>
               <label class="toggle-card">
@@ -1473,6 +1473,23 @@ function previewStartup() {
   }
 }
 
+function handleToggleStartupAnimation() {
+  const val = form.showStartupAnimation ? "1" : "0";
+  try {
+    localStorage.setItem("showStartupAnimation", val);
+    localStorage.setItem("logicweaverEndfieldLoader", val);
+  } catch {}
+  void saveImmediate("showStartupAnimation");
+}
+
+function handleStartupStyleChange() {
+  try {
+    localStorage.setItem("startupAnimationStyle", form.startupAnimationStyle || "endfield");
+    localStorage.setItem("logicweaverStartupStyle", form.startupAnimationStyle || "endfield");
+  } catch {}
+  void saveImmediate("startupAnimationStyle");
+}
+
 // 搜索栏位管理
 const showAddSlotForm = ref(false);
 const newSlotForm = ref<{
@@ -1736,6 +1753,20 @@ async function loadAll() {
       if (cfg[key] !== undefined) {
         (form as any)[key] = cfg[key];
       }
+    }
+    // 同步到 localStorage 确保首绘脚本即时生效
+    if (cfg.showStartupAnimation !== undefined) {
+      const val = cfg.showStartupAnimation ? "1" : "0";
+      try {
+        localStorage.setItem("showStartupAnimation", val);
+        localStorage.setItem("logicweaverEndfieldLoader", val);
+      } catch {}
+    }
+    if (cfg.startupAnimationStyle) {
+      try {
+        localStorage.setItem("startupAnimationStyle", cfg.startupAnimationStyle);
+        localStorage.setItem("logicweaverStartupStyle", cfg.startupAnimationStyle);
+      } catch {}
     }
 
     if (cfg[SHORTCUT_STORAGE_KEY]) {

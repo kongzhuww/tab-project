@@ -83,10 +83,21 @@ export class OptionsService {
   /** Global settings are explicitly scoped; community sources can contain Tokens. */
   public async loadGlobalSettings(): Promise<Record<string, any>> {
     if (typeof chrome === "undefined" || !chrome.storage?.local) throw new Error("设置存储不可用，未读取配置");
-    return chrome.storage.local.get([
+    const data = await chrome.storage.local.get([
       ...GLOBAL_SETTINGS_KEYS, SHORTCUT_STORAGE_KEY, CUSTOM_AVATAR_STORAGE_KEY,
       SEARCH_IGNORED_BOOKMARK_FOLDERS_STORAGE_KEY
     ]);
+    if (typeof localStorage !== "undefined") {
+      if (data.showStartupAnimation !== undefined) {
+        localStorage.setItem("showStartupAnimation", data.showStartupAnimation ? "1" : "0");
+        localStorage.setItem("logicweaverEndfieldLoader", data.showStartupAnimation ? "1" : "0");
+      }
+      if (data.startupAnimationStyle) {
+        localStorage.setItem("startupAnimationStyle", String(data.startupAnimationStyle));
+        localStorage.setItem("logicweaverStartupStyle", String(data.startupAnimationStyle));
+      }
+    }
+    return data;
   }
 
   /** Save only edited keys, rejecting stale drafts under a lock shared by new settings views. */
