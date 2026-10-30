@@ -13,6 +13,7 @@ if (!existsSync(chunksDir)) {
 }
 
 const isForce = process.argv.includes("--force") || process.argv.includes("--all");
+const isPurgeAll = process.argv.includes("--purge-all");
 const allChunkFiles = await readdir(chunksDir);
 const entryFiles = (await readdir(genDir)).filter(f => f.endsWith(".js") && f !== "theme-init.js");
 
@@ -57,17 +58,20 @@ while (queue.length > 0) {
 }
 
 const now = Date.now();
-const MAX_AGE_MS = 15 * 60 * 1000; // 保留 15 分钟内构建的旧切片，防止开发时立即击碎正在打开的标签页
+// 默认宽容保留 60 分钟内构建的切片；即使普通 --force 也保留 15 分钟内的切片，保护正在运行的老标签页
+const MAX_AGE_MS = 60 * 60 * 1000;
+const FORCE_GRACE_MS = 15 * 60 * 1000;
 let removedCount = 0;
 let retainedCount = 0;
 
 for (const file of allChunkFiles) {
   if (!reachableChunks.has(file)) {
     const filePath = path.join(chunksDir, file);
-    if (!isForce) {
+    if (!isPurgeAll) {
       try {
         const fileStat = await stat(filePath);
-        if (now - fileStat.mtimeMs < MAX_AGE_MS) {
+        const ageLimit = isForce ? FORCE_GRACE_MS : MAX_AGE_MS;
+        if (now - fileStat.mtimeMs < ageLimit) {
           retainedCount++;
           continue;
         }

@@ -43,6 +43,7 @@ import { launcherRuntime } from "./launcher/runtime";
 import { homePrefsRuntime } from "./launcher/home-prefs.store";
 import { homeMusicState } from "./music/store";
 import { radioTapeState } from "./bilibili/radio-tape-store";
+import { scheduleDockModulesPrefetch } from "./modules/prefetch";
 
 interface ViewMeta {
   title: string;
@@ -182,6 +183,7 @@ onMounted(() => {
     void navWheelRuntime.start();
     homePrefsRuntime.start();
     void launcherRuntime.init().catch((error) => console.warn("[Launcher] 初始化失败", error));
+    scheduleDockModulesPrefetch();
     if (typeof chrome !== "undefined" && chrome?.runtime?.sendMessage) {
       setTimeout(() => {
         try {

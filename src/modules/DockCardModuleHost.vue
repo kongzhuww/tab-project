@@ -34,6 +34,10 @@ function handleReload() {
   dockLifecycleController.reloadApp(definition.id);
 }
 
+function handleRefresh() {
+  if (typeof window !== "undefined") window.location.reload();
+}
+
 const view = defineAsyncComponent({
   loader: definition.loadView,
   onError(error, retry, fail, attempts) {
@@ -48,6 +52,11 @@ const view = defineAsyncComponent({
       h("h2", definition.title),
       h("p", "工作区切片加载受阻（可能因插件重载或切片更新）。可点击「重新加载模块」，或返回首页。"),
       h("div", { style: "display: flex; gap: 10px; margin-top: 14px;" }, [
+        h("button", {
+          type: "button",
+          style: "padding: 6px 14px; border-radius: 999px; border: 1px solid var(--border); background: var(--primary, #3b82f6); color: #fff; cursor: pointer; font-size: 12px; font-weight: 500;",
+          onClick: handleRefresh
+        }, "⟳ 刷新标签页 (加载最新版)"),
         h("button", {
           type: "button",
           style: "padding: 6px 14px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface); color: var(--text); cursor: pointer; font-size: 12px;",
