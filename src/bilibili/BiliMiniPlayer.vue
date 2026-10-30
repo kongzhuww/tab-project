@@ -25,13 +25,31 @@ const upFansCount = ref<number | null>(null);
 const upFansLoading = ref(false);
 const upFollowConfirming = ref(false);
 const upFollowBusy = ref(false);
+const isUpFollowed = ref(false);
 
-const isUpFollowed = computed(() => {
-  const mid = String(state.authorMid || "");
-  if (!mid) return false;
+async function checkFollowStatus(mid: string | number) {
+  const midStr = String(mid || "");
+  if (!midStr) {
+    isUpFollowed.value = false;
+    return;
+  }
+  // 1. 本地缓存秒判
   const followings = bilibiliChannelService.upGroupsState.followingsCache || [];
-  return followings.some((f) => String(f.mid) === mid);
-});
+  if (followings.some((f) => String(f.mid) === midStr)) {
+    isUpFollowed.value = true;
+  }
+  // 2. 向 B站关系接口核验权威关注状态
+  try {
+    const res = await bilibiliService.api<{ attribute?: number }>(
+      `https://api.bilibili.com/x/relation?fid=${midStr}`
+    );
+    if (res && typeof res.attribute === "number") {
+      isUpFollowed.value = res.attribute === 2 || res.attribute === 6 || res.attribute === 1;
+    }
+  } catch {
+    // 保持缓存结果
+  }
+}
 
 async function loadUpFans(mid: string | number) {
   const midStr = String(mid || "");
@@ -62,6 +80,7 @@ watch(
     upFollowConfirming.value = false;
     if (isOpen && mid) {
       void loadUpFans(mid as string | number);
+      void checkFollowStatus(mid as string | number);
     } else if (!isOpen) {
       upFansCount.value = null;
     }
@@ -78,30 +97,42 @@ async function handleFollowClick() {
       upFollowConfirming.value = true;
       return;
     }
-    // 二次确认，执行取关
+    // 二次确认，执行取关（0ms 乐观响应）
+    upFollowConfirming.value = false;
+    isUpFollowed.value = false;
+    if (upFansCount.value != null && upFansCount.value > 0) {
+      upFansCount.value -= 1;
+    }
     upFollowBusy.value = true;
     try {
       const res = await bilibiliChannelService.unfollowBiliUp(mid);
       if (res.ok) {
-        upFollowConfirming.value = false;
         const currentFollowings = bilibiliChannelService.upGroupsState.followingsCache || [];
         bilibiliChannelService.upGroupsState.followingsCache = currentFollowings.filter(
           (x) => String(x.mid) !== mid
         );
-        if (upFansCount.value != null && upFansCount.value > 0) {
-          upFansCount.value -= 1;
-        }
+      } else {
+        // 接口失败回滚
+        isUpFollowed.value = true;
+        if (upFansCount.value != null) upFansCount.value += 1;
       }
+    } catch {
+      isUpFollowed.value = true;
+      if (upFansCount.value != null) upFansCount.value += 1;
     } finally {
       upFollowBusy.value = false;
     }
   } else {
-    // 执行关注
+    // 执行关注（0ms 乐观响应，按钮立即变“已关注”，粉丝数立即+1）
+    isUpFollowed.value = true;
+    upFollowConfirming.value = false;
+    if (upFansCount.value != null) {
+      upFansCount.value += 1;
+    }
     upFollowBusy.value = true;
     try {
       const res = await bilibiliChannelService.followBiliUp(mid);
       if (res.ok) {
-        upFollowConfirming.value = false;
         const currentFollowings = bilibiliChannelService.upGroupsState.followingsCache || [];
         if (!currentFollowings.some((x) => String(x.mid) === mid)) {
           currentFollowings.unshift({
@@ -112,9 +143,17 @@ async function handleFollowClick() {
           });
           bilibiliChannelService.upGroupsState.followingsCache = [...currentFollowings];
         }
-        if (upFansCount.value != null) {
-          upFansCount.value += 1;
+      } else {
+        // 接口失败回滚
+        isUpFollowed.value = false;
+        if (upFansCount.value != null && upFansCount.value > 0) {
+          upFansCount.value -= 1;
         }
+      }
+    } catch {
+      isUpFollowed.value = false;
+      if (upFansCount.value != null && upFansCount.value > 0) {
+        upFansCount.value -= 1;
       }
     } finally {
       upFollowBusy.value = false;

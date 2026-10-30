@@ -201,7 +201,7 @@ export class MusicService {
       return this.albumDetailCache.get(cacheKey)!;
     }
 
-    const res = await fetch(`${MONSTER_SIREN_API}/album/${albumCid}/data`, { headers: { Accept: "application/json" } });
+    const res = await fetch(`${MONSTER_SIREN_API}/album/${albumCid}/detail`, { headers: { Accept: "application/json" } });
     const json = await res.json();
     const songsRaw = json.data?.songs || [];
     const coverUrl = json.data?.coverUrl || "";
@@ -209,7 +209,7 @@ export class MusicService {
     const songs: MusicSong[] = songsRaw.map((s: any) => ({
       cid: s.cid,
       name: s.name,
-      artists: s.artists || [],
+      artists: s.artists || s.artistes || [],
       albumCid,
       coverUrl
     }));

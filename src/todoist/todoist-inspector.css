@@ -72,6 +72,15 @@
 .label-option-row input { flex-shrink: 0; accent-color: var(--accent); }
 .menu-actions { display: flex; justify-content: flex-end; gap: 8px; }
 .draft-status { margin: 0 0 10px; padding: 7px; border: 1px solid var(--border); border-radius: 5px; background: var(--surface); font-size: 11px; }
+
+/* 🐙 关联 GitHub 仓库标识 */
+.inspector-repo-badges { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+.inspector-repo-btn { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 8px; background: var(--surface); border: 1px solid var(--border); color: var(--heading); font-family: inherit; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.15s ease; user-select: none; }
+.inspector-repo-btn:hover { background: var(--surface-hover, var(--border)); color: var(--accent); border-color: var(--accent); }
+.inspector-repo-btn .repo-badge-icon { font-size: 13px; line-height: 1; flex-shrink: 0; }
+.inspector-repo-btn .repo-badge-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.inspector-repo-btn .repo-badge-jump { font-size: 11px; color: var(--muted); line-height: 1; transition: color 0.15s ease; }
+.inspector-repo-btn:hover .repo-badge-jump { color: var(--accent); }
 @container (max-width: 560px) {
   .inspector-split-layout { grid-template-columns: minmax(0, 1fr) 165px; }
   .inspector-main-col { padding: 12px; }

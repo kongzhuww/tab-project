@@ -19,9 +19,18 @@ import { folderState } from "../launcher/folder-store";
 import { folderParent } from "../launcher/folder-tree";
 import { notifications } from "../sdk/notifications";
 
+function onWindowBlurOrHide() {
+  cleanupPointerDrag();
+  isDraggingTile = false;
+  hasPointerMoved = false;
+}
+
 onMounted(() => {
   launcherGroupsController.setExternalDragHandler(onExternalDragHover);
   launcherGroupsController.setExternalDropHandler(onExternalDrop);
+  window.addEventListener("blur", onWindowBlurOrHide);
+  window.addEventListener("pagehide", onWindowBlurOrHide);
+  document.addEventListener("visibilitychange", onWindowBlurOrHide);
   const win = window as any;
   if (launcherGroupsState.hasBili && typeof win.ensureLauncherMediaCards === "function") {
     win.ensureLauncherMediaCards();
@@ -436,6 +445,7 @@ function cleanupPointerDrag() {
   draggedLinkId = null;
   draggedGroupName = null;
   hasPointerMoved = false;
+  isDraggingTile = false;
   activeDragLinkId.value = null;
   activeDragGroupName.value = null;
   previewPageItems.value = null;
@@ -445,12 +455,18 @@ function cleanupPointerDrag() {
   lastDesktopSwapKey = "";
   document.querySelector("#launcher-folder-dialog")?.classList.remove("drop-hover-valid");
   folderState.dropHoverValid = false;
+  window.removeEventListener("pointermove", onGlobalPointerMove);
+  window.removeEventListener("pointerup", onGlobalPointerUp);
+  window.removeEventListener("pointercancel", onGlobalPointerUp);
 }
 
 onUnmounted(() => {
   launcherGroupsController.setExternalDragHandler(null);
   launcherGroupsController.setExternalDropHandler(null);
   cleanupPointerDrag();
+  window.removeEventListener("blur", onWindowBlurOrHide);
+  window.removeEventListener("pagehide", onWindowBlurOrHide);
+  document.removeEventListener("visibilitychange", onWindowBlurOrHide);
   window.removeEventListener("pointermove", onGlobalPointerMove);
   window.removeEventListener("pointerup", onGlobalPointerUp);
   window.removeEventListener("pointercancel", onGlobalPointerUp);
@@ -654,6 +670,9 @@ function onLinkMouseDown(event: MouseEvent) {
 function onLinkClick(link: LauncherLink, event: MouseEvent) {
   event.preventDefault();
   event.stopPropagation();
+  if (!activePointerId) {
+    isDraggingTile = false;
+  }
   const movedDist = Math.hypot(event.clientX - mouseStartX, event.clientY - mouseStartY);
   // 若发生位移超过 6px、或处于拖拽状态、或刚拖拽结束 600ms 内，坚决拦截一切打开行为！
   if (movedDist >= 6 || isDraggingTile || (Date.now() - dragEndedTimestamp < 600)) {
@@ -667,6 +686,9 @@ function onLinkContextMenu(link: LauncherLink, event: MouseEvent) {
 }
 
 function onFolderClick(groupName: string, event: MouseEvent) {
+  if (!activePointerId) {
+    isDraggingTile = false;
+  }
   if (isDraggingTile || (Date.now() - dragEndedTimestamp < 450)) {
     event.preventDefault();
     event.stopPropagation();

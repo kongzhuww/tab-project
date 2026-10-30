@@ -1,4 +1,4 @@
-import { readdir, readFile, unlink } from "node:fs/promises";
+import { readdir, readFile, unlink, stat } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -12,6 +12,7 @@ if (!existsSync(chunksDir)) {
   process.exit(0);
 }
 
+const isForce = process.argv.includes("--force") || process.argv.includes("--all");
 const allChunkFiles = await readdir(chunksDir);
 const entryFiles = (await readdir(genDir)).filter(f => f.endsWith(".js") && f !== "theme-init.js");
 
@@ -55,12 +56,26 @@ while (queue.length > 0) {
   await scanFile(current.path, current.isChunk);
 }
 
+const now = Date.now();
+const MAX_AGE_MS = 15 * 60 * 1000; // 保留 15 分钟内构建的旧切片，防止开发时立即击碎正在打开的标签页
 let removedCount = 0;
+let retainedCount = 0;
+
 for (const file of allChunkFiles) {
   if (!reachableChunks.has(file)) {
-    await unlink(path.join(chunksDir, file)).catch(() => {});
+    const filePath = path.join(chunksDir, file);
+    if (!isForce) {
+      try {
+        const fileStat = await stat(filePath);
+        if (now - fileStat.mtimeMs < MAX_AGE_MS) {
+          retainedCount++;
+          continue;
+        }
+      } catch {}
+    }
+    await unlink(filePath).catch(() => {});
     removedCount++;
   }
 }
 
-console.log(`Verified ${allChunkFiles.length} chunks. Active: ${reachableChunks.size}, Cleaned: ${removedCount}.`);
+console.log(`Verified ${allChunkFiles.length} chunks. Active: ${reachableChunks.size}, Cleaned: ${removedCount}${retainedCount ? `, Gracefully Retained: ${retainedCount}` : ""}.`);

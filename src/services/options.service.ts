@@ -11,7 +11,6 @@
 
 import { sameSettingValue, cloneSettingValue, SettingsSaveUnconfirmedError } from "../settings/draft-values";
 import { mergeShortcutDraft, mergeIgnoredFolderDraft } from "../settings/entry-preferences";
-import { mergePreferenceFields } from "../settings/field-preferences";
 import { sendNativeRequest } from "../core/native-messaging";
 import { type NativeRequest } from "../core/native-protocol";
 import { parseGitCheckReply, type GitCheckReply } from "../settings/git-native-reply";
@@ -37,7 +36,6 @@ export interface GlobalSettingsConfig {
   searchEngine?: string;
   singleNewTab: boolean;
   showHomeMusicVisualizer: boolean;
-  showLimbusLyricEffect: boolean;
   dockPosition?: "bottom" | "left" | "right" | "top";
   customAvatarUrl?: string;
 }
@@ -50,75 +48,23 @@ export interface IgnoredBookmarkFolder {
   path: string;
 }
 
-export interface LimbusConfig {
-  preset: string;
-  coverAdaptive: boolean;
-  textColor: string;
-  strokeColor: string;
-  strokeWidth: string;
-  outlineEnabled: boolean;
-  glowColor: string;
-  glowEnabled: boolean;
-  shadowColor: string;
-  fontFamily: string;
-  fontSize: string;
-  fontWeight: string;
-  perspectiveStrength: string;
-  charSpeedMode: string;
-  fadeDuration: string;
-}
-
 // Explicit allowlist: global UI must never read or overwrite module credentials.
 export const GLOBAL_SETTINGS_KEYS: (keyof GlobalSettingsConfig)[] = [
   "displaySize", "city", "showWeather", "showSites", "showBili", "showYouTube", "showTodo",
   "showLeftNavigation", "showNavBall", "showBookmarkPanel", "showBookmarkFoldersTop",
   "showStartupAnimation", "startupAnimationStyle", "searchEngine", "singleNewTab",
-  "showHomeMusicVisualizer", "showLimbusLyricEffect", "dockPosition"
+  "showHomeMusicVisualizer", "dockPosition"
 ];
 
 export const SETTINGS_TOGGLE_KEYS: (keyof GlobalSettingsConfig)[] = [
   "showStartupAnimation", "showWeather", "showSites", "showBili", "showYouTube",
   "showTodo", "showLeftNavigation", "showNavBall", "showBookmarkPanel",
-  "showBookmarkFoldersTop", "singleNewTab", "showHomeMusicVisualizer", "showLimbusLyricEffect"
+  "showBookmarkFoldersTop", "singleNewTab", "showHomeMusicVisualizer"
 ];
 
 export const SHORTCUT_STORAGE_KEY = "customShortcuts";
-export const LIMBUS_STORAGE_KEY = "limbusLyricConfig";
 export const CUSTOM_AVATAR_STORAGE_KEY = "customNewtabAvatar";
 export const SEARCH_IGNORED_BOOKMARK_FOLDERS_STORAGE_KEY = "searchIgnoredBookmarkFolders";
-
-export const DEFAULT_LIMBUS_CONFIG: LimbusConfig = {
-  preset: "cover",
-  coverAdaptive: true,
-  textColor: "#fffeef",
-  strokeColor: "#d8a523",
-  strokeWidth: "2.2",
-  outlineEnabled: true,
-  glowColor: "#d8a523",
-  glowEnabled: true,
-  shadowColor: "#000000",
-  fontFamily: "'Cinzel', 'Source Han Serif SC', 'Noto Serif SC', 'Songti SC', 'SimSun', serif",
-  fontSize: "36",
-  fontWeight: "900",
-  perspectiveStrength: "1.0",
-  charSpeedMode: "adaptive",
-  fadeDuration: "2.8"
-};
-
-export const LIMBUS_PRESETS: Record<string, Partial<LimbusConfig>> = {
-  default: {
-    textColor: "#fffeef", strokeColor: "#d8a523", glowColor: "#d8a523", shadowColor: "#000000",
-    strokeWidth: "2.2", outlineEnabled: true, glowEnabled: true
-  },
-  heartbreak: {
-    textColor: "#b223cb", strokeColor: "#991eaf", glowColor: "#b223cb", shadowColor: "#000000",
-    strokeWidth: "2.2", outlineEnabled: true, glowEnabled: true
-  },
-  command: {
-    textColor: "#00ffff", strokeColor: "#00aaff", glowColor: "#00aaff", shadowColor: "#000000",
-    strokeWidth: "2.2", outlineEnabled: true, glowEnabled: true
-  }
-};
 
 export { AVAILABLE_SHORTCUT_TOOLS } from "./shortcut-catalog";
 
@@ -139,34 +85,27 @@ export class OptionsService {
     if (typeof chrome === "undefined" || !chrome.storage?.local) throw new Error("设置存储不可用，未读取配置");
     return chrome.storage.local.get([
       ...GLOBAL_SETTINGS_KEYS, SHORTCUT_STORAGE_KEY, CUSTOM_AVATAR_STORAGE_KEY,
-      SEARCH_IGNORED_BOOKMARK_FOLDERS_STORAGE_KEY, LIMBUS_STORAGE_KEY
+      SEARCH_IGNORED_BOOKMARK_FOLDERS_STORAGE_KEY
     ]);
   }
 
   /** Save only edited keys, rejecting stale drafts under a lock shared by new settings views. */
-  public async saveSettings(data: Record<string, any>, expected: Record<string, unknown>,
-    draftExpected?: Record<string, unknown>, limbusFields: readonly string[] = []): Promise<Record<string, any>> {
+  public async saveSettings(data: Record<string, any>, expected: Record<string, unknown>): Promise<Record<string, any>> {
     if (typeof chrome === "undefined" || !chrome.storage?.local) throw new Error("设置存储不可用，未保存");
     const allowed = new Set<string>([
       ...GLOBAL_SETTINGS_KEYS, SHORTCUT_STORAGE_KEY, CUSTOM_AVATAR_STORAGE_KEY,
-      SEARCH_IGNORED_BOOKMARK_FOLDERS_STORAGE_KEY, LIMBUS_STORAGE_KEY
+      SEARCH_IGNORED_BOOKMARK_FOLDERS_STORAGE_KEY
     ]);
     const keys = Object.keys(data);
     if (keys.some(key => !allowed.has(key) || !Object.prototype.hasOwnProperty.call(expected, key))) {
       throw new Error("保存范围或草稿基线无效，未提交设置");
     }
     if (!keys.length) return {};
-    if (keys.includes(LIMBUS_STORAGE_KEY) && (!draftExpected ||
-        !Object.prototype.hasOwnProperty.call(draftExpected, LIMBUS_STORAGE_KEY))) {
-      throw new Error("歌词草稿基线缺失，未提交设置");
-    }
     if (typeof navigator === "undefined" || !navigator.locks?.request) {
       throw new Error("当前环境不支持跨标签保存保护，未提交设置");
     }
     const submitted = cloneSettingValue(data);
     const baseline = cloneSettingValue(expected);
-    const draftBaseline = cloneSettingValue(draftExpected || {});
-    const explicitLimbusFields = [...limbusFields];
     const controller = new AbortController();
     const deadline = Date.now() + 10000;
     const timer = setTimeout(() => controller.abort(), 10000);
@@ -183,9 +122,6 @@ export class OptionsService {
             accepted[key] = mergeShortcutDraft(baseline[key], submitted[key], latest[key]);
           } else if (key === SEARCH_IGNORED_BOOKMARK_FOLDERS_STORAGE_KEY) {
             accepted[key] = mergeIgnoredFolderDraft(baseline[key], submitted[key], latest[key]);
-          } else if (key === LIMBUS_STORAGE_KEY) {
-            accepted[key] = mergePreferenceFields(baseline[key], draftBaseline[key], submitted[key],
-              latest[key], { ...DEFAULT_LIMBUS_CONFIG }, explicitLimbusFields);
           } else {
             if (!sameSettingValue(latest[key], baseline[key]) && !sameSettingValue(latest[key], submitted[key])) {
               throw new Error("其他页面已修改同一项设置，未覆盖；本页草稿保留。可重读设置后重新编辑。");

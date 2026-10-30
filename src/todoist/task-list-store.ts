@@ -1,6 +1,6 @@
 import { reactive } from "vue";
 import { todoistModuleState, withTodoistWrite } from "./module-state";
-import { createTaskStartDateReader } from "./task-date-helper";
+import { createTaskStartDateReader, parseDateKeyword } from "./task-date-helper";
 
 export interface TodoistTaskItem {
   id: string;
@@ -65,7 +65,7 @@ export const todoistTaskListState = reactive<TodoistTaskListState>({
   moveError: false,
   moveNeedsRefresh: false,
   emptyText: "",
-  view: "inbox",
+  view: (typeof localStorage !== "undefined" && (localStorage.getItem("todoist_last_active_view") as any)) || "inbox",
   activeProjectId: "",
   activeProjectName: "",
   projects: [],
@@ -151,13 +151,19 @@ export const todoistTaskListController = {
     const session = todoistModuleState.session, sequence = loadWorkspaceSeq;
     const current = () => !request.signal.aborted && todoistModuleState.active &&
       session === todoistModuleState.session && sequence === loadWorkspaceSeq;
-    const targetView = view || todoistTaskListState.view || "inbox";
+    const targetView = view || todoistTaskListState.view || (typeof localStorage !== "undefined" && (localStorage.getItem("todoist_last_active_view") as any)) || "inbox";
     const targetProjectId = projectId || (targetView === "projects"
       ? (todoistTaskListState.activeProjectId || todoistService.getActiveProjectId()) : undefined);
     const changed = targetView !== todoistTaskListState.view ||
       (targetView === "projects" && targetProjectId !== todoistTaskListState.activeProjectId);
     todoistTaskListState.view = targetView;
-    if (changed) this.updateState({ columns: [], emptyText: "", activeProjectId: targetProjectId || "" });
+    if (typeof localStorage !== "undefined") {
+      try { localStorage.setItem("todoist_last_active_view", targetView); } catch {}
+    }
+    if (typeof chrome !== "undefined" && chrome.storage?.local) {
+      try { chrome.storage.local.set({ todoist_last_active_view: targetView }); } catch {}
+    }
+
     const apply = (data: any) => {
       if (!current()) return;
       // Mutating a window card must not mutate a shared service/cache object.
@@ -193,9 +199,17 @@ export const todoistTaskListController = {
           (targetView === "today" ? "今天" : "收件箱")
       });
     };
-    // 仅在界面没有任何数据时才显示全屏加载中；若已有数据，保持安静
-    const hasExistingData = todoistTaskListState.columns.length > 0;
-    this.setLoading(!hasExistingData);
+
+    // 0ms SWR 首帧直出：优先尝试同步快照（内存或 localStorage）
+    const syncFast = !force ? todoistService.getFastSnapshot(targetView, targetProjectId) : null;
+    if (syncFast && syncFast.columns && syncFast.columns.length > 0) {
+      apply(syncFast);
+    } else if (changed && !todoistTaskListState.columns.length) {
+      this.updateState({ columns: [], emptyText: "", activeProjectId: targetProjectId || "" });
+      this.setLoading(true);
+    } else if (!todoistTaskListState.columns.length) {
+      this.setLoading(true);
+    }
 
     try {
       // Distinguish missing configuration from storage, authentication and network failures.
@@ -207,14 +221,12 @@ export const todoistTaskListController = {
         return;
       }
 
-      let cacheApplied = false;
-      if (!force) {
+      if (!syncFast && !force) {
         // 优先读取本地持久化或内存缓存（0ms 极速直出）
         const cached = await todoistService.getCachedWorkspaceData(targetView, targetProjectId);
         if (!current()) return;
         if (cached && Array.isArray(cached.columns) && cached.columns.length > 0) {
           apply(cached);
-          cacheApplied = true;
           this.setLoading(false);
         }
       }
@@ -479,16 +491,31 @@ export const todoistTaskListController = {
         });
       }
     } else if (action === "add-task-submit") {
-      const content = String(payload?.content || "").trim();
+      let content = String(payload?.content || "").trim();
       const currentView = payload?.view || todoistTaskListState.view || "inbox";
       let projectId: string | undefined = payload?.projectId || payload?.group?.projectId || undefined;
       let sectionId: string | undefined = payload?.sectionId !== undefined ? payload.sectionId : payload?.group?.sectionId;
-      let dueString: string | undefined = undefined;
+      let dueDate: string | undefined = payload?.dueDate;
+      let dueText: string | undefined = payload?.dueText;
+      let dueString: string | undefined = payload?.dueString;
+
+      // 如果外部未传日期，自动识别内容中的日期关键词（0ms 本地计算）
+      if (!dueDate && !dueString && content) {
+        const parsed = parseDateKeyword(content);
+        if (parsed) {
+          dueDate = parsed.date;
+          dueText = parsed.label + (parsed.time ? ` ${parsed.time}` : "");
+          dueString = parsed.time ? `${parsed.date} ${parsed.time}` : parsed.date;
+          content = parsed.cleanTitle || content;
+        }
+      }
 
       if (currentView === "projects") {
         if (!projectId) projectId = todoistTaskListState.activeProjectId || undefined;
-      } else if (currentView === "today") {
+      } else if (currentView === "today" && !dueDate && !dueString) {
         dueString = "today";
+        dueDate = new Date().toISOString().slice(0, 10);
+        dueText = "今天";
       }
 
       // API 只接受真实 sectionId，空字符串表示无板块
@@ -503,7 +530,9 @@ export const todoistTaskListController = {
           completed: false,
           priority: 1,
           labels: [],
-          dueText: dueString ? "今天" : "",
+          dueDate: dueDate || "",
+          dueText: dueText || (dueDate ? dueDate.slice(5) : (dueString === "today" ? "今天" : "")),
+          dueString: dueString || dueDate || "",
           isOverdue: false
         };
 
@@ -525,20 +554,30 @@ export const todoistTaskListController = {
           optimisticTask.description = attachments.map((a: any) => `![${a.file_name}](${a.file_url})`).join("\n\n");
         }
 
+        const taskPayload: {
+          content: string;
+          project_id?: string;
+          section_id?: string;
+          due_date?: string;
+          due_string?: string;
+        } = {
+          content,
+          project_id: projectId,
+          section_id: apiSectionId
+        };
+
+        if (dueDate) {
+          taskPayload.due_date = dueDate;
+        } else if (dueString) {
+          taskPayload.due_string = dueString;
+        }
+
         const taskPromise = attachments.length > 0
           ? todoistService.createTaskWithAttachments({
-              content,
-              project_id: projectId,
-              section_id: apiSectionId,
-              due_string: dueString,
+              ...taskPayload,
               attachments
             })
-          : todoistService.createTask({
-              content,
-              project_id: projectId,
-              section_id: apiSectionId,
-              due_string: dueString
-            });
+          : todoistService.createTask(taskPayload);
 
         return taskPromise.then((realTask) => {
           if (realTask && realTask.id) {

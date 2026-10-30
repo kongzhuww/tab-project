@@ -15,11 +15,17 @@ export interface TodoistWorkspaceController {
   readonly active: boolean;
 }
 
-const state = reactive<{ view: TodoistWorkspaceView }>({ view: "inbox" });
+const initialView: TodoistWorkspaceView = (typeof localStorage !== "undefined" && (localStorage.getItem("todoist_last_active_view") as any)) || "inbox";
+const state = reactive<{ view: TodoistWorkspaceView }>({ view: initialView });
 let actions: TodoistWorkspaceActions = {};
 let active = false;
 
-function update(view: TodoistWorkspaceView): void { state.view = view; }
+function update(view: TodoistWorkspaceView): void {
+  state.view = view;
+  if (typeof localStorage !== "undefined") {
+    try { localStorage.setItem("todoist_last_active_view", view); } catch {}
+  }
+}
 function setActions(nextActions: TodoistWorkspaceActions): void { actions = Object.freeze({ ...nextActions }); }
 function setMounted(mounted: boolean): void { active = mounted; }
 async function switchView(view: TodoistWorkspaceView): Promise<void> {

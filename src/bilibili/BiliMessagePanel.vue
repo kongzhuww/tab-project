@@ -20,8 +20,8 @@
           />
           <div>
             <h2 id="bili-notification-user">{{ state.userName || 'B站用户' }}</h2>
-            <p v-if="state.userMid">UID: {{ state.userMid }} · {{ totalUnread }} 条未读</p>
-            <p v-else>点击右上角刷新获取未读</p>
+            <p v-if="state.userMid">UID: {{ state.userMid }} · 消息动态 (纯浏览)</p>
+            <p v-else>点击右上角刷新获取消息</p>
           </div>
         </div>
         <span class="grow"></span>
@@ -63,27 +63,16 @@
           @click="onSwitchKind(tab.kind)"
         >
           {{ tab.label }}
-          <span v-if="state.unreadCounts[tab.kind] > 0" class="bili-tab-badge">
-            {{ state.unreadCounts[tab.kind] }}
-          </span>
         </button>
       </nav>
 
-      <!-- 操作工具栏：分类标题与一键已读 -->
+      <!-- 操作工具栏：分类标题 -->
       <div class="bili-message-toolbar">
         <div>
           <strong>{{ currentTabLabel }}</strong>
-          <span>{{ state.items.length }} 条 · 未读 {{ currentUnread }}</span>
+          <span>共 {{ state.items.length }} 条动态</span>
         </div>
-        <button
-          type="button"
-          class="bili-local-read"
-          :disabled="currentUnread <= 0"
-          title="仅清除扩展内未读红点"
-          @click="onMarkAllKnown"
-        >
-          ✓ 一键已读
-        </button>
+        <span class="bili-toolbar-note">🔒 纯浏览模式</span>
       </div>
 
       <!-- 消息列表主体 -->
@@ -102,13 +91,11 @@
             v-for="item in state.items"
             :key="item.id"
             class="bili-message-item"
-            :class="{ 'locally-known': item.isKnown }"
             :href="item.url || 'https://message.bilibili.com/'"
             target="_blank"
             rel="noreferrer"
-            title="单击：标记已读；双击：打开对应 B站页面"
+            title="点击打开对应 B站页面"
             @click.prevent="onItemClick(item)"
-            @dblclick.prevent.stop="onItemDblClick(item)"
           >
             <img
               class="bili-message-avatar"
@@ -182,35 +169,17 @@ const currentTabLabel = computed(() => {
   return match ? match.label : "消息";
 });
 
-const currentUnread = computed(() => {
-  return Number(state.unreadCounts[state.activeKind] || 0);
-});
-
-const totalUnread = computed(() => {
-  return Object.values(state.unreadCounts).reduce((acc, cur) => acc + (Number(cur) || 0), 0);
-});
-
 function onSwitchKind(kind: BiliMessageKind) {
   if (state.activeKind === kind) return;
   biliMessagePanelController.switchKind(kind);
 }
 
-function onMarkAllKnown() {
-  biliMessagePanelController.markAllKnown(state.activeKind);
-}
-
 function onItemClick(item: BiliMessageItem) {
-  biliMessagePanelController.markKnown(state.activeKind, item.id);
-}
-
-function onItemDblClick(item: BiliMessageItem) {
-  onItemClick(item);
-  window.open(item.url || "https://message.bilibili.com/", "_blank");
+  window.open(item.url || "https://message.bilibili.com/", "_blank", "noopener,noreferrer");
 }
 
 function onImagePreview(item: BiliMessageItem) {
   if (item.image) {
-    onItemClick(item);
     images.open({
       source: item.image,
       title: `${item.title} 的图片`
@@ -237,17 +206,9 @@ function onClose() {
   z-index: 92;
 }
 
-.bili-tab-badge {
-  display: inline-block;
-  margin-left: 3px;
-  padding: 0 4px;
-  border-radius: 999px;
-  background: rgba(239, 68, 68, 0.9);
-  color: #fff;
-  font-size: 9px;
-  line-height: 14px;
-  font-weight: 700;
-  vertical-align: middle;
+.bili-toolbar-note {
+  color: var(--dim, #94a3b8);
+  font-size: 10px;
 }
 
 .bili-msg-drag-header {

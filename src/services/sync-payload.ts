@@ -7,8 +7,7 @@ export class SyncBackupError extends Error {}
 const booleanKeys = new Set([
   "showWeather", "showSites", "showBili", "showYouTube", "showTodo",
   "showLeftNavigation", "showNavBall", "showBookmarkPanel", "showBookmarkFoldersTop",
-  "showStartupAnimation", "singleNewTab", "showHomeMusicVisualizer",
-  "showLimbusLyricEffect"
+  "showStartupAnimation", "singleNewTab", "showHomeMusicVisualizer"
 ]);
 const arrayKeys = new Set([
   "searchIgnoredBookmarkFolders", "wereadSortIds",
@@ -17,7 +16,7 @@ const arrayKeys = new Set([
   "ghCats", "ghUsed"
 ]);
 const objectKeys = new Set([
-  "customShortcuts", "limbusLyricConfig", "launcherFolders", "quickLinkGroupSizes",
+  "customShortcuts", "launcherFolders", "quickLinkGroupSizes",
   "launcherPageLabels", "launcherFolderPositionV1",
   "foTree", "ghMap", "ghRepoRemarksV1",
   "lw_private_chat_v1", "lw_webdav_config", "googleCalendarSessionTokenV1"

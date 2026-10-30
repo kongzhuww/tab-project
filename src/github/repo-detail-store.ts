@@ -4,7 +4,7 @@
 import { reactive, readonly } from "vue";
 import { ReadSessionSlot } from "../core/read-session";
 import { markdownAstEngine } from "../utils/markdown-ast";
-import { GitHubDetailReadError, readRepositoryDocument } from "./detail-read";
+import { GitHubDetailReadError, readRepositoryDocument, readRepositorySpecificDocument } from "./detail-read";
 import { githubTaskCreation } from "../todoist/github-task-target";
 
 export interface RepoHeadingItem {
@@ -266,7 +266,10 @@ class GitHubRepoDetailController {
       request.signal.throwIfAborted();
       if (!current()) return;
       const markdown = cleanAndNormalizeReadme(result.markdown, owner, repo, result.branch, result.path);
-      const html = markdownAstEngine.renderMarkdown(markdown, { renderMode: "rendered" });
+      // 双保险：优先使用官方权威预渲染 HTML，若官方未返回则无缝使用本地 markdownAstEngine 渲染
+      const html = (result.html && result.html.trim().length > 30)
+        ? result.html
+        : markdownAstEngine.renderMarkdown(markdown, { renderMode: "rendered" });
       if (!current()) return;
       const data = result.metadata;
       if (data) {
@@ -286,6 +289,52 @@ class GitHubRepoDetailController {
       if (current()) state.error = error instanceof GitHubDetailReadError ? error.message
         : request.signal.aborted ? "README 读取已取消或超过整体 45 秒上限，请重新打开仓库详情。"
         : "README 内容解析失败，请重新打开仓库详情或到 GitHub 查看。";
+    } finally {
+      if (request.finish()) state.isLoading = false;
+    }
+  }
+
+  /**
+   * 原地无缝切换当前 README 语言版本 (如从英文切换到 README_zh.md，或从中文切换回 README.md)
+   */
+  public async switchReadme(targetPath?: string): Promise<void> {
+    if (!state.isOpen || !this.pageActive || state.isLoading) return;
+    const { owner, repo, defaultBranch } = state;
+    if (!owner || !repo) return;
+
+    let target = targetPath?.trim();
+    if (!target) {
+      target = state.isZh ? "README.md" : "README.zh-CN.md";
+    }
+
+    state.isLoading = true;
+    state.error = null;
+    const revision = ++state.revision;
+    const request = this.reads.begin({
+      timeoutMs: 30000,
+      isCurrent: () => state.isOpen && this.pageActive && state.revision === revision,
+      onStop: () => { state.isLoading = false; }
+    });
+
+    try {
+      const result = await request.wait(() => readRepositorySpecificDocument(owner, repo, target!, defaultBranch, request.signal));
+      request.signal.throwIfAborted();
+      if (!request.current()) return;
+
+      const markdown = cleanAndNormalizeReadme(result.markdown, owner, repo, defaultBranch, result.path);
+      const html = (result.html && result.html.trim().length > 30)
+        ? result.html
+        : markdownAstEngine.renderMarkdown(markdown, { renderMode: "rendered" });
+
+      state.isZh = result.isZh;
+      state.readmeMarkdown = markdown;
+      state.readmeHtml = html;
+      state.headings = extractHeadings(markdown);
+      state.hasReadme = true;
+    } catch (error: any) {
+      if (request.current()) {
+        state.notice = `切换文档版本失败: ${error?.message || "未找到目标文档"}`;
+      }
     } finally {
       if (request.finish()) state.isLoading = false;
     }

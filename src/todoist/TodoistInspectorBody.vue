@@ -4,6 +4,22 @@
     <main class="inspector-main-col">
       <p v-if="state.error" class="draft-status" role="alert">{{ state.error }}</p>
 
+      <!-- 🐙 关联 GitHub 仓库 (在任务标题上方清晰展示) -->
+      <div v-if="taskRepos.length" class="inspector-repo-badges">
+        <button
+          v-for="repo in taskRepos"
+          :key="repo.fullName"
+          type="button"
+          class="inspector-repo-btn"
+          :title="'关联 GitHub 仓库：' + repo.fullName + ' · 点击在插件内查看详情'"
+          @click="openGitHubRepo(repo.fullName)"
+        >
+          <span class="repo-badge-icon">🐙</span>
+          <span class="repo-badge-name">{{ repo.fullName }}</span>
+          <span class="repo-badge-jump">↗</span>
+        </button>
+      </div>
+
       <!-- 1. 任务标题（带大圆圈完成状态复选框） -->
       <section class="inspector-section inspector-title-section">
         <div class="task-title-row">
@@ -269,6 +285,8 @@ import { ref, computed, nextTick, watch, onMounted, onUnmounted } from "vue";
 import InspectorPopover from "./InspectorPopover.vue";
 import TaskRepositoryLinks from "./TaskRepositoryLinks.vue";
 import ReminderPicker from "./ReminderPicker.vue";
+import { getTaskRepositoryLinks, type RepositoryLink } from "./repository-links";
+import { githubRepoDetailController } from "../github/repo-detail-store";
 import { todoistService } from "../services/todoist.service";
 import { todoistModuleState } from "./module-state";
 import type { TodoistInspectorState } from "./inspector-store";
@@ -453,6 +471,28 @@ function createOrSelectLabel() {
 
 function openImageViewer(url: string, name: string) {
   imageViewerController.open(url, name);
+}
+
+const repoLinksVersion = ref(0);
+function onRepoLinksChanged() {
+  repoLinksVersion.value++;
+}
+onMounted(() => {
+  window.addEventListener('storage', onRepoLinksChanged);
+  window.addEventListener('todoist-repository-links-changed', onRepoLinksChanged);
+});
+onUnmounted(() => {
+  window.removeEventListener('storage', onRepoLinksChanged);
+  window.removeEventListener('todoist-repository-links-changed', onRepoLinksChanged);
+});
+
+const taskRepos = computed<RepositoryLink[]>(() => {
+  void repoLinksVersion.value;
+  return getTaskRepositoryLinks(props.state.taskId, props.editDescription);
+});
+
+function openGitHubRepo(fullName: string) {
+  githubRepoDetailController.open(fullName);
 }
 
 function formatDisplayDate(dateStr?: string, timeStr?: string): string {

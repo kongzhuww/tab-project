@@ -62,12 +62,25 @@
         </div>
       </div>
 
-      <p class="ms-netease-status-text" style="padding: 0 16px;" role="status">{{ websiteStatus }}</p>
-
       <!-- 歌单与歌曲双栏布局 -->
       <div class="ms-netease-body">
         <!-- 左侧歌单列表 -->
         <div class="ms-netease-playlists">
+          <!-- 莱茵唱片专区 -->
+          <div class="ms-netease-section-title">官方原声</div>
+          <button
+            type="button"
+            class="ms-netease-pl-item ms-netease-pl-rhine"
+            :class="{ active: isShowingRhine }"
+            @click="selectRhine"
+          >
+            <div class="ms-netease-pl-icon-box" style="background: linear-gradient(135deg, rgba(245, 158, 11, 0.2), rgba(234, 88, 12, 0.2)); color: #f59e0b;">💿</div>
+            <div class="ms-netease-pl-info">
+              <div class="ms-netease-pl-name">莱茵唱片</div>
+              <div class="ms-netease-pl-count">{{ homeMusicState.albums?.length || 0 }} 张官方专辑</div>
+            </div>
+          </button>
+
           <div class="ms-netease-section-title">我的歌单 & 精选推荐</div>
 
           <!-- 1. 我喜欢的音乐专属置顶卡片 -->
@@ -104,7 +117,7 @@
             :key="pl.id"
             type="button"
             class="ms-netease-pl-item"
-            :class="{ active: !isShowingRecent && !isShowingFavorites && workspaceState.neteaseActivePlaylist?.id === pl.id }"
+            :class="{ active: !isShowingRhine && !isShowingRecent && !isShowingFavorites && workspaceState.neteaseActivePlaylist?.id === pl.id }"
             @click="selectPlaylist(pl)"
           >
             <img class="ms-netease-pl-cover" :src="pl.coverImgUrl" alt="" loading="lazy" />
@@ -117,8 +130,174 @@
 
         <!-- 右侧曲目详情 -->
         <div class="ms-netease-tracks">
-          <!-- 搜索条与最近听过快捷栏 -->
-          <div class="ms-netease-search-wrap" ref="searchWrapRef">
+          <!-- 莱茵唱片专区 -->
+          <template v-if="isShowingRhine">
+            <div class="ms-netease-tracks-head">
+              <div>
+                <div class="ms-netease-tracks-title">莱茵唱片 · 官方原声曲库</div>
+                <div class="ms-netease-tracks-sub">
+                  塞壬唱片 MSR 出品 · 共 {{ homeMusicState.albums?.length || 0 }} 张官方专辑
+                </div>
+              </div>
+              <div v-if="!selectedRhineAlbum" class="ms-rhine-search-wrap">
+                <input
+                  v-model="rhineSearchQuery"
+                  type="text"
+                  class="ms-rhine-search-input"
+                  placeholder="搜索专辑或艺术家…"
+                />
+              </div>
+            </div>
+
+            <!-- 专辑下钻曲目详情 -->
+            <div v-if="selectedRhineAlbum" class="ms-rhine-album-detail">
+              <header class="ms-rhine-detail-banner">
+                <button type="button" class="ms-rhine-back-btn" @click="selectedRhineAlbum = null">
+                  ‹ 返回专辑列表
+                </button>
+                <img
+                  :src="selectedRhineAlbum.coverUrl || DEFAULT_SIREN_COVER"
+                  class="ms-rhine-detail-cover"
+                  alt=""
+                />
+                <div class="ms-rhine-detail-info">
+                  <span class="siren-badge">OFFICIAL ALBUM</span>
+                  <h2 class="ms-rhine-detail-title">{{ selectedRhineAlbum.name }}</h2>
+                  <p class="ms-rhine-detail-sub">塞壬唱片-MSR 出品 · 共 {{ selectedRhineAlbum._songs?.length || 0 }} 首曲目</p>
+                  <button
+                    type="button"
+                    class="ms-rhine-play-album-btn"
+                    @click="playWholeRhineAlbum(selectedRhineAlbum)"
+                  >
+                    ▶ 播放整张专辑
+                  </button>
+                </div>
+              </header>
+
+              <div v-if="rhineSongsLoading" class="ms-netease-loading-box">
+                <div class="ms-netease-spinner"></div>
+                <div class="ms-netease-loading-tip">正在调取专辑曲目列表…</div>
+              </div>
+              <div v-else class="ms-rhine-track-list">
+                <button
+                  v-for="(song, idx) in selectedRhineAlbum._songs || []"
+                  :key="song.cid"
+                  type="button"
+                  class="ms-netease-track-row"
+                  :class="{ playing: isCurrentRhineSong(song) }"
+                  @click="playRhineSong(song)"
+                >
+                  <span class="ms-netease-track-idx">
+                    <span v-if="isCurrentRhineSong(song)" style="color: #f59e0b;">▶</span>
+                    <span v-else>{{ idx + 1 }}</span>
+                  </span>
+                  <div class="ms-netease-track-info">
+                    <span class="ms-netease-track-name" :title="song.name">{{ song.name }}</span>
+                    <span class="ms-netease-track-artist">{{ (song.artists || []).join(", ") || "塞壬唱片" }}</span>
+                  </div>
+                  <div class="ms-netease-track-dur" style="display: flex; align-items: center; gap: 8px;">
+                    <button
+                      type="button"
+                      class="siren-btn-icon"
+                      :class="{ liked: isRhineSongLiked(song) }"
+                      :title="isRhineSongLiked(song) ? '取消收藏' : '收藏曲目'"
+                      @click.stop="toggleRhineLike(song, $event)"
+                    >
+                      {{ isRhineSongLiked(song) ? "♥" : "♡" }}
+                    </button>
+                  </div>
+                </button>
+              </div>
+            </div>
+
+            <!-- 专辑网格一览 (适配右栏宽度，每页 8 张) -->
+            <div v-else class="ms-rhine-grid-wrap">
+              <div v-if="!filteredRhineAlbums.length" class="ms-dropdown-empty" style="padding: 40px 0;">
+                正在加载专辑或未找到匹配项…
+              </div>
+              <template v-else>
+                <div class="ms-rhine-album-grid">
+                  <div
+                    v-for="album in pagedRhineAlbums"
+                    :key="album.cid"
+                    class="ms-rhine-album-card"
+                    @click="openRhineAlbum(album)"
+                  >
+                    <div class="ms-rhine-cover-wrap">
+                      <img :src="album.coverUrl || DEFAULT_SIREN_COVER" class="ms-rhine-cover" alt="" loading="lazy" />
+                      <div class="ms-rhine-hover-play">▶</div>
+                    </div>
+                    <div class="ms-rhine-meta">
+                      <span class="ms-rhine-album-name" :title="album.name">{{ album.name }}</span>
+                      <span class="ms-rhine-corp">塞壬唱片 MSR</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- 8 专辑分页控制底栏 -->
+                <div v-if="rhineTotalPages > 1" class="ms-netease-pagination-bar ms-rhine-pagination-bar">
+                  <span class="ms-pagination-info">
+                    第 {{ rhinePage }} / {{ rhineTotalPages }} 页 · 共 {{ filteredRhineAlbums.length }} 张专辑
+                  </span>
+                  <div class="ms-pagination-btns">
+                    <button
+                      type="button"
+                      class="ms-page-btn"
+                      :disabled="rhinePage <= 1"
+                      title="首页"
+                      @click="rhinePage = 1"
+                    >
+                      «
+                    </button>
+                    <button
+                      type="button"
+                      class="ms-page-btn"
+                      :disabled="rhinePage <= 1"
+                      title="上一页"
+                      @click="rhinePage = Math.max(1, rhinePage - 1)"
+                    >
+                      ◀
+                    </button>
+
+                    <button
+                      v-for="p in visibleRhinePages"
+                      :key="'rpage-' + p"
+                      type="button"
+                      class="ms-page-btn"
+                      :class="{ active: p === rhinePage }"
+                      @click="rhinePage = p"
+                    >
+                      {{ p }}
+                    </button>
+
+                    <button
+                      type="button"
+                      class="ms-page-btn"
+                      :disabled="rhinePage >= rhineTotalPages"
+                      title="下一页"
+                      @click="rhinePage = Math.min(rhineTotalPages, rhinePage + 1)"
+                    >
+                      ▶
+                    </button>
+                    <button
+                      type="button"
+                      class="ms-page-btn"
+                      :disabled="rhinePage >= rhineTotalPages"
+                      title="尾页"
+                      @click="rhinePage = rhineTotalPages"
+                    >
+                      »
+                    </button>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </template>
+
+          <!-- 网易云常规曲目专区 -->
+          <template v-else>
+            <!-- 搜索条与最近听过快捷栏 -->
+            <div class="ms-netease-search-wrap" ref="searchWrapRef">
             <input
               type="text"
               class="ms-netease-search-input"
@@ -226,32 +405,33 @@
               未找到曲目，可尝试在上方搜索框输入关键词
             </div>
 
-            <!-- 10 首分页控制底栏 -->
-            <div v-if="totalPages > 1" class="ms-netease-pagination-bar">
-              <span class="ms-pagination-info">
-                第 {{ page }} / {{ totalPages }} 页 · 共 {{ currentSongList.length }} 首
-              </span>
-              <div class="ms-pagination-btns">
-                <button
-                  type="button"
-                  class="ms-page-btn"
-                  :disabled="page <= 1"
-                  title="上一页"
-                  @click="prevPage"
-                >
-                  ◀ 上一页
-                </button>
-                <button
-                  type="button"
-                  class="ms-page-btn"
-                  :disabled="page >= totalPages"
-                  title="下一页"
-                  @click="nextPage"
-                >
-                  下一页 ▶
-                </button>
+              <!-- 10 首分页控制底栏 -->
+              <div v-if="totalPages > 1" class="ms-netease-pagination-bar">
+                <span class="ms-pagination-info">
+                  第 {{ page }} / {{ totalPages }} 页 · 共 {{ currentSongList.length }} 首
+                </span>
+                <div class="ms-pagination-btns">
+                  <button
+                    type="button"
+                    class="ms-page-btn"
+                    :disabled="page <= 1"
+                    title="上一页"
+                    @click="prevPage"
+                  >
+                    ◀ 上一页
+                  </button>
+                  <button
+                    type="button"
+                    class="ms-page-btn"
+                    :disabled="page >= totalPages"
+                    title="下一页"
+                    @click="nextPage"
+                  >
+                    下一页 ▶
+                  </button>
+                </div>
               </div>
-            </div>
+            </template>
           </template>
         </div>
       </div>
@@ -345,7 +525,8 @@ import {
   homeMusicController as controller,
   DEFAULT_COVER,
   DEFAULT_SIREN_COVER,
-  type MusicSong
+  type MusicSong,
+  type MusicAlbum
 } from "./store";
 
 const DEFAULT_USER_AVATAR =
@@ -406,6 +587,107 @@ function onDocumentClick(e: MouseEvent) {
 }
 
 const isShowingRecent = ref(false);
+const isShowingRhine = ref(false);
+const selectedRhineAlbum = ref<MusicAlbum | null>(null);
+const rhineSongsLoading = ref(false);
+const rhineSearchQuery = ref("");
+const rhinePage = ref(1);
+const rhinePageSize = 8;
+
+const filteredRhineAlbums = computed(() => {
+  const list = homeMusicState.albums || [];
+  const q = rhineSearchQuery.value.trim().toLowerCase();
+  if (!q) return list;
+  return list.filter((a) => (a.name || "").toLowerCase().includes(q));
+});
+
+const rhineTotalPages = computed(() => Math.max(1, Math.ceil(filteredRhineAlbums.value.length / rhinePageSize)));
+
+const pagedRhineAlbums = computed(() => {
+  const start = (rhinePage.value - 1) * rhinePageSize;
+  return filteredRhineAlbums.value.slice(start, start + rhinePageSize);
+});
+
+const visibleRhinePages = computed(() => {
+  const total = rhineTotalPages.value;
+  const cur = rhinePage.value;
+  const pages: number[] = [];
+  const start = Math.max(1, cur - 2);
+  const end = Math.min(total, cur + 2);
+  for (let i = start; i <= end; i++) {
+    pages.push(i);
+  }
+  return pages;
+});
+
+watch(rhineSearchQuery, () => {
+  rhinePage.value = 1;
+});
+
+function selectRhine() {
+  workspace.pause();
+  isShowingRhine.value = true;
+  isShowingRecent.value = false;
+  selectedRhineAlbum.value = null;
+  if (!homeMusicState.albums || homeMusicState.albums.length === 0) {
+    void musicService.getSirenAlbums().then((albums) => {
+      if (albums?.length) homeMusicState.albums = albums;
+    });
+  }
+}
+
+async function openRhineAlbum(album: MusicAlbum) {
+  selectedRhineAlbum.value = album;
+  if (!album._songs || !album._songs.length) {
+    rhineSongsLoading.value = true;
+    try {
+      const songs = await musicService.getSirenAlbumDetail(album.cid);
+      album._songs = songs;
+      selectedRhineAlbum.value = { ...album, _songs: songs };
+    } catch (e) {
+      console.warn("加载专辑曲目失败", e);
+    } finally {
+      rhineSongsLoading.value = false;
+    }
+  }
+}
+
+function playRhineSong(song: MusicSong) {
+  if (selectedRhineAlbum.value?._songs?.length) {
+    const songs = selectedRhineAlbum.value._songs;
+    const idx = songs.findIndex((s) => String(s.cid) === String(song.cid));
+    musicService.setQueue(songs, idx >= 0 ? idx : 0, true);
+    homeMusicState.activeAlbum = selectedRhineAlbum.value;
+  } else {
+    void musicService.playSong(song);
+  }
+}
+
+function playWholeRhineAlbum(album: MusicAlbum) {
+  const songs = album._songs || [];
+  if (songs.length > 0) {
+    musicService.setQueue(songs, 0, true);
+    homeMusicState.activeAlbum = album;
+  }
+}
+
+function isCurrentRhineSong(song: MusicSong): boolean {
+  if (!homeMusicState.playing) return false;
+  const curr = musicService.getState().currentSong;
+  return Boolean(curr && String(curr.cid) === String(song.cid));
+}
+
+function isRhineSongLiked(song: MusicSong): boolean {
+  return musicService.isLiked(song.cid);
+}
+
+function toggleRhineLike(song: MusicSong, e?: Event) {
+  e?.stopPropagation();
+  const liked = musicService.toggleLike(song);
+  if (isCurrentRhineSong(song)) {
+    homeMusicState.liked = liked;
+  }
+}
 
 const favoritePlaylist = computed(() => {
   return workspaceState.neteasePlaylists.find(p => p.name?.includes("喜欢的音乐") || p.specialType === 5);
@@ -418,12 +700,14 @@ const userOtherPlaylists = computed(() => {
 });
 
 const isShowingFavorites = computed(() => {
-  if (isShowingRecent.value || isSearching.value) return false;
+  if (isShowingRhine.value || isShowingRecent.value || isSearching.value) return false;
   return favoritePlaylist.value && workspaceState.neteaseActivePlaylist?.id === favoritePlaylist.value.id;
 });
 
 function selectFavoritesList() {
   workspace.pause();
+  isShowingRhine.value = false;
+  selectedRhineAlbum.value = null;
   isShowingRecent.value = false;
   const fav = favoritePlaylist.value;
   if (fav) {
@@ -492,11 +776,15 @@ function handleClose() {
 
 function selectRecentList() {
   workspace.pause();
+  isShowingRhine.value = false;
+  selectedRhineAlbum.value = null;
   isShowingRecent.value = true;
   workspaceState.neteaseActivePlaylist = null;
 }
 
 function selectPlaylist(pl: NeteasePlaylist) {
+  isShowingRhine.value = false;
+  selectedRhineAlbum.value = null;
   isShowingRecent.value = false;
   void workspace.selectPlaylist(pl);
 }
@@ -1033,5 +1321,235 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 10px;
   margin-top: 4px;
+}
+
+/* 莱茵唱片专区样式适配（契合网易云工作区尺寸与主题） */
+.ms-netease-pl-rhine.active {
+  background: rgba(245, 158, 11, 0.12);
+  border-color: rgba(245, 158, 11, 0.4);
+}
+.ms-netease-pl-rhine.active .ms-netease-pl-name {
+  color: #f59e0b;
+  font-weight: 700;
+}
+
+.ms-rhine-search-wrap {
+  width: 200px;
+}
+.ms-rhine-search-input {
+  width: 100%;
+  padding: 5px 10px;
+  border-radius: 6px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  font-size: 11.5px;
+  color: var(--text);
+  outline: none;
+  box-sizing: border-box;
+}
+.ms-rhine-search-input:focus {
+  border-color: #f59e0b;
+}
+
+.ms-rhine-grid-wrap {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 2px 20px;
+}
+
+.ms-rhine-album-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 12px;
+}
+
+.ms-rhine-album-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  cursor: pointer;
+  border-radius: 8px;
+  padding: 6px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  transition: transform 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease;
+}
+
+.ms-rhine-album-card:hover {
+  transform: translateY(-2px);
+  border-color: #f59e0b;
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.15);
+}
+
+.ms-rhine-cover-wrap {
+  position: relative;
+  aspect-ratio: 1;
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--panel);
+}
+
+.ms-rhine-cover {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.ms-rhine-hover-play {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #f59e0b;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  opacity: 0;
+  transform: scale(0.85);
+  transition: all 0.18s ease;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+.ms-rhine-album-card:hover .ms-rhine-hover-play {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.ms-rhine-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ms-rhine-album-name {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--heading);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ms-rhine-corp {
+  font-size: 10px;
+  color: var(--muted);
+}
+
+/* 专辑下钻详情头 */
+.ms-rhine-detail-banner {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  margin-bottom: 12px;
+  position: relative;
+}
+
+.ms-rhine-back-btn {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  padding: 3px 8px;
+  border-radius: 5px;
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.ms-rhine-back-btn:hover {
+  color: var(--heading);
+  border-color: #f59e0b;
+}
+
+.ms-rhine-detail-cover {
+  width: 80px;
+  height: 80px;
+  border-radius: 6px;
+  object-fit: cover;
+  border: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.ms-rhine-detail-info {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  flex: 1;
+}
+
+.ms-rhine-detail-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--heading);
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ms-rhine-detail-sub {
+  font-size: 11px;
+  color: var(--muted);
+  margin: 0;
+}
+
+.ms-rhine-play-album-btn {
+  margin-top: 6px;
+  align-self: flex-start;
+  padding: 4px 12px;
+  background: linear-gradient(135deg, #f59e0b, #ea580c);
+  border: none;
+  border-radius: 6px;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+.ms-rhine-play-album-btn:hover {
+  opacity: 0.9;
+}
+
+.ms-rhine-track-list {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.siren-badge {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: #f59e0b;
+}
+
+.siren-btn-icon {
+  background: transparent;
+  border: none;
+  font-size: 14px;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: color 0.15s ease;
+}
+.siren-btn-icon:hover {
+  color: #f43f5e;
+}
+.siren-btn-icon.liked {
+  color: #f43f5e;
 }
 </style>

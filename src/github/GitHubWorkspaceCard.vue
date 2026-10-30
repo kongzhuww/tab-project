@@ -12,6 +12,12 @@ import GitHubBatchBar from "./GitHubBatchBar.vue";
 import GitHubTrending from "./GitHubTrending.vue";
 import GitHubAwesome from "./GitHubAwesome.vue";
 import GitHubMyRepos from "./GitHubMyRepos.vue";
+import GitHubNotificationPanel from "./GitHubNotificationPanel.vue";
+import GitHubNotificationDetailDrawer from "./GitHubNotificationDetailDrawer.vue";
+import {
+  gitHubNotificationsState,
+  gitHubNotificationsController
+} from "./github-notifications-store";
 const GitHubSettingsModal = defineAsyncComponent(() => import("./GitHubSettingsModal.vue"));
 import { gitHubService, type GitHubSearchRule } from "../services/github.service";
 import { fullscreenCardState } from "../core/fullscreen-card-state";
@@ -178,6 +184,22 @@ onBeforeUnmount(() => { gitHubService.setAiViewActive(false); ++initialVersion; 
         </div>
         <div id="gh-search-suggest" class="gh-search-suggest" hidden></div>
       </div>
+
+      <!-- 🔔 GitHub 消息通知按钮（与 B站 消息按钮完全对齐） -->
+      <button
+        id="gh-header-msg-center-btn"
+        class="gh-header-msg-btn"
+        type="button"
+        :class="{ 'has-unread': gitHubNotificationsState.unreadCount > 0, 'is-active': gitHubNotificationsState.isOpen }"
+        :title="gitHubNotificationsState.unreadCount > 0 ? `GitHub 消息通知 (${gitHubNotificationsState.unreadCount} 条未读)` : 'GitHub 消息通知中心'"
+        @click="gitHubNotificationsController.toggle()"
+      >
+        <span class="gh-header-msg-icon">🔔</span>
+        <span class="gh-header-msg-label">消息</span>
+        <span v-if="gitHubNotificationsState.unreadCount > 0" class="gh-header-msg-badge">
+          {{ gitHubNotificationsState.unreadCount > 99 ? '99+' : gitHubNotificationsState.unreadCount }}
+        </span>
+      </button>
 
       <!-- ⚙️ 独立模组自包含设置按钮 -->
       <div class="gh-settings-anchor">
@@ -372,6 +394,10 @@ onBeforeUnmount(() => { gitHubService.setAiViewActive(false); ++initialVersion; 
         </section>
       </div>
     </div>
+    <!-- GitHub 消息与通知中心弹窗 -->
+    <GitHubNotificationPanel />
+    <!-- GitHub 消息通知详情抽屉 -->
+    <GitHubNotificationDetailDrawer />
   </section>
 </template>
 
@@ -401,5 +427,61 @@ onBeforeUnmount(() => { gitHubService.setAiViewActive(false); ++initialVersion; 
   background: var(--bg-hover, #e2e8f0);
   /* Keep the settings control stationary. */
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+
+/* 🔔 GitHub 顶栏消息通知按钮（契合系统主题变量，对标 B站 消息按钮） */
+.gh-header-msg-btn {
+  position: relative !important;
+  margin: 0 0 0 10px !important;
+  height: 32px !important;
+  padding: 0 10px !important;
+  white-space: nowrap !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 5px !important;
+  border-radius: 8px !important;
+  cursor: pointer !important;
+  background: var(--surface, rgba(255, 255, 255, 0.08)) !important;
+  border: 1px solid var(--border, rgba(0, 0, 0, 0.12)) !important;
+  color: var(--text, #334155) !important;
+  font-size: 11.5px !important;
+  font-weight: 500 !important;
+  transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  flex-shrink: 0 !important;
+}
+
+.gh-header-msg-btn:hover {
+  background: var(--surface-hover, rgba(0, 0, 0, 0.05)) !important;
+  color: var(--heading, #0f172a) !important;
+  border-color: rgba(2, 132, 199, 0.45) !important;
+}
+
+.gh-header-msg-btn.is-active {
+  background: rgba(2, 132, 199, 0.12) !important;
+  border-color: #0284c7 !important;
+  color: #0284c7 !important;
+}
+
+.gh-header-msg-icon {
+  font-size: 12px;
+}
+
+.gh-header-msg-label {
+  letter-spacing: 0.02em;
+}
+
+.gh-header-msg-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 3px;
+  border-radius: 10px;
+  background: #ef4444;
+  color: #fff;
+  font-size: 8.5px;
+  font-weight: 750;
+  box-shadow: 0 1px 3px rgba(239, 68, 68, 0.35);
 }
 </style>

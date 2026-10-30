@@ -210,9 +210,16 @@ export const launcherGroupsController: LauncherGroupsController = {
     }
     if (link?.url) {
       const inBackground = Boolean(event && (event.ctrlKey || event.metaKey || event.button === 1));
+      let opened = false;
       if (typeof chrome !== "undefined" && chrome.tabs?.create) {
-        chrome.tabs.create({ url: link.url, active: !inBackground });
-      } else {
+        try {
+          chrome.tabs.create({ url: link.url, active: !inBackground });
+          opened = true;
+        } catch (_) {
+          opened = false;
+        }
+      }
+      if (!opened) {
         window.open(link.url, "_blank", "noopener,noreferrer");
       }
     }

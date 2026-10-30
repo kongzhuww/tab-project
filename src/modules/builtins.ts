@@ -6,7 +6,7 @@ import { bilibiliDockModule } from "../bilibili/module";
 import { aihotDockModule } from "../aihot/module";
 import { pricingDockModule } from "../pricing/module";
 import { stickersDockModule } from "../stickers/module";
-import { musicDockModule, sirenDockModule } from "../music/module";
+import { musicDockModule } from "../music/module";
 import { todoistDockModule } from "../todoist/module";
 import { chatDockModule } from "../chat/module";
 
@@ -15,7 +15,6 @@ registerDockModule(chatDockModule);
 // Register card insertion targets before their dependents to preserve the original Dock order.
 registerDockModule(todoistDockModule);
 registerDockModule(stickersDockModule);
-registerDockModule(sirenDockModule);
 registerDockModule(musicDockModule);
 registerDockModule(pricingDockModule);
 registerDockModule(youtubeDockModule);

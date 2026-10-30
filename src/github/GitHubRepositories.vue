@@ -8,6 +8,7 @@ import type { GitHubRepositoryCardView } from "./repositories";
 import { githubRepositoryController as controller, githubRepositoryState as state } from "./repositories";
 import { githubRepoDetailController } from "./repo-detail-store";
 import { gitHubService } from "../services/github.service";
+import { githubStatusState } from "./store";
 import ChatShareMenu from "../chat/ChatShareMenu.vue";
 import { chatService } from "../chat/chat.service";
 import type { ChatShareTarget } from "../chat/private-chat-client";
@@ -178,6 +179,12 @@ function onDragStart(event: DragEvent, fullName: string): void {
   }
   controller.startDrag(fullName, event);
 }
+
+const isLoading = computed(() => {
+  if (state.cards.length > 0) return false;
+  const actionText = githubStatusState.actionText || "";
+  return Boolean(actionText.includes("正在读取") || actionText.includes("正在加载") || actionText.includes("正在统计") || actionText.includes("正在同步"));
+});
 </script>
 
 <template>
@@ -191,7 +198,13 @@ function onDragStart(event: DragEvent, fullName: string): void {
     <button type="button" class="gh-tab" style="padding:2px 8px;font-size:11px;margin-left:8px" @click="controller.resetSearch()">清空搜索</button>
   </div>
 
-  <p v-if="state.emptyMessage" class="muted small">{{ state.emptyMessage }}</p>
+  <!-- 加载中指示器：居中转圈 -->
+  <div v-if="isLoading" class="gh-repos-loading">
+    <div class="gh-spinner" aria-hidden="true"></div>
+    <span class="gh-loading-label">正在读取 GitHub 仓库列表中…</span>
+  </div>
+
+  <p v-else-if="state.emptyMessage" class="muted small" style="text-align: center; padding: 40px 0; font-size: 13px;">{{ state.emptyMessage }}</p>
 
   <div v-if="state.cards.length" class="repos gh-grid" :class="{ 'gh-batch-active': state.batchMode }">
     <article
@@ -332,3 +345,34 @@ function onDragStart(event: DragEvent, fullName: string): void {
     </div>
   </Teleport>
 </template>
+
+<style scoped>
+.gh-repos-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 60px 0;
+  width: 100%;
+}
+
+.gh-spinner {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 3px solid rgba(2, 132, 199, 0.15);
+  border-top-color: #0284c7;
+  animation: gh-spin 0.8s linear infinite;
+}
+
+@keyframes gh-spin {
+  to { transform: rotate(360deg); }
+}
+
+.gh-loading-label {
+  font-size: 13px;
+  color: var(--muted, #64748b);
+  font-weight: 500;
+}
+</style>

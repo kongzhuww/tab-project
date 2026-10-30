@@ -2,7 +2,7 @@
 import { ref, reactive, watch, onBeforeUnmount } from "vue";
 import ModuleSettingsPanel from "../components/ModuleSettingsPanel.vue";
 import { gitHubService, DEFAULT_GH_AI_CONFIG } from "../services/github.service";
-import { loadGitHubSettings, saveGitHubSettings, clearGitHubStarCache, type GitHubModuleSettings } from "./settings";
+import { loadGitHubSettings, saveGitHubSettings, type GitHubModuleSettings } from "./settings";
 import { createGitHubReadHeaders, readGitHubJson, GitHubReadError } from "./api-client";
 import { ArchifyWebhookConfigError } from "./workflow-settings";
 const props = withDefaults(defineProps<{ anchor: HTMLElement | null; visible?: boolean; aiRequest?: number }>(), { visible: true, aiRequest: 0 });
@@ -98,22 +98,6 @@ async function saveSettings() {
   } catch (error) { message.value = error instanceof ArchifyWebhookConfigError ? error.message : saved ? "设置已保存，但同步失败，请重试。" : "保存失败或其他页面已修改配置，请重新打开面板核对；原配置未确认更新。"; }
   finally { isSaving.value = false; }
 }
-async function clearCache() {
-  if (disposed || !props.visible || !ready.value || isSaving.value || isTesting.value) return;
-  isSaving.value = true;
-  try {
-    // Do not apply an unsaved token or username while clearing a cache.
-    const settings = await loadGitHubSettings();
-    if (!settings.ghUser && !settings.ghToken) { message.value = "请先保存账号设置。"; return; }
-    if (disposed) return;
-    await clearGitHubStarCache();
-    if (disposed) return;
-    emit("account-reload");
-    await gitHubService.loadGitHub(settings.ghUser, settings.ghToken);
-    message.value = "已提交 Star 缓存清理，分类和备注保留；仓库重读状态请查看主页面。";
-  } catch { message.value = "清理或同步失败，请重试。"; }
-  finally { isSaving.value = false; }
-}
 </script>
 
 <template>
@@ -127,43 +111,14 @@ async function clearCache() {
       <button type="button" class="gh-popover-close-btn" title="关闭" @click="emit('close')">✕</button>
     </header>
 
-    <!-- 极简标签导航 -->
-    <nav class="gh-popover-tabs">
-      <button
-        type="button"
-        class="gh-popover-tab"
-        :class="{ active: activeTab === 'account' }"
-        @click="activeTab = 'account'"
-      >
-        账号与 Token
-      </button>
-      <button
-        type="button"
-        class="gh-popover-tab"
-        :class="{ active: activeTab === 'ai' }"
-        @click="activeTab = 'ai'"
-      >
-        AI 研读
-      </button>
-
-      <button
-        type="button"
-        class="gh-popover-tab"
-        :class="{ active: activeTab === 'cache' }"
-        @click="activeTab = 'cache'"
-      >
-        缓存维护
-      </button>
-    </nav>
-
     <!-- 内容区 -->
     <p class="gh-settings-message">隐藏面板或离开卡片会保留草稿；关闭整个标签页仍会丢失。</p>
     <button v-if="!ready" type="button" :disabled="loading || !visible" @click="readSettings">{{ loading ? "正在读取…" : "重试读取" }}</button>
     <p v-if="message" class="gh-settings-message" role="status">{{ message }}</p>
     <fieldset class="gh-settings-fields" :disabled="!ready || isSaving || isTesting">
     <main class="gh-popover-body">
-      <!-- Tab 1: 账号与连接 -->
-      <section v-show="activeTab === 'account'" class="gh-field-list">
+      <!-- 账号与连接 -->
+      <section class="gh-field-list">
         <div class="gh-field-item">
           <label class="gh-field-label">
             <span>用户名</span>
@@ -222,62 +177,6 @@ async function clearCache() {
             <span v-if="testResult.rateLimit" class="rate">({{ testResult.rateLimit.remaining }}/{{ testResult.rateLimit.limit }})</span>
           </div>
         </div>
-      </section>
-
-      <!-- Tab 2: AI 研读 -->
-      <section v-show="activeTab === 'ai'" class="gh-field-list">
-        <div class="gh-field-item">
-          <label class="gh-field-label">模型供应商</label>
-          <div class="gh-radio-bar">
-            <label><input v-model="form.ai.provider" type="radio" value="gemini" /> Gemini</label>
-            <label><input v-model="form.ai.provider" type="radio" value="openai" /> DeepSeek/OpenAI</label>
-          </div>
-        </div>
-
-        <div class="gh-field-item">
-          <label class="gh-field-label">API Key</label>
-          <input
-            v-model="form.ai.apiKey"
-            type="password"
-            class="gh-input"
-            placeholder="sk-... / AIzaSy..."
-            autocomplete="off"
-          />
-        </div>
-
-        <div class="gh-field-item">
-          <label class="gh-field-label">模型名</label>
-          <input
-            v-model="form.ai.model"
-            type="text"
-            class="gh-input"
-            :placeholder="form.ai.provider === 'gemini' ? 'gemini-3.6-flash' : 'deepseek-chat'"
-          />
-        </div>
-
-        <div class="gh-field-item">
-          <label class="gh-field-label">Base URL</label>
-          <input
-            v-model="form.ai.baseUrl"
-            type="text"
-            class="gh-input"
-            placeholder="填写与供应商匹配的 API 地址"
-          />
-        </div>
-        <label><input v-model="form.ai.useCustomPrompt" type="checkbox" /> 使用自定义提示词</label>
-        <textarea v-if="form.ai.useCustomPrompt" v-model="form.ai.customPrompt" class="gh-input" rows="4" aria-label="自定义提示词"></textarea>
-      </section>
-
-
-
-      <!-- Tab 3: 缓存 -->
-      <section v-show="activeTab === 'cache'" class="gh-field-list">
-        <p class="gh-cache-desc">
-          若 GitHub 上刚添加了 Star 或更改了仓库信息，可就地清理缓存强制拉取最新数据。
-        </p>
-        <button type="button" class="gh-clear-btn" @click="clearCache">
-          🧹 清空本地缓存并全量同步
-        </button>
       </section>
     </main>
     </fieldset>

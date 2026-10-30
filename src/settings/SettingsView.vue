@@ -395,11 +395,6 @@
                 <input v-model="form.showHomeMusicVisualizer" type="checkbox" @change="saveImmediate('showHomeMusicVisualizer')" />
                 <i class="switch"></i>
               </label>
-              <label class="toggle-card">
-                <span class="toggle-copy"><b>边狱巴士 漫游歌词</b><small>屏幕随机位置逐字跟随演出</small></span>
-                <input v-model="form.showLimbusLyricEffect" type="checkbox" @change="saveImmediate('showLimbusLyricEffect')" />
-                <i class="switch"></i>
-              </label>
             </div>
           </div>
         </section>
@@ -475,88 +470,10 @@
           </div>
         </section>
 
-        <!-- 04 漫游歌词高级定制 -->
-        <section v-show="currentTab === 'limbus'" class="settings-panel">
-          <header class="panel-head">
-            <span class="panel-index">04</span>
-            <div>
-              <h2>边狱巴士 漫游歌词定制</h2>
-              <p>深度调整全屏漫游歌词色彩、字体、描边宽度、光晕与 3D 透视视差。</p>
-            </div>
-          </header>
-
-          <div class="fields-grid">
-            <div class="field full-width">
-              <label>色彩风格预设 <em>PRESET</em></label>
-              <select v-model="limbus.preset" @change="applyLimbusPreset">
-                <option value="cover">🖼 封面自适应 (随当前播放专辑封面实时变色 - 强烈推荐)</option>
-                <option value="default">👑 通用 (经典金珀) — Limbus 默认战役风格</option>
-                <option value="heartbreak">💔 心碎 (暴怒紫红) — 绯红暴怒战斗色相</option>
-                <option value="command">💠 指令 (科技青蓝) — 绝密指引深空荧光</option>
-                <option value="custom">🎨 自定义色彩与特效</option>
-              </select>
-            </div>
-
-            <div class="field">
-              <label>主文字颜色 <em>TEXT COLOR</em></label>
-              <div style="display:flex;gap:10px;align-items:center;">
-                <input v-model="limbus.textColor" type="color" class="color-picker" @input="markLimbusField('textColor')" />
-                <input v-model="limbus.textColor" type="text" style="flex:1;" @input="markLimbusField('textColor')" />
-              </div>
-            </div>
-
-            <div class="field">
-              <label>轮廓描边颜色 <em>STROKE</em></label>
-              <div style="display:flex;gap:10px;align-items:center;">
-                <input v-model="limbus.strokeColor" type="color" class="color-picker" @input="markLimbusField('strokeColor')" />
-                <input v-model="limbus.strokeColor" type="text" style="flex:1;" @input="markLimbusField('strokeColor')" />
-              </div>
-            </div>
-
-            <div class="field">
-              <label>辉光光晕颜色 <em>GLOW</em></label>
-              <div style="display:flex;gap:10px;align-items:center;">
-                <input v-model="limbus.glowColor" type="color" class="color-picker" @input="markLimbusField('glowColor')" />
-                <input v-model="limbus.glowColor" type="text" style="flex:1;" @input="markLimbusField('glowColor')" />
-              </div>
-            </div>
-
-            <div class="field">
-              <label>描边轮廓宽度 <em>WIDTH</em></label>
-              <select v-model="limbus.strokeWidth" @change="markLimbusField('strokeWidth')">
-                <option value="1.5">细致 (1.5px)</option>
-                <option value="2.2">标准 (2.2px - 原版预设)</option>
-                <option value="3.0">浓重 (3.0px)</option>
-                <option value="4.0">超厚 (4.0px)</option>
-              </select>
-            </div>
-
-            <div class="field">
-              <label>字号大小 <em>FONT SIZE</em></label>
-              <select v-model="limbus.fontSize" @change="markLimbusField('fontSize')">
-                <option value="26">紧凑 (26px)</option>
-                <option value="36">标准 (36px - 推荐)</option>
-                <option value="46">大型 (46px - 巨幕沉浸)</option>
-                <option value="56">特大 (56px - 冲击力)</option>
-              </select>
-            </div>
-
-            <div class="field">
-              <label>3D 透视视差倾角 <em>PERSPECTIVE</em></label>
-              <select v-model="limbus.perspectiveStrength" @change="markLimbusField('perspectiveStrength')">
-                <option value="0">关闭透视 (纯平面)</option>
-                <option value="0.6">轻柔透视 (0.6x)</option>
-                <option value="1.0">标准透视 (1.0x - 原版算法)</option>
-                <option value="1.5">强烈透视 (1.5x - 视差拉扯)</option>
-              </select>
-            </div>
-          </div>
-        </section>
-
-        <!-- 05 壁纸与桌面背景 -->
+        <!-- 04 壁纸与桌面背景 -->
         <section v-show="currentTab === 'wallpaper'" class="settings-panel">
           <header class="panel-head">
-            <span class="panel-index">05</span>
+            <span class="panel-index">04</span>
             <div>
               <h2>壁纸与桌面背景</h2>
               <p>个性化定制新标签页背景：支持预设山景、纯黑无干扰、赛博霓虹渐变、自定义本地图片与动态视频壁纸。</p>
@@ -710,10 +627,10 @@
           </div>
         </section>
 
-        <!-- 06 版本与在线更新 -->
+        <!-- 05 版本与在线更新 -->
         <section v-show="currentTab === 'sync'" class="settings-panel">
           <header class="panel-head">
-            <span class="panel-index">06</span>
+            <span class="panel-index">05</span>
             <div>
               <h2>数据备份、多端云同步与版本更新</h2>
               <p>管理新标签页的 WebDAV 云端同步、本地 JSON 配置快照导出，以及版本检查与热重载。</p>
@@ -899,7 +816,7 @@
         </section>
         <section v-show="currentTab === 'storage'" class="settings-panel">
           <header class="panel-head">
-            <span class="panel-index">07</span>
+            <span class="panel-index">06</span>
             <div><h2>文件夹与存储</h2><p>按用途管理本地目录，各目录独立授权。</p></div>
           </header>
           <StorageSettings
@@ -937,13 +854,9 @@ import {
   GLOBAL_SETTINGS_KEYS,
   SETTINGS_TOGGLE_KEYS,
   AVAILABLE_SHORTCUT_TOOLS,
-  DEFAULT_LIMBUS_CONFIG,
-  LIMBUS_PRESETS,
   SHORTCUT_STORAGE_KEY,
-  LIMBUS_STORAGE_KEY,
   SEARCH_IGNORED_BOOKMARK_FOLDERS_STORAGE_KEY,
   type GlobalSettingsConfig as SettingsConfig,
-  type LimbusConfig,
   type IgnoredBookmarkFolder
 } from "../services/options.service";
 import { settingsController } from "./store";
@@ -973,10 +886,9 @@ const tabs = [
   { id: "modules", index: "01", name: "模块与功能" },
   { id: "shortcuts", index: "02", name: "快捷键配置" },
   { id: "privacy", index: "03", name: "搜索书签过滤" },
-  { id: "limbus", index: "04", name: "漫游歌词定制" },
-  { id: "wallpaper", index: "05", name: "壁纸与背景" },
-  { id: "sync", index: "06", name: "数据备份与同步" },
-  { id: "storage", index: "07", name: "文件夹与存储" }
+  { id: "wallpaper", index: "04", name: "壁纸与背景" },
+  { id: "sync", index: "05", name: "数据备份与同步" },
+  { id: "storage", index: "06", name: "文件夹与存储" }
 ];
 
 const currentTab = ref("modules");
@@ -1295,15 +1207,9 @@ const defaultForm: SettingsConfig = {
   searchEngine: "bing",
   singleNewTab: false,
   showHomeMusicVisualizer: true,
-  showLimbusLyricEffect: true,
   dockPosition: "bottom"
 };
 const form = reactive<SettingsConfig>({ ...defaultForm });
-
-// Limbus 歌词配置
-const limbus = reactive<LimbusConfig>({ ...DEFAULT_LIMBUS_CONFIG });
-const limbusExplicitFields = new Set<string>();
-let limbusIntentVersion = 0;
 
 // 快捷键状态
 const shortcutTools = computed(() => AVAILABLE_SHORTCUT_TOOLS.filter(tool => isShortcutToolAvailable(tool.id)));
@@ -1314,19 +1220,53 @@ const shortcutGroups = computed(() => [
 const customShortcuts = ref<Record<string, string>>({});
 const recordingToolId = ref<string | null>(null);
 const browserShortcuts = ref<Record<string, string> | null>(null);
+const browserShortcutDescriptions = ref<Record<string, string>>({});
 let browserShortcutRead = 0;
+
 function browserShortcutLabel(id: string) {
-  return browserShortcuts.value ? (browserShortcuts.value[id] || '未分配') : '点击查看 / 修改';
+  if (!browserShortcuts.value) return '点击查看 / 修改';
+  if (id === 'open-side-panel') {
+    // 兼容 Chromium Action 触发（_execute_action，配合 openPanelOnActionClick 打开侧边栏）、
+    // 自定义 open-side-panel 以及原生 _execute_side_panel
+    const key = browserShortcuts.value['open-side-panel']
+      || browserShortcuts.value['_execute_action']
+      || browserShortcuts.value['_execute_side_panel']
+      || browserShortcuts.value['open_side_panel']
+      || browserShortcutDescriptions.value['open-side-panel'];
+    return key || '未分配';
+  }
+  return browserShortcuts.value[id] || browserShortcutDescriptions.value?.[id] || '未分配';
 }
+
 async function refreshBrowserShortcuts() {
   if (!props.active || currentTab.value !== 'shortcuts') return;
   const version = ++browserShortcutRead;
   try {
     const commands = await chrome.commands.getAll();
     if (!alive || version !== browserShortcutRead) return;
-    browserShortcuts.value = Object.fromEntries(commands.filter((item: any) => typeof item.name === 'string')
-      .map((item: any) => [item.name, typeof item.shortcut === 'string' ? item.shortcut : '']));
-  } catch { if (alive && version === browserShortcutRead) browserShortcuts.value = null; }
+    const map: Record<string, string> = {};
+    const descMap: Record<string, string> = {};
+    for (const item of commands || []) {
+      if (typeof item.name === 'string') {
+        const key = typeof item.shortcut === 'string' ? item.shortcut.trim() : '';
+        map[item.name] = key;
+        const desc = (item.description || '').toLowerCase();
+        if (desc.includes('侧边栏') || desc.includes('side panel') || item.name === '_execute_action') {
+          if (key) descMap['open-side-panel'] = key;
+        }
+        if (desc.includes('新标签') || desc.includes('newtab') || desc.includes('new tab')) {
+          if (key) descMap['focus-newtab'] = key;
+        }
+      }
+    }
+    browserShortcuts.value = map;
+    browserShortcutDescriptions.value = descMap;
+  } catch {
+    if (alive && version === browserShortcutRead) {
+      browserShortcuts.value = null;
+      browserShortcutDescriptions.value = {};
+    }
+  }
 }
 async function openBrowserShortcutSettings() {
   cancelShortcutRecording();
@@ -1374,7 +1314,6 @@ let draftBaseline: Record<string, any> = {};
 function draftSnapshot(): Record<string, any> {
   const values: Record<string, any> = {};
   for (const key of GLOBAL_SETTINGS_KEYS) values[key] = form[key];
-  values[LIMBUS_STORAGE_KEY] = limbus;
   values[SHORTCUT_STORAGE_KEY] = customShortcuts.value;
   values[SEARCH_IGNORED_BOOKMARK_FOLDERS_STORAGE_KEY] = ignoredFolders.value;
   return cloneSettingValue(values);
@@ -1383,7 +1322,15 @@ function draftSnapshot(): Record<string, any> {
 // ========================================================
 // 05 壁纸与桌面背景 (Wallpaper Settings)
 // ========================================================
-const BUILTIN_WALLPAPERS = [
+const BUILTIN_WALLPAPERS: Array<{
+  id: string;
+  title: string;
+  kind: string;
+  value: any;
+  thumb?: string;
+  style?: string;
+  isBuiltin?: boolean;
+}> = [
   {
     id: "builtin-mountain",
     title: "默认山景 (Mountains)",
@@ -1391,30 +1338,6 @@ const BUILTIN_WALLPAPERS = [
     value: DEFAULT_MOUNTAIN_VALUE,
     thumb: "assets/newtab-mountains.png",
     isBuiltin: true
-  },
-  {
-    id: "builtin-pure-dark",
-    title: "极简深色 (Pure Dark)",
-    kind: "纯色",
-    value: null,
-    style: "background: #090d16;",
-    isPure: true
-  },
-  {
-    id: "builtin-cyber-gradient",
-    title: "赛博霓虹 (Cyber Neon)",
-    kind: "渐变",
-    value: { type: "style", style: "background: radial-gradient(circle at 80% 20%, rgba(56, 189, 248, 0.25), transparent 45%), radial-gradient(circle at 20% 80%, rgba(168, 85, 247, 0.2), transparent 45%), #090d16;" },
-    style: "background: radial-gradient(circle at 80% 20%, rgba(56, 189, 248, 0.25), transparent 45%), radial-gradient(circle at 20% 80%, rgba(168, 85, 247, 0.2), transparent 45%), #090d16;",
-    isGradient: true
-  },
-  {
-    id: "builtin-aurora",
-    title: "极光翡翠 (Aurora Green)",
-    kind: "渐变",
-    value: { type: "style", style: "background: radial-gradient(circle at 50% 0%, rgba(16, 185, 129, 0.28), transparent 60%), #0c141f;" },
-    style: "background: radial-gradient(circle at 50% 0%, rgba(16, 185, 129, 0.28), transparent 60%), #0c141f;",
-    isGradient: true
   }
 ];
 
@@ -1752,21 +1675,6 @@ async function saveIgnoredFolders() {
   await handleSave(false, false, [SEARCH_IGNORED_BOOKMARK_FOLDERS_STORAGE_KEY]);
 }
 
-function markLimbusField(field: string) {
-  ++limbusIntentVersion;
-  limbusExplicitFields.add(field);
-}
-
-function applyLimbusPreset() {
-  const p = limbus.preset;
-  ++limbusIntentVersion;
-  limbusExplicitFields.add("preset");
-  if (LIMBUS_PRESETS[p]) {
-    for (const field of Object.keys(LIMBUS_PRESETS[p])) limbusExplicitFields.add(field);
-    Object.assign(limbus, LIMBUS_PRESETS[p]);
-  }
-}
-
 // Immediate controls submit only their own field, never other unfinished drafts.
 function onDockPositionChange() {
   const pos = form.dockPosition || "bottom";
@@ -1788,24 +1696,20 @@ async function handleSave(closeAfter = false, silent = false, onlyKeys?: string[
   settingsSaving.value = true;
   try {
     const snapshot = draftSnapshot();
-    const explicitLimbusFields = [...limbusExplicitFields];
-    const intentVersion = limbusIntentVersion;
     const payload: Record<string, any> = {};
     const expected: Record<string, unknown> = {};
     for (const key of onlyKeys || Object.keys(snapshot)) {
-      if (!sameSettingValue(snapshot[key], draftBaseline[key]) ||
-          (key === LIMBUS_STORAGE_KEY && explicitLimbusFields.length > 0)) {
+      if (!sameSettingValue(snapshot[key], draftBaseline[key])) {
         payload[key] = snapshot[key];
         expected[key] = storedBaseline[key];
       }
     }
-    const editedBaseline = Object.fromEntries(Object.keys(payload).map(key => [key, draftBaseline[key]]));
-    const accepted = await optionsService.saveSettings(payload, expected, editedBaseline, explicitLimbusFields);
+    const accepted = await optionsService.saveSettings(payload, expected);
     if (!alive) return true;
     const live = draftSnapshot();
-    for (const key of [SHORTCUT_STORAGE_KEY, SEARCH_IGNORED_BOOKMARK_FOLDERS_STORAGE_KEY, LIMBUS_STORAGE_KEY]) {
+    for (const key of [SHORTCUT_STORAGE_KEY, SEARCH_IGNORED_BOOKMARK_FOLDERS_STORAGE_KEY]) {
       if (Object.prototype.hasOwnProperty.call(payload, key) &&
-          (!sameSettingValue(live[key], snapshot[key]) || (key === LIMBUS_STORAGE_KEY && intentVersion !== limbusIntentVersion))) {
+          !sameSettingValue(live[key], snapshot[key])) {
         throw new SettingsSaveUnconfirmedError("本次修改已保存，但保存期间产生了新的设置草稿；请重读核对后再写入，草稿未覆盖");
       }
     }
@@ -1815,14 +1719,8 @@ async function handleSave(closeAfter = false, silent = false, onlyKeys?: string[
       const confirmed = cloneSettingValue(accepted[key]);
       if (key === SHORTCUT_STORAGE_KEY) customShortcuts.value = confirmed;
       if (key === SEARCH_IGNORED_BOOKMARK_FOLDERS_STORAGE_KEY) ignoredFolders.value = confirmed;
-      const effective = key === LIMBUS_STORAGE_KEY ? { ...DEFAULT_LIMBUS_CONFIG, ...confirmed } : confirmed;
-      if (key === LIMBUS_STORAGE_KEY) {
-        for (const field of Object.keys(limbus)) delete (limbus as any)[field];
-        Object.assign(limbus, effective);
-        for (const field of explicitLimbusFields) limbusExplicitFields.delete(field);
-      }
       storedBaseline[key] = cloneSettingValue(confirmed);
-      draftBaseline[key] = cloneSettingValue(effective);
+      draftBaseline[key] = cloneSettingValue(confirmed);
     }
     if (!silent) notify(Object.keys(payload).length ? "✓ 本次改动已保存生效" : "没有待保存的改动");
     if (closeAfter) settingsController.close();
@@ -1840,7 +1738,7 @@ async function handleSave(closeAfter = false, silent = false, onlyKeys?: string[
 
 async function reloadSettings() {
   if (settingsSaving.value || settingsLoading.value || reloadPromptOpen || !alive) return;
-  if (hasLoadedDraft && (!sameSettingValue(draftSnapshot(), draftBaseline) || limbusExplicitFields.size > 0)) {
+  if (hasLoadedDraft && !sameSettingValue(draftSnapshot(), draftBaseline)) {
     reloadPromptOpen = true;
     let discard = false;
     try {
@@ -1876,7 +1774,7 @@ async function loadAll() {
         throw new Error("设置数据格式异常，未允许覆盖；请核对已有配置");
       }
     }
-    for (const key of [LIMBUS_STORAGE_KEY, SHORTCUT_STORAGE_KEY]) {
+    for (const key of [SHORTCUT_STORAGE_KEY]) {
       if (cfg[key] !== undefined && (!cfg[key] || typeof cfg[key] !== "object" || Array.isArray(cfg[key]))) {
         throw new Error("设置数据格式异常，未允许覆盖；请核对已有配置");
       }
@@ -1886,10 +1784,6 @@ async function loadAll() {
       throw new Error("书签过滤设置格式异常，未允许覆盖");
     }
     Object.assign(form, defaultForm);
-    for (const key of Object.keys(limbus)) delete (limbus as any)[key];
-    Object.assign(limbus, DEFAULT_LIMBUS_CONFIG);
-    limbusExplicitFields.clear();
-    ++limbusIntentVersion;
     customShortcuts.value = {};
     ignoredFolders.value = [];
 
@@ -1899,9 +1793,6 @@ async function loadAll() {
       }
     }
 
-    if (cfg[LIMBUS_STORAGE_KEY]) {
-      Object.assign(limbus, cfg[LIMBUS_STORAGE_KEY]);
-    }
     if (cfg[SHORTCUT_STORAGE_KEY]) {
       customShortcuts.value = cfg[SHORTCUT_STORAGE_KEY];
     }

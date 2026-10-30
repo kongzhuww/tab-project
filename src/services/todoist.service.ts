@@ -164,7 +164,8 @@ export class TodoistService {
 
   // 项目与活动上下文缓存
   private cachedProjects: TodoistRawProject[] = [];
-  private activeProjectId: string = "";
+  private activeProjectId: string = (typeof localStorage !== "undefined" && localStorage.getItem("todoist_active_project_id")) || "";
+  private inboxProjectId: string = (typeof localStorage !== "undefined" && localStorage.getItem("todoist_inbox_project_id")) || "";
   private activeProjectName: string = "";
 
   private readonly changeChannel = createTodoistChangeChannel(() => this.initToken(), () => {
@@ -205,6 +206,9 @@ export class TodoistService {
 
   public setActiveProjectId(projectId: string): void {
     this.activeProjectId = String(projectId || "");
+    if (typeof localStorage !== "undefined") {
+      try { localStorage.setItem("todoist_active_project_id", this.activeProjectId); } catch {}
+    }
     if (typeof chrome !== "undefined" && chrome.storage?.local && this.activeProjectId) {
       const value = this.activeProjectId;
       void withTodoistWrite(async () => { await chrome.storage.local.set({ [TODOIST_ACTIVE_PROJECT_ID_KEY]: value }); })
@@ -359,6 +363,30 @@ export class TodoistService {
     }
   }
 
+  public getFastSnapshot(
+    view: "inbox" | "today" | "projects" = "inbox",
+    targetProjectId?: string
+  ): TodoistWorkspaceData | null {
+    const key = this.getWorkspaceCacheKey(view, targetProjectId);
+    const mem = this.workspaceMemoryCache.get(key);
+    if (mem?.data?.columns && Array.isArray(mem.data.columns) && mem.data.columns.length > 0) {
+      return mem.data;
+    }
+    if (typeof localStorage !== "undefined") {
+      try {
+        const raw = localStorage.getItem(`todoist_fast_snapshot:${key}`);
+        if (raw) {
+          const entry = JSON.parse(raw);
+          if (entry?.data?.columns && Array.isArray(entry.data.columns) && entry.data.columns.length > 0) {
+            this.workspaceMemoryCache.set(key, entry);
+            return entry.data;
+          }
+        }
+      } catch {}
+    }
+    return null;
+  }
+
   public getWorkspaceCacheKey(view: string, projectId?: string): string {
     if (view === "projects") {
       return `v3:projects:${projectId || this.activeProjectId || "default"}`;
@@ -390,6 +418,9 @@ export class TodoistService {
         // 允许 30 天内的本地离线缓存作为底包直出，绝不在超过 15 分钟后强行清空/阻断离线呈现
         if (entry?.data?.columns && Array.isArray(entry.data.columns) && Date.now() - entry.timestamp < 30 * 86400000) {
           this.workspaceMemoryCache.set(key, entry);
+          if (typeof localStorage !== "undefined") {
+            try { localStorage.setItem(`todoist_fast_snapshot:${key}`, JSON.stringify(entry)); } catch {}
+          }
           return entry.data;
         }
       } catch {}
@@ -455,9 +486,41 @@ export class TodoistService {
     const cacheKey = this.getWorkspaceCacheKey(view, targetProjectId);
 
     try {
-      // 1. 获取所有有效项目
-      const rawProjects = await this.getProjects(signal);
+      const effectiveProjId = targetProjectId || this.activeProjectId;
+      const nowStr = new Date().toLocaleDateString("en-CA");
+
+      // 并行化拉取：不再串行等待 projects 结束后才拉取任务和板块
+      const projectsPromise = this.getProjects(signal);
+
+      let sectionsPromise: Promise<TodoistRawSection[]>;
+      let tasksPromise: Promise<TodoistRawTask[]>;
+
+      if (view === "projects" && effectiveProjId) {
+        sectionsPromise = this.getSections(effectiveProjId, signal);
+        tasksPromise = this.getTasksByProject(effectiveProjId, signal);
+      } else if (view === "today") {
+        sectionsPromise = Promise.resolve([]);
+        tasksPromise = this.getTasks("today | overdue", signal);
+      } else {
+        // Inbox 视图：若已知 Inbox ID 则直接并行拉取
+        const inboxId = this.inboxProjectId;
+        if (inboxId) {
+          sectionsPromise = this.getSections(inboxId, signal);
+          tasksPromise = this.getTasksByProject(inboxId, signal);
+        } else {
+          sectionsPromise = Promise.resolve([]);
+          tasksPromise = Promise.resolve([]);
+        }
+      }
+
+      // 等待第一波并行网络请求
+      const [rawProjects, initialSections, initialTasks] = await Promise.all([
+        projectsPromise,
+        sectionsPromise,
+        tasksPromise
+      ]);
       ensureCurrent();
+
       const userProjects = rawProjects.filter(
         (p) => !p.inbox_project && !p.is_inbox_project && !/^(Inbox|收件箱)$/i.test(p.name) && !p.is_archived && !p.is_deleted
       );
@@ -486,14 +549,20 @@ export class TodoistService {
       }
 
       let columns: TodoistColumnItem[] = [];
-      const nowStr = new Date().toLocaleDateString("en-CA");
 
-      // 2. 根据不同视图拉取任务
+      // 2. 根据不同视图装配任务
       if (view === "projects" && this.activeProjectId) {
-        const [sections, tasks] = await Promise.all([
-          this.getSections(this.activeProjectId, signal),
-          this.getTasksByProject(this.activeProjectId, signal)
-        ]);
+        let sections = initialSections;
+        let tasks = initialTasks;
+        // 如果预取的 effectiveProjId 与最终确定的 activeProjectId 不一致，重新拉取
+        if (effectiveProjId !== this.activeProjectId || (initialSections.length === 0 && initialTasks.length === 0)) {
+          const [sec, tsk] = await Promise.all([
+            this.getSections(this.activeProjectId, signal),
+            this.getTasksByProject(this.activeProjectId, signal)
+          ]);
+          sections = sec;
+          tasks = tsk;
+        }
 
         const defaultCol: TodoistColumnItem = {
           projectId: this.activeProjectId,
@@ -512,7 +581,7 @@ export class TodoistService {
           });
         }
       } else if (view === "today") {
-        const tasks = await this.getTasks("today | overdue", signal);
+        const tasks = initialTasks;
         const overdueTasks = tasks.filter((t) => {
           const d = t.due?.date ? String(t.due.date).slice(0, 10) : "";
           return d && d < nowStr;
@@ -530,12 +599,25 @@ export class TodoistService {
         // 默认 Inbox
         const inbox = rawProjects.find((p) => p.inbox_project || p.is_inbox_project) || rawProjects.find((p) => /^(Inbox|收件箱)$/i.test(p.name));
         if (inbox) {
-          const [sections, tasks] = await Promise.all([
-            this.getSections(inbox.id, signal),
-            this.getTasksByProject(inbox.id, signal)
-          ]);
+          const actualInboxId = String(inbox.id);
+          this.inboxProjectId = actualInboxId;
+          if (typeof localStorage !== "undefined") {
+            try { localStorage.setItem("todoist_inbox_project_id", actualInboxId); } catch {}
+          }
+
+          let sections = initialSections;
+          let tasks = initialTasks;
+          if (!this.inboxProjectId || (initialSections.length === 0 && initialTasks.length === 0)) {
+            const [sec, tsk] = await Promise.all([
+              this.getSections(actualInboxId, signal),
+              this.getTasksByProject(actualInboxId, signal)
+            ]);
+            sections = sec;
+            tasks = tsk;
+          }
+
           const defaultCol: TodoistColumnItem = {
-            projectId: String(inbox.id),
+            projectId: actualInboxId,
             sectionId: "",
             title: this.getDefaultSectionName(),
             tasks: this.mapTasks(tasks.filter((t) => !t.section_id), nowStr)
@@ -543,7 +625,7 @@ export class TodoistService {
           columns.push(defaultCol);
           for (const sec of sections) {
             columns.push({
-              projectId: String(inbox.id),
+              projectId: actualInboxId,
               sectionId: String(sec.id),
               title: sec.name,
               tasks: this.mapTasks(tasks.filter((t) => String(t.section_id) === String(sec.id)), nowStr)
@@ -576,6 +658,17 @@ export class TodoistService {
       this.workspaceMemoryCache.set(specificCacheKey, entry);
       if (cacheKey !== specificCacheKey) this.workspaceMemoryCache.set(cacheKey, entry);
       this.workspaceCacheInvalidated = false;
+
+      if (typeof localStorage !== "undefined") {
+        try {
+          const entryJson = JSON.stringify(entry);
+          localStorage.setItem(`todoist_fast_snapshot:${specificCacheKey}`, entryJson);
+          if (cacheKey !== specificCacheKey) {
+            localStorage.setItem(`todoist_fast_snapshot:${cacheKey}`, entryJson);
+          }
+        } catch {}
+      }
+
       // Persist once, with fallback to legacy cache key for backward compatibility.
       if (typeof chrome !== "undefined" && chrome.storage?.local) {
         try {
@@ -878,6 +971,8 @@ export class TodoistService {
     project_id?: string;
     section_id?: string;
     due_string?: string;
+    due_date?: string;
+    due_datetime?: string;
     priority?: number;
     labels?: string[];
   }, requestId?: string): Promise<TodoistRawTask> {
@@ -1036,6 +1131,8 @@ export class TodoistService {
     project_id?: string;
     section_id?: string;
     due_string?: string;
+    due_date?: string;
+    due_datetime?: string;
     priority?: number;
     labels?: string[];
     attachments?: Array<{
@@ -1060,6 +1157,8 @@ export class TodoistService {
       project_id: payload.project_id,
       section_id: payload.section_id,
       due_string: payload.due_string,
+      due_date: payload.due_date,
+      due_datetime: payload.due_datetime,
       priority: payload.priority,
       labels: payload.labels
     });

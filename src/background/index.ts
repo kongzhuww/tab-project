@@ -25,12 +25,14 @@ import {
 } from "./tab-manager";
 import { handleSearchWebImages, handleFetchSiteImages } from "./image-proxy";
 import { acquireImageSlot, fetchImageBytes, mediaUrl, MAX_IMAGE_BYTES, MAX_IMAGE_PIXELS, validateImagePixels } from "./media-fetch";
+import { initTodoistBackgroundSync, syncTodoistInBackground } from "./todoist-sync";
 
 declare const chrome: any;
 
 // 1. 初始化各领域核心微模块与监听器
 initBilibiliNetRules();
 initNotificationListeners();
+initTodoistBackgroundSync();
 // Retire persisted alarms from the removed mail/social feeds. Never clear other modules.
 for (const name of ["gmail-inbox-poll", "x-account-poll"]) {
   chrome.alarms.clear(name).catch(() => console.warn("[Migration] Could not clear retired feed alarm"));
@@ -42,7 +44,7 @@ initContextMenu();
 if (typeof chrome !== "undefined" && chrome.commands?.onCommand) {
   chrome.commands.onCommand.addListener((command: string, tab?: { windowId?: number }) => {
     if (command === "focus-newtab") void openOrFocusNewTab();
-    if (command === "open-side-panel") {
+    if (command === "open-side-panel" || command === "_execute_side_panel") {
       const failed = () => { void flashBadge("ERR", "#ef4444"); console.warn("[SidePanel] Could not open panel from keyboard command."); };
       // Call directly in the command gesture when the browser supplies the active tab.
       if (Number.isInteger(tab?.windowId) && tab!.windowId! >= 0) {
@@ -440,6 +442,7 @@ chrome.runtime.onInstalled?.addListener?.(() => {
   syncYouTubeNetRules();
   setTimeout(cleanupOrReplaceBrowserDefaultNewTabs, 200);
   setTimeout(cleanupOrReplaceBrowserDefaultNewTabs, 1000);
+  setTimeout(() => void syncTodoistInBackground(), 3000);
 });
 
 chrome.runtime.onStartup?.addListener?.(() => {
@@ -448,4 +451,5 @@ chrome.runtime.onStartup?.addListener?.(() => {
   syncYouTubeNetRules();
   setTimeout(cleanupOrReplaceBrowserDefaultNewTabs, 200);
   setTimeout(cleanupOrReplaceBrowserDefaultNewTabs, 1000);
+  setTimeout(() => void syncTodoistInBackground(), 3000);
 });

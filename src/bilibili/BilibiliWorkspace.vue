@@ -702,18 +702,17 @@ function onRadioVideoDragStart(event: DragEvent, video: { bvid: string; title: s
 
 
       <div class="bili-header-right">
-        <!-- B站互动消息按钮（位于搜索栏左侧） -->
+        <!-- B站互动消息按钮（位于搜索栏左侧，纯浏览模式） -->
         <button
           id="bili-header-msg-center-btn"
           class="fm-tab bili-header-msg-btn"
           type="button"
-          :class="{ 'has-unread': unreadMsgCount > 0, 'is-active': biliMessagePanelState.isOpen }"
-          :title="unreadMsgCount > 0 ? `B站互动消息 (${unreadMsgCount} 条未读)` : 'B站互动消息中心'"
+          :class="{ 'is-active': biliMessagePanelState.isOpen }"
+          title="B站消息中心 (纯浏览模式)"
           @click="toggleMessagePanel"
         >
           <span class="bili-header-msg-icon">🔔</span>
           <span class="bili-header-msg-label">消息</span>
-          <span v-if="unreadMsgCount > 0" class="bili-header-msg-badge">{{ unreadMsgCount > 99 ? '99+' : unreadMsgCount }}</span>
         </button>
 
         <!-- 移到右侧的高级 B站搜索（带热门推荐与实时视频联想下拉浮层） -->

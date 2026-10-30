@@ -15,6 +15,24 @@ const renamingColumnTopic = ref<string | null>(null);
 
 // 看板横向滚动容器引用
 const boardViewportRef = ref<HTMLElement | null>(null);
+const shelfScrollRef = ref<HTMLElement | null>(null);
+const isDefaultShelfCollapsed = ref(false);
+
+function toggleShelfCollapse() {
+  isDefaultShelfCollapsed.value = !isDefaultShelfCollapsed.value;
+}
+
+function onShelfWheel(event: WheelEvent) {
+  const shelf = shelfScrollRef.value;
+  if (!shelf) return;
+  if (Math.abs(event.deltaX) > Math.abs(event.deltaY) && event.deltaX !== 0) {
+    return;
+  }
+  if (event.deltaY !== 0) {
+    event.preventDefault();
+    shelf.scrollLeft += event.deltaY;
+  }
+}
 
 // 内存直接绑定的拖拽状态
 const activeDragRepo = ref<MyRepoItem | null>(null);
@@ -235,11 +253,27 @@ async function handleRemoveRepoFromTopic(repo: MyRepoItem, topic: string) {
 function onViewportWheel(event: WheelEvent) {
   const vp = boardViewportRef.value;
   if (!vp) return;
-  // 按住 Shift 滚轮，或者拖拽卡片中滚轮，或者触摸板横向滑动
-  if (event.shiftKey || activeDragRepo.value || Math.abs(event.deltaX) > 0) {
+
+  // 1. 若光标在某列内部纵向卡片滚动区，且该列可以纵向滚动，不拦截，保证该列卡片自然纵向滚动
+  const target = event.target as HTMLElement | null;
+  const colScroll = target?.closest(".column-cards-scroll");
+  if (colScroll && colScroll.scrollHeight > colScroll.clientHeight && !event.shiftKey && event.deltaX === 0) {
+    const atTop = colScroll.scrollTop <= 0 && event.deltaY < 0;
+    const atBottom = colScroll.scrollTop + colScroll.clientHeight >= colScroll.scrollHeight - 1 && event.deltaY > 0;
+    if (!atTop && !atBottom) {
+      return;
+    }
+  }
+
+  // 2. 触摸板双指天然横向滑动（deltaX），完全不 preventDefault，走浏览器 120Hz 硬件加速自然惯性滚动
+  if (Math.abs(event.deltaX) > Math.abs(event.deltaY) && event.deltaX !== 0) {
+    return;
+  }
+
+  // 3. 鼠标滚轮垂直滑动（deltaY），直接平滑映射至看板横向滚动
+  if (event.deltaY !== 0) {
     event.preventDefault();
-    const delta = event.deltaX !== 0 ? event.deltaX : event.deltaY;
-    vp.scrollLeft += delta;
+    vp.scrollLeft += event.deltaY;
   }
 }
 
@@ -248,7 +282,7 @@ function onWindowWheelWhileDragging(event: WheelEvent) {
   if (!activeDragRepo.value || !boardViewportRef.value) return;
   event.preventDefault();
   const delta = event.deltaX !== 0 ? event.deltaX : event.deltaY;
-  boardViewportRef.value.scrollLeft += delta * 1.2;
+  boardViewportRef.value.scrollLeft += delta;
 }
 
 function startAutoScroll() {
@@ -411,55 +445,126 @@ onUnmounted(() => {
 
 <template>
   <div class="my-repos-workspace">
-    <!-- 顶栏工具区 -->
-    <header class="my-repos-header">
-      <div class="header-left">
-        <h2 class="title">
-          <span class="icon">📦</span>
-          <span>我的仓库 · Topic 看板</span>
-          <span class="count-pill">{{ myReposState.repos.length }} 个项目</span>
-        </h2>
-        <span v-if="myReposState.syncingTopic" class="sync-status">
-          <i class="spin-icon">⏳</i> 正在同步 GitHub 远端 Topics…
-        </span>
-      </div>
-
-      <div class="header-right">
-        <div class="search-box">
-          <input
-            v-model="myReposState.searchQuery"
-            type="text"
-            placeholder="过滤仓库名 / 描述 / 标签..."
-            class="search-input"
-          />
-          <button
-            v-if="myReposState.searchQuery"
-            type="button"
-            class="clear-btn"
-            @click="myReposState.searchQuery = ''"
-          >✕</button>
-        </div>
-
-        <button
-          type="button"
-          class="btn-refresh"
-          :disabled="myReposState.loading || myReposState.syncingTopic"
-          title="重新从 GitHub 拉取仓库列表"
-          @click="myReposController.load(true)"
-        >
-          <span :class="{ spinning: myReposState.loading }">🔄</span>
-          <span>{{ myReposState.loading ? '正在刷新…' : '刷新仓库' }}</span>
-        </button>
-      </div>
-    </header>
-
     <!-- 错误状态提示条 -->
     <div v-if="myReposState.errorMessage" class="error-banner">
       <span>⚠️ {{ myReposState.errorMessage }}</span>
       <button type="button" @click="myReposController.load(true)">重试</button>
     </div>
 
-    <!-- 看板横向多列滚动区 -->
+    <!-- 1. 顶部全宽长方形：默认板块 (未分配 Topic 仓库池 / 快速分发托盘) -->
+    <section
+      class="default-shelf"
+      :class="{ 'drop-active': hoverTargetColumn === 'default', 'is-collapsed': isDefaultShelfCollapsed }"
+      @dragover="onDragOver($event, 'default')"
+      @dragleave="onDragLeave($event, 'default')"
+      @drop="onDropToTopic($event, 'default')"
+    >
+      <header class="shelf-header">
+        <div class="shelf-title-group">
+          <span class="col-dot default-dot"></span>
+          <h3 class="shelf-title">默认板块</h3>
+          <span class="badge-count">{{ defaultColumnRepos.length }}</span>
+          <span class="shelf-hint">未分类仓库 · 直接拖拽分发到下方各个 Topic 看板</span>
+          <span v-if="myReposState.syncingTopic" class="sync-status">
+            <i class="spin-icon">⏳</i> 正在同步 GitHub Topics…
+          </span>
+        </div>
+        <div class="shelf-actions">
+          <!-- 紧凑搜索框 -->
+          <div class="shelf-search-box">
+            <input
+              v-model="myReposState.searchQuery"
+              type="text"
+              placeholder="过滤项目 / 标签…"
+              class="shelf-search-input"
+            />
+            <button
+              v-if="myReposState.searchQuery"
+              type="button"
+              class="shelf-clear-btn"
+              @click="myReposState.searchQuery = ''"
+            >✕</button>
+          </div>
+
+          <!-- 紧凑刷新按钮 -->
+          <button
+            type="button"
+            class="shelf-btn-refresh"
+            :disabled="myReposState.loading || myReposState.syncingTopic"
+            title="重新从 GitHub 拉取仓库列表"
+            @click="myReposController.load(true)"
+          >
+            <span :class="{ spinning: myReposState.loading }">🔄</span>
+            <span>{{ myReposState.loading ? '刷新中…' : '刷新' }}</span>
+          </button>
+
+          <!-- 折叠切换 -->
+          <button
+            type="button"
+            class="shelf-toggle-btn"
+            :title="isDefaultShelfCollapsed ? '展开默认板块' : '收起默认板块'"
+            @click="toggleShelfCollapse"
+          >
+            {{ isDefaultShelfCollapsed ? '展开 ▼' : '收起 ▲' }}
+          </button>
+        </div>
+      </header>
+
+      <div
+        v-show="!isDefaultShelfCollapsed"
+        ref="shelfScrollRef"
+        class="shelf-cards-scroll"
+        @wheel="onShelfWheel"
+      >
+        <div
+          v-for="repo in defaultColumnRepos"
+          :key="repo.id"
+          class="repo-card shelf-card"
+          :class="{ 'card-dragging': activeDragRepo?.id === repo.id }"
+          draggable="true"
+          @dragstart="onDragStart($event, repo, 'default')"
+          @dragend="onDragEnd"
+          @contextmenu="handleOpenContextMenu($event, repo, 'default')"
+        >
+          <div class="repo-card-head">
+            <span class="repo-name" :title="repo.fullName" @click="openRepoUrl(repo.htmlUrl)">
+              {{ repo.name }}
+            </span>
+            <span v-if="repo.isPrivate" class="badge-repo-visibility private">私有</span>
+            <span v-if="repo.isFork" class="badge-repo-visibility fork">Fork</span>
+          </div>
+
+          <p v-if="repo.description" class="repo-desc" :title="repo.description">
+            {{ repo.description }}
+          </p>
+
+          <div v-if="repo.topics.length" class="repo-topics-row">
+            <span v-for="t in repo.topics" :key="t" class="topic-chip">
+              #{{ t }}
+            </span>
+          </div>
+
+          <div class="repo-card-footer">
+            <div class="meta-left">
+              <span v-if="repo.language" class="meta-item lang">
+                <span class="lang-color"></span>{{ repo.language }}
+              </span>
+              <span class="meta-item">⭐ {{ repo.stargazersCount }}</span>
+              <span v-if="repo.forksCount" class="meta-item">🍴 {{ repo.forksCount }}</span>
+            </div>
+            <span class="meta-date" :title="'最后更新：' + repo.updatedAt">
+              {{ formatDate(repo.pushedAt || repo.updatedAt) }}
+            </span>
+          </div>
+        </div>
+
+        <div v-if="!defaultColumnRepos.length" class="empty-shelf-placeholder">
+          <span>暂无未分类仓库 (全部项目已分配至下方各个 Topic 看板)</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- 2. 下方：各个 Topic 看板横向多列滚动区 -->
     <div
       ref="boardViewportRef"
       class="board-viewport"
@@ -467,77 +572,7 @@ onUnmounted(() => {
       @dragover="onViewportDragOver"
     >
       <div class="board-columns-track">
-        
-        <!-- 1. 左侧第一列：默认板块 (未分配 Topic / 基础列表) -->
-        <section
-          class="board-column default-column"
-          :class="{ 'drop-active': hoverTargetColumn === 'default' }"
-          @dragover="onDragOver($event, 'default')"
-          @dragleave="onDragLeave($event, 'default')"
-          @drop="onDropToTopic($event, 'default')"
-        >
-          <header class="column-header">
-            <div class="column-title-group">
-              <span class="col-dot default-dot"></span>
-              <h3 class="column-title">默认板块</h3>
-              <span class="badge-count">{{ defaultColumnRepos.length }}</span>
-            </div>
-            <div class="column-actions">
-              <span class="column-hint" title="未分配到右侧任何 Topic 的项目自动归入此板块">未分类</span>
-            </div>
-          </header>
-
-          <div class="column-cards-scroll">
-            <div
-              v-for="repo in defaultColumnRepos"
-              :key="repo.id"
-              class="repo-card"
-              :class="{ 'card-dragging': activeDragRepo?.id === repo.id }"
-              draggable="true"
-              @dragstart="onDragStart($event, repo, 'default')"
-              @dragend="onDragEnd"
-              @contextmenu="handleOpenContextMenu($event, repo, 'default')"
-            >
-              <div class="repo-card-head">
-                <span class="repo-name" :title="repo.fullName" @click="openRepoUrl(repo.htmlUrl)">
-                  {{ repo.name }}
-                </span>
-                <span v-if="repo.isPrivate" class="badge-repo-visibility private">私有</span>
-                <span v-if="repo.isFork" class="badge-repo-visibility fork">Fork</span>
-              </div>
-
-              <p v-if="repo.description" class="repo-desc" :title="repo.description">
-                {{ repo.description }}
-              </p>
-
-              <!-- 已有 Topics 标签 -->
-              <div v-if="repo.topics.length" class="repo-topics-row">
-                <span v-for="t in repo.topics" :key="t" class="topic-chip">
-                  #{{ t }}
-                </span>
-              </div>
-
-              <div class="repo-card-footer">
-                <div class="meta-left">
-                  <span v-if="repo.language" class="meta-item lang">
-                    <span class="lang-color"></span>{{ repo.language }}
-                  </span>
-                  <span class="meta-item">⭐ {{ repo.stargazersCount }}</span>
-                  <span v-if="repo.forksCount" class="meta-item">🍴 {{ repo.forksCount }}</span>
-                </div>
-                <span class="meta-date" :title="'最后更新：' + repo.updatedAt">
-                  {{ formatDate(repo.pushedAt || repo.updatedAt) }}
-                </span>
-              </div>
-            </div>
-
-            <div v-if="!defaultColumnRepos.length" class="empty-column-placeholder">
-              <span>暂无未分类仓库</span>
-            </div>
-          </div>
-        </section>
-
-        <!-- 2. 右侧各个 Topic 看板列 -->
+        <!-- 右侧各个 Topic 看板列 -->
         <section
           v-for="topic in activeTopicColumns"
           :key="topic"
@@ -785,46 +820,8 @@ onUnmounted(() => {
   overflow: hidden;
 }
 
-/* 顶栏 */
-.my-repos-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 12px 20px;
-  border-bottom: 1px solid var(--border, rgba(0, 0, 0, 0.08));
-  background: var(--panel, #ffffff);
-  flex-shrink: 0;
-  gap: 16px;
-}
-
-.header-left {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.title {
-  margin: 0;
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--heading, #0f172a);
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.count-pill {
-  font-size: 11px;
-  font-weight: 500;
-  padding: 2px 8px;
-  background: var(--surface-hover, rgba(0, 0, 0, 0.05));
-  border: 1px solid var(--border, rgba(0, 0, 0, 0.1));
-  border-radius: 9999px;
-  color: var(--muted, #64748b);
-}
-
 .sync-status {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--muted, #64748b);
   display: inline-flex;
   align-items: center;
@@ -839,64 +836,6 @@ onUnmounted(() => {
 @keyframes spin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
-}
-
-.header-right {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.search-box {
-  position: relative;
-  display: flex;
-  align-items: center;
-}
-
-.search-input {
-  width: 220px;
-  padding: 6px 26px 6px 10px;
-  font-size: 12px;
-  border: 1px solid var(--border, rgba(0, 0, 0, 0.12));
-  border-radius: 6px;
-  background: var(--panel, #ffffff);
-  color: var(--text, #1e293b);
-  outline: none;
-  transition: border-color 0.15s ease;
-}
-
-.search-input:focus {
-  border-color: #0284c7;
-}
-
-.clear-btn {
-  position: absolute;
-  right: 6px;
-  background: none;
-  border: none;
-  color: var(--muted, #94a3b8);
-  cursor: pointer;
-  font-size: 12px;
-  padding: 2px;
-}
-
-.btn-refresh {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-  border: 1px solid var(--border, rgba(0, 0, 0, 0.12));
-  border-radius: 6px;
-  background: var(--panel, #ffffff);
-  color: var(--text, #334155);
-  font-size: 12px;
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.btn-refresh:hover:not(:disabled) {
-  background: var(--surface-hover, rgba(0, 0, 0, 0.04));
-  border-color: var(--border-strong, rgba(0, 0, 0, 0.2));
 }
 
 .error-banner {
@@ -919,13 +858,181 @@ onUnmounted(() => {
   cursor: pointer;
 }
 
-/* 看板视口 */
+/* 顶部默认板块横幅架容器：长方形全宽，位于看板最顶端 */
+.default-shelf {
+  margin: 16px 20px 0 20px;
+  background: var(--surface, #f8fafc);
+  border: 1px solid var(--border, rgba(0, 0, 0, 0.08));
+  border-radius: 10px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+}
+
+.default-shelf.drop-active {
+  border-color: #0284c7 !important;
+  background: rgba(2, 132, 199, 0.05) !important;
+  box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.2);
+}
+
+.shelf-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--border, rgba(0, 0, 0, 0.06));
+  gap: 12px;
+}
+
+.default-shelf.is-collapsed .shelf-header {
+  border-bottom: none;
+}
+
+.shelf-title-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.shelf-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--heading, #0f172a);
+}
+
+.shelf-hint {
+  font-size: 11px;
+  color: var(--muted, #94a3b8);
+  margin-left: 2px;
+}
+
+.shelf-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.shelf-search-box {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.shelf-search-input {
+  width: 170px;
+  padding: 4px 22px 4px 8px;
+  font-size: 11px;
+  border: 1px solid var(--border, rgba(0, 0, 0, 0.12));
+  border-radius: 6px;
+  background: var(--panel, #ffffff);
+  color: var(--text, #1e293b);
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+.shelf-search-input:focus {
+  border-color: #0284c7;
+}
+
+.shelf-clear-btn {
+  position: absolute;
+  right: 4px;
+  background: none;
+  border: none;
+  color: var(--muted, #94a3b8);
+  cursor: pointer;
+  font-size: 10px;
+  padding: 1px 3px;
+}
+
+.shelf-btn-refresh {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border: 1px solid var(--border, rgba(0, 0, 0, 0.12));
+  border-radius: 6px;
+  background: var(--panel, #ffffff);
+  color: var(--text, #334155);
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.shelf-btn-refresh:hover:not(:disabled) {
+  background: var(--surface-hover, rgba(0, 0, 0, 0.04));
+  border-color: var(--border-strong, rgba(0, 0, 0, 0.2));
+}
+
+.shelf-btn-refresh:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.shelf-toggle-btn {
+  background: transparent;
+  border: 1px solid var(--border, rgba(0, 0, 0, 0.08));
+  border-radius: 6px;
+  padding: 3px 8px;
+  font-size: 11px;
+  color: var(--muted, #64748b);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.shelf-toggle-btn:hover {
+  background: var(--surface-hover, rgba(0, 0, 0, 0.04));
+  color: var(--text, #1e293b);
+  border-color: var(--border-strong, rgba(0, 0, 0, 0.15));
+}
+
+/* 顶部默认板块横向滚动卡片轨道 */
+.shelf-cards-scroll {
+  display: flex;
+  align-items: stretch;
+  gap: 12px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 10px 14px 12px;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  max-height: 160px;
+}
+
+.shelf-card {
+  width: 260px;
+  min-width: 260px;
+  max-width: 260px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.empty-shelf-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 14px 0;
+  color: var(--muted, #94a3b8);
+  font-size: 12px;
+}
+
+/* 看板视口：与顶部长方形协同 */
 .board-viewport {
   flex: 1;
   overflow-x: auto;
   overflow-y: hidden;
-  padding: 16px 20px;
-  scroll-behavior: smooth;
+  padding: 12px 20px 16px;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
 .board-columns-track {

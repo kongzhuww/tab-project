@@ -1,6 +1,8 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref } from "vue";
+import { onMounted, onUnmounted, ref, computed } from "vue";
 import { radioTapeState, radioTapeController } from "./radio-tape-store";
+import { biliFavoritesState } from "./bili-favorites-store";
+import { biliRadioController } from "./radio-store";
 
 const props = withDefaults(defineProps<{
   dockSide?: boolean;
@@ -21,6 +23,40 @@ const isDragOver = ref(false);
 const isInserting = ref(false);
 const insertedTitle = ref("");
 const isCollapsed = ref(false);
+const isSeriesPickerOpen = ref(false);
+
+function toggleSeriesPicker(e: Event) {
+  e.stopPropagation();
+  isSeriesPickerOpen.value = !isSeriesPickerOpen.value;
+  if (isSeriesPickerOpen.value) {
+    void biliRadioController.init();
+  }
+}
+
+async function selectAndPlaySeries(id: string) {
+  isSeriesPickerOpen.value = false;
+  await biliRadioController.playSeries(id, 0);
+}
+
+function onGlobalPointerDown(e: PointerEvent) {
+  if (!isSeriesPickerOpen.value) return;
+  const target = e.target as HTMLElement | null;
+  if (!target?.closest(".tape-series-popover") && !target?.closest(".tape-cassette-wrap")) {
+    isSeriesPickerOpen.value = false;
+  }
+}
+
+function onGlobalKeyDown(e: KeyboardEvent) {
+  if (e.key === "Escape" && isSeriesPickerOpen.value) {
+    isSeriesPickerOpen.value = false;
+  }
+}
+
+const modeTooltip = computed(() => {
+  if (radioTapeState.mode === "one") return "单曲循环";
+  if (radioTapeState.mode === "shuffle") return "乱序播放";
+  return "顺序播放";
+});
 
 // 🌟 动态测量 Dock 真实边界：确保磁带机自适应铺展到右侧，但绝对不遮挡 Dock！
 const safeMaxWidth = ref<number>(380);
@@ -53,6 +89,11 @@ function onWindowResize() {
 }
 
 onMounted(() => {
+  void biliRadioController.init();
+  if (typeof window !== "undefined") {
+    window.addEventListener("pointerdown", onGlobalPointerDown);
+    window.addEventListener("keydown", onGlobalKeyDown);
+  }
   if (props.dockSide) {
     measureDock();
     window.addEventListener("resize", onWindowResize);
@@ -67,6 +108,8 @@ onMounted(() => {
 
 onUnmounted(() => {
   if (typeof window !== "undefined") {
+    window.removeEventListener("pointerdown", onGlobalPointerDown);
+    window.removeEventListener("keydown", onGlobalKeyDown);
     window.removeEventListener("resize", onWindowResize);
   }
   const dock = document.querySelector(".mac-dock-shelf") || document.querySelector("#mac-dock") || document.querySelector(".mac-dock");
@@ -252,9 +295,9 @@ function updateSeekFromPointer(e: PointerEvent) {
         class="tape-cassette-wrap"
         role="button"
         tabindex="0"
-        :title="radioTapeState.playing ? '点击暂停电台 (也可直接拖拽视频封面至此装填)' : '点击播放电台 (也可直接拖拽视频封面至此装填)'"
-        @click="radioTapeController.togglePlay()"
-        @keydown.enter.space.prevent="radioTapeController.togglePlay()"
+        :title="`点击选择电台系列 (已建 ${biliFavoritesState.radioSeries.length} 个系列 · 也可直接拖拽视频封面至此装填)`"
+        @click="toggleSeriesPicker"
+        @keydown.enter.space.prevent="toggleSeriesPicker"
       >
         <div class="tape-cassette">
           <!-- 左磁带转轮 (播放时匀速平滑转动) -->
@@ -292,6 +335,60 @@ function updateSeekFromPointer(e: PointerEvent) {
               <span></span><span></span><span></span>
             </div>
             <div class="tape-spool-center"></div>
+          </div>
+        </div>
+
+        <!-- 🌟 电台自建系列弹窗：点击磁带时向上弹出 -->
+        <div
+          v-if="isSeriesPickerOpen"
+          class="tape-series-popover"
+          @click.stop
+        >
+          <div class="tape-series-header">
+            <div class="tape-series-title-group">
+              <span class="tape-series-icon">📻</span>
+              <span class="tape-series-title">自建电台系列</span>
+              <span class="tape-series-count-pill">{{ biliFavoritesState.radioSeries.length }}</span>
+            </div>
+            <button
+              type="button"
+              class="tape-series-close-btn"
+              title="关闭"
+              aria-label="关闭"
+              @click.stop="isSeriesPickerOpen = false"
+            >
+              ✕
+            </button>
+          </div>
+
+          <div class="tape-series-list-scroll">
+            <div
+              v-for="series in biliFavoritesState.radioSeries"
+              :key="series.id"
+              class="tape-series-item"
+              :class="{ 'is-active': radioTapeState.seriesName === series.name }"
+              @click.stop="selectAndPlaySeries(series.id)"
+            >
+              <div class="tape-series-item-left">
+                <span class="tape-series-item-bullet">📼</span>
+                <div class="tape-series-item-info">
+                  <span class="tape-series-item-name" :title="series.name">{{ series.name }}</span>
+                  <span class="tape-series-item-count">{{ series.count }} 首曲目 · 顺序连播</span>
+                </div>
+              </div>
+              <span v-if="radioTapeState.seriesName === series.name && radioTapeState.playing" class="tape-series-playing-tag">
+                播放中
+              </span>
+              <span v-else class="tape-series-play-action">
+                ▶
+              </span>
+            </div>
+
+            <div v-if="!biliFavoritesState.radioSeries.length" class="tape-series-empty">
+              <span class="empty-icon">📂</span>
+              <span class="empty-text">暂无保存的电台系列</span>
+              <span class="empty-tip">可在 B站工作区 → 电台 中添加曲目并保存为系列</span>
+            </div>
           </div>
         </div>
       </div>
@@ -346,6 +443,71 @@ function updateSeekFromPointer(e: PointerEvent) {
               {{ radioTapeState.lyric || '♪ 纯音乐 / 伴奏' }}
             </span>
           </div>
+
+          <!-- 🎵 播放模式切换 (顺序 / 单曲循环 / 随机乱序) 纯 SVG 矢量图标，无文字 -->
+          <button
+            type="button"
+            class="tape-mode-btn"
+            :title="modeTooltip"
+            :aria-label="modeTooltip"
+            @click="radioTapeController.toggleMode()"
+          >
+            <!-- 顺序播放 (列表循环) -->
+            <svg
+              v-if="radioTapeState.mode === 'order'"
+              viewBox="0 0 24 24"
+              width="13"
+              height="13"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <polyline points="17 1 21 5 17 9" />
+              <path d="M3 11V9a4 4 0 0 1 4-4h14" />
+              <polyline points="7 23 3 19 7 15" />
+              <path d="M21 13v2a4 4 0 0 1-4 4H3" />
+            </svg>
+
+            <!-- 单曲循环 -->
+            <svg
+              v-else-if="radioTapeState.mode === 'one'"
+              viewBox="0 0 24 24"
+              width="13"
+              height="13"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <polyline points="17 1 21 5 17 9" />
+              <path d="M3 11V9a4 4 0 0 1 4-4h14" />
+              <polyline points="7 23 3 19 7 15" />
+              <path d="M21 13v2a4 4 0 0 1-4 4H3" />
+              <text x="12" y="14.5" font-size="7.5" font-weight="900" font-family="system-ui, -apple-system, sans-serif" fill="currentColor" stroke="none" text-anchor="middle">1</text>
+            </svg>
+
+            <!-- 乱序播放 (随机播放) -->
+            <svg
+              v-else-if="radioTapeState.mode === 'shuffle'"
+              viewBox="0 0 24 24"
+              width="13"
+              height="13"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <polyline points="16 3 21 3 21 8" />
+              <line x1="4" y1="20" x2="21" y2="3" />
+              <polyline points="21 16 21 21 16 21" />
+              <line x1="15" y1="15" x2="21" y2="21" />
+              <line x1="4" y1="4" x2="9" y2="9" />
+            </svg>
+          </button>
         </div>
 
         <div
@@ -409,7 +571,7 @@ function updateSeekFromPointer(e: PointerEvent) {
   border: 1px solid var(--border, rgba(0, 0, 0, 0.08));
   border-radius: 12px;
   box-sizing: border-box;
-  overflow: hidden;
+  overflow: visible;
   user-select: none;
   font-family: inherit;
   box-shadow: 0 4px 18px rgba(0, 0, 0, 0.05);
@@ -430,7 +592,7 @@ function updateSeekFromPointer(e: PointerEvent) {
   backdrop-filter: blur(14px);
   background: color-mix(in srgb, var(--surface, #ffffff) 94%, transparent);
   border-color: var(--border-strong, var(--border));
-  overflow: hidden;
+  overflow: visible;
 }
 
 .tape-body-content {
@@ -441,7 +603,7 @@ function updateSeekFromPointer(e: PointerEvent) {
   min-height: 54px;
   box-sizing: border-box;
   width: 100%;
-  overflow: hidden;
+  overflow: visible;
 }
 
 /* 独立在最右侧的折叠控制按钮 (自然参与 flex 布局，绝不覆盖上方时间) */
@@ -561,13 +723,212 @@ function updateSeekFromPointer(e: PointerEvent) {
 
 /* 磁带实体图形 (现代卡带拟物) */
 .tape-cassette-wrap {
+  position: relative;
   flex-shrink: 0;
   cursor: pointer;
   outline: none;
-  transition: transform 0.15s ease;
 }
-.tape-cassette-wrap:hover {
+.tape-cassette-wrap:hover .tape-cassette {
   transform: translateY(-1px);
+}
+
+/* 🌟 电台系列选择器弹窗 (向上弹出，纯实色面板，绝不透底背景文字) */
+.tape-series-popover {
+  position: absolute;
+  bottom: calc(100% + 12px);
+  left: 0;
+  width: 240px;
+  max-width: calc(100vw - 32px);
+  background: var(--panel, #ffffff) !important;
+  background-color: var(--panel, #ffffff) !important;
+  border: 1px solid var(--border-strong, var(--border, rgba(0, 0, 0, 0.15)));
+  border-radius: 10px;
+  box-shadow: 0 14px 35px rgba(0, 0, 0, 0.25), 0 2px 8px rgba(0, 0, 0, 0.08);
+  z-index: 1005;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: tapePopoverFadeIn 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  cursor: default;
+}
+
+@keyframes tapePopoverFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.tape-series-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border, rgba(0, 0, 0, 0.08));
+  background: color-mix(in srgb, var(--panel, #ffffff) 92%, var(--text, #000000) 8%);
+}
+
+.tape-series-title-group {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.tape-series-icon {
+  font-size: 13px;
+}
+
+.tape-series-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--heading, #0f172a);
+}
+
+.tape-series-count-pill {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 5px;
+  border-radius: 10px;
+  background: rgba(2, 132, 199, 0.12);
+  color: #0284c7;
+}
+
+.tape-series-close-btn {
+  background: transparent;
+  border: none;
+  font-size: 11px;
+  color: var(--muted, #64748b);
+  cursor: pointer;
+  padding: 2px 5px;
+  border-radius: 4px;
+  transition: all 0.15s ease;
+}
+
+.tape-series-close-btn:hover {
+  background: var(--panel-hover, rgba(0, 0, 0, 0.05));
+  color: var(--heading, #0f172a);
+}
+
+.tape-series-list-scroll {
+  max-height: 200px;
+  overflow-y: auto;
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: var(--panel, #ffffff);
+}
+
+.tape-series-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.tape-series-item:hover {
+  background: var(--panel-hover, rgba(0, 0, 0, 0.04));
+}
+
+.tape-series-item.is-active {
+  background: rgba(2, 132, 199, 0.1);
+}
+
+.tape-series-item-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  flex: 1;
+}
+
+.tape-series-item-bullet {
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.tape-series-item-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.tape-series-item-name {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text, #334155);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tape-series-item.is-active .tape-series-item-name {
+  color: #0284c7;
+  font-weight: 600;
+}
+
+.tape-series-item-count {
+  font-size: 10px;
+  color: var(--muted, #64748b);
+}
+
+.tape-series-playing-tag {
+  font-size: 10px;
+  font-weight: 600;
+  color: #0284c7;
+  padding: 1px 4px;
+  background: rgba(2, 132, 199, 0.15);
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.tape-series-play-action {
+  font-size: 10px;
+  color: var(--muted, #94a3b8);
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  flex-shrink: 0;
+}
+
+.tape-series-item:hover .tape-series-play-action {
+  opacity: 1;
+  color: #0284c7;
+}
+
+.tape-series-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 20px 10px;
+  text-align: center;
+  gap: 4px;
+}
+
+.tape-series-empty .empty-icon {
+  font-size: 18px;
+  opacity: 0.7;
+}
+
+.tape-series-empty .empty-text {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text, #475569);
+}
+
+.tape-series-empty .empty-tip {
+  font-size: 10px;
+  color: var(--muted, #94a3b8);
+  line-height: 1.4;
 }
 
 .tape-cassette {
@@ -773,10 +1134,37 @@ function updateSeekFromPointer(e: PointerEvent) {
 }
 .tape-time-lyric-row {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 6px;
   min-width: 0;
   overflow: hidden;
+}
+
+/* 🎵 播放模式切换按钮 (纯 SVG 图标，无文字) */
+.tape-mode-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--muted, #64748b);
+  border-radius: 4px;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+  margin-left: 2px;
+}
+
+.tape-mode-btn:hover {
+  background: var(--panel-hover, rgba(0, 0, 0, 0.05));
+  color: #0284c7;
+}
+
+.tape-mode-btn:active {
+  transform: scale(0.92);
 }
 .tape-timestamp {
   font-family: ui-monospace, monospace;

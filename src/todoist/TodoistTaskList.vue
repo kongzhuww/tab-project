@@ -84,7 +84,6 @@
           <header class="todoist-board-column-head">
             <h3>
               {{ col.title }}
-              <small v-if="isGitHubTaskTarget(col)" class="github-task-section-badge">GitHub任务区</small>
               <span>{{ col.tasks.length }}</span>
             </h3>
             <button
@@ -115,6 +114,34 @@
               @paste="onComposerPaste($event)"
             ></textarea>
 
+            <!-- 智能日期识别提示条 (0ms 本地识别) -->
+            <div
+              v-if="detectedComposerDate"
+              class="todoist-composer-date-hint"
+              :class="{ 'is-ignored': ignoreDetectedDate }"
+            >
+              <div class="date-hint-left">
+                <span class="date-hint-icon">📅</span>
+                <span class="date-hint-badge">
+                  {{ detectedComposerDate.label }}{{ detectedComposerDate.time ? ' ' + detectedComposerDate.time : '' }}
+                  <span class="date-hint-sub">({{ detectedComposerDate.formattedDate }})</span>
+                </span>
+                <span v-if="!ignoreDetectedDate" class="date-hint-preview">
+                  精简任务名: <strong>{{ detectedComposerDate.cleanTitle }}</strong>
+                </span>
+                <span v-else class="date-hint-preview ignored-text">
+                  (已忽略日期，按纯文本创建)
+                </span>
+              </div>
+              <button
+                type="button"
+                class="date-hint-toggle-btn"
+                @click="ignoreDetectedDate = !ignoreDetectedDate"
+              >
+                {{ ignoreDetectedDate ? '↺ 恢复识别' : '× 忽略' }}
+              </button>
+            </div>
+
             <!-- 粘贴的图片预览区 -->
             <div v-if="composerPastedImages.length > 0" class="todoist-composer-images">
               <div
@@ -142,7 +169,6 @@
 
           <!-- 普通板块使用虚拟列表保持高性能 -->
           <TodoistVirtualList
-            v-if="!isGitHubTaskTarget(col)"
             :tasks="previewTasks(col, colIndex)"
             :pinned-id="draggingTaskId || editingTaskId"
             :hidden-id="dragOverColIndex !== null ? draggingTaskId : null"
@@ -202,6 +228,22 @@
 
               <div class="todoist-board-task-main">
                 <span v-if="state.movingTaskId === task.id" class="todoist-position-pending" role="status">保存中</span>
+
+                <!-- 🐙 关联 GitHub 仓库标识 (上面有仓库名字) -->
+                <div v-if="getTaskRepos(task.id, task.description).length" class="todoist-card-repo-strip">
+                  <button
+                    v-for="repo in getTaskRepos(task.id, task.description)"
+                    :key="repo.fullName"
+                    type="button"
+                    class="todoist-card-repo-btn"
+                    :title="'关联 GitHub 仓库：' + repo.fullName + ' · 点击在插件内查看详情'"
+                    @click.stop="openGitHubRepo(repo.fullName)"
+                  >
+                    <span class="repo-badge-icon">🐙</span>
+                    <span class="repo-badge-name">{{ repo.fullName }}</span>
+                  </button>
+                </div>
+
                 <!-- 原地就地编辑框 -->
                 <textarea
                   v-if="editingTaskId === task.id"
@@ -277,155 +319,6 @@
             </template>
           </TodoistVirtualList>
 
-          <!-- GitHub 任务区按关联仓库进行分层展示 -->
-          <div
-            v-else
-            class="todoist-board-list todoist-github-grouped-list"
-            :data-group-index="colIndex"
-            :class="{ 'drag-over': dragOverColIndex === colIndex }"
-            @dragover.prevent="onColDragOver($event, colIndex)"
-            @dragleave="onColDragLeave($event, colIndex)"
-            @drop.prevent="onColDrop($event, col)"
-          >
-            <p v-if="col.tasks.length === 0 && dragOverColIndex !== colIndex" class="todoist-column-empty">
-              暂无 GitHub 关联任务 · 可以在 GitHub 仓库详情右侧创建
-            </p>
-
-            <div
-              v-for="group in getGitHubRepoGroups(col)"
-              :key="group.key"
-              class="todoist-github-group-block"
-            >
-              <div class="todoist-github-group-header" @click="toggleGroupCollapse(group.key)">
-                <span class="github-group-icon">{{ group.isRepo ? '🐙' : '📁' }}</span>
-                <button
-                  v-if="group.isRepo"
-                  type="button"
-                  class="github-group-title-btn"
-                  :title="'在插件内查看 GitHub 仓库详情: ' + group.fullName"
-                  @click.stop="openGitHubRepo(group.fullName)"
-                >
-                  {{ getRepoDisplayName(group.fullName) }}
-                </button>
-                <span v-else class="github-group-title-text">{{ group.fullName }}</span>
-                <span class="github-group-badge">{{ group.tasks.length }}</span>
-                <span class="github-group-collapse-arrow" :class="{ collapsed: isGroupCollapsed(group.key) }">▾</span>
-              </div>
-
-              <div v-show="!isGroupCollapsed(group.key)" class="todoist-github-group-cards">
-                <article
-                  v-for="(task, taskIdx) in group.tasks"
-                  :key="task.id"
-                  class="todoist-board-task"
-                  :class="[
-                    {
-                      completed: task.completed,
-                      'has-custom-color': !!task.customColorHex,
-                      editing: editingTaskId === task.id,
-                      'dragging-task': !isDragPreview(task) && draggingTaskId === task.id,
-                      'drop-before': dragOverTaskId === task.id && !dragAfterTask,
-                      'drop-after': dragOverTaskId === task.id && dragAfterTask,
-                      'saving-position': state.movingTaskId === task.id,
-                      'todoist-task-preview': isDragPreview(task),
-                      'drag-origin-hidden': draggingTaskId === task.id && !isDragPreview(task) && dragOverColIndex !== null
-                    }
-                  ]"
-                  :style="task.customColorHex ? { '--task-custom-color': task.customColorHex } : {}"
-                  :data-task-id="isDragPreview(task) ? undefined : task.id"
-                  :aria-hidden="isDragPreview(task) || undefined"
-                  :tabindex="isDragPreview(task) ? -1 : 0"
-                  :title="getCardTitle()"
-                  :draggable="!isDragPreview(task) && !task.completed && !state.loading && !state.movingTaskId && !state.moveNeedsRefresh && editingTaskId !== task.id && !task.id.startsWith('optimistic-')"
-                  @dragstart="onTaskDragStart($event, task, col, taskIdx)"
-                  @dragend="onTaskDragEnd"
-                  @dragover.stop.prevent="onTaskDragOver($event, task, col, taskIdx)"
-                  @drop.stop.prevent="onTaskDrop($event, task, col, taskIdx)"
-                  @dblclick="onCardDblClick(task, $event)"
-                  @click="onCardClick(task, $event)"
-                  @contextmenu.prevent.stop="openTaskContextMenu(task, col, $event)"
-                >
-                  <button
-                    type="button"
-                    class="todoist-board-check"
-                    :class="{ checked: task.completed }"
-                    :disabled="isDragPreview(task) || state.movingTaskId === task.id"
-                    :title="task.completed ? '撤销完成' : '完成任务'"
-                    :aria-label="(task.completed ? '撤销完成：' : '完成：') + task.content"
-                    @click.stop="onToggleCheck(task, col)"
-                  ></button>
-
-                  <div class="todoist-board-task-main">
-                    <span v-if="state.movingTaskId === task.id" class="todoist-position-pending" role="status">保存中</span>
-                    <textarea
-                      v-if="editingTaskId === task.id"
-                      ref="editingInputRef"
-                      v-model="editingContent"
-                      class="todoist-task-editor"
-                      rows="2"
-                      aria-label="编辑任务名称"
-                      @keydown="onEditorKeyDown($event, task)"
-                      @blur="finishEditing(task, true)"
-                      @click.stop
-                    ></textarea>
-
-                    <p v-else class="todoist-board-task-title todoist-task-content">{{ task.content || "未命名任务" }}</p>
-
-                    <p
-                      v-if="getTaskCleanDesc(task)"
-                      class="todoist-board-task-description"
-                    >{{ getTaskCleanDesc(task) }}</p>
-
-                    <div v-if="hasMeta(task)" class="todoist-board-task-meta">
-                      <span
-                        v-if="task.startDate && !task.dueDate"
-                        class="todoist-board-due start-only"
-                        :title="`开始时间：${task.startDate}`"
-                      >
-                        🛫 自 {{ formatMonthDayTime(task.startDate) }} 起
-                      </span>
-                      <span
-                        v-else-if="task.startDate && task.dueDate"
-                        class="todoist-board-due date-range"
-                        :title="`时间区间：${task.startDate} 至 ${task.dueDate}`"
-                      >
-                        ⏱ {{ formatMonthDayTime(task.startDate) }} ~ {{ formatMonthDayTime(task.dueDate) }}
-                      </span>
-                      <span
-                        v-else-if="task.dueText"
-                        class="todoist-board-due"
-                        :class="{ recurring: task.isRecurring }"
-                        :title="task.isRecurring ? `循环任务：${task.dueString || task.dueText}` : undefined"
-                      >{{ task.isRecurring ? '↻ ' : '▣ ' }}{{ task.dueText }}</span>
-                      <span
-                        v-for="lbl in (task.labels || []).slice(0, 3)"
-                        :key="lbl"
-                        class="todoist-board-label"
-                      >◇ {{ lbl }}</span>
-                      <span
-                        v-if="task.timedDeadlineText"
-                        class="todoist-board-timer"
-                        :title="(task.timedDurationMinutes || 0) + '分钟时间限制'"
-                      >⏱ {{ task.timedDeadlineText }}</span>
-                      <span
-                        v-if="task.extraCountText"
-                        class="todoist-board-extra"
-                      >{{ task.extraCountText }}</span>
-                    </div>
-
-                    <div
-                      v-if="getTaskThumb(task)"
-                      class="todoist-card-thumb-wrap"
-                      title="点击在小窗查看大图"
-                      @click.stop="openCardImage(getTaskThumb(task)!, task)"
-                    >
-                      <img :src="getTaskThumb(task)!" class="todoist-card-thumb" alt="任务照片" loading="lazy" />
-                      <span class="todoist-card-img-badge">🖼️ 附件照片</span>
-                    </div>
-                  </div>
-                </article>
-              </div>
-            </div>
-          </div>
         </section>
 
         <!-- 添加板块栏 -->
@@ -480,13 +373,6 @@
       >
         <span class="section-menu-icon">✏️</span>
         <span class="section-menu-text">重命名板块</span>
-      </button>
-
-      <button v-if="sectionMenu.col.sectionId && sectionMenu.col.projectId" type="button"
-        class="todoist-section-menu-item" :disabled="githubTaskCreation.saving"
-        @click="setGitHubTaskSection(sectionMenu.col)">
-        <span class="section-menu-icon">◇</span>
-        <span class="section-menu-text">{{ isGitHubTaskTarget(sectionMenu.col) ? '取消 GitHub 任务区' : '设为 GitHub 任务区' }}</span>
       </button>
 
       <div v-if="sectionMenu.col.sectionId" class="todoist-section-menu-move-row">
@@ -788,7 +674,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, nextTick, watch, onUnmounted } from "vue";
+import { ref, reactive, computed, nextTick, watch, onMounted, onUnmounted } from "vue";
 import { useTodoistBoardDrag } from "./useTodoistBoardDrag";
 import TodoistVirtualList from "./TodoistVirtualList.vue";
 import { todoistModuleState, withTodoistWrite } from "./module-state";
@@ -803,94 +689,34 @@ import {
 import { todoistService } from "../services/todoist.service";
 import { todoistInspectorController } from "./inspector-store";
 import { notifications } from "../sdk/notifications";
-import { formatMonthDayTime } from "./task-date-helper";
-import { useGitHubTaskTarget, isGitHubTaskTarget, selectGitHubTaskTarget, githubTaskCreation } from "./github-task-target";
-import { readRepositoryLinks } from "./repository-links";
+import { formatMonthDayTime, parseDateKeyword } from "./task-date-helper";
+import { githubTaskCreation } from "./github-task-target";
+import { getTaskRepositoryLinks, type RepositoryLink } from "./repository-links";
 import { githubRepoDetailController } from "../github/repo-detail-store";
 
-export interface GitHubRepoGroup {
-  key: string;
-  fullName: string;
-  isRepo: boolean;
-  tasks: TodoistTaskItem[];
+const repoLinksVersion = ref(0);
+function onRepoLinksChanged() {
+  repoLinksVersion.value++;
 }
+onMounted(() => {
+  window.addEventListener('storage', onRepoLinksChanged);
+  window.addEventListener('todoist-repository-links-changed', onRepoLinksChanged);
+});
+onUnmounted(() => {
+  window.removeEventListener('storage', onRepoLinksChanged);
+  window.removeEventListener('todoist-repository-links-changed', onRepoLinksChanged);
+});
 
-const collapsedGroups = reactive<Record<string, boolean>>({});
-
-function toggleGroupCollapse(key: string) {
-  collapsedGroups[key] = !collapsedGroups[key];
-}
-
-function isGroupCollapsed(key: string): boolean {
-  return !!collapsedGroups[key];
-}
-
-function getRepoDisplayName(fullName: string): string {
-  if (!fullName) return "";
-  const parts = fullName.split("/");
-  return parts[parts.length - 1] || fullName;
+function getTaskRepos(taskId: string, description?: string): RepositoryLink[] {
+  void repoLinksVersion.value;
+  return getTaskRepositoryLinks(taskId, description);
 }
 
 function openGitHubRepo(fullName: string) {
   githubRepoDetailController.open(fullName);
 }
 
-function getGitHubRepoGroups(col: TodoistColumnItem): GitHubRepoGroup[] {
-  const repoMap = new Map<string, TodoistTaskItem[]>();
-  const unlinkedTasks: TodoistTaskItem[] = [];
-
-  for (const task of col.tasks) {
-    let repoName = "";
-    try {
-      const links = readRepositoryLinks(task.id);
-      if (links && links.length > 0 && links[0]?.fullName) {
-        repoName = links[0].fullName;
-      }
-    } catch {}
-
-    if (repoName) {
-      if (!repoMap.has(repoName)) repoMap.set(repoName, []);
-      repoMap.get(repoName)!.push(task);
-    } else {
-      unlinkedTasks.push(task);
-    }
-  }
-
-  const groups: GitHubRepoGroup[] = [];
-  const sortedRepos = [...repoMap.keys()].sort((a, b) => a.localeCompare(b));
-  for (const repo of sortedRepos) {
-    groups.push({
-      key: "repo:" + repo,
-      fullName: repo,
-      isRepo: true,
-      tasks: repoMap.get(repo)!
-    });
-  }
-
-  if (unlinkedTasks.length > 0) {
-    groups.push({
-      key: "unlinked",
-      fullName: "未关联仓库",
-      isRepo: false,
-      tasks: unlinkedTasks
-    });
-  }
-
-  return groups;
-}
-
-
 const state = todoistTaskListState;
-useGitHubTaskTarget();
-function setGitHubTaskSection(col: TodoistColumnItem) {
-  sectionMenu.isOpen = false;
-  try {
-    selectGitHubTaskTarget(col);
-    notifications.show({ appName: "Todoist", title: isGitHubTaskTarget(col) ? "已设为 GitHub 任务区" : "已取消 GitHub 任务区", message: col.title, showActions: false });
-  } catch (error) {
-    notifications.show({ appName: "Todoist", title: "任务区未更新", message: error instanceof Error ? error.message : "本机配置保存失败。", showActions: false });
-  }
-}
 
 // 添加板块
 const newSectionName = ref("");
@@ -898,6 +724,12 @@ const newSectionName = ref("");
 // 内嵌创建任务
 const activeComposerKey = ref<string | null>(null);
 const composerContent = ref("");
+const ignoreDetectedDate = ref(false);
+
+const detectedComposerDate = computed(() => {
+  if (!composerContent.value) return null;
+  return parseDateKeyword(composerContent.value);
+});
 
 interface PastedImageItem {
   file: File;
@@ -1198,6 +1030,7 @@ function openComposer(col: TodoistColumnItem, index: number, event: MouseEvent) 
   const button = event.currentTarget as HTMLButtonElement;
   activeComposerKey.value = getColKey(col, index);
   composerContent.value = "";
+  ignoreDetectedDate.value = false;
   nextTick(() => {
     // Each column renders its own composer; focus the one opened by this button.
     button.nextElementSibling?.querySelector("textarea")?.focus();
@@ -1208,6 +1041,7 @@ function closeComposer() { if (!isSubmittingComposer.value) clearComposerDraft()
 function clearComposerDraft() {
   activeComposerKey.value = null;
   composerContent.value = "";
+  ignoreDetectedDate.value = false;
   for (const img of composerPastedImages.value) {
     try {
       URL.revokeObjectURL(img.previewUrl);
@@ -1243,8 +1077,22 @@ function openCardImage(url: string, task?: TodoistTaskItem) {
 async function submitComposer(col: TodoistColumnItem) {
   if (!todoistModuleState.active || isSubmittingComposer.value) return;
   const images = [...composerPastedImages.value];
-  const finalContent = composerContent.value.trim() || images[0]?.name || "";
+  const rawText = composerContent.value.trim();
+  let finalContent = rawText || images[0]?.name || "";
   if (!finalContent) return;
+
+  let dueDate: string | undefined = undefined;
+  let dueText: string | undefined = undefined;
+  let dueString: string | undefined = undefined;
+
+  if (detectedComposerDate.value && !ignoreDetectedDate.value) {
+    const d = detectedComposerDate.value;
+    finalContent = d.cleanTitle || finalContent;
+    dueDate = d.date;
+    dueText = d.label + (d.time ? ` ${d.time}` : "");
+    dueString = d.time ? `${d.date} ${d.time}` : d.date;
+  }
+
   const key = activeComposerKey.value, originalText = composerContent.value;
   const view = state.view;
   const projectId = col.projectId || (view === "projects" ? (state.activeProjectId || undefined) : undefined);
@@ -1265,7 +1113,14 @@ async function submitComposer(col: TodoistColumnItem) {
         }
       }
       const ok = await todoistTaskListController.dispatch("add-task-submit", {
-        content: finalContent, view, group: col, projectId, sectionId,
+        content: finalContent,
+        view,
+        group: col,
+        projectId,
+        sectionId,
+        dueDate,
+        dueText,
+        dueString,
         attachments: images.map(image => ({ file_url: image.uploadedUrl!, file_name: image.name, file_type: image.file.type || "image/png" }))
       });
       if (ok && key === activeComposerKey.value && originalText === composerContent.value &&
@@ -1721,93 +1576,49 @@ onUnmounted(() => {
   padding: 4px 2px 16px;
 }
 
-.todoist-github-group-block {
+.todoist-card-repo-strip {
   display: flex;
-  flex-direction: column;
-  gap: 6px;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 5px;
 }
 
-.todoist-github-group-header {
-  display: flex;
+.todoist-card-repo-btn {
+  display: inline-flex;
   align-items: center;
-  gap: 7px;
-  padding: 6px 10px;
-  border-radius: 8px;
+  gap: 4px;
+  max-width: 100%;
+  padding: 2px 7px;
+  border-radius: 6px;
   background: var(--surface);
   border: 1px solid var(--border);
+  color: var(--heading);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
   cursor: pointer;
+  transition: all 0.15s ease;
   user-select: none;
-  transition: background 0.15s ease, border-color 0.15s ease;
+  box-sizing: border-box;
 }
 
-.todoist-github-group-header:hover {
+.todoist-card-repo-btn:hover {
   background: var(--surface-hover, var(--border));
+  color: var(--accent);
+  border-color: var(--accent);
 }
 
-.github-group-icon {
-  font-size: 13px;
+.todoist-card-repo-btn .repo-badge-icon {
+  font-size: 11.5px;
   line-height: 1;
   flex-shrink: 0;
 }
 
-.github-group-title-btn {
-  border: 0;
-  background: transparent;
-  color: var(--heading);
-  font-family: inherit;
-  font-size: 11.5px;
-  font-weight: 700;
-  cursor: pointer;
-  padding: 0;
-  text-align: left;
+.todoist-card-repo-btn .repo-badge-name {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   flex: 1 1 auto;
-}
-
-.github-group-title-btn:hover {
-  color: var(--accent);
-  text-decoration: underline;
-}
-
-.github-group-title-text {
-  color: var(--muted);
-  font-size: 11.5px;
-  font-weight: 600;
-  flex: 1 1 auto;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.github-group-badge {
-  padding: 1px 6px;
-  border-radius: 999px;
-  font-size: 10px;
-  font-weight: 600;
-  background: var(--panel);
-  border: 1px solid var(--border);
-  color: var(--muted);
-  flex-shrink: 0;
-}
-
-.github-group-collapse-arrow {
-  font-size: 10px;
-  color: var(--muted);
-  transition: transform 0.2s ease;
-  flex-shrink: 0;
-}
-
-.github-group-collapse-arrow.collapsed {
-  transform: rotate(-90deg);
-}
-
-.todoist-github-group-cards {
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
-  padding-left: 6px;
 }
 
 /* Match the accepted native-button typography, including project/recurrence choices. */
@@ -1997,4 +1808,84 @@ onUnmounted(() => {
   background: transparent; backdrop-filter: none; pointer-events: auto;
 }
 .todoist-dialog-card { width: 100%; max-height: calc(100vh - 120px); overflow: auto; transition: none; }
+
+/* 智能日期识别提示条样式 (适配主题规范，严禁暗色死色) */
+.todoist-composer-date-hint {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 5px 8px;
+  margin: 6px 0;
+  background: var(--surface, #ffffff);
+  border: 1px solid var(--border, rgba(0, 0, 0, 0.08));
+  border-radius: 6px;
+  font-size: 11px;
+  color: var(--text, #334155);
+}
+
+.todoist-composer-date-hint.is-ignored {
+  opacity: 0.6;
+  background: transparent;
+  border-style: dashed;
+}
+
+.date-hint-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.date-hint-icon {
+  font-size: 12px;
+}
+
+.date-hint-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 6px;
+  background: rgba(2, 132, 199, 0.12);
+  color: #0284c7;
+  border-radius: 4px;
+  font-weight: 600;
+  font-size: 11px;
+}
+
+.date-hint-sub {
+  font-weight: normal;
+  opacity: 0.8;
+  font-size: 10px;
+}
+
+.date-hint-preview {
+  color: var(--muted, #64748b);
+  font-size: 11px;
+}
+
+.date-hint-preview strong {
+  color: var(--heading, #0f172a);
+}
+
+.date-hint-preview.ignored-text {
+  font-style: italic;
+  color: var(--muted, #94a3b8);
+}
+
+.date-hint-toggle-btn {
+  background: transparent;
+  border: none;
+  color: var(--muted, #64748b);
+  cursor: pointer;
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: all 0.15s;
+}
+
+.date-hint-toggle-btn:hover {
+  background: var(--panel-hover, rgba(0, 0, 0, 0.05));
+  color: var(--heading, #0f172a);
+}
 </style>

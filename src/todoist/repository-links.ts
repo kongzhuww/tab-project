@@ -46,3 +46,24 @@ export function attachRepository(taskId: string, repo: RepositoryLink) {
   if (links.some(link => link.fullName.toLowerCase() === repo.fullName.toLowerCase())) return;
   writeRepositoryLinks(taskId, [...links, repo]);
 }
+
+/** 获取任务关联的 GitHub 仓库（支持本地关联记录与描述/正文中包含的仓库链接） */
+export function getTaskRepositoryLinks(taskId: string, description?: string): RepositoryLink[] {
+  if (taskId) {
+    try {
+      const links = readRepositoryLinks(taskId);
+      if (links && links.length > 0) return links;
+    } catch {}
+  }
+  if (description) {
+    const match = description.match(/github\.com\/([a-zA-Z0-9_.-]+)\/([a-zA-Z0-9_.-]+)/);
+    if (match) {
+      const cleanedRepo = `${match[1]}/${match[2].replace(/\.git$/, '')}`;
+      if (validRepositoryName(cleanedRepo)) {
+        return [{ fullName: cleanedRepo, description: '' }];
+      }
+    }
+  }
+  return [];
+}
+

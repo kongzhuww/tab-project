@@ -22,8 +22,6 @@ const emit = defineEmits<{ "open-ai-settings": [] }>();
     <p id="gh-hero-desc">{{ state.description }}</p>
   </div>
   <div class="gh-bili-actions">
-    <button id="gh-ai-analyze-all-btn" type="button" class="gh-hero-btn" title="仅分析当前筛选下已加载且没有摘要的仓库，不代表全部远端收藏" @click="controller.analyzeAll()">✨ AI 分析已加载项</button>
-    <button id="gh-ai-settings-btn" type="button" class="gh-hero-btn" title="配置 AI 服务（DeepSeek、Gemini、OpenAI等）" @click="emit('open-ai-settings')">🤖 AI 设置</button>
     <button id="gh-batch-toggle-btn" type="button" class="gh-hero-btn gh-batch-toggle-btn" :class="{ active: state.batchMode }" title="批量多选操作" @click="controller.toggleBatch()">
       <span class="gh-batch-btn-icon">☑</span>
       <span class="gh-batch-btn-text">{{ state.batchMode ? '返回' : '批量操作' }}</span>

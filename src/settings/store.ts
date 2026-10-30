@@ -1,6 +1,6 @@
 import { reactive } from "vue";
 
-export type SettingsSection = "modules" | "shortcuts" | "privacy" | "limbus" | "wallpaper" | "sync" | "storage" | "bili-cache" | "stickers";
+export type SettingsSection = "modules" | "shortcuts" | "privacy" | "wallpaper" | "sync" | "storage" | "bili-cache" | "stickers";
 export type StorageSettingsTarget = "stickers" | "bili-cache";
 
 export interface SettingsDialogState {

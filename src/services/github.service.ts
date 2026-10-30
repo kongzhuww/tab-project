@@ -1259,7 +1259,7 @@ ${repoInfo}`;
     githubRepositoryController.update({
       cards: cardViews,
       batchMode: this.batchMode,
-      emptyMessage: totalItems === 0 ? "当前分类下暂无仓库" : "",
+      emptyMessage: (this.initializing || this.actionMessage.includes("正在读取") || this.actionMessage.includes("正在统计")) ? "" : (totalItems === 0 ? "当前分类下暂无仓库" : ""),
       searchMessage: this.searchQuery ? `包含 “${this.searchQuery}” 的搜索结果` : "",
       page: currentPage,
       totalPages,

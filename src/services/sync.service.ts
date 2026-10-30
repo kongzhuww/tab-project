@@ -15,17 +15,16 @@ export const BASE_KEYS = [
   "displaySize", "city", "showWeather", "showSites", "showBili", "showYouTube",
   "showTodo", "showLeftNavigation", "showNavBall", "showBookmarkPanel",
   "showBookmarkFoldersTop", "showStartupAnimation", "startupAnimationStyle",
-  "singleNewTab", "showHomeMusicVisualizer", "showLimbusLyricEffect"
+  "singleNewTab", "showHomeMusicVisualizer"
 ];
 export const SHORTCUT_KEY = "customShortcuts";
 export const SEARCH_IGNORED_BOOKMARK_FOLDERS_KEY = "searchIgnoredBookmarkFolders";
-export const LIMBUS_CONFIG_KEY = "limbusLyricConfig";
 export const CUSTOM_AVATAR_KEY = "customNewtabAvatar";
 export const LEGACY_AVATAR_KEY = "customAvatar";
 // Ordinary backups only. Exclude whole connection/account objects, not just obvious token keys.
 // New module settings are NOT backed up unless explicitly classified and reviewed here.
 export const SYNC_WHITELIST_KEYS: readonly string[] = [
-  ...BASE_KEYS, SHORTCUT_KEY, SEARCH_IGNORED_BOOKMARK_FOLDERS_KEY, LIMBUS_CONFIG_KEY,
+  ...BASE_KEYS, SHORTCUT_KEY, SEARCH_IGNORED_BOOKMARK_FOLDERS_KEY,
   "wereadSortIds", "foGroups",
   "foTree", "foCollapsedGroupsV1", "biliFollowingGroupsV1", "biliSubCustomChannelsV1", "biliRadioSeriesV1",
   "ghCats", "ghMap", "ghUsed", "ghRepoRemarksV1",

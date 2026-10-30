@@ -28,6 +28,82 @@ function localChineseLink(markdown: string, readmePath: string): string | undefi
   return decodeURIComponent(url.pathname.slice(1));
 }
 
+/**
+ * 尝试通过 GitHub 官方 application/vnd.github.html+json 管道拉取预渲染的权威 HTML
+ */
+async function fetchOfficialReadmeHtml(
+  owner: string,
+  repo: string,
+  filePath: string,
+  branch: string,
+  headers: Record<string, string>,
+  signal: AbortSignal
+): Promise<string> {
+  try {
+    const prefix = `${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`;
+    const ref = branch ? `?ref=${encodeURIComponent(branch)}` : "";
+    let url: string;
+    // 关键修复：只有明确是根目录默认 readme.md 时才用 /readme 端点；任何中文或指定路径文件均请求 contents/{path}
+    if (filePath && filePath.toLowerCase() !== "readme.md") {
+      url = `https://api.github.com/repos/${prefix}/contents/${filePath.split("/").map(encodeURIComponent).join("/")}${ref}`;
+    } else {
+      url = `https://api.github.com/repos/${prefix}/readme${ref}`;
+    }
+
+    const res = await fetch(url, {
+      method: "GET",
+      signal,
+      cache: "no-store",
+      headers: {
+        ...headers,
+        Accept: "application/vnd.github.html+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+      },
+    });
+
+    if (res.ok) {
+      const text = await res.text();
+      if (text && text.trim().length > 30) {
+        return text;
+      }
+    }
+  } catch {}
+  return "";
+}
+
+/**
+ * 备选：通过 GitHub 官方 POST /markdown 接口携带仓库上下文完成权威渲染
+ */
+async function renderWithOfficialMarkdown(
+  text: string,
+  context: string,
+  headers: Record<string, string>,
+  signal: AbortSignal
+): Promise<string> {
+  if (!text) return "";
+  try {
+    const res = await fetch("https://api.github.com/markdown", {
+      method: "POST",
+      signal,
+      cache: "no-store",
+      headers: {
+        ...headers,
+        "Content-Type": "application/json",
+        Accept: "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+      },
+      body: JSON.stringify({ text, mode: "gfm", context }),
+    });
+    if (res.ok) {
+      const html = await res.text();
+      if (html && html.trim().length > 30) {
+        return html;
+      }
+    }
+  } catch {}
+  return "";
+}
+
 export async function readRepositoryDocument(owner: string, repo: string, signal: AbortSignal) {
   const headers = await loadGitHubReadHeaders(signal);
   const read = (path: string) => readDetailJson(path, signal, headers);
@@ -78,5 +154,52 @@ export async function readRepositoryDocument(owner: string, repo: string, signal
         : " 中文版本未能确认，显示已读取的默认 README。";
     }
   }
-  return { ...document, metadata, branch, isZh, notice };
+
+  // ★★★ 核心突破：通过官方 HTML 渲染管线拉取权威 HTML ★★★
+  let officialHtml = "";
+  try {
+    officialHtml = await fetchOfficialReadmeHtml(owner, repo, document.path, branch, headers, signal);
+    if (!officialHtml && document.markdown) {
+      officialHtml = await renderWithOfficialMarkdown(document.markdown, `${owner}/${repo}`, headers, signal);
+    }
+  } catch {}
+
+  return { ...document, html: officialHtml, metadata, branch, isZh, notice };
+}
+
+/**
+ * 原地读取指定的文档/语言版本 (如 README.md, README_zh.md, README.zh-CN.md 等)
+ */
+export async function readRepositorySpecificDocument(
+  owner: string,
+  repo: string,
+  filePath: string,
+  branch: string,
+  signal: AbortSignal
+) {
+  const headers = await loadGitHubReadHeaders(signal);
+  const prefix = `${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`;
+  const ref = branch ? `?ref=${encodeURIComponent(branch)}` : "";
+  const read = (path: string) => readDetailJson(path, signal, headers);
+
+  const cleanPath = filePath.replace(/^\.?\//, "");
+  let data: any;
+  if (!cleanPath || cleanPath.toLowerCase() === "readme.md") {
+    data = await read(`${prefix}/readme${ref}`);
+  } else {
+    data = await read(`${prefix}/contents/${cleanPath.split("/").map(encodeURIComponent).join("/")}${ref}`);
+  }
+  signal.throwIfAborted();
+  const document = decodeReadme(data);
+  const isZh = /(?:^|[/_.-])(?:zh(?:[-_]cn|[-_]hans)?|chinese|cn)(?:[/_.-]|$)/i.test(document.path);
+
+  let officialHtml = "";
+  try {
+    officialHtml = await fetchOfficialReadmeHtml(owner, repo, document.path, branch, headers, signal);
+    if (!officialHtml && document.markdown) {
+      officialHtml = await renderWithOfficialMarkdown(document.markdown, `${owner}/${repo}`, headers, signal);
+    }
+  } catch {}
+
+  return { ...document, html: officialHtml, branch, isZh };
 }

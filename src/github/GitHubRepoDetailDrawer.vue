@@ -106,7 +106,46 @@ function handleArticleClick(e: MouseEvent) {
     e.preventDefault();
     e.stopPropagation();
     images.open({ source: img.src, title: img.alt || "图片预览" });
+    return;
   }
+  const link = target?.closest("a") as HTMLAnchorElement | null;
+  if (link) {
+    const rawHref = link.getAttribute("href") || "";
+    // 1. 内部页面锚点 (#heading)
+    if (rawHref.startsWith("#")) {
+      return;
+    }
+
+    // 2. 检查是否为指向项目内部其他文档/语言切换的相对链接 (例如 README_zh.md, README.zh-CN.md, README.md 等)
+    const isDocSwitch = /^(?:\.?\/)?(README[._a-zA-Z0-9-]*\.md)$/i.exec(rawHref);
+    if (isDocSwitch) {
+      e.preventDefault();
+      e.stopPropagation();
+      void controller.switchReadme(isDocSwitch[1]);
+      return;
+    }
+
+    // 3. 检查是否是 GitHub 完整链接指向该项目的 README 文档
+    const full = state.fullName.toLowerCase();
+    const blobMatch = new RegExp(`^https?:\\/\\/github\\.com\\/${full}\\/blob\\/[^/]+\\/(README[._a-zA-Z0-9-]*\\.md)$`, "i").exec(rawHref);
+    if (blobMatch) {
+      e.preventDefault();
+      e.stopPropagation();
+      void controller.switchReadme(blobMatch[1]);
+      return;
+    }
+
+    // 4. 普通超链接：在浏览器新标签页安全打开 (过滤掉可能导致本地 404 的 chrome-extension:// 链接)
+    if (link.href && !link.href.startsWith("chrome-extension://")) {
+      e.preventDefault();
+      e.stopPropagation();
+      window.open(link.href, "_blank", "noopener,noreferrer");
+    }
+  }
+}
+
+function toggleLanguage() {
+  void controller.switchReadme();
 }
 
 function scrollToHeading(heading: RepoHeadingItem) {
@@ -236,9 +275,17 @@ onUnmounted(() => {
       <!-- 2. 项目核心元信息条 (Repo Meta Ribbon) -->
       <div class="gh-modal-ribbon">
         <div class="gh-meta-badges">
-          <span v-if="state.isZh" class="gh-meta-item gh-meta-zh" title="当前已优先加载中文版 README">
-            🇨🇳 中文版
-          </span>
+          <!-- 中文/英文一键切换按钮 (可点击原地互切) -->
+          <button
+            type="button"
+            class="gh-meta-item gh-meta-zh-btn"
+            :class="{ 'is-zh': state.isZh }"
+            :title="state.isZh ? '当前为中文文档 · 点击切换为英文原版' : '当前为英文文档 · 点击切换为中文文档'"
+            @click="toggleLanguage"
+          >
+            {{ state.isZh ? '🇨🇳 中文版' : '🌐 English' }}
+            <span class="zh-toggle-arrow">⇄</span>
+          </button>
           <span class="gh-meta-item gh-meta-stars" title="Stars 关注数">
             ★ <strong>{{ state.stars.toLocaleString() }}</strong>
           </span>
@@ -763,14 +810,116 @@ onUnmounted(() => {
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.18) !important;
 }
 
+.gh-meta-zh-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  border-radius: 6px;
+  border: 1px solid var(--border, rgba(0, 0, 0, 0.12));
+  background: var(--surface, #ffffff);
+  color: #0284c7;
+  font-weight: 600;
+  padding: 2px 7px;
+  font-size: 11px;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.gh-meta-zh-btn:hover {
+  background: rgba(2, 132, 199, 0.08);
+  border-color: #0284c7;
+}
+
+.gh-meta-zh-btn.is-zh {
+  background: rgba(16, 185, 129, 0.1);
+  color: #059669;
+  border-color: rgba(16, 185, 129, 0.3);
+}
+
+.gh-meta-zh-btn.is-zh:hover {
+  background: rgba(16, 185, 129, 0.18);
+  border-color: #059669;
+}
+
+.zh-toggle-arrow {
+  font-size: 10px;
+  opacity: 0.6;
+}
+
 /* 限制 README 内部大图尺寸，避免撑破视口 */
 .gh-readme-rendered :deep(img):not(.gh-inline-header-logo) {
   max-width: 100% !important;
-  max-height: 180px !important;
+  max-height: 240px !important;
   object-fit: contain !important;
   border-radius: 6px;
   margin: 8px auto;
   display: block;
+}
+
+/* GitHub 官方预渲染 HTML 特征元素适配 */
+.gh-readme-rendered :deep(.markdown-body) {
+  font-family: inherit;
+  color: inherit;
+}
+
+.gh-readme-rendered :deep(details) {
+  margin: 12px 0;
+  border: 1px solid var(--border, rgba(0, 0, 0, 0.1));
+  border-radius: 8px;
+  padding: 10px 14px;
+  background: var(--surface);
+}
+
+.gh-readme-rendered :deep(summary) {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--heading);
+  outline: none;
+}
+
+.gh-readme-rendered :deep(summary:hover) {
+  color: #0284c7;
+}
+
+.gh-readme-rendered :deep(table) {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 14px 0;
+  font-size: 13px;
+  display: table;
+  overflow-x: auto;
+}
+
+.gh-readme-rendered :deep(th),
+.gh-readme-rendered :deep(td) {
+  padding: 8px 12px;
+  border: 1px solid var(--border, rgba(0, 0, 0, 0.1));
+  text-align: left;
+}
+
+.gh-readme-rendered :deep(th) {
+  background: var(--surface-hover, rgba(0, 0, 0, 0.04));
+  font-weight: 650;
+  color: var(--heading);
+}
+
+.gh-readme-rendered :deep(ul.contains-task-list) {
+  list-style: none !important;
+  padding-left: 0 !important;
+}
+
+.gh-readme-rendered :deep(li.task-list-item) {
+  list-style: none !important;
+  display: flex !important;
+  align-items: baseline !important;
+  gap: 8px !important;
+  margin: 4px 0 !important;
+}
+
+.gh-readme-rendered :deep(input[type="checkbox"]) {
+  accent-color: #0284c7;
+  cursor: default;
 }
 
 /* 针对 shields.io 徽章、build 状态、小图标：保持行内并排，不强制独占放大 */

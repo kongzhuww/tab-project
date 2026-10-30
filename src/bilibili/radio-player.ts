@@ -1,5 +1,5 @@
 import { bilibiliService } from "../services/bilibili.service";
-import { radioTapeController } from "./radio-tape-store";
+import { radioTapeState, radioTapeController } from "./radio-tape-store";
 import { homeMusicController } from "../music/store";
 
 type Track = {
@@ -145,13 +145,36 @@ function getAudio(): HTMLAudioElement {
   audio = new Audio();
   audio.id = "bili-radio-audio";
   audio.preload = "auto";
-  audio.addEventListener("ended", () => { void playIndex(index + 1); });
+  audio.addEventListener("ended", onAudioEnded);
   audio.addEventListener("timeupdate", onAudioTimeUpdate);
   audio.addEventListener("play", syncTape);
   audio.addEventListener("pause", syncTape);
   audio.addEventListener("loadedmetadata", onAudioLoadedMetadata);
   audio.addEventListener("error", onAudioError);
   return audio;
+}
+
+function onAudioEnded(): void {
+  const mode = radioTapeState.mode || "order";
+  if (mode === "one") {
+    if (audio) {
+      audio.currentTime = 0;
+      void audio.play().catch(() => {});
+      syncTape();
+    }
+  } else if (mode === "shuffle") {
+    if (items.length <= 1) {
+      void playIndex(0);
+    } else {
+      let nextIdx = Math.floor(Math.random() * items.length);
+      if (nextIdx === index && items.length > 1) {
+        nextIdx = (index + 1) % items.length;
+      }
+      void playIndex(nextIdx);
+    }
+  } else {
+    void playIndex(index + 1);
+  }
 }
 
 function syncTape(): void {
@@ -259,8 +282,30 @@ export const biliRadioPlayer = {
     if (!items.length) return;
     void playIndex(targetIndex);
   },
-  next(): void { void playIndex(index + 1); },
-  prev(): void { void playIndex(index - 1); },
+  next(): void {
+    const mode = radioTapeState.mode || "order";
+    if (mode === "shuffle" && items.length > 1) {
+      let nextIdx = Math.floor(Math.random() * items.length);
+      if (nextIdx === index) {
+        nextIdx = (index + 1) % items.length;
+      }
+      void playIndex(nextIdx);
+    } else {
+      void playIndex(index + 1);
+    }
+  },
+  prev(): void {
+    const mode = radioTapeState.mode || "order";
+    if (mode === "shuffle" && items.length > 1) {
+      let nextIdx = Math.floor(Math.random() * items.length);
+      if (nextIdx === index) {
+        nextIdx = ((index - 1) % items.length + items.length) % items.length;
+      }
+      void playIndex(nextIdx);
+    } else {
+      void playIndex(index - 1);
+    }
+  },
   toggle(): void {
     const media = getAudio();
     if (!active && !media.src) {

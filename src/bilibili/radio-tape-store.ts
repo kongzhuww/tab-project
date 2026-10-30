@@ -4,6 +4,7 @@ export interface BiliRadioTapeState {
   active: boolean;
   loading: boolean;
   playing: boolean;
+  mode: "order" | "one" | "shuffle";
   title: string;
   coverUrl?: string;
   seriesName: string;
@@ -24,10 +25,13 @@ function fmtTime(s: number): string {
   return String(m).padStart(2, "0") + ":" + String(sec).padStart(2, "0");
 }
 
+const savedMode = (typeof localStorage !== "undefined" ? localStorage.getItem("bili_radio_mode") : null) as "order" | "one" | "shuffle" | null;
+
 const initialState = (): BiliRadioTapeState => ({
   active: false,
   loading: false,
   playing: false,
+  mode: (savedMode === "order" || savedMode === "one" || savedMode === "shuffle") ? savedMode : "order",
   title: "B站电台",
   coverUrl: "",
   seriesName: "SoundTrack",
@@ -48,6 +52,7 @@ export interface RadioTapeController {
   update(partial: Partial<BiliRadioTapeState>): void;
   setProgress(currentTime: number, duration: number): void;
   togglePlay(): void;
+  toggleMode(): void;
   seek(percent: number): void;
   prev(): void;
   next(): void;
@@ -113,6 +118,19 @@ export const radioTapeController: RadioTapeController = {
       }
     }
     window.dispatchEvent(new CustomEvent("logicweaver:bili-radio-toggle"));
+  },
+  toggleMode() {
+    const current = radioTapeState.mode || "order";
+    const nextMap: Record<string, "order" | "one" | "shuffle"> = {
+      order: "one",
+      one: "shuffle",
+      shuffle: "order"
+    };
+    const next = nextMap[current] || "order";
+    radioTapeState.mode = next;
+    try {
+      localStorage.setItem("bili_radio_mode", next);
+    } catch {}
   },
   seek(percent) {
     const player = (window as any).LogicWeaverBiliRadioPlayer;

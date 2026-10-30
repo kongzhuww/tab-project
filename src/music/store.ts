@@ -1,7 +1,7 @@
 import { reactive, readonly, type DeepReadonly } from "vue";
 import { musicService } from "../services/music.service";
 import { neteaseService, type NeteaseUser, type NeteasePlaylist, type NeteaseSong } from "../services/netease.service";
-import { sirenModuleState } from "./module-state";
+import { musicModuleState } from "./module-state";
 import { CACHED_FAVORITES_KEY, CACHED_PLAYLISTS_KEY, readPlaylistCache } from "./playlist-cache";
 
 export type PlayMode = "list" | "one" | "shuffle";
@@ -128,8 +128,8 @@ export const DEFAULT_SIREN_COVER =
 const initialState = (): HomeMusicSnapshot => ({
   mounted: false,
   playing: false,
-  title: "塞壬唱片 · 点击播放",
-  artist: "明日方舟音乐库",
+  title: "点击播放",
+  artist: "作者",
   coverUrl: DEFAULT_SIREN_COVER,
   currentTime: 0,
   duration: 0,
@@ -179,8 +179,8 @@ export const homeMusicController: HomeMusicController = {
     homeMusicState.playing = playing;
   },
   setTrack(title, artist, coverUrl) {
-    homeMusicState.title = title || "塞壬唱片 · 点击播放";
-    homeMusicState.artist = artist || "明日方舟音乐库";
+    homeMusicState.title = title || "点击播放";
+    homeMusicState.artist = artist || "作者";
     homeMusicState.coverUrl = coverUrl || "";
   },
   setProgress(currentTime, duration) {
@@ -202,9 +202,9 @@ export const homeMusicController: HomeMusicController = {
   },
   togglePicker(forceState) {
     if (forceState !== undefined) {
-      sirenModuleState.visible = forceState;
+      musicModuleState.visible = forceState;
     } else {
-      sirenModuleState.visible = !sirenModuleState.visible;
+      musicModuleState.visible = !musicModuleState.visible;
     }
   },
   setPickerTab(tab) {
@@ -238,7 +238,8 @@ export const homeMusicController: HomeMusicController = {
     if (boundActions.playCid) {
       boundActions.playCid(cid);
     } else {
-      const allSongs = [...homeMusicState.songs, ...homeMusicState.favorites];
+      const albumSongs = homeMusicState.activeAlbum?._songs || [];
+      const allSongs = [...homeMusicState.songs, ...homeMusicState.favorites, ...albumSongs];
       const target = allSongs.find((s) => String(s.cid) === String(cid));
       if (target) {
         void musicService.playSong(target);
@@ -514,8 +515,8 @@ if (typeof window !== "undefined") {
     homeMusicState.isNetease = !!state.currentSong?.isNetease;
     homeMusicState.currentLyric = state.currentLyric || "";
     if (state.currentSong) {
-      homeMusicState.title = state.currentSong.name || "塞壬唱片 · 点击播放";
-      homeMusicState.artist = (state.currentSong.artists || []).join(", ") || "明日方舟音乐库";
+      homeMusicState.title = state.currentSong.name || "点击播放";
+      homeMusicState.artist = (state.currentSong.artists || []).join(", ") || "作者";
       homeMusicState.coverUrl = state.currentSong.coverUrl || "";
       homeMusicState.liked = musicService.isLiked(state.currentSong.cid);
     }
@@ -555,7 +556,7 @@ export async function initHomeMusicService(): Promise<void> {
     ]);
     if (songs.length > 0 && homeMusicState.songs.length === 0) {
       homeMusicState.songs = songs;
-      // 预置曲库队列，但不自动选中或切歌，保持黑胶唱机默认待机态（塞壬唱片 · 点击播放）
+      // 预置曲库队列，但不自动选中或切歌，保持黑胶唱机默认待机态（点击播放）
       musicService.setQueue(songs, -1, false);
     }
     if (albums.length > 0 && homeMusicState.albums.length === 0) {

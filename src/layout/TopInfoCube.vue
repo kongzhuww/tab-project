@@ -113,11 +113,7 @@ const displayLyric = computed(() => {
 });
 
 function openMusicPicker() {
-  if (homeMusicState.isNetease) {
-    windowManagerController.handleToolClick("music");
-  } else {
-    windowManagerController.handleToolClick("siren");
-  }
+  windowManagerController.handleToolClick("music");
 }
 
 const nowTs = ref(Date.now());
