@@ -10,7 +10,8 @@
     const animSetting = localStorage.getItem("showStartupAnimation");
     const loaderSetting = localStorage.getItem("logicweaverEndfieldLoader");
     // 默认不启用：只有显式为 "1" 或 "true" 时才启用开屏动画
-    const isAnimEnabled = animSetting === "1" || animSetting === "true" || loaderSetting === "1" || loaderSetting === "true";
+    const savedAnimation = animSetting ?? loaderSetting;
+    const isAnimEnabled = savedAnimation === "1" || savedAnimation === "true";
     if (!isAnimEnabled) {
       document.documentElement.classList.add("skip-endfield-loader");
     } else {

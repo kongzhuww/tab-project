@@ -6,11 +6,7 @@
     <title>新标签页</title>
     <link rel="icon" type="image/png" sizes="32x32" href="assets/icon-32.png" />
     <link rel="icon" type="image/png" sizes="16x16" href="assets/icon-16.png" />
-    <script>
-      window.addEventListener("load", function() {
-        document.documentElement.dataset.windowLoaded = "true";
-      }, { once: true });
-    </script>
+    <script src="generated/theme-init.js"></script>
     <style>
       html.skip-endfield-loader #endfield-loader,
       body:not(.is-starting) #endfield-loader,
@@ -25,69 +21,12 @@
         visibility: hidden !important;
       }
     </style>
-    <script>
-      try {
-        localStorage.removeItem("lw_active_card");
-        var activeCard = null;
-        if (window.location && window.location.hash) {
-          var h = window.location.hash.replace(/^#/, "");
-          if (["todoist", "card-github", "daily-aihot", "daily-bilibili", "daily-youtube", "daily-pricing"].indexOf(h) !== -1) {
-            activeCard = h;
-          }
-        }
-        if (!activeCard) {
-          activeCard = sessionStorage.getItem("lw_active_card");
-        }
-        if (activeCard) {
-          document.documentElement.classList.add("has-card-fullscreen");
-        }
-        const t = localStorage.getItem("theme") || "light";
-        document.documentElement.dataset.theme = t;
-        document.documentElement.setAttribute("data-theme", t);
-        const animSetting = localStorage.getItem("showStartupAnimation");
-        const loaderSetting = localStorage.getItem("logicweaverEndfieldLoader");
-        // 只要开启了开屏动画，就不跳过，完整展现开屏动效
-        const isAnimEnabled = (animSetting === "1" || animSetting === "true" || loaderSetting === "1" || loaderSetting === "true");
-        if (!isAnimEnabled) {
-          document.documentElement.classList.add("skip-endfield-loader");
-        } else {
-          const startupStyle = localStorage.getItem("startupAnimationStyle") || localStorage.getItem("logicweaverStartupStyle") || "endfield";
-          document.documentElement.dataset.startupStyle = startupStyle;
-        }
-        const displaySize = localStorage.getItem("logicweaverDisplaySize") || "auto";
-        if (["classic", "compact", "large"].includes(displaySize)) document.documentElement.dataset.displaySize = displaySize;
-        else delete document.documentElement.dataset.displaySize;
-      } catch (e) {}
-    </script>
+
     <!-- 纯血 Vue 3 SPA 统一全局编译样式 -->
     <link rel="stylesheet" href="generated/vue-ui.css" />
   </head>
   <body>
-    <script>
-      (function() {
-        var card = null;
-        try {
-          if (window.location && window.location.hash) {
-            var h = window.location.hash.replace(/^#/, "");
-            if (["todoist", "card-github", "daily-aihot", "daily-bilibili", "daily-youtube", "daily-pricing"].indexOf(h) !== -1) card = h;
-          }
-          if (!card) card = sessionStorage.getItem("lw_active_card");
-        } catch (e) {}
-        if (card) {
-          document.body.classList.add("has-card-fullscreen");
-        }
-        var s = localStorage.getItem("showStartupAnimation");
-        var l = localStorage.getItem("logicweaverEndfieldLoader");
-        var isAnimEnabled = (s === "1" || s === "true" || l === "1" || l === "true");
-        if (!isAnimEnabled) {
-          document.documentElement.classList.add("skip-endfield-loader");
-          var loader = document.getElementById("endfield-loader");
-          if (loader) loader.remove();
-        } else {
-          document.body.classList.add("is-starting");
-        }
-      })();
-    </script>
+    <script src="generated/newtab-init.js"></script>
     <div id="endfield-loader" class="endfield-loader notranslate" role="status" aria-live="polite" aria-label="tab-project-next 正在启动" translate="no" lang="en">
       <div class="endfield-stage" aria-hidden="true">
         <div class="endfield-loader-texture"></div>
@@ -171,16 +110,7 @@
     <div id="vue-spa-root"></div>
     <div id="app-toast" class="app-toast" hidden></div>
     <div id="mobile-transfer-toast-container" class="mobile-transfer-toast-container" aria-live="polite"></div>
-    <script>
-      // 容灾保险：仅在极端异常未触发完成事件时兜底释放，正常流程由开屏动画播完后自行退出
-      setTimeout(function() {
-        if (document.body.classList.contains("is-starting")) {
-          document.body.classList.remove("is-starting");
-          var loader = document.getElementById("endfield-loader");
-          if (loader) loader.remove();
-        }
-      }, 6000);
-    </script>
+
     <!-- 纯血 Vue 3 SPA 唯一单根入口模块 -->
     <script type="module" src="generated/vue-ui.js"></script>
   </body>

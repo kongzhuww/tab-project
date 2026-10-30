@@ -20,14 +20,14 @@
 
 | 功能 | 源码/入口 |
 | --- | --- |
-| 新标签页 | manifest 的 `newtab-bootstrap.html` → `newtab.html` → `generated/vue-ui.js` → `src/intro/main.ts` / `src/App.vue`；首页首帧主题当前为 HTML 内联初始化，不依赖已删除的根 `theme-init.js` |
+| 新标签页 | manifest 的 `newtab-bootstrap.html` → `newtab.html` → `generated/vue-ui.js` → `src/intro/main.ts` / `src/App.vue`；首页首帧主题由外部 `generated/theme-init.js` 初始化；`generated/newtab-init.js` 设置开屏首帧状态，避免 MV3 CSP 拦截内联 JavaScript |
 | 侧边栏 | `sidepanel.html` → `src/sidepanel/index.ts` / `SidePanelApp.vue` → `generated/sidepanel-ui.js`；manifest 没有 `default_popup`，仓库没有 `popup.html` 或 `src/popup/PopupApp.vue` |
 | 独立工作区 | `bilibili.html`、`github.html`、`aihot.html`、`pricing.html`、`youtube.html`；保留独立页，不为统一 SPA 而关闭或合并用户标签 |
 | 独立工具 | `options.html`、`newtab-search.html`、`stickers.html`、`sticker-sidepanel.html`、`sync-bridge.html`；按 HTML 与 Vite 输入核对实际 bundle |
 | 后台 | manifest 加载 `generated/background.js`，源文件 `src/background/index.ts`；根 `background.js` 同时作为构建输出保留，不应误当 manifest 当前目标 |
 | 构建 | `package.json`、`vite.ui.config.ts`、`vite.sandbox.config.ts`、`vite.localizer.config.ts`；不要从历史测试文件推导允许执行的验证方式 |
 
-`src/theme/theme-init.ts` 是部分入口使用的首绘脚本源码，不能据此声称所有页面都加载同一个根目录脚本。
+`src/theme/theme-init.ts` 是首页及部分独立入口使用的首绘脚本源码，输出至 `generated/theme-init.js`，不是根目录脚本。首页开屏默认关闭；开启后先核对 chrome.storage.local 的已保存偏好，组件挂载后才开始演播，刷新恢复卡片不跳过动画。CSP 与启动时序已做源码修正及构建检查，实际扩展刷新效果仍待浏览器验收。
 - **界面主题**：由 CSS 变量 `data-theme` 驱动，支持 4 套风格：白天模式 (`light`，默认)、夜晚模式 (`dark`)、终末地风格 (`endfield`)、孤星风格 (`lonetrail`)。旧版本曾使用 Lone Trail / Endfield 等名称，当前主题键以源码为准；
 - **启动开机动画**：由 `startupAnimationStyle` 独立控制，支持莱茵生命科技终端动效 (`rhinelab`，冷启动默认) 与终末地工业风开机动效 (`endfield`)；启动动效与页面主题相互独立，非同一配置。
 

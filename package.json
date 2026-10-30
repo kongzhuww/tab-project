@@ -1,6 +1,6 @@
 {
   "name": "tab-project",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "private": true,
   "type": "module",
   "description": "tab-project-next desktop Chromium browser extension with Vue UI",
@@ -9,7 +9,7 @@
     "clean:chunks": "node scripts/clean-chunks.mjs",
     "release:build": "node scripts/build-release.mjs",
     "check": "npm run ui:check",
-    "build:bg": "esbuild src/background/index.ts --bundle --outfile=generated/background.js --format=esm --target=chrome120 && esbuild src/background/index.ts --bundle --outfile=background.js --format=esm --target=chrome120 && esbuild src/workers/bookmarks.worker.ts --bundle --outfile=generated/bookmarks-worker.js --target=chrome120 && esbuild src/workers/bookmarks.worker.ts --bundle --outfile=bookmarks-worker.js --target=chrome120 && esbuild src/theme/theme-init.ts --bundle --minify --outfile=generated/theme-init.js --target=chrome120",
+    "build:bg": "esbuild src/background/index.ts --bundle --outfile=generated/background.js --format=esm --target=chrome120 && esbuild src/background/index.ts --bundle --outfile=background.js --format=esm --target=chrome120 && esbuild src/workers/bookmarks.worker.ts --bundle --outfile=generated/bookmarks-worker.js --target=chrome120 && esbuild src/workers/bookmarks.worker.ts --bundle --outfile=bookmarks-worker.js --target=chrome120 && esbuild src/theme/theme-init.ts --bundle --minify --outfile=generated/theme-init.js --target=chrome120 && esbuild src/intro/page-init.ts --bundle --minify --outfile=generated/newtab-init.js --target=chrome120",
     "ui:build": "vite build --config vite.ui.config.ts && vite build --config vite.sandbox.config.ts && vite build --config vite.localizer.config.ts && npm run build:bg",
     "ui:watch": "node scripts/watch-ui.mjs",
     "ui:typecheck": "vue-tsc --noEmit -p tsconfig.ui.json",

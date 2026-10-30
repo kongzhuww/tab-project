@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
-import { introController, introState, registerFinishHandler } from "./controller";
+import { introController, introState, registerFinishHandler, startIntroSequence } from "./controller";
 
 const viewportHeight = ref(window.innerHeight);
 const viewportWidth = ref(window.innerWidth);
@@ -98,9 +98,8 @@ onMounted(() => {
   window.addEventListener("resize", onResize, { passive: true });
   window.addEventListener("keydown", onKeydown, true);
   unregisterFinish = registerFinishHandler(startExit);
-  if (introState.finished) {
-    startExit(introState.forced);
-  }
+  // Start only once the animation is actually mounted, not at module evaluation.
+  startIntroSequence();
 });
 
 onBeforeUnmount(() => {

@@ -8,7 +8,7 @@ import { installGlobalControllers } from "../core/globals";
 import { registerUiCommands } from "../core/ui-commands";
 import { registerUiFeatures } from "../core/ui-features";
 import { bookmarksService } from "../services/bookmarks.service";
-import { introController } from "./controller";
+import { introController, prepareStartupIntro } from "./controller";
 
 const featureRegistry = createFeatureRegistry(commandRegistry);
 
@@ -22,6 +22,7 @@ void (async () => {
   if (document.getElementById("vue-bili-favorites-root") && !document.getElementById("vue-spa-root")) {
     await import("../services/bilibili-channel.service");
   }
+  await prepareStartupIntro();
   await featureRegistry.startEager();
   introController.notifyBootReady();
 })().catch((error) => console.error("[LogicWeaver] 页面启动失败", error));

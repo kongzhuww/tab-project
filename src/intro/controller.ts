@@ -27,8 +27,8 @@ const isAnimEnabled = (() => {
   try {
     const s = localStorage.getItem("showStartupAnimation");
     const l = localStorage.getItem("logicweaverEndfieldLoader");
-    return (s === "1" || s === "true" || l === "1" || l === "true") &&
-      !document.documentElement.classList.contains("skip-endfield-loader");
+    const saved = s ?? l;
+    return saved === "1" || saved === "true";
   } catch {
     return false;
   }
@@ -127,28 +127,28 @@ export function startIntroSequence(): void {
   }, 1650);
 }
 
-if (isAnimEnabled) {
-  startIntroSequence();
-} else if (typeof chrome !== "undefined" && chrome?.storage?.local) {
+// Read the canonical preference before mounting either the intro or the SPA.
+// Do not replay asynchronously after the SPA has already removed the loader.
+export async function prepareStartupIntro(): Promise<void> {
+  if (!document.getElementById("vue-spa-root")) return;
   try {
-    chrome.storage.local.get(["showStartupAnimation", "startupAnimationStyle"], (res) => {
-      if (res && res.showStartupAnimation !== undefined) {
-        const isEnabled = Boolean(res.showStartupAnimation);
-        try {
-          localStorage.setItem("showStartupAnimation", isEnabled ? "1" : "0");
-          localStorage.setItem("logicweaverEndfieldLoader", isEnabled ? "1" : "0");
-          if (res.startupAnimationStyle) {
-            localStorage.setItem("startupAnimationStyle", String(res.startupAnimationStyle));
-            localStorage.setItem("logicweaverStartupStyle", String(res.startupAnimationStyle));
-          }
-        } catch {}
-        // 若 localStorage 之前缺失导致本次未自动开始，但实际配置已开启，立即平滑呈现完整演播！
-        if (isEnabled && !state.enabled) {
-          void introController.playIntro({ style: res.startupAnimationStyle || state.style });
-        }
-      }
-    });
-  } catch {}
+    const saved = await chrome.storage.local.get(["showStartupAnimation", "startupAnimationStyle"]);
+    if (typeof saved.showStartupAnimation === "boolean") {
+      state.enabled = saved.showStartupAnimation;
+      localStorage.setItem("showStartupAnimation", state.enabled ? "1" : "0");
+      localStorage.setItem("logicweaverEndfieldLoader", state.enabled ? "1" : "0");
+    }
+    if (saved.startupAnimationStyle === "endfield" || saved.startupAnimationStyle === "rhinelab") {
+      state.style = saved.startupAnimationStyle;
+      localStorage.setItem("startupAnimationStyle", state.style);
+    }
+  } catch (error) {
+    console.warn("[Intro] Startup preferences unavailable; using first-paint preference.");
+  }
+  state.finished = !state.enabled;
+  document.documentElement.dataset.startupStyle = state.style;
+  document.documentElement.classList.toggle("skip-endfield-loader", !state.enabled);
+  document.body.classList.toggle("is-starting", state.enabled);
 }
 
 export const introState = readonly(state);
