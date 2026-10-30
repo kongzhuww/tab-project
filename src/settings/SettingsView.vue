@@ -342,61 +342,6 @@
               </div>
             </div>
           </div>
-
-          <!-- 4. 首页组件与动效开关 -->
-          <div class="settings-subgroup">
-            <div class="settings-subgroup-title">
-              <span>🧩 首页卡片组件与动效</span>
-              <small>CARDS & VISUAL EFFECTS</small>
-            </div>
-            <div class="module-toggles">
-              <label class="toggle-card">
-                <span class="toggle-copy"><b>天气模块</b><small>当前天气与短期预报</small></span>
-                <input v-model="form.showWeather" type="checkbox" @change="saveImmediate('showWeather')" />
-                <i class="switch"></i>
-              </label>
-              <label class="toggle-card">
-                <span class="toggle-copy"><b>常用网站</b><small>快捷入口与自定义分区</small></span>
-                <input v-model="form.showSites" type="checkbox" @change="saveImmediate('showSites')" />
-                <i class="switch"></i>
-              </label>
-              <label class="toggle-card">
-                <span class="toggle-copy"><b>B站收藏夹</b><small>读取当前登录账号收藏</small></span>
-                <input v-model="form.showBili" type="checkbox" @change="saveImmediate('showBili')" />
-                <i class="switch"></i>
-              </label>
-              <label class="toggle-card">
-                <span class="toggle-copy"><b>日报 · YouTube</b><small>订阅更新与播放列表</small></span>
-                <input v-model="form.showYouTube" type="checkbox" @change="saveImmediate('showYouTube')" />
-                <i class="switch"></i>
-              </label>
-              <label class="toggle-card">
-                <span class="toggle-copy"><b>任务串</b><small>首页任务轮播区域</small></span>
-                <input v-model="form.showTodo" type="checkbox" @change="saveImmediate('showTodo')" />
-                <i class="switch"></i>
-              </label>
-              <label class="toggle-card">
-                <span class="toggle-copy"><b>常驻导航悬浮球</b><small>关闭则仅快捷键唤出</small></span>
-                <input v-model="form.showNavBall" type="checkbox" @change="saveImmediate('showNavBall')" />
-                <i class="switch"></i>
-              </label>
-              <label class="toggle-card">
-                <span class="toggle-copy"><b>浏览器书签菜单</b><small>侧边书签整理面板</small></span>
-                <input v-model="form.showBookmarkPanel" type="checkbox" @change="saveImmediate('showBookmarkPanel')" />
-                <i class="switch"></i>
-              </label>
-              <label class="toggle-card">
-                <span class="toggle-copy"><b>顶部书签文件夹</b><small>替代浏览器原生书签栏</small></span>
-                <input v-model="form.showBookmarkFoldersTop" type="checkbox" @change="saveImmediate('showBookmarkFoldersTop')" />
-                <i class="switch"></i>
-              </label>
-              <label class="toggle-card">
-                <span class="toggle-copy"><b>音乐卡片音频频谱</b><small>跟随音频实时跳动频谱柱</small></span>
-                <input v-model="form.showHomeMusicVisualizer" type="checkbox" @change="saveImmediate('showHomeMusicVisualizer')" />
-                <i class="switch"></i>
-              </label>
-            </div>
-          </div>
         </section>
 
         <!-- 02 快捷键配置 -->

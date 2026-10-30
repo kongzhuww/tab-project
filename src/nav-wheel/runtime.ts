@@ -170,21 +170,14 @@ export const navWheelRuntime = {
     window.addEventListener("keydown", onKeyDown, true);
     storageListener = (changes, area) => {
       if (area !== "local") return;
-      if (changes.showNavBall) {
-        showBall = Boolean(changes.showNavBall.newValue);
-        navWheelController.setVisibility(showBall || navWheelState.isExpanded);
-      }
       if (changes.siteShelfLinks || changes.logicweaverNavWheelShortcutsV1) void this.loadShortcuts();
     };
     storage()?.onChanged?.addListener(storageListener);
     try {
-      const saved = await storage()?.local?.get(["showNavBall", "navBallPosition"]);
       if (!initialized) return;
-      showBall = Boolean(saved?.showNavBall);
-      const position = saved?.navBallPosition;
-      setBall(typeof position?.x === "number" ? position.x : 28,
-        typeof position?.y === "number" ? position.y : Math.min(window.innerHeight - 60, 180));
-      navWheelController.setVisibility(showBall);
+      // 常驻导航悬浮球已彻底停用，不在页面边缘挂载悬浮小球
+      showBall = false;
+      navWheelController.setVisibility(false);
     } catch { /* Optional preferences must not block the wheel. */ }
     await this.loadShortcuts();
     publish();
