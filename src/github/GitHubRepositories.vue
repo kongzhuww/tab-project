@@ -14,13 +14,20 @@ import { chatService } from "../chat/chat.service";
 import type { ChatShareTarget } from "../chat/private-chat-client";
 
 // 右键上下文菜单与分类选择器
-const contextMenuState = reactive({
+const contextMenuState = reactive<{
+  visible: boolean;
+  x: number;
+  y: number;
+  fullName: string;
+  folders: string[];
+  hasRemark: boolean;
+  url: string;
+}>({
   visible: false,
   x: 0,
   y: 0,
   fullName: "",
-  folder: "",
-  used: false,
+  folders: [],
   hasRemark: false,
   url: ""
 });
@@ -33,13 +40,13 @@ function onCardClick(event: MouseEvent, card: GitHubRepositoryCardView): void {
   const target = event.target;
   if (!(target instanceof Element)) return;
   if (state.batchMode) {
-    if (target.closest(".fo-card-more,.gh-badge-folder,.gh-badge-used,.gh-badge-remark,.gh-inline-remark-box")) return;
+    if (target.closest(".fo-card-more,.gh-badge-folder,.gh-badge-remark,.gh-inline-remark-box")) return;
     event.preventDefault();
     event.stopPropagation();
     controller.toggleSelection(card.fullName);
     return;
   }
-  if (target.closest("a,button,.gh-badge-folder,.gh-badge-used,.gh-badge-remark,.fo-card-more,.gh-card-hole,.gh-card-checkbox,.gh-inline-remark-box")) return;
+  if (target.closest("a,button,.gh-badge-folder,.gh-badge-remark,.fo-card-more,.gh-card-hole,.gh-card-checkbox,.gh-inline-remark-box")) return;
   event.preventDefault();
   event.stopPropagation();
   githubRepoDetailController.open(card.fullName, undefined, card);
@@ -57,8 +64,7 @@ function openCardContextMenu(event: MouseEvent, card: GitHubRepositoryCardView):
   contextMenuState.x = x;
   contextMenuState.y = y;
   contextMenuState.fullName = card.fullName;
-  contextMenuState.folder = card.folder || "";
-  contextMenuState.used = Boolean(card.used);
+  contextMenuState.folders = [...(card.folders || (card.folder ? [card.folder] : []))];
   contextMenuState.hasRemark = Boolean(card.customRemark);
   contextMenuState.url = card.url;
   contextMenuState.visible = true;
@@ -76,13 +82,18 @@ function closeContextMenu(): void {
   activeSubMenu.value = null;
 }
 
-function toggleUsed(): void {
-  gitHubService.toggleRepoUsed(contextMenuState.fullName);
-  closeContextMenu();
+function toggleFolder(folder: string): void {
+  if (contextMenuState.folders.includes(folder)) {
+    contextMenuState.folders = contextMenuState.folders.filter(f => f !== folder);
+  } else {
+    contextMenuState.folders.push(folder);
+  }
+  gitHubService.toggleRepoList(contextMenuState.fullName, folder);
 }
 
-function setFolder(folder: string): void {
-  gitHubService.setRepoFolder(contextMenuState.fullName, folder);
+function clearFolders(): void {
+  contextMenuState.folders = [];
+  gitHubService.clearRepoLists(contextMenuState.fullName);
   closeContextMenu();
 }
 
@@ -120,7 +131,7 @@ function shareToRoom(target: ChatShareTarget): void {
     desc: repo.description || undefined,
     language: repo.language || undefined,
     stars: repo.stargazers_count,
-    category: contextMenuState.folder || "未分类",
+    category: (contextMenuState.folders && contextMenuState.folders.length ? contextMenuState.folders.join(", ") : "未分类"),
     url: repo.html_url || `https://github.com/${repo.full_name}`,
     updatedAt: repo.updated_at ? repo.updated_at.split("T")[0] : undefined
   }, target);
@@ -229,14 +240,25 @@ const isLoading = computed(() => {
       </div>
       <div class="gh-card-body">
         <div class="gh-card-badges">
-          <!-- 文件夹分类标签 -->
+          <!-- 文件夹分类标签（支持多 List 归属展示） -->
+          <template v-if="card.folders && card.folders.length">
+            <span
+              v-for="folderName in card.folders"
+              :key="folderName"
+              class="gh-badge-folder"
+              :title="`GitHub 列表：${folderName}（点击管理所属列表）`"
+              @click.stop="openCategoryPickerDirectly(card, $event)"
+            >
+              📁 {{ folderName }}
+            </span>
+          </template>
           <span
-            class="gh-badge-folder"
-            :class="{ uncat: !card.folder }"
-            :title="card.folder ? `文件夹：${card.folder}（点击更换）` : '未分类（点击归类）'"
+            v-else
+            class="gh-badge-folder uncat"
+            title="未分类（点击加入 GitHub 列表）"
             @click.stop="openCategoryPickerDirectly(card, $event)"
           >
-            {{ card.folder ? `📁 ${card.folder}` : '＋ 未分类' }}
+            ＋ 未分类
           </span>
 
           <!-- ✨ 紧随未分类/文件夹标签右侧的就地内联编辑框 -->
@@ -252,10 +274,6 @@ const isLoading = computed(() => {
             <span class="gh-badge-remark-icon">💬</span>
             <span class="gh-badge-remark-text">{{ card.customRemark }}</span>
           </span>
-
-          <span v-if="card.showUsedStatus && card.used" class="gh-badge-used" title="已标记为正在使用（点击移除）" @click.stop="controller.removeUsed(card.fullName)">⚡ 正在使用</span>
-          <a v-if="card.showUsedStatus && card.releaseKind !== 'none' && card.releaseUrl" class="gh-update-badge" :class="{ latest: card.releaseKind === 'latest' }" :href="card.releaseUrl" target="_blank" rel="noreferrer">{{ card.releaseText }}</a>
-          <span v-else-if="card.showUsedStatus && card.releaseKind !== 'none'" class="gh-update-badge" :class="{ latest: card.releaseKind === 'latest' }">{{ card.releaseText }}</span>
         </div>
         <p v-if="card.descriptionKind === 'analyzing'" class="desc gh-desc-analyzing" title="正在使用 AI 分析仓库…"><span class="gh-ai-sparkle">✨</span> 正在使用 AI 分析仓库并提炼中文介绍…</p>
         <p v-else-if="card.descriptionKind === 'ai'" class="desc gh-desc-ai" title="AI 中文简介（点击可直接修改，右键可重新分析）">
@@ -287,35 +305,35 @@ const isLoading = computed(() => {
       @click.stop
       @contextmenu.prevent
     >
-      <!-- 1. 移动到文件夹（悬停即展开子菜单） -->
+      <!-- 1. 所属 GitHub 列表（悬停即展开子菜单） -->
       <div
         class="gh-menu-has-sub"
         :class="{ 'is-active': activeSubMenu === 'folder' }"
         @mouseenter="activeSubMenu = 'folder'"
       >
         <button class="fo-cover-menu-item with-sub-arrow" type="button">
-          <span>📁 移动到文件夹</span>
+          <span>📁 所属 GitHub 列表</span>
           <span class="sub-arrow">›</span>
         </button>
         <!-- 侧边级联飞出子菜单 -->
         <div class="gh-sub-flyout" :class="{ 'flyout-left': isFlyoutLeft }" @click.stop>
           <button
             class="fo-cover-menu-item"
-            :class="{ primary: !contextMenuState.folder }"
+            :class="{ primary: contextMenuState.folders.length === 0 }"
             type="button"
-            @click="setFolder('')"
+            @click="clearFolders"
           >
-            {{ !contextMenuState.folder ? "✓ " : "  " }}＋ 设为未分类（清旧使用标记）
+            {{ contextMenuState.folders.length === 0 ? "✓ " : "  " }}＋ 设为未分类（清空列表）
           </button>
           <button
             v-for="cat in gitHubService.cats"
             :key="cat"
             class="fo-cover-menu-item"
-            :class="{ primary: contextMenuState.folder === cat }"
+            :class="{ primary: contextMenuState.folders.includes(cat) }"
             type="button"
-            @click="setFolder(cat)"
+            @click="toggleFolder(cat)"
           >
-            {{ contextMenuState.folder === cat ? "✓ " : "  " }}📁 {{ cat }}
+            {{ contextMenuState.folders.includes(cat) ? "✓ " : "  " }}📁 {{ cat }}
           </button>
         </div>
       </div>

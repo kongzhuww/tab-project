@@ -12,7 +12,15 @@ import { githubRepositoryController, type GitHubRepositoryCardView } from "../gi
 import { githubBatchBarController } from "../github/batch-bar";
 import { githubRepoDetailController } from "../github/repo-detail-store";
 import { storageCache } from "./storage-cache.service";
-import { categoryFeedback, categoryStorageBusy, categoryFingerprint, decodeCategories, projectCategories, readCategories, changeCategories, type CategoryData } from "../github/category-storage";
+import { categoryFeedback, type CategoryData } from "../github/category-storage";
+import {
+  fetchGitHubUserLists,
+  createGitHubUserList,
+  deleteGitHubUserList,
+  updateGitHubItemLists,
+  type GitHubUserList,
+  type GitHubListsSnapshot
+} from "../github/lists-client";
 import { githubAiJob } from "../github/ai-job";
 import { REPOSITORY_DRAG_TYPE } from "../github/repository-drag";
 import { readAiReadme, requestGitHubAi, parseGitHubAiOutput } from "../github/ai-request";
@@ -69,6 +77,7 @@ export const DEFAULT_GH_AI_CONFIG: GitHubAiConfig = {
 
 export interface GitHubRawRepo {
   id: number | string;
+  node_id?: string;
   name: string;
   full_name: string;
   html_url: string;
@@ -154,6 +163,7 @@ export class GitHubService {
     if (this.pendingInitialization) { await this.resumeRepositoryReads(); return; }
     if (!await this.verifyUncertainStars()) return;
     await this.loadGitHub(this.configuredUser, this.token);
+    void this.loadLists();
   }
 
   private async verifyUncertainStars(): Promise<boolean> {
@@ -195,9 +205,12 @@ export class GitHubService {
   public allStarsLoaded = false;
   public loadingAllStars = false;
   public total = 0;
-  public cats: string[] = [];
-  public map: Record<string, string> = {};
-  public used = new Set<string>();
+  public lists: GitHubUserList[] = [];
+  public get cats(): string[] { return this.lists.map(l => l.name); }
+  public repoListNames = new Map<string, string[]>();
+  public repoListIds = new Map<string, string[]>();
+  public repoNodeIds = new Map<string, string>();
+  private listsRevision = 0;
   public remarks: Record<string, any> = {};
   private remarksRevision = 0;
   private categoryRevision = 0;
@@ -265,7 +278,7 @@ export class GitHubService {
           githubRepoDetailController.open(fullName);
         }
       },
-      removeUsed: (fullName) => this.toggleRepoUsed(fullName, false),
+      removeUsed: () => {},
       toggleSelection: (fullName) => this.toggleSelectRepo(fullName),
       setSelection: (fullName, selected) => this.setRepoSelection(fullName, selected),
       resetSearch: () => this.resetLocalSearch(),
@@ -338,11 +351,10 @@ export class GitHubService {
 
     // 读取持久化数据
     const remarksRevision = this.remarksRevision;
-    const categoryRevision = this.categoryRevision;
     let stored: any = {};
     if (typeof chrome !== "undefined" && chrome.storage?.local) {
       stored = await chrome.storage.local.get([
-        "ghCats", "ghMap", "ghUsed", "ghStarredCache",
+        "ghStarredCache",
         GH_REPO_REMARKS_KEY, GH_AI_CONFIG_KEY
       ]);
     }
@@ -361,9 +373,8 @@ export class GitHubService {
     if (!savedAiCfg || typeof savedAiCfg !== "object" || Array.isArray(savedAiCfg)) savedAiCfg = null;
     this.aiConfig = savedAiCfg ? { ...DEFAULT_GH_AI_CONFIG, ...savedAiCfg } : { ...DEFAULT_GH_AI_CONFIG };
 
-    if (categoryRevision === this.categoryRevision && !categoryFeedback.busy && !categoryStorageBusy()) {
-      this.applyCategories(decodeCategories(stored));
-    }
+    // 0ms 秒开：先从本地恢复 Lists 缓存
+    await this.restoreListsCache(this.cacheKey);
 
     this.pages.clear();
     this.repos = [];
@@ -417,6 +428,7 @@ export class GitHubService {
       if (!this.actionError) this.actionMessage = "";
       this.publishAll();
       void this.ensureAllStarsLoaded();
+      void this.loadLists(session);
     } catch (error: any) {
       if (!current()) return;
       this.actionMessage = "GitHub 同步失败，请检查网络、令牌或 API 额度。";
@@ -542,6 +554,11 @@ export class GitHubService {
     });
     this.categoryRepos.forEach((repo) => unique.set(repo.full_name || String(repo.id), repo));
     this.repos = [...unique.values()];
+    this.repos.forEach(repo => {
+      if (repo.node_id && repo.full_name) {
+        this.repoNodeIds.set(repo.full_name.toLowerCase(), repo.node_id);
+      }
+    });
   }
 
   private async savePageCache(current: () => boolean = () => true, strict = false): Promise<void> {
@@ -555,6 +572,7 @@ export class GitHubService {
       String(p),
       (items || []).map((repo) => ({
         id: repo.id,
+        node_id: repo.node_id,
         name: repo.name,
         full_name: repo.full_name,
         html_url: repo.html_url,
@@ -585,99 +603,196 @@ export class GitHubService {
   }
 
   // ============================================================================
-  // 分类与仓库管理 (Folders & Repository Mutations)
+  // GitHub 原生 Lists (列表) 与仓库归属管理
   // ============================================================================
+  public getRepoFolders(fullName: string): string[] {
+    const names = this.repoListNames.get(fullName.toLowerCase());
+    return names ? [...names] : [];
+  }
+
   public getRepoFolder(fullName: string): string {
-    const raw = this.map[fullName];
-    if (!raw) return "";
-    return this.cats.includes(raw) ? raw : "";
+    return this.getRepoFolders(fullName)[0] || "";
   }
 
-  private applyCategories(data: CategoryData): void {
-    const projected = projectCategories(data);
-    this.cats = projected.cats; this.map = projected.map; this.used = projected.used;
-    if (this.active !== "全部" && this.active !== this.UNCAT && !this.cats.includes(this.active)) this.active = "全部";
-  }
-
-  private categoryContext(): () => boolean {
-    const revision = this.accountRevision, signal = this.viewReadSignal;
-    return () => revision === this.accountRevision && signal === this.viewReadSignal && !signal?.aborted;
-  }
-
-  private categoryReady(): boolean {
-    if (categoryFeedback.busy || categoryStorageBusy()) return false;
-    if (this.initializing || this.pendingInitialization || this.viewReadSignal?.aborted) {
-      categoryFeedback.message = "请返回 GitHub 并等待账号读取完成后再操作分类。";
-      categoryFeedback.error = true; return false;
+  public async loadLists(inheritedSession?: GitHubReadSession): Promise<void> {
+    if (!this.token) {
+      this.lists = [];
+      this.repoListNames.clear();
+      this.repoListIds.clear();
+      this.publishFolders();
+      return;
     }
-    return true;
+    const revision = ++this.listsRevision;
+    const session = inheritedSession || this.getReadSession();
+    try {
+      categoryFeedback.busy = true;
+      const snapshot = await fetchGitHubUserLists(this.token, session?.signal);
+      if (revision !== this.listsRevision) return;
+      this.applyListsSnapshot(snapshot);
+      await this.saveListsCache();
+      this.publishAll();
+    } catch (error) {
+      if (revision !== this.listsRevision) return;
+      console.warn("加载 GitHub Lists 失败", error);
+    } finally {
+      if (revision === this.listsRevision) categoryFeedback.busy = false;
+    }
   }
 
-  private async commitCategories(label: string, change: (data: CategoryData) => void, expected?: string, context = this.categoryContext()): Promise<boolean> {
-    if (!this.categoryReady()) return false;
-    categoryFeedback.busy = true; categoryFeedback.error = false;
-    categoryFeedback.message = label + "：正在保存…";
-    ++this.categoryRevision;
+  private applyListsSnapshot(snapshot: GitHubListsSnapshot): void {
+    this.lists = snapshot.lists;
+    this.repoListNames = snapshot.repoListNames;
+    this.repoListIds = snapshot.repoListIds;
+    for (const [key, id] of snapshot.repoNodeIds) {
+      this.repoNodeIds.set(key, id);
+    }
+    if (this.active !== "全部" && this.active !== this.UNCAT && !this.cats.includes(this.active)) {
+      this.active = "全部";
+    }
+  }
+
+  private async saveListsCache(): Promise<void> {
+    if (typeof chrome !== "undefined" && chrome.storage?.local && this.cacheKey) {
+      try {
+        await chrome.storage.local.set({
+          [`ghListsCache_${this.cacheKey}`]: {
+            lists: this.lists,
+            repoListNames: Object.fromEntries(this.repoListNames),
+            repoListIds: Object.fromEntries(this.repoListIds),
+            repoNodeIds: Object.fromEntries(this.repoNodeIds),
+            savedAt: Date.now()
+          }
+        });
+      } catch {}
+    }
+  }
+
+  private async restoreListsCache(key: string): Promise<void> {
+    if (typeof chrome !== "undefined" && chrome.storage?.local && key) {
+      try {
+        const stored = await chrome.storage.local.get([`ghListsCache_${key}`]);
+        const cached = stored[`ghListsCache_${key}`];
+        if (cached && Array.isArray(cached.lists)) {
+          this.lists = cached.lists;
+          this.repoListNames = new Map(Object.entries(cached.repoListNames || {}));
+          this.repoListIds = new Map(Object.entries(cached.repoListIds || {}));
+          this.repoNodeIds = new Map(Object.entries(cached.repoNodeIds || {}));
+          this.publishFolders();
+        }
+      } catch {}
+    }
+  }
+
+  public async getOrFetchRepoNodeId(fullName: string): Promise<string> {
+    const key = fullName.toLowerCase();
+    const existing = this.repoNodeIds.get(key);
+    if (existing) return existing;
+    const repo = this.repos.find(r => r.full_name.toLowerCase() === key);
+    if (repo?.node_id) {
+      this.repoNodeIds.set(key, repo.node_id);
+      return repo.node_id;
+    }
+    const [owner, name] = fullName.split("/");
+    const query = `query GetRepoId($owner: String!, $name: String!) { repository(owner: $owner, name: $name) { id } }`;
+    const res = await fetch("https://api.github.com/graphql", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${this.token}`,
+        "Content-Type": "application/json",
+        Accept: "application/vnd.github+json"
+      },
+      body: JSON.stringify({ query, variables: { owner, name } })
+    });
+    const json = await res.json();
+    const id = json?.data?.repository?.id;
+    if (!id) throw new Error(`未找到仓库 ${fullName} 的 Node ID`);
+    this.repoNodeIds.set(key, id);
+    return id;
+  }
+
+  public async toggleRepoList(fullName: string, listName: string): Promise<boolean> {
+    if (!this.token) {
+      this.actionMessage = "请先配置具备 user 权限的 Token。";
+      this.actionError = true;
+      this.publishStatus();
+      return false;
+    }
+    const targetList = this.lists.find(l => l.name === listName);
+    if (!targetList) return false;
+
+    const key = fullName.toLowerCase();
+    const currentListIds = this.repoListIds.get(key) || [];
+    const isMember = currentListIds.includes(targetList.id);
+    const nextListIds = isMember
+      ? currentListIds.filter(id => id !== targetList.id)
+      : [...currentListIds, targetList.id];
+
+    categoryFeedback.busy = true;
+    this.actionMessage = `${isMember ? "正在从" : "正在加入"} GitHub 列表「${listName}」…`;
+    this.actionError = false;
+    this.publishStatus();
+
     try {
-      const data = await changeCategories(data => {
-        if (!context()) throw new Error("账号或页面已变化，未提交分类写入。");
-        change(data);
-      }, expected);
-      this.applyCategories(data); this.publishAll();
-      categoryFeedback.message = label + "：已保存并回读核对。";
+      const nodeId = await this.getOrFetchRepoNodeId(fullName);
+      const updatedLists = await updateGitHubItemLists(this.token, nodeId, nextListIds);
+
+      this.repoListIds.set(key, updatedLists.map(l => l.id));
+      this.repoListNames.set(key, updatedLists.map(l => l.name));
+      await this.saveListsCache();
+
+      this.actionMessage = isMember
+        ? `已从列表「${listName}」移出：${fullName}`
+        : `已加入列表「${listName}」：${fullName}`;
+      this.actionError = false;
+      this.publishAll();
       return true;
     } catch (error) {
-      categoryFeedback.error = true;
-      categoryFeedback.message = label + "：" + (error instanceof Error ? error.message : "保存未确认，请先读取分类核对。");
+      this.actionMessage = error instanceof Error ? error.message : "更新列表所属失败";
+      this.actionError = true;
+      this.publishStatus();
       return false;
-    } finally { ++this.categoryRevision; categoryFeedback.busy = false; }
+    } finally {
+      categoryFeedback.busy = false;
+    }
   }
 
-  public async reloadCategories(): Promise<void> {
-    if (!this.categoryReady()) return;
-    categoryFeedback.busy = true; ++this.categoryRevision;
+  public async clearRepoLists(fullName: string): Promise<boolean> {
+    if (!this.token) {
+      this.actionMessage = "请先配置具备 user 权限的 Token。";
+      this.actionError = true;
+      this.publishStatus();
+      return false;
+    }
+    const key = fullName.toLowerCase();
+    categoryFeedback.busy = true;
+    this.actionMessage = `正在清空 ${fullName} 的所有列表归属…`;
+    this.actionError = false;
+    this.publishStatus();
     try {
-      this.applyCategories(await readCategories(true)); this.publishAll();
-      categoryFeedback.message = "已读取本地分类、归属及使用标记；没有重新提交上次写入。";
-      categoryFeedback.error = false;
+      const nodeId = await this.getOrFetchRepoNodeId(fullName);
+      await updateGitHubItemLists(this.token, nodeId, []);
+      this.repoListIds.set(key, []);
+      this.repoListNames.set(key, []);
+      await this.saveListsCache();
+      this.actionMessage = `已将 ${fullName} 设为未分类。`;
+      this.actionError = false;
+      this.publishAll();
+      return true;
     } catch (error) {
-      categoryFeedback.message = error instanceof Error ? error.message : "读取分类失败。";
-      categoryFeedback.error = true;
-    } finally { ++this.categoryRevision; categoryFeedback.busy = false; }
-  }
-
-  private async moveRepositories(names: string[], folder: string, context = this.categoryContext()): Promise<boolean> {
-    const targets = [...new Set(names)];
-    if (!targets.length) return false;
-    return this.commitCategories(`移动 ${targets.length} 个仓库至「${folder || this.UNCAT}」`, data => {
-      if (targets.some(name => !/^[a-z0-9-]+\/[a-z0-9_.-]+$/i.test(name))) throw new Error("仓库名称无效，未写入。");
-      const cats = projectCategories(data).cats;
-      if (folder && !cats.includes(folder)) throw new Error("目标分类已不存在，未改为未分类；请先读取分类。");
-      // Materialize a legacy virtual category only when explicitly moving into it.
-      if (folder && !data.ghCats.some(name => name.trim() === folder)) data.ghCats.push(folder);
-      for (const name of targets) {
-        if (folder) data.ghMap[name] = folder;
-        else delete data.ghMap[name];
-      }
-      // Otherwise legacy used fallback would immediately reclassify an uncategorized repo.
-      if (!folder) data.ghUsed = data.ghUsed.filter(name => !targets.includes(name));
-    }, undefined, context);
+      this.actionMessage = error instanceof Error ? error.message : "清空列表所属失败";
+      this.actionError = true;
+      this.publishStatus();
+      return false;
+    } finally {
+      categoryFeedback.busy = false;
+    }
   }
 
   public async setRepoFolder(fullName: string, folder: string): Promise<boolean> {
-    return this.moveRepositories([fullName], folder);
-  }
-
-  public isRepoUsed(fullName: string): boolean { return this.used.has(fullName); }
-
-  public async toggleRepoUsed(fullName: string, forceState?: boolean): Promise<boolean> {
-    return this.commitCategories(`使用标记：${fullName}`, data => {
-      if (!/^[a-z0-9-]+\/[a-z0-9_.-]+$/i.test(fullName)) throw new Error("仓库名称无效，未写入。");
-      const used = new Set(data.ghUsed);
-      const next = forceState ?? !used.has(fullName);
-      if (next) used.add(fullName); else used.delete(fullName);
-      data.ghUsed = [...used];
-    });
+    if (!folder) {
+      return this.clearRepoLists(fullName);
+    }
+    return this.toggleRepoList(fullName, folder);
   }
 
   public selectFolder(title: string): void {
@@ -685,67 +800,113 @@ export class GitHubService {
   }
 
   public async deleteFolder(title: string): Promise<void> {
-    if (!this.categoryReady() || !this.cats.includes(title)) return;
-    const context = this.categoryContext();
-    categoryFeedback.busy = true; ++this.categoryRevision;
-    categoryFeedback.message = `正在准备删除分类「${title}」的确认；尚未写入。`; categoryFeedback.error = false;
-    let expected: string | undefined;
-    let accepted = false;
-    try {
-      const data = await readCategories();
-      if (!context()) throw new Error("账号或页面已变化，删除准备已取消，没有写入。");
-      if (!projectCategories(data).cats.includes(title)) throw new Error("分类已不存在，请先读取分类。");
-      expected = categoryFingerprint(data);
-      accepted = await appDialog.confirm({
-        title: "删除分类",
-        message: `确定删除「${title}」的分类归属吗？不会取消 GitHub Star，也不删除备注。旧多分类记录的其它标签保留；仍有旧使用标记且无其它分类的仓库会归入正在使用。${title === GH_USED_CATEGORY ? "同时清除旧的正在使用标记，避免分类重新出现。" : ""}`,
-        danger: true
-      });
-    } catch (error) {
-      categoryFeedback.error = true;
-      categoryFeedback.message = error instanceof Error ? error.message : "无法准备删除，没有写入。";
-    } finally { ++this.categoryRevision; categoryFeedback.busy = false; }
-    if (!accepted || expected === undefined) {
-      if (!categoryFeedback.error) categoryFeedback.message = "已取消删除，没有写入。";
+    if (!this.token) {
+      this.actionMessage = "请先配置具备 user 权限的 Token。";
+      this.actionError = true;
+      this.publishStatus();
       return;
     }
-    await this.commitCategories(`删除分类「${title}」`, data => {
-      data.ghCats = data.ghCats.filter(name => name.trim() !== title);
-      for (const [repo, raw] of Object.entries(data.ghMap)) {
-        if (Array.isArray(raw)) {
-          const remaining = raw.filter(name => name !== title);
-          if (remaining.length) data.ghMap[repo] = remaining; else delete data.ghMap[repo];
-        } else if (raw === title) delete data.ghMap[repo];
+    const target = this.lists.find(l => l.name === title);
+    if (!target) return;
+    const confirmed = await appDialog.confirm({
+      title: "删除 GitHub 列表",
+      message: `确定在 GitHub 官网删除列表「${title}」吗？列表内的仓库仍保留 Star 收藏，不会被取消。`,
+      danger: true
+    });
+    if (!confirmed) return;
+
+    this.actionMessage = `正在 GitHub 删除列表「${title}」…`;
+    this.actionError = false;
+    this.publishStatus();
+    categoryFeedback.busy = true;
+    try {
+      await deleteGitHubUserList(this.token, target.id);
+      this.lists = this.lists.filter(l => l.id !== target.id);
+      for (const [key, names] of this.repoListNames) {
+        if (names.includes(title)) {
+          this.repoListNames.set(key, names.filter(n => n !== title));
+        }
       }
-      if (title === GH_USED_CATEGORY) data.ghUsed = [];
-    }, expected, context);
+      for (const [key, ids] of this.repoListIds) {
+        if (ids.includes(target.id)) {
+          this.repoListIds.set(key, ids.filter(id => id !== target.id));
+        }
+      }
+      if (this.active === title) this.active = "全部";
+      await this.saveListsCache();
+      this.actionMessage = `GitHub 列表「${title}」已删除。`;
+      this.actionError = false;
+      this.publishAll();
+    } catch (error) {
+      this.actionMessage = error instanceof Error ? error.message : "删除列表失败";
+      this.actionError = true;
+      this.publishStatus();
+    } finally {
+      categoryFeedback.busy = false;
+    }
   }
 
   public async promptCreateFolder(): Promise<void> {
-    if (!this.categoryReady()) return;
-    const context = this.categoryContext();
-    categoryFeedback.busy = true;
-    categoryFeedback.message = "正在准备新分类；尚未写入。"; categoryFeedback.error = false;
-    let name: string | null = null;
-    try {
-      name = await appDialog.prompt({ title: "新建分类文件夹", message: "请输入分类名称：", placeholder: "文件夹名称…" });
-    } catch {
-      categoryFeedback.message = "无法准备新分类，没有写入。"; categoryFeedback.error = true;
-    } finally { categoryFeedback.busy = false; }
-    if (!name) {
-      if (!categoryFeedback.error) categoryFeedback.message = "已取消新建，没有写入。";
+    if (!this.token) {
+      this.actionMessage = "请先在 GitHub 模块设置中配置具备 user 权限的 Token。";
+      this.actionError = true;
+      this.publishStatus();
       return;
     }
-    const trimmed = name.trim();
-    await this.commitCategories(`新建分类「${trimmed}」`, data => {
-      if (!trimmed || trimmed === this.UNCAT || trimmed === "全部") throw new Error("分类名称为空或与系统保留名称冲突。");
-      if (!projectCategories(data).cats.includes(trimmed)) data.ghCats.push(trimmed);
-    }, undefined, context);
+    let name: string | null = null;
+    try {
+      name = await appDialog.prompt({
+        title: "新建 GitHub 列表",
+        message: "在 GitHub 官网上创建一个新的 Star 列表：",
+        placeholder: "列表名称（如：前端工具、深度学习）…"
+      });
+    } catch { return; }
+    const trimmed = name?.trim();
+    if (!trimmed) return;
+    if (trimmed === "全部" || trimmed === this.UNCAT) {
+      this.actionMessage = "列表名称不能与系统保留名称冲突。";
+      this.actionError = true;
+      this.publishStatus();
+      return;
+    }
+    if (this.cats.includes(trimmed)) {
+      this.actionMessage = `列表「${trimmed}」已存在。`;
+      this.actionError = true;
+      this.publishStatus();
+      return;
+    }
+    this.actionMessage = `正在 GitHub 创建列表「${trimmed}」…`;
+    this.actionError = false;
+    this.publishStatus();
+    categoryFeedback.busy = true;
+    try {
+      const created = await createGitHubUserList(this.token, trimmed);
+      this.lists.push(created);
+      await this.saveListsCache();
+      this.actionMessage = `GitHub 列表「${trimmed}」创建成功！`;
+      this.actionError = false;
+      this.publishAll();
+    } catch (error) {
+      this.actionMessage = error instanceof Error ? error.message : "创建列表失败";
+      this.actionError = true;
+      this.publishStatus();
+    } finally {
+      categoryFeedback.busy = false;
+    }
   }
 
   public async dropRepositoryIntoFolder(fullName: string, folderTitle: string): Promise<void> {
     if (!fullName || folderTitle === "全部") return;
-    await this.moveRepositories([fullName], folderTitle === this.UNCAT ? "" : folderTitle);
+    if (folderTitle === this.UNCAT) {
+      await this.clearRepoLists(fullName);
+      return;
+    }
+    const targetList = this.lists.find(l => l.name === folderTitle);
+    if (!targetList) return;
+    const key = fullName.toLowerCase();
+    const currentListIds = this.repoListIds.get(key) || [];
+    if (currentListIds.includes(targetList.id)) return;
+    await this.toggleRepoList(fullName, folderTitle);
   }
 
   public findRepository(fullName: string): GitHubRawRepo | null {
@@ -789,14 +950,7 @@ export class GitHubService {
   }
 
   public async batchToggleUsed(): Promise<void> {
-    const targets = [...this.selectedRepos];
-    if (!targets.length) return;
-    await this.commitCategories(`批量修改 ${targets.length} 个使用标记`, data => {
-      if (targets.some(name => !/^[a-z0-9-]+\/[a-z0-9_.-]+$/i.test(name))) throw new Error("仓库名称无效，未写入。");
-      const used = new Set(data.ghUsed), remove = targets.every(name => used.has(name));
-      for (const name of targets) { if (remove) used.delete(name); else used.add(name); }
-      data.ghUsed = [...used];
-    });
+    // 官方 Lists 模式下无需使用标记
   }
 
   private copyStarTarget(repo: GitHubRawRepo): GitHubRawRepo {
@@ -930,15 +1084,96 @@ export class GitHubService {
     } finally { this.unstarBusy.delete(repo.full_name); this.publishAll(); }
   }
 
+  public async batchAddToList(targetListTitle: string): Promise<boolean> {
+    if (!this.token) {
+      this.actionMessage = "请先配置具备 user 权限的 Token。";
+      this.actionError = true;
+      this.publishStatus();
+      return false;
+    }
+    const targetList = this.lists.find(l => l.name === targetListTitle);
+    if (!targetList) return false;
+    const names = [...this.selectedRepos];
+    if (!names.length) return false;
+
+    this.actionMessage = `正在将 ${names.length} 个仓库加入列表「${targetListTitle}」…`;
+    this.actionError = false;
+    this.publishStatus();
+    categoryFeedback.busy = true;
+
+    let successCount = 0;
+    try {
+      for (const name of names) {
+        try {
+          const key = name.toLowerCase();
+          const currentIds = this.repoListIds.get(key) || [];
+          if (!currentIds.includes(targetList.id)) {
+            const nodeId = await this.getOrFetchRepoNodeId(name);
+            const nextIds = [...currentIds, targetList.id];
+            const updated = await updateGitHubItemLists(this.token, nodeId, nextIds);
+            this.repoListIds.set(key, updated.map(l => l.id));
+            this.repoListNames.set(key, updated.map(l => l.name));
+          }
+          successCount++;
+        } catch (e) {
+          console.warn(`添加 ${name} 到列表失败`, e);
+        }
+      }
+      await this.saveListsCache();
+      this.actionMessage = `已成功将 ${successCount}/${names.length} 个仓库加入列表「${targetListTitle}」。`;
+      this.actionError = false;
+      this.publishAll();
+      return true;
+    } finally {
+      categoryFeedback.busy = false;
+    }
+  }
+
   public prepareBatchMove(): { names: string[]; submit: (folder: string) => Promise<boolean> } | undefined {
-    if (!this.categoryReady()) return;
-    const names = [...this.selectedRepos], context = this.categoryContext();
+    if (!this.token) {
+      this.actionMessage = "请先配置具备 user 权限的 Token。";
+      this.actionError = true;
+      this.publishStatus();
+      return;
+    }
+    const names = [...this.selectedRepos];
     if (!names.length) return;
-    return { names: [...names], submit: folder => this.moveRepositories(names, folder, context) };
+    return {
+      names: [...names],
+      submit: async (folder: string) => {
+        if (!folder) {
+          categoryFeedback.busy = true;
+          this.actionMessage = `正在清空 ${names.length} 个仓库的列表归属…`;
+          this.actionError = false;
+          this.publishStatus();
+          try {
+            for (const name of names) {
+              try {
+                const nodeId = await this.getOrFetchRepoNodeId(name);
+                await updateGitHubItemLists(this.token, nodeId, []);
+                this.repoListIds.set(name.toLowerCase(), []);
+                this.repoListNames.set(name.toLowerCase(), []);
+              } catch {}
+            }
+            await this.saveListsCache();
+            this.actionMessage = `已将选中的 ${names.length} 个仓库设为未分类。`;
+            this.actionError = false;
+            this.publishAll();
+            return true;
+          } finally {
+            categoryFeedback.busy = false;
+          }
+        } else {
+          return this.batchAddToList(folder);
+        }
+      }
+    };
   }
 
   public async batchMoveToFolder(folder: string): Promise<boolean> {
-    return this.moveRepositories([...this.selectedRepos], folder);
+    const prepared = this.prepareBatchMove();
+    if (!prepared) return false;
+    return prepared.submit(folder);
   }
 
   public async updateRepoRemark(fullName: string, data: Partial<{ summary: string; aiSummary: string; userRemark: string; tags: string[]; platforms: string[]; updatedAt: number; provider: string; model: string }>, expectedUserRemark?: string, beforeWrite?: () => void): Promise<void> {
@@ -1167,15 +1402,17 @@ ${repoInfo}`;
   public publishFolders(): void {
     const counts: Record<string, number> = { [this.UNCAT]: 0 };
     this.cats.forEach((c) => { counts[c] = 0; });
-    let usedCount = 0;
 
     const sourceRepos = this.allStarsLoaded && this.categoryRepos.length ? this.categoryRepos : this.repos;
     sourceRepos.forEach((repo) => {
-      const fn = repo.full_name;
-      if (this.used.has(fn)) usedCount++;
-      const folder = this.getRepoFolder(fn);
-      if (folder && counts[folder] !== undefined) counts[folder]++;
-      else counts[this.UNCAT]++;
+      const folders = this.getRepoFolders(repo.full_name);
+      if (folders.length === 0) {
+        counts[this.UNCAT]++;
+      } else {
+        folders.forEach((f) => {
+          if (counts[f] !== undefined) counts[f]++;
+        });
+      }
     });
 
     const folderViews: GitHubFolderView[] = [
@@ -1191,11 +1428,11 @@ ${repoInfo}`;
         kind: "uncategorized",
         active: this.active === this.UNCAT
       },
-      ...this.cats.map((cat) => ({
-        title: cat,
-        count: counts[cat] || 0,
+      ...this.lists.map((list) => ({
+        title: list.name,
+        count: list.totalCount > 0 ? list.totalCount : (counts[list.name] || 0),
         kind: "custom" as const,
-        active: this.active === cat
+        active: this.active === list.name
       }))
     ];
 
@@ -1203,14 +1440,13 @@ ${repoInfo}`;
   }
 
   public publishHero(filtered = this.getFilteredRepositories()): void {
-    let heroKind: "all" | "used" | "uncategorized" | "custom" = "custom";
+    let heroKind: "all" | "uncategorized" | "custom" = "custom";
     if (this.active === "全部") heroKind = "all";
-    else if (this.active === GH_USED_CATEGORY) heroKind = "used";
     else if (this.active === this.UNCAT) heroKind = "uncategorized";
 
     githubHeroController.update({
       title: this.active,
-      description: `${filtered.length} 个 Star 仓库 · 可右键仓库卡片移动或添加到正在使用`,
+      description: `${filtered.length} 个 Star 仓库 · GitHub 官方 Lists 实时云端同步`,
       kind: heroKind,
       batchMode: this.batchMode
     });
@@ -1239,6 +1475,7 @@ ${repoInfo}`;
         avatarUrl: repo.owner?.avatar_url || "",
         url: repo.html_url,
         folder: this.getRepoFolder(fn),
+        folders: this.getRepoFolders(fn),
         used: false,
         showUsedStatus: false,
         selected: this.selectedRepos.has(fn),
@@ -1283,9 +1520,9 @@ ${repoInfo}`;
     if (this.active === "全部") {
       list = this.repos;
     } else if (this.active === this.UNCAT) {
-      list = this.repos.filter((r) => !this.getRepoFolder(r.full_name));
+      list = this.repos.filter((r) => this.getRepoFolders(r.full_name).length === 0);
     } else {
-      list = this.repos.filter((r) => this.getRepoFolder(r.full_name) === this.active);
+      list = this.repos.filter((r) => this.getRepoFolders(r.full_name).includes(this.active));
     }
 
     if (this.searchQuery.trim()) {
@@ -1300,7 +1537,7 @@ ${repoInfo}`;
         const summary = (remark?.summary || "").toLowerCase();
         const lang = (r.language || "").toLowerCase();
         const topics = Array.isArray(r.topics) ? r.topics.map((t: string) => t.toLowerCase()) : [];
-        const folder = (this.getRepoFolder(r.full_name) || "").toLowerCase();
+        const folders = this.getRepoFolders(r.full_name).map(f => f.toLowerCase());
 
         if (rule === "exact") {
           return fn.includes(q) || desc.includes(q) || summary.includes(q);
@@ -1313,7 +1550,7 @@ ${repoInfo}`;
             desc.includes(token) ||
             summary.includes(token) ||
             lang.includes(token) ||
-            folder.includes(token) ||
+            folders.some(f => f.includes(token)) ||
             topics.some((t) => t.includes(token))
           );
         }
@@ -1321,14 +1558,14 @@ ${repoInfo}`;
         if (rule === "topic") {
           return (
             topics.some((t) => t.includes(q)) ||
-            folder.includes(q) ||
+            folders.some(f => f.includes(q)) ||
             lang.includes(q) ||
             fn.includes(q)
           );
         }
 
         if (rule === "smart") {
-          if (fn.includes(q) || desc.includes(q) || summary.includes(q) || lang.includes(q) || folder.includes(q)) {
+          if (fn.includes(q) || desc.includes(q) || summary.includes(q) || lang.includes(q) || folders.some(f => f.includes(q))) {
             return true;
           }
           const synonyms = GH_SEARCH_SYNONYMS[q] || [];

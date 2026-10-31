@@ -152,9 +152,8 @@ This extension strictly adheres to the **Chromium Manifest V3** security standar
 | `bookmarks` | Read browser bookmarks to display in the new-tab kanban grid; support organization, folder creation, and drag-and-drop sorting (indexed locally via Web Worker). |
 | `tabs` / `activeTab` | Power the top-bar tab manager (tree display of open tabs, one-click switching), avoiding duplicate opened tabs. |
 | `cookies` | **Read-only** check for active login sessions on `bilibili.com` and `music.163.com` in the same browser profile to display your favorites and playlists. **Cookies are never uploaded, collected, or exported.** |
-| `sidePanel` | Support opening the workspace directly in the Chromium native side panel (recommended shortcut: `Alt+W`). |
 | `downloads` | Triggered strictly by user action: exporting configuration backups, downloading cached audio/video, and saving wallpapers. |
-| `scripting` | Web translation helper: injects a lightweight Shadow DOM floating overlay for translation upon explicit user invocation. Never modifies webpage logic. |
+| `scripting` | Injects an isolated, non-modal overlay sidebar or web translation helper only on explicit user invocation. The sidebar (suggested shortcut: `Alt+W`) does not resize webpages. Browser internal pages, extension stores and other protected pages cannot be injected. |
 | `identity` | Optional Google Calendar OAuth2 authorization for agenda synchronization. |
 | `declarativeNetRequest` | Rewrite anti-hotlinking headers: appends necessary `Referer` headers when requesting stream fragments or cover art from official Bilibili/YouTube CDNs to ensure smooth playback. |
 | `contextMenus` / `clipboardWrite` | Context menus for shortcut cards, and one-click copying of URLs, clone commands, or AI news summaries to clipboard. |

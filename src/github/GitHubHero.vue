@@ -7,7 +7,6 @@ const emit = defineEmits<{ "open-ai-settings": [] }>();
 <template>
   <div id="gh-hero-cover" class="gh-bili-cover">
     <span v-if="state.kind === 'all'">⭐</span>
-    <span v-else-if="state.kind === 'used'">⚡</span>
     <span v-else-if="state.kind === 'uncategorized'">📄</span>
     <i v-else class="fo-folder-icon"></i>
   </div>
@@ -27,7 +26,7 @@ const emit = defineEmits<{ "open-ai-settings": [] }>();
       <span class="gh-batch-btn-text">{{ state.batchMode ? '返回' : '批量操作' }}</span>
     </button>
     <button id="gh-refresh-btn" type="button" class="gh-hero-btn" title="只读核对未确认的 Star 状态并刷新列表，不重发远端操作" @click="controller.refresh()">↻ 刷新 / 核对</button>
-    <button id="gh-hero-add-folder-btn" type="button" class="gh-hero-btn primary" @click="controller.createFolder()">＋ 新建文件夹</button>
+    <button id="gh-hero-add-folder-btn" type="button" class="gh-hero-btn primary" title="在 GitHub 官网上创建新 List" @click="controller.createFolder()">＋ 新建列表</button>
   </div>
 </template>
 

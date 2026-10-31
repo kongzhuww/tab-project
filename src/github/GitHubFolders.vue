@@ -57,7 +57,7 @@ function onDrop(event: DragEvent, title: string): void {
   <p v-if="categoryFeedback.message" role="status" style="font-size:12px;color:var(--danger,#ef4444);padding:4px 8px;margin:0 0 6px 0;border-radius:6px;background:var(--surface)">{{ categoryFeedback.message }}</p>
   <template v-for="(folder, index) in state.folders" :key="folder.title">
     <div v-if="folder.kind === 'custom' && state.folders[index - 1]?.kind !== 'custom'" class="gh-sidebar-divider"></div>
-    <div v-if="folder.kind === 'custom' && state.folders[index - 1]?.kind !== 'custom'" class="gh-sidebar-caption">我的文件夹</div>
+    <div v-if="folder.kind === 'custom' && state.folders[index - 1]?.kind !== 'custom'" class="gh-sidebar-caption">GitHub 列表 (Lists)</div>
     <button
       type="button"
       class="gh-bili-folder"
@@ -70,7 +70,6 @@ function onDrop(event: DragEvent, title: string): void {
     >
       <span class="gh-folder-icon-wrap" style="font-size:13px;display:grid;place-items:center">
         <span v-if="folder.kind === 'all'">⭐</span>
-        <span v-else-if="folder.kind === 'used'">⚡</span>
         <span v-else-if="folder.kind === 'uncategorized'">📄</span>
         <i v-else class="fo-folder-icon" style="color:currentColor"></i>
       </span>
@@ -79,7 +78,7 @@ function onDrop(event: DragEvent, title: string): void {
       <span
         v-if="folder.kind === 'custom'"
         class="gh-folder-delete"
-        title="删除文件夹"
+        title="删除 GitHub 列表"
         :data-del="folder.title"
         role="button"
         tabindex="0"

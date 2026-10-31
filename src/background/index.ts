@@ -13,7 +13,6 @@
 import { initBilibiliNetRules, syncYouTubeNetRules, removeLegacyGlobalNetRule } from "./dnr";
 import {
   initNotificationListeners,
-  enableStickerSidePanel,
   flashBadge
 } from "./notifications";
 import {
@@ -26,6 +25,7 @@ import {
 import { handleSearchWebImages, handleFetchSiteImages } from "./image-proxy";
 import { acquireImageSlot, fetchImageBytes, mediaUrl, MAX_IMAGE_BYTES, MAX_IMAGE_PIXELS, validateImagePixels } from "./media-fetch";
 import { initTodoistBackgroundSync, syncTodoistInBackground } from "./todoist-sync";
+import { initWebSideDrawer, toggleWebSideDrawer } from "./web-side-drawer";
 
 declare const chrome: any;
 
@@ -39,26 +39,62 @@ for (const name of ["gmail-inbox-poll", "x-account-poll"]) {
 }
 initTabWatcher();
 initContextMenu();
+initWebSideDrawer();
 
-// 监听扩展全局快捷键（例如 Alt+H 回到新标签页）
+// Extension documents receive runtime messages, not tabs.sendMessage (content scripts).
+function toggleSidePanelForTab(tab: { id?: number; url?: string; pendingUrl?: string; windowId?: number }): void {
+  const failed = () => {
+    void flashBadge("ERR", "#ef4444");
+    console.warn("[SidePanel] Could not toggle the requested panel.");
+  };
+  const url = tab.pendingUrl || tab.url || "";
+  const isHome = ["newtab.html", "newtab-bootstrap.html"].some(
+    path => url.split(/[?#]/, 1)[0] === chrome.runtime.getURL(path)
+  ) || url === "edge://newtab/" || url === "chrome://newtab/";
+  if (isHome) {
+    // Never fall back to a viewport-resizing native panel on the home page.
+    if (!Number.isInteger(tab.id)) { failed(); return; }
+    chrome.runtime.sendMessage({ type: "TOGGLE_SIDE_DRAWER", targetTabId: tab.id })
+      .then((reply: any) => { if (!reply?.ok) failed(); })
+      .catch(failed);
+    return;
+  }
+  if (/^https?:\/\//i.test(url) && Number.isInteger(tab.id)) {
+    void toggleWebSideDrawer(tab.id!).catch(() => {
+      failed();
+      void chrome.notifications.create({
+        type: "basic", iconUrl: "assets/icon-128.png", title: "无法打开侧栏",
+        message: "浏览器禁止在此页面注入侧栏，或尚未授予网站访问权限。请在普通网页上重试。"
+      }).catch(() => {});
+    });
+  } else {
+    failed();
+    void chrome.notifications.create({
+      type: "basic", iconUrl: "assets/icon-128.png", title: "此页面不支持覆盖式侧栏",
+      message: "浏览器内置页、其他扩展页面和受保护页面无法注入。请切换到普通网页或新标签页。"
+    }).catch(() => {});
+  }
+}
+
+function handleSidePanelRequest(tab?: { id?: number; url?: string; pendingUrl?: string; windowId?: number }): void {
+  if (tab && (tab.url || tab.pendingUrl)) {
+    toggleSidePanelForTab(tab);
+    return;
+  }
+  chrome.tabs.query({ active: true, lastFocusedWindow: true })
+    .then(([activeTab]: any[]) => { if (activeTab) toggleSidePanelForTab(activeTab); })
+    .catch(() => console.warn("[SidePanel] Could not find the active tab."));
+}
+
 if (typeof chrome !== "undefined" && chrome.commands?.onCommand) {
-  chrome.commands.onCommand.addListener((command: string, tab?: { windowId?: number }) => {
+  chrome.commands.onCommand.addListener((command: string, tab?: any) => {
     if (command === "focus-newtab") void openOrFocusNewTab();
     if (command === "open-side-panel" || command === "_execute_side_panel") {
-      const failed = () => { void flashBadge("ERR", "#ef4444"); console.warn("[SidePanel] Could not open panel from keyboard command."); };
-      // Call directly in the command gesture when the browser supplies the active tab.
-      if (Number.isInteger(tab?.windowId) && tab!.windowId! >= 0) {
-        chrome.sidePanel.open({ windowId: tab!.windowId }).catch(failed);
-      } else {
-        chrome.windows.getLastFocused().then((win: { id?: number }) => {
-          if (!Number.isInteger(win.id)) throw new Error("No active browser window");
-          return chrome.sidePanel.open({ windowId: win.id });
-        }).catch(failed);
-      }
+      handleSidePanelRequest(tab);
     }
   });
 }
-
+chrome.action?.onClicked?.addListener(handleSidePanelRequest);
 function bufferToBase64(buffer: ArrayBuffer): string {
   const bytes = new Uint8Array(buffer);
   const chunkSize = 0x8000;
@@ -437,7 +473,6 @@ chrome.runtime.onMessage.addListener((message: any, sender: any, sendResponse: (
 // 3. 安装与启动生命周期初始化
 
 chrome.runtime.onInstalled?.addListener?.(() => {
-  enableStickerSidePanel();
   initBilibiliNetRules();
   syncYouTubeNetRules();
   setTimeout(cleanupOrReplaceBrowserDefaultNewTabs, 200);
@@ -446,7 +481,6 @@ chrome.runtime.onInstalled?.addListener?.(() => {
 });
 
 chrome.runtime.onStartup?.addListener?.(() => {
-  enableStickerSidePanel();
   initBilibiliNetRules();
   syncYouTubeNetRules();
   setTimeout(cleanupOrReplaceBrowserDefaultNewTabs, 200);

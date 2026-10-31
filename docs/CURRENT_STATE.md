@@ -21,7 +21,7 @@
 | 功能 | 源码/入口 |
 | --- | --- |
 | 新标签页 | manifest 的 `newtab-bootstrap.html` → `newtab.html` → `generated/vue-ui.js` → `src/intro/main.ts` / `src/App.vue`；首页首帧主题由外部 `generated/theme-init.js` 初始化；`generated/newtab-init.js` 设置开屏首帧状态，避免 MV3 CSP 拦截内联 JavaScript |
-| 侧边栏 | `sidepanel.html` → `src/sidepanel/index.ts` / `SidePanelApp.vue` → `generated/sidepanel-ui.js`；manifest 没有 `default_popup`，仓库没有 `popup.html` 或 `src/popup/PopupApp.vue` |
+| 侧边栏 | 新标签页使用 `InPageSideDrawer.vue`；普通 HTTP(S) 网页由 `src/background/web-side-drawer.ts` 按需注入隔离容器，内嵌 `sidepanel.html` → `src/sidepanel/index.ts` / `SidePanelApp.vue`。manifest 不再声明原生 `side_panel` 或 `sidePanel` 权限；无 `default_popup`。见 [SIDE_DRAWER.md](SIDE_DRAWER.md) |
 | 独立工作区 | `bilibili.html`、`github.html`、`aihot.html`、`pricing.html`、`youtube.html`；保留独立页，不为统一 SPA 而关闭或合并用户标签 |
 | 独立工具 | `options.html`、`newtab-search.html`、`stickers.html`、`sticker-sidepanel.html`、`sync-bridge.html`；按 HTML 与 Vite 输入核对实际 bundle |
 | 后台 | manifest 加载 `generated/background.js`，源文件 `src/background/index.ts`；根 `background.js` 同时作为构建输出保留，不应误当 manifest 当前目标 |
@@ -33,7 +33,9 @@
 
 ## 最新默认行为与快捷键（源码已改，待人工验收）
 
-- 浏览器右侧的侧边栏恢复 `open-side-panel` 命令，建议键 Alt+W，后台响应用户命令打开当前窗口侧边栏；页面工作区、窗口管理和轮盘不再用Alt+W关闭。设置区从commands.getAll显示真实绑定，点击进入Edge/Chrome扩展快捷键管理页修改；浏览器冲突或旧安装未自动分配时需用户在那里指定。原“书签侧栏”明确为“书签面板（新标签页内）”，仍为页面可录制快捷键，与浏览器侧边栏分开。需要用户重新加载扩展以注册manifest命令，未自动操作浏览器。
+- `open-side-panel` 命令（建议键 Alt+W）与工具栏扩展图标共用入口：本扩展新标签页通过 `runtime.sendMessage` 和目标 tab ID 切换页面内无模态侧栏，不走 content-script 专用的 `tabs.sendMessage`，失败也不回退到挤压视口的原生侧栏；普通 HTTP(S) 网页改为按需注入覆盖式侧栏，不再调用原生侧栏。页面不再额外硬编码 Alt+W，避免双重切换且尊重用户重绑。顶栏侧栏按钮为直接页面入口。抽屉 Teleport 至 body，继承 `--panel` 背景，关闭时 inert。已删除原生侧栏注册与权限，扩展图标与快捷键统一为覆盖入口；受保护页面提示不支持，不回退到原生挤压侧栏。设置区从 commands.getAll 显示真实绑定。Edge 当前加载正式目录已通过 Windows UI Automation 核对。用户授权重载后，实际操作扩展图标、Alt+W 收起/展开、侧栏 × 和顶栏按钮：主页文档区域均保持 1912×948，页面内侧栏宽 380，无原生侧窗格；PrintWindow 截图确认背景不再透出底层卡片。随后在 Edge B站网页完成扩展图标、Alt+W、×、Esc 实际操作：网页区域始终 1912×948，侧栏为 380px；侧栏展开时点击网页搜索框仍能聚焦。未做帧率基准或全站兼容性验收。
+
+- 修复后台实际启动阻断：`TodoistService` 被后台同步模块导入时会创建 change-channel，旧代码无条件访问 window/document，导致 Service Worker registration failed (15)，从而快捷键/图标处理均不注册。`change-channel.ts` 现仅在 document 环境挂载页面监听。已重新构建并在 Edge 重载验证后台入口恢复；历史扩展错误记录未清除。
 
 - `shortcut-catalog.ts` 统一设置列表、默认键与派发可用性；设置按导航/组件分组，停用或未注册功能不出现、不触发，旧绑定不删除。× 保存空绑定以禁用，↺ 才恢复默认；录制统一Meta与物理键，Esc取消，固定键/重键提示，录制期间不触发原窗口/导航/命令面板快捷操作。
 - Alt+E 主轮盘按组件启用状态过滤；Alt+Q 从商店中已注册且已启用的独立模块生成，不再列出任务架子、预约、云盘、监控等退役/未注册项。启用状态变化重绘，点击前再检查。

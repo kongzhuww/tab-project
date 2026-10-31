@@ -172,6 +172,13 @@ function handleTabCloseVideo(): void {
 }
 
 watch(() => organizer.value.query, (query) => { searchQuery.value = query; });
+watch(searchQuery, (newVal) => {
+  if (!newVal || !newVal.trim()) {
+    if (organizer.value.query) {
+      dispatch("organizer-search", "");
+    }
+  }
+});
 
 function dispatch(action: Parameters<typeof biliFavoritesController.dispatch>[0], payload?: unknown): void {
   biliFavoritesController.dispatch(action, payload);
@@ -266,8 +273,9 @@ function submitSearch(): void {
 }
 
 function onSearchInput(): void {
-  if (organizer.value.mode === "organizer") {
-    dispatch("organizer-search", searchQuery.value.trim());
+  const q = searchQuery.value.trim();
+  if (!q && organizer.value.query) {
+    dispatch("organizer-search", "");
   }
 }
 
@@ -1014,7 +1022,14 @@ function onRadioVideoDragStart(event: DragEvent, video: { bvid: string; title: s
                   </div>
                 </div>
                 <form v-if="!organizer.batchMode" class="fo-bili-search" @submit.prevent="submitSearch">
-                  <input v-model="searchQuery" type="search" placeholder="请输入关键词" aria-label="搜索当前收藏夹" /><button type="submit" title="搜索">⌕</button>
+                  <input
+                    v-model="searchQuery"
+                    type="search"
+                    placeholder="请输入关键词"
+                    aria-label="搜索当前收藏夹"
+                    @input="onSearchInput"
+                    @search="onSearchInput"
+                  /><button type="submit" title="搜索">⌕</button>
                 </form>
                 <div v-else class="fo-bili-batch-actions">
                   <span class="fo-batch-count">已选择 {{ organizer.selectedCount }} 项</span>

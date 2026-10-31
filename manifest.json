@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "minimum_chrome_version": "120",
   "name": "tab-project 新标签页",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "description": "tab-project 现代化浏览器新标签页与生产力工作台看板：聚合搜索、B站收藏夹、Todoist、模型价格与 GitHub。",
   "chrome_url_overrides": {
     "newtab": "newtab-bootstrap.html"
@@ -26,7 +26,6 @@
     "declarativeNetRequest",
     "identity",
     "scripting",
-    "sidePanel",
     "notifications",
     "downloads",
     "contextMenus",
@@ -103,7 +102,7 @@
   "commands": {
     "open-side-panel": {
       "suggested_key": { "default": "Alt+W", "mac": "Alt+W" },
-      "description": "打开浏览器右侧的插件侧边栏"
+      "description": "展开或收起覆盖式侧栏（不挤压网页）"
     },
     "focus-newtab": {
       "suggested_key": {
@@ -113,13 +112,14 @@
       "description": "立即回到 tab-project-next 新标签页"
     }
   },
-  "side_panel": {
-    "default_path": "sidepanel.html"
-  },
   "background": {
     "service_worker": "generated/background.js"
   },
   "web_accessible_resources": [
+    {
+      "resources": ["sidepanel.html"],
+      "matches": ["https://*/*", "http://*/*"]
+    },
     {
       "resources": [
         "favicon.ico",

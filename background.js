@@ -277,11 +277,6 @@ async function restoreReminderAlarms() {
 }
 
 // src/background/notifications.ts
-function enableStickerSidePanel() {
-  if (!chrome.sidePanel?.setPanelBehavior) return;
-  chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => {
-  });
-}
 function flashBadge(text, color) {
   return new Promise((resolve) => {
     chrome.action.setBadgeText({ text });
@@ -3654,11 +3649,13 @@ function createTodoistChangeChannel(getToken, invalidate) {
       }
     }
   }
-  window.addEventListener("storage", (event) => {
-    if (event.key === KEY) void receive(event.newValue);
-  });
-  document.addEventListener("visibilitychange", reconcile);
-  window.addEventListener("pageshow", reconcile);
+  if (typeof window !== "undefined" && typeof document !== "undefined") {
+    window.addEventListener("storage", (event) => {
+      if (event.key === KEY) void receive(event.newValue);
+    });
+    document.addEventListener("visibilitychange", reconcile);
+    window.addEventListener("pageshow", reconcile);
+  }
   return {
     async publish(token) {
       try {
@@ -5132,6 +5129,106 @@ function initTodoistBackgroundSync() {
   });
 }
 
+// src/background/web-side-drawer.ts
+var EMBED_KEY = "webSideDrawer:";
+function toggleWebDrawer(frameUrl, token) {
+  const scope = globalThis;
+  const key = "__tabProjectWebDrawer";
+  if (scope[key]) {
+    scope[key].close();
+    return { open: false };
+  }
+  const host = document.createElement("div");
+  host.setAttribute("popover", "manual");
+  host.setAttribute("aria-label", "tab-project \u4FA7\u680F");
+  const styles = {
+    all: "initial",
+    position: "fixed",
+    inset: "0 0 0 auto",
+    margin: "0",
+    padding: "0",
+    width: "min(380px, 90vw)",
+    height: "100dvh",
+    border: "0",
+    display: "block",
+    overflow: "hidden",
+    background: "transparent",
+    "z-index": "2147483647",
+    "box-shadow": "-8px 0 28px color-mix(in srgb, CanvasText 15%, transparent)"
+  };
+  for (const [name, value] of Object.entries(styles)) host.style.setProperty(name, value, "important");
+  const shadow = host.attachShadow({ mode: "closed" });
+  const frame = document.createElement("iframe");
+  frame.title = "\u7F51\u9875\u5DE5\u5177\u4E0E\u6536\u96C6\u7BB1";
+  frame.src = frameUrl;
+  frame.style.cssText = "display:block;width:100%;height:100%;border:0;background:transparent;color-scheme:normal";
+  shadow.append(frame);
+  function close() {
+    window.removeEventListener("message", onMessage);
+    window.removeEventListener("keydown", onKeyDown);
+    host.remove();
+    delete scope[key];
+  }
+  function onMessage(event) {
+    if (event.source !== frame.contentWindow || event.origin !== frameUrl.split("/").slice(0, 3).join("/") || event.data?.token !== token) return;
+    if (event.data.type === "TAB_PROJECT_CLOSE_DRAWER") close();
+  }
+  function onKeyDown(event) {
+    if (event.key === "Escape" && !event.defaultPrevented) close();
+  }
+  scope[key] = { close };
+  window.addEventListener("message", onMessage);
+  window.addEventListener("keydown", onKeyDown);
+  document.documentElement.append(host);
+  try {
+    host.showPopover();
+  } catch (error) {
+    close();
+    throw error;
+  }
+  return { open: true };
+}
+async function toggleWebSideDrawer(tabId) {
+  const token = crypto.randomUUID();
+  const key = EMBED_KEY + tabId;
+  await chrome.storage.session.set({ [key]: { token, issuedAt: Date.now() } });
+  try {
+    const results = await chrome.scripting.executeScript({
+      target: { tabId, frameIds: [0] },
+      world: "ISOLATED",
+      func: toggleWebDrawer,
+      args: [chrome.runtime.getURL("sidepanel.html") + "#embed=" + token, token]
+    });
+    if (!results?.[0]?.result?.open) await chrome.storage.session.remove(key);
+  } catch (error) {
+    await chrome.storage.session.remove(key);
+    throw error;
+  }
+}
+function initWebSideDrawer() {
+  chrome.runtime.onMessage.addListener((message, sender, respond) => {
+    if (message?.type !== "AUTHORIZE_SIDE_DRAWER_EMBED") return;
+    if (sender.id !== chrome.runtime.id || !Number.isInteger(sender.tab?.id) || sender.frameId <= 0 || sender.url?.split("#")[0] !== chrome.runtime.getURL("sidepanel.html")) {
+      respond({ ok: false });
+      return;
+    }
+    const key = EMBED_KEY + sender.tab.id;
+    void chrome.storage.session.get(key).then(async (stored) => {
+      const grant = stored[key];
+      if (!grant || grant.token !== message.token || Date.now() - grant.issuedAt > 3e4 || !/^https?:\/\//i.test(sender.tab.url || "")) {
+        respond({ ok: false });
+        return;
+      }
+      await chrome.storage.session.remove(key);
+      respond({ ok: true, parentOrigin: new URL(sender.tab.url).origin });
+    }).catch(() => respond({ ok: false }));
+    return true;
+  });
+  chrome.tabs.onRemoved.addListener((tabId) => {
+    void chrome.storage.session.remove(EMBED_KEY + tabId);
+  });
+}
+
 // src/background/index.ts
 initBilibiliNetRules();
 initNotificationListeners();
@@ -5141,25 +5238,66 @@ for (const name of ["gmail-inbox-poll", "x-account-poll"]) {
 }
 initTabWatcher();
 initContextMenu();
+initWebSideDrawer();
+function toggleSidePanelForTab(tab) {
+  const failed = () => {
+    void flashBadge("ERR", "#ef4444");
+    console.warn("[SidePanel] Could not toggle the requested panel.");
+  };
+  const url = tab.pendingUrl || tab.url || "";
+  const isHome = ["newtab.html", "newtab-bootstrap.html"].some(
+    (path) => url.split(/[?#]/, 1)[0] === chrome.runtime.getURL(path)
+  ) || url === "edge://newtab/" || url === "chrome://newtab/";
+  if (isHome) {
+    if (!Number.isInteger(tab.id)) {
+      failed();
+      return;
+    }
+    chrome.runtime.sendMessage({ type: "TOGGLE_SIDE_DRAWER", targetTabId: tab.id }).then((reply) => {
+      if (!reply?.ok) failed();
+    }).catch(failed);
+    return;
+  }
+  if (/^https?:\/\//i.test(url) && Number.isInteger(tab.id)) {
+    void toggleWebSideDrawer(tab.id).catch(() => {
+      failed();
+      void chrome.notifications.create({
+        type: "basic",
+        iconUrl: "assets/icon-128.png",
+        title: "\u65E0\u6CD5\u6253\u5F00\u4FA7\u680F",
+        message: "\u6D4F\u89C8\u5668\u7981\u6B62\u5728\u6B64\u9875\u9762\u6CE8\u5165\u4FA7\u680F\uFF0C\u6216\u5C1A\u672A\u6388\u4E88\u7F51\u7AD9\u8BBF\u95EE\u6743\u9650\u3002\u8BF7\u5728\u666E\u901A\u7F51\u9875\u4E0A\u91CD\u8BD5\u3002"
+      }).catch(() => {
+      });
+    });
+  } else {
+    failed();
+    void chrome.notifications.create({
+      type: "basic",
+      iconUrl: "assets/icon-128.png",
+      title: "\u6B64\u9875\u9762\u4E0D\u652F\u6301\u8986\u76D6\u5F0F\u4FA7\u680F",
+      message: "\u6D4F\u89C8\u5668\u5185\u7F6E\u9875\u3001\u5176\u4ED6\u6269\u5C55\u9875\u9762\u548C\u53D7\u4FDD\u62A4\u9875\u9762\u65E0\u6CD5\u6CE8\u5165\u3002\u8BF7\u5207\u6362\u5230\u666E\u901A\u7F51\u9875\u6216\u65B0\u6807\u7B7E\u9875\u3002"
+    }).catch(() => {
+    });
+  }
+}
+function handleSidePanelRequest(tab) {
+  if (tab && (tab.url || tab.pendingUrl)) {
+    toggleSidePanelForTab(tab);
+    return;
+  }
+  chrome.tabs.query({ active: true, lastFocusedWindow: true }).then(([activeTab]) => {
+    if (activeTab) toggleSidePanelForTab(activeTab);
+  }).catch(() => console.warn("[SidePanel] Could not find the active tab."));
+}
 if (typeof chrome !== "undefined" && chrome.commands?.onCommand) {
   chrome.commands.onCommand.addListener((command, tab) => {
     if (command === "focus-newtab") void openOrFocusNewTab();
     if (command === "open-side-panel" || command === "_execute_side_panel") {
-      const failed = () => {
-        void flashBadge("ERR", "#ef4444");
-        console.warn("[SidePanel] Could not open panel from keyboard command.");
-      };
-      if (Number.isInteger(tab?.windowId) && tab.windowId >= 0) {
-        chrome.sidePanel.open({ windowId: tab.windowId }).catch(failed);
-      } else {
-        chrome.windows.getLastFocused().then((win) => {
-          if (!Number.isInteger(win.id)) throw new Error("No active browser window");
-          return chrome.sidePanel.open({ windowId: win.id });
-        }).catch(failed);
-      }
+      handleSidePanelRequest(tab);
     }
   });
 }
+chrome.action?.onClicked?.addListener(handleSidePanelRequest);
 function bufferToBase64(buffer) {
   const bytes = new Uint8Array(buffer);
   const chunkSize = 32768;
@@ -5481,7 +5619,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 });
 chrome.runtime.onInstalled?.addListener?.(() => {
-  enableStickerSidePanel();
   initBilibiliNetRules();
   syncYouTubeNetRules();
   setTimeout(cleanupOrReplaceBrowserDefaultNewTabs, 200);
@@ -5489,7 +5626,6 @@ chrome.runtime.onInstalled?.addListener?.(() => {
   setTimeout(() => void syncTodoistInBackground(), 3e3);
 });
 chrome.runtime.onStartup?.addListener?.(() => {
-  enableStickerSidePanel();
   initBilibiliNetRules();
   syncYouTubeNetRules();
   setTimeout(cleanupOrReplaceBrowserDefaultNewTabs, 200);

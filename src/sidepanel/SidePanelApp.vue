@@ -7,6 +7,9 @@ import {
   saveQuickLink, tabHost, type PopupTab
 } from "../services/quick-links-export.service";
 
+const props = withDefaults(defineProps<{ inDrawer?: boolean }>(), { inDrawer: false });
+const emit = defineEmits<{ (e: "close"): void }>();
+
 // ============================================================================
 // 0. 全网标签页智能聚合中心 (取代就地汉化)
 // ============================================================================
@@ -448,6 +451,10 @@ async function submitManualLink(): Promise<void> {
 }
 
 function openDashboard(): void {
+  if (props.inDrawer) {
+    emit("close");
+    return;
+  }
   void chrome.tabs.create({ url: chrome.runtime.getURL("newtab.html"), active: true });
 }
 
@@ -463,31 +470,44 @@ function syncTheme(): void {
   } catch {}
 }
 
-// 监听浏览器标签页切换与更新事件，侧边栏保持实时跟随
-function onTabsChanged(): void {
-  void refreshActiveTabInfo();
+// 监听浏览器标签页切换与更新事件，侧边栏保持防抖跟随
+let tabsDebounceTimer: any = null;
+function debouncedOnTabsChanged(): void {
+  clearTimeout(tabsDebounceTimer);
+  tabsDebounceTimer = setTimeout(() => {
+    void refreshActiveTabInfo();
+    void loadOpenTabs();
+  }, 120);
 }
+
+const refreshPages = () => {
+  loadLauncherPages().then(({ pages, labels }) => {
+    if (pages && pages.length) launcherPages.value = pages;
+    launcherPageLabels.value = labels || {};
+    const saved = localStorage.getItem("lw_target_bookmark_page");
+    if (saved && launcherPages.value.includes(saved)) targetPage.value = saved;
+    else if (!launcherPages.value.includes(targetPage.value)) targetPage.value = launcherPages.value[0] || "常用网站";
+  });
+};
 
 onMounted(() => {
   syncTheme();
   void refreshActiveTabInfo();
-  void loadTodoistMountData();
-  void loadOpenTabs();
-  const refreshPages = () => {
-    loadLauncherPages().then(({ pages, labels }) => {
-      if (pages && pages.length) launcherPages.value = pages;
-      launcherPageLabels.value = labels || {};
-      const saved = localStorage.getItem("lw_target_bookmark_page");
-      if (saved && launcherPages.value.includes(saved)) targetPage.value = saved;
-      else if (!launcherPages.value.includes(targetPage.value)) targetPage.value = launcherPages.value[0] || "常用网站";
-    });
-  };
-  refreshPages();
+
+  // 保证浏览器侧边栏滑出展开动画（~150ms）跑满 60fps：让出主线程，在首帧绘制完成后再装载重型标签页树与待办列表
+  requestAnimationFrame(() => {
+    setTimeout(() => {
+      void loadOpenTabs();
+      void loadTodoistMountData();
+      refreshPages();
+    }, 100);
+  });
+
   if (typeof chrome !== "undefined" && chrome?.tabs) {
-    chrome.tabs.onActivated?.addListener(onTabsChanged);
-    chrome.tabs.onUpdated?.addListener(onTabsChanged);
-    chrome.tabs.onCreated?.addListener(loadOpenTabs);
-    chrome.tabs.onRemoved?.addListener(loadOpenTabs);
+    chrome.tabs.onActivated?.addListener(debouncedOnTabsChanged);
+    chrome.tabs.onUpdated?.addListener(debouncedOnTabsChanged);
+    chrome.tabs.onCreated?.addListener(debouncedOnTabsChanged);
+    chrome.tabs.onRemoved?.addListener(debouncedOnTabsChanged);
   }
   if (typeof chrome !== "undefined" && chrome?.storage?.onChanged) {
     chrome.storage.onChanged.addListener((changes: any, areaName: string) => {
@@ -504,9 +524,12 @@ onMounted(() => {
 
 onUnmounted(() => {
   clearTimeout(noticeTimer);
+  clearTimeout(tabsDebounceTimer);
   if (typeof chrome !== "undefined" && chrome?.tabs) {
-    chrome.tabs.onActivated?.removeListener(onTabsChanged);
-    chrome.tabs.onUpdated?.removeListener(onTabsChanged);
+    chrome.tabs.onActivated?.removeListener(debouncedOnTabsChanged);
+    chrome.tabs.onUpdated?.removeListener(debouncedOnTabsChanged);
+    chrome.tabs.onCreated?.removeListener(debouncedOnTabsChanged);
+    chrome.tabs.onRemoved?.removeListener(debouncedOnTabsChanged);
   }
 });
 </script>
@@ -522,10 +545,10 @@ onUnmounted(() => {
       <button
         type="button"
         class="sp-nav-icon-btn"
-        title="打开完整新标签页仪表盘"
+        :title="props.inDrawer ? '关闭侧栏' : '打开完整新标签页仪表盘'"
         @click="openDashboard"
       >
-        ⌂
+        {{ props.inDrawer ? '✕' : '⌂' }}
       </button>
     </header>
 
@@ -807,12 +830,13 @@ onUnmounted(() => {
   flex-direction: column;
   height: 100vh;
   width: 100%;
-  background: var(--bg);
+  background: var(--panel);
   color: var(--text);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
   user-select: none;
   box-sizing: border-box;
   overflow: hidden;
+  contain: layout paint style;
 }
 
 /* 顶部分段控制器 */
@@ -850,7 +874,7 @@ onUnmounted(() => {
   justify-content: center;
   cursor: pointer;
   font-size: 14px;
-  transition: all 0.15s ease;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
 }
 .sp-nav-icon-btn:hover {
   background: var(--surface-hover);
@@ -935,7 +959,7 @@ onUnmounted(() => {
   color: var(--heading);
   cursor: pointer;
   text-align: left;
-  transition: all 0.15s ease;
+  transition: background 0.15s ease, border-color 0.15s ease;
 }
 .sp-action-btn:hover {
   background: linear-gradient(135deg, rgba(201, 153, 63, 0.25), rgba(125, 146, 168, 0.14));
@@ -988,7 +1012,7 @@ onUnmounted(() => {
   background: rgba(201, 153, 63, 0.14);
   border: 1px solid rgba(201, 153, 63, 0.45);
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: background 0.15s ease;
 }
 .sp-action-btn.split-addon:hover,
 .sp-action-btn.split-addon.active {
@@ -1054,7 +1078,7 @@ onUnmounted(() => {
   font-weight: 600;
   cursor: pointer;
   text-align: left;
-  transition: all 0.15s ease;
+  transition: background 0.15s ease, color 0.15s ease;
 }
 .sp-page-picker-dropdown .dropdown-item:hover {
   background: var(--surface-hover);
@@ -1175,7 +1199,7 @@ onUnmounted(() => {
   color: var(--muted);
   padding: 1px 6px;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: background 0.15s ease, color 0.15s ease;
   margin-right: 4px;
 }
 .sp-tab-refresh-btn:hover {
@@ -1204,6 +1228,7 @@ onUnmounted(() => {
   flex-direction: column;
   gap: 8px;
   padding: 2px 2px 10px 2px;
+  contain: content;
 }
 .tab-group-block {
   background: var(--panel);
@@ -1289,7 +1314,7 @@ onUnmounted(() => {
   border-radius: 6px;
   cursor: pointer;
   user-select: none;
-  transition: all 0.12s ease;
+  transition: background 0.12s ease;
   min-width: 0;
   background: transparent;
 }
@@ -1364,7 +1389,7 @@ onUnmounted(() => {
   color: #b45309;
   padding: 2px 6px;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: background 0.15s ease, border-color 0.15s ease;
 }
 .todoist-switch-btn:hover {
   background: var(--surface-hover);
@@ -1427,7 +1452,7 @@ onUnmounted(() => {
   border-radius: 6px;
   background: var(--panel);
   border: 1px solid var(--border);
-  transition: all 0.2s ease;
+  transition: border-color 0.15s ease;
 }
 .todoist-task-item:hover {
   border-color: rgba(180, 83, 9, 0.4);
@@ -1456,7 +1481,7 @@ onUnmounted(() => {
   color: #fff;
   font-size: 11px;
   font-weight: 900;
-  transition: all 0.15s ease;
+  transition: border-color 0.15s ease, background 0.15s ease;
 }
 .todoist-checkbox:hover {
   border-color: #b45309;
@@ -1529,7 +1554,7 @@ onUnmounted(() => {
   font-size: 11.5px;
   font-weight: 700;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: background 0.15s ease, opacity 0.15s ease;
   white-space: nowrap;
 }
 .sp-collect-btn:hover {
@@ -1547,7 +1572,7 @@ onUnmounted(() => {
   font-size: 11px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
   white-space: nowrap;
   max-width: 95px;
 }
@@ -1595,7 +1620,7 @@ onUnmounted(() => {
   font-size: 11.5px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: background 0.15s ease, color 0.15s ease;
   text-align: center;
 }
 .sp-segment-item:hover {

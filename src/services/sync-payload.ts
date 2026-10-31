@@ -12,13 +12,12 @@ const booleanKeys = new Set([
 const arrayKeys = new Set([
   "searchIgnoredBookmarkFolders", "wereadSortIds",
   "foGroups", "launcherGroups", "quickLinks", "launcherPages",
-  "foCollapsedGroupsV1", "biliFollowingGroupsV1", "biliSubCustomChannelsV1", "biliRadioSeriesV1",
-  "ghCats", "ghUsed"
+  "foCollapsedGroupsV1", "biliFollowingGroupsV1", "biliSubCustomChannelsV1", "biliRadioSeriesV1"
 ]);
 const objectKeys = new Set([
   "customShortcuts", "launcherFolders", "quickLinkGroupSizes",
   "launcherPageLabels", "launcherFolderPositionV1",
-  "foTree", "ghMap", "ghRepoRemarksV1",
+  "foTree", "ghRepoRemarksV1",
   "lw_private_chat_v1", "lw_webdav_config", "googleCalendarSessionTokenV1"
 ]);
 
@@ -62,7 +61,7 @@ function validateJson(value: unknown, depth = 0): void {
 
 function validateSetting(key: string, value: unknown): void {
   const fail = () => { throw new SyncBackupError(`配置项 ${key} 格式无效，操作已取消`); };
-  if (["foGroups", "launcherGroups", "ghUsed"].includes(key)) {
+  if (["foGroups", "launcherGroups"].includes(key)) {
     // Historical versions used both keyed maps and arrays for these collections.
     if (!Array.isArray(value) && !isRecord(value)) fail();
   } else if (booleanKeys.has(key)) {

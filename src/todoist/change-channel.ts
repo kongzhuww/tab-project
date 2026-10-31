@@ -25,9 +25,13 @@ export function createTodoistChangeChannel(getToken: () => Promise<string>, inva
       try { void receive(localStorage.getItem(KEY)); } catch { /* Storage unavailable: manual refresh remains available. */ }
     }
   }
-  window.addEventListener('storage', event => { if (event.key === KEY) void receive(event.newValue); });
-  document.addEventListener('visibilitychange', reconcile);
-  window.addEventListener('pageshow', reconcile);
+  // TodoistService is also imported by the MV3 worker, which has no DOM.
+  // Page-to-page localStorage reconciliation belongs only to document contexts.
+  if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+    window.addEventListener('storage', event => { if (event.key === KEY) void receive(event.newValue); });
+    document.addEventListener('visibilitychange', reconcile);
+    window.addEventListener('pageshow', reconcile);
+  }
   return {
     async publish(token: string) {
       try {

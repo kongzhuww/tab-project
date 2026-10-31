@@ -336,10 +336,10 @@ onBeforeUnmount(() => { gitHubService.setAiViewActive(false); ++initialVersion; 
           <!-- 2. 文件夹列表 -->
           <header class="gh-bili-sidebar-head">
             <div>
-              <b style="font-size: 13px; display: flex; align-items: center; gap: 6px;"><i class="fo-folder-icon"></i> 收藏文件夹</b>
-              <small style="color: var(--dim); font-size: 9.5px;">单一文件夹 · 独立正在使用</small>
+              <b style="font-size: 13px; display: flex; align-items: center; gap: 6px;"><i class="fo-folder-icon"></i> GitHub 列表</b>
+              <small style="color: var(--dim); font-size: 9.5px;">GitHub 官方 Lists · 云端实时同步</small>
             </div>
-            <button class="fo-sidebar-add" id="gh-folder-add-btn" type="button" title="新建文件夹" aria-label="新建文件夹" @click="gitHubService.promptCreateFolder()">＋</button>
+            <button class="fo-sidebar-add" id="gh-folder-add-btn" type="button" title="新建 GitHub 列表" aria-label="新建 GitHub 列表" @click="gitHubService.promptCreateFolder()">＋</button>
           </header>
           <nav class="gh-bili-folder-list" id="gh-folder-list" @click="handleSelectFolder">
             <GitHubFolders :active="active" />

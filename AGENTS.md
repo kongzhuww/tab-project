@@ -77,7 +77,7 @@
 | 用户口令 | 对应源码文件 | 作用位置与说明 |
 | :--- | :--- | :--- |
 | **dock** | `src/dock/MacDock.vue` | 底部全局 MacDock 栏 |
-| **侧边栏** | `src/sidepanel/SidePanelApp.vue` / `sidepanel.html` | 浏览器原生侧边栏；当前不存在 `src/popup/PopupApp.vue`，不要凭旧文档补建 Popup 入口 |
+| **侧边栏** | `src/sidepanel/SidePanelApp.vue` / `InPageSideDrawer.vue` / `src/background/web-side-drawer.ts` | 统一覆盖式无模态侧栏，不挤压视口；普通网页按需注入隔离容器与经授权的扩展 iframe，首页页面内挂载。已移除原生 side_panel 注册及 sidePanel 权限，不恢复原生挤压入口；受保护页面不支持注入。见 docs/SIDE_DRAWER.md。不要补建旧 Popup 入口 |
 
 ### 3.4 全屏插件（Dock 栏左侧/中段大看板 · 展开占满全屏）
 | 用户口令 | 对应源码文件 | 核心功能与当前状态 |

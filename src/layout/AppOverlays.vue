@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { defineAsyncComponent } from "vue";
+import { defineAsyncComponent, onMounted, onUnmounted } from "vue";
 import { ensureViewStyles } from "../core/view-styles";
 import { pluginMarketController } from "../modules/market-store";
 import NotificationHost from "../notifications/NotificationHost.vue";
@@ -18,6 +18,7 @@ import { commandPaletteState } from "../commands/command-palette-store";
 import { bookmarkMenuController } from "../bookmarks/menu-store";
 import { launcherDialogsState } from "../launcher/dialogs-store";
 import { githubRepoDetailState } from "../github/repo-detail-store";
+import { sideDrawerState, bindSideDrawerMessages } from "../sidepanel/drawer-store";
 import BiliUpPreview from "../bilibili/BiliUpPreview.vue";
 
 const mountMarket = useRetainedMount(() => pluginMarketController.state.isOpen);
@@ -32,6 +33,10 @@ const mountBiliMessagePanel = useRetainedMount(() => biliMessagePanelState.isOpe
 const mountAiDialog = useRetainedMount(() => aiDialogController.state.isOpen);
 const mountGithubDetail = useRetainedMount(() => githubRepoDetailState.isOpen);
 const mountCommandPalette = useRetainedMount(() => commandPaletteState.isOpen);
+const mountSideDrawer = useRetainedMount(() => sideDrawerState.isOpen);
+let unbindSideDrawer: (() => void) | undefined;
+onMounted(() => { unbindSideDrawer = bindSideDrawerMessages(); });
+onUnmounted(() => { unbindSideDrawer?.(); });
 const mountBookmarkNoteMenu = useRetainedMount(() => bookmarkMenuController.state.isOpen);
 const mountLauncherFolder = useRetainedMount(() => folderState.isOpen);
 const mountLauncherDialogs = useRetainedMount(() => (
@@ -61,6 +66,7 @@ const AiDialog = defineAsyncComponent(() => import("../ai/AiDialog.vue"));
 const AihotViewer = defineAsyncComponent(() => import("../viewers/AihotViewer.vue"));
 const NavWheelOverlay = defineAsyncComponent(() => import("../nav-wheel/NavWheelOverlay.vue"));
 const GitHubRepoDetailDrawer = defineAsyncComponent(() => import("../github/GitHubRepoDetailDrawer.vue"));
+const InPageSideDrawer = defineAsyncComponent(() => import("../sidepanel/InPageSideDrawer.vue"));
 const BiliSubtitleModal = defineAsyncComponent(() => import("../bilibili/BiliSubtitleModal.vue"));
 const FirecrawlModal = defineAsyncComponent(() => import("../firecrawl/FirecrawlModal.vue"));
 const FloatingImageViewer = defineAsyncComponent(() => import("../viewers/FloatingImageViewer.vue"));
@@ -192,6 +198,9 @@ const PluginMarketDialog = defineAsyncComponent(async () => {
     <div id="vue-command-palette-root">
       <CommandPalette v-if="mountCommandPalette" />
     </div>
+
+    <!-- 📑 网页工具与收集箱高图层无模态侧栏抽屉（不挤压主屏） -->
+    <InPageSideDrawer v-if="mountSideDrawer" />
 
     <!-- 👤 UP主/作者近期投稿与详情浮层预览 -->
     <BiliUpPreview />

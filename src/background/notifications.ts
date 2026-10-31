@@ -5,11 +5,6 @@
 import { deliverReminder, restoreReminderAlarms } from "../todoist/local-reminders";
 declare const chrome: any;
 
-export function enableStickerSidePanel(): void {
-  if (!chrome.sidePanel?.setPanelBehavior) return;
-  chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => {});
-}
-
 export function flashBadge(text: string, color: string): Promise<void> {
   return new Promise((resolve) => {
     chrome.action.setBadgeText({ text });

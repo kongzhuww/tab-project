@@ -10,6 +10,7 @@ export interface GitHubRepositoryCardView {
   avatarUrl: string;
   url: string;
   folder: string;
+  folders: readonly string[];
   used: boolean;
   showUsedStatus: boolean;
   selected: boolean;
@@ -73,6 +74,7 @@ function update(snapshot: GitHubRepositoryViewSnapshot): void {
   const cards = Array.isArray(snapshot?.cards)
     ? snapshot.cards.map((card) => ({
         ...card,
+        folders: Array.isArray(card.folders) ? [...card.folders] : (card.folder ? [card.folder] : []),
         tags: Array.isArray(card.tags) ? [...card.tags] : [],
         platforms: Array.isArray(card.platforms) ? [...card.platforms] : []
       }))

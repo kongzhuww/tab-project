@@ -156,9 +156,10 @@ async function saveSettings() {
             </button>
           </div>
           <div class="gh-hint-row">
-            <a href="https://github.com/settings/tokens/new?scopes=read:user&description=LogicWeaver-NewTab" target="_blank" rel="noopener" class="gh-link">
-              申请 Token ↗
+            <a href="https://github.com/settings/tokens/new?scopes=user&description=LogicWeaver-NewTab" target="_blank" rel="noopener" class="gh-link">
+              申请具备 user 权限的 Token ↗
             </a>
+            <span style="font-size: 11px; color: var(--muted); margin-left: 8px;">（用于读取与管理 GitHub 官方 Lists 列表）</span>
           </div>
         </div>
 

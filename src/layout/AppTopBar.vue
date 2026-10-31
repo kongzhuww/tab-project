@@ -9,6 +9,7 @@ import { topProfileState, profileMenuController } from "../profile/store";
 import { notificationHistoryController, notificationHistoryState, notificationUnreadCount } from "../notifications/history-store";
 import { bookmarkFolderStripState } from "../bookmarks/folder-strip-store";
 import { bookmarksService } from "../services/bookmarks.service";
+import { sideDrawerState, sideDrawerController } from "../sidepanel/drawer-store";
 
 const WorkspaceLaunchers = defineAsyncComponent(() => import("../workspaces/WorkspaceLaunchers.vue"));
 
@@ -110,6 +111,7 @@ onMounted(() => {
   document.documentElement.setAttribute("data-theme", saved);
   updateThemeDisplay();
 });
+
 </script>
 
 <template>
@@ -163,6 +165,18 @@ onMounted(() => {
       <span id="workspace-launchers" hidden>
         <WorkspaceLaunchers />
       </span>
+      <button
+        id="side-drawer-toggle"
+        class="tb-btn"
+        type="button"
+        title="侧栏 · 标签页聚合与待办"
+        aria-controls="in-page-side-drawer"
+        :aria-expanded="sideDrawerState.isOpen"
+        :class="{ active: sideDrawerState.isOpen }"
+        @click="sideDrawerController.toggle()"
+      >
+        📑
+      </button>
       <button id="settings-open" class="tb-btn" title="设置" @click="handleOpenSettings">⚙</button>
       <button
         id="theme-toggle"

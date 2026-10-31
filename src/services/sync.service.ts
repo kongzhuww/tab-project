@@ -27,7 +27,7 @@ export const SYNC_WHITELIST_KEYS: readonly string[] = [
   ...BASE_KEYS, SHORTCUT_KEY, SEARCH_IGNORED_BOOKMARK_FOLDERS_KEY,
   "wereadSortIds", "foGroups",
   "foTree", "foCollapsedGroupsV1", "biliFollowingGroupsV1", "biliSubCustomChannelsV1", "biliRadioSeriesV1",
-  "ghCats", "ghMap", "ghUsed", "ghRepoRemarksV1",
+  "ghRepoRemarksV1",
   "ghUser", "ghToken", "todoistToken", "todoistActiveProjectIdV1", "lw_private_chat_v1", "googleCalendarSessionTokenV1", "lw_webdav_config",
   "launcherGroups", "launcherFolders", "quickLinks", "quickLinkGroupSizes",
   "launcherPages", "launcherPageLabels", "launcherActivePage", "launcherFolderPositionV1",
