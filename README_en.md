@@ -199,7 +199,7 @@ This extension strictly adheres to the **Chromium Manifest V3** security standar
 | `storage` / `unlimitedStorage` | Store shortcuts, custom groups, theme settings, radio queues, and offline caches locally in `chrome.storage.local` and IndexedDB. |
 | `bookmarks` | Read browser bookmarks to display in the new-tab kanban grid; support organization, folder creation, and drag-and-drop sorting (indexed locally via Web Worker). |
 | `tabs` / `activeTab` | Power the top-bar tab manager (tree display of open tabs, one-click switching), avoiding duplicate opened tabs. |
-| `cookies` | **Read-only** check for active login sessions on `bilibili.com` and `music.163.com` in the same browser profile to display your favorites and playlists. **Cookies are never uploaded, collected, or exported.** |
+| `cookies` | Bilibili actions read the `bili_jct` CSRF cookie. Background code also retains YouTube session authentication and YouTube/Google cookie-name diagnostics. NetEase uses website-session requests rather than cookie extraction. The archived YouTube UI does not mean these background paths are removed; see the [permission audit](docs/MANIFEST_PERMISSION_AUDIT.md). |
 | `downloads` | Triggered strictly by user action: exporting configuration backups, downloading cached audio/video, and saving wallpapers. |
 | `scripting` | Injects an isolated, non-modal overlay sidebar or web translation helper only on explicit user invocation. The sidebar (suggested shortcut: `Alt+W`) does not resize webpages. Browser internal pages, extension stores and other protected pages cannot be injected. |
 | `identity` | Optional Google Calendar OAuth2 authorization for agenda synchronization. |

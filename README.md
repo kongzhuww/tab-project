@@ -204,7 +204,7 @@ npm run check
 | `storage` / `unlimitedStorage` | 在本地（`chrome.storage.local` / IndexedDB）存储常用网站、自定义分组、主题偏好、电台队列与离线缓存。 |
 | `bookmarks` | 读取浏览器书签并在新标签页看板平铺展示，支持在页面内整理、新建与拖拽排序（通过 Web Worker 进行离线本地检索）。 |
 | `tabs` / `activeTab` | 顶栏标签页管理器（树状显示打开的标签、一键聚焦切换）；避免重复打开已有工作区标签页。 |
-| `cookies` | 仅以**只读方式**读取浏览器本地已有的 B站（`bilibili.com`）与网易云（`music.163.com`）官网登录会话状态，用于加载你自己的收藏夹与歌单。**绝不提取、上传或导出 Cookie。** |
+| `cookies` | B站操作读取 `bili_jct` CSRF Cookie；后台仍保留 YouTube 会话鉴权与 YouTube/Google Cookie 名称诊断路径。网易云现行链路使用官网会话请求，不通过此权限提取 Cookie。YouTube 处于封藏状态，不代表后台相关代码已删除；详见[权限审计](docs/MANIFEST_PERMISSION_AUDIT.md)。 |
 | `downloads` | 用于用户主动触发的操作：备份文件导出、视频/音频本地缓存下载以及壁纸保存。 |
 | `scripting` | 在用户主动触发时，向普通网页注入隔离的覆盖式侧栏（建议快捷键 `Alt+W`），或网页汉化浮层；不缩窄网页，不常驻注入所有网站。浏览器内置页、扩展商店等受保护页面不支持。 |
 | `identity` | 用于可选的 Google Calendar 日历授权登录（通过官方 OAuth2 流程连接）。 |

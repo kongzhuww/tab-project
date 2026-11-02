@@ -32,7 +32,8 @@
     "clipboardWrite"
   ],
   "host_permissions": [
-    "<all_urls>",
+    "https://*/*",
+    "http://*/*",
     "https://*.jianguoyun.com/*",
     "https://dav.jianguoyun.com/*",
     "https://api.bilibili.com/*",
@@ -42,20 +43,12 @@
     "https://*.bilivideo.cn/*",
     "https://api.todoist.com/*",
     "https://www.googleapis.com/*",
-    "https://translate.googleapis.com/*",
-    "https://api.mymemory.translated.net/*",
     "https://generativelanguage.googleapis.com/*",
     "https://www.youtube.com/*",
     "https://*.youtube.com/*",
     "https://api.github.com/*",
     "https://openrouter.ai/*",
-    "https://cdn.jsdelivr.net/*",
-    "https://favicon.im/*",
-    "https://artificialanalysis.ai/*",
     "https://api.deepseek.com/*",
-    "https://modelgrep.com/*",
-    "https://lmspeed.net/*",
-    "https://huggingface.co/*",
     "https://api.open-meteo.com/*",
     "https://geocoding-api.open-meteo.com/*",
     "https://aihot.virxact.com/*",
@@ -64,9 +57,6 @@
     "https://*.hycdn.cn/*",
     "http://127.0.0.1/*",
     "https://r.jina.ai/*",
-    "https://weread.qq.com/*",
-    "https://*.weread.qq.com/*",
-    "https://i.weread.qq.com/*",
     "https://itunes.apple.com/*",
     "https://cn.bing.com/*",
     "https://*.bing.com/*",
@@ -76,9 +66,7 @@
     "https://*.126.net/*",
     "https://music.163.com/*",
     "https://*.music.163.com/*",
-    "https://*.163.com/*",
-    "https://api.multica.ai/*",
-    "https://multica.ai/*"
+    "https://*.163.com/*"
   ],
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'self'; frame-src 'self' https://player.bilibili.com blob:; img-src 'self' https: http: data: blob:;",
@@ -130,7 +118,8 @@
         "assets/nav-home.svg"
       ],
       "matches": [
-        "<all_urls>"
+        "https://*/*",
+        "http://*/*"
       ]
     }
   ]

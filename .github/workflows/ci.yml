@@ -27,7 +27,7 @@ jobs:
         with:
           node-version: '22'
           cache: npm
-      - name: Release policy regression tests
+      - name: Regression and policy tests
         run: npm test
       - run: npm ci
       - name: Typecheck and isolated extension build

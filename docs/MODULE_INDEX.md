@@ -14,7 +14,7 @@
 | **新标签页主页 (SPA)** | `newtab.html` → `generated/vue-ui.js`<br>（由 `src/intro/main.ts` / `src/App.vue` 驱动） | 单根 Vue 3 SPA。集成首屏时钟、标语、天气、搜索、常用网站、底栏 Dock、全屏卡片与弹窗。 |
 | **首绘主题引导** | `newtab.html` (内联) / `src/theme/theme-init.ts` | 极速同步执行，首帧确定主题变量（Light / Lonetrail / Dark），彻底杜绝白屏/黑屏闪烁。 |
 | **后台服务 (Service Worker)** | `manifest.json` → `generated/background.js`<br>（源自 `src/background/index.ts`） | MV3 规范后台。负责扩展快捷键监听、侧边栏呼出、B站/YouTube/QQ图片代理、防盗链 DNR 规则注入、受限下载流管理。 |
-| **浏览器侧边栏 (SidePanel)** | `sidepanel.html` → `generated/sidepanel-ui.js`<br>（源自 `src/sidepanel/SidePanelApp.vue`） | 浏览器原生右侧边栏，支持快捷键呼出（建议绑定 Alt+W），提供独立书签、小窗及便签导航。 |
+| **覆盖式侧边栏 (In-Page Overlay Sidebar)** | 动态注入 / `sidepanel.html` → `generated/sidepanel-ui.js`<br>（源自 `src/sidepanel/SidePanelApp.vue` / `src/sidepanel/in-page-drawer.ts`） | 覆盖式浮层侧边栏（不挤压网页宽度，不使用原生 `sidePanel` API），支持快捷键呼出（建议绑定 Alt+W），提供独立书签、小窗及便签导航。 |
 | **极速搜索独立页** | `newtab-search.html` → `generated/search-ui.js`<br>（源自 `src/search/SearchLauncher.vue`） | 轻量零干扰搜索页，支持多引擎秒切与本地优先联想。 |
 | **全屏卡片独立标签页** | `bilibili.html`、`github.html`、`aihot.html`、`pricing.html`、`youtube.html` | 均为产品的正式既有入口，由 Vue 构建 bundle 独立装配运行，不强行与主页合并。 |
 | **独立设置页** | `options.html` → `src/settings/SettingsView.vue` | 独立全功能选项页，复用主页设置组件。 |
