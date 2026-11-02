@@ -360,7 +360,7 @@ onUnmounted(() => {
         <article
           v-else
           ref="readmeContainerRef"
-          class="gh-readme-rendered obsidian-markdown-rendered allow-copy"
+          class="gh-readme-rendered markdown-rendered allow-copy"
           v-html="state.readmeHtml"
           @click="handleArticleClick"
         ></article>
@@ -382,12 +382,12 @@ onUnmounted(() => {
 }
 
 :deep(.gh-readme-rendered img),
-:deep(.obsidian-markdown-rendered img) {
+:deep(.markdown-rendered img) {
   cursor: zoom-in;
   transition: opacity 0.15s ease;
 }
 :deep(.gh-readme-rendered img:hover),
-:deep(.obsidian-markdown-rendered img:hover) {
+:deep(.markdown-rendered img:hover) {
   opacity: 0.92;
 }
 
@@ -1021,16 +1021,6 @@ html[data-theme="lonetrail"] .gh-btn {
 html[data-theme="lonetrail"] .gh-btn:hover {
   background: #ffffff !important;
   border-color: rgba(38, 34, 26, 0.35) !important;
-}
-
-html[data-theme="lonetrail"] .gh-btn-obsidian {
-  background: rgba(139, 92, 246, 0.12) !important;
-  border-color: rgba(139, 92, 246, 0.35) !important;
-  color: #7c3aed !important;
-}
-
-html[data-theme="lonetrail"] .gh-btn-obsidian:hover {
-  background: rgba(139, 92, 246, 0.22) !important;
 }
 
 html[data-theme="lonetrail"] .gh-modal-ribbon {

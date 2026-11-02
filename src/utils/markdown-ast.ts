@@ -1,9 +1,9 @@
 /**
  * MarkdownAstEngine — 独立自研 Markdown 与 MathML Core AST 解析引擎 (Pure TypeScript, Zero DOM)
- * 物理抽离自历史巨型脚本 obsidian.js，具备：
+ * 具备：
  * 1. 完整的 LaTeX 数学公式递归下降解析器，将公式极速无损编译为 W3C MathML Core 原生标准节点；
  * 2. 纯函数式 Markdown 语法树编译器（块级语法、表格、任务列表、Callout 块、参考文献脚注）；
- * 3. Obsidian Wiki 双链（[[WikiLink]]）、嵌入语法（![[Image]]）与 Tag 标签语义提取。
+ * 3. 增强 Wiki 双链（[[WikiLink]]）、嵌入语法（![[Image]]）与 Tag 标签语义提取。
  */
 
 export const GREEK: Record<string, string> = {

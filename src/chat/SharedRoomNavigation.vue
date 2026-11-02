@@ -414,7 +414,7 @@ const canArchive = computed(() => editingId.value && (editor.value === "space" ?
     </Teleport>
 
     <aside class="col-channels-sidebar">
-      <!-- 模式 A：私信会话列表（QQ / Discord 经典会话卡片列表） -->
+      <!-- 模式 A：私信会话列表（经典会话卡片列表） -->
       <template v-if="navMode === 'dm'">
         <div class="channels-header">
           <div class="group-brand-info">

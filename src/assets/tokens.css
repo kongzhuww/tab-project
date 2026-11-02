@@ -20,7 +20,6 @@
   --lw-brand-endfield: #00f0ff;
   --lw-brand-bili: #00aeec;
   --lw-brand-github: #24292f;
-  --lw-brand-obsidian: #7c3aed;
 
   /* 高性能通透底座（绝不使用大面积高负荷 blur） */
   --lw-surface-light: rgba(255, 255, 255, 0.94);

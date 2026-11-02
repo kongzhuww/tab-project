@@ -107,11 +107,11 @@
 | 网页汉化编辑气泡 | `src/localizer/LocalizerOverlay.vue` + `src/localizer/main.ts` → 单文件 `generated/page-localizer-ui.js` | MV3 ISOLATED world 的 Vue Shadow DOM 编辑与提示；保留本地词典键、Alt+点击和页面文字翻译；旧 `page-localizer.js` 已删除，不与宿主页面共享框架 |
 | 隔离壁纸沙箱 | `wallpaper-sandbox.html` → `src/wallpaper/sandbox.ts` → `generated/wallpaper-sandbox-ui.js` | 仍为 manifest sandbox 且经典 IIFE 单文件，不共享 Vue 模块或扩展页同源权限；仅接受父页壁纸消息 |
 | 本机同步过继页 | `sync-bridge.html` → `src/sync/SyncBridgeApp.vue` + `generated/sync-bridge-ui.js` | 只在用户点击时调用本机 `/api/sync-push`/`sync-pull`；Token 输入使用 Vue 状态，不写入日志；旧 `sync-bridge.js` 已删除 |
-| 侧边栏 | `sidepanel.html` → `src/sidepanel/index.ts` / `SidePanelApp.vue` → `generated/sidepanel-ui.js` | manifest 的 `side_panel` 指向该页，无 `default_popup`；`popup.html` 与 `src/popup/PopupApp.vue` 已不存在，不按旧说明重建 |
+| 侧边栏 | `sidepanel.html` → `src/sidepanel/index.ts` / `SidePanelApp.vue` → `generated/sidepanel-ui.js` | 历史台账记录：早期迁移时无 `default_popup`；现行版本已收敛为纯前端隔离覆盖侧栏，manifest 不再声明原生 `side_panel` 权限。 |
 | 独立设置页 | `options.html` → `src/settings/SettingsView.vue` | Vue 复用首页设置视图；缓存与贴纸目录句柄由 TypeScript 服务管理，B站缓存兼容旧 IDB 句柄；原 `options.js` 已删除，保存并返回从独立页回新标签 |
 | 主页面 / 独立页 | 新标签页由 Vue SPA 管理；B站、AI HOT、价格、YouTube 与 GitHub 独立页由 Vue bundle 管理 | `newtab.html` → 内联首绘主题/启动看门狗 + `generated/vue-ui.js`；`bilibili.html`、`aihot.html`、`pricing.html`、`youtube.html`、`github.html` → Vue bundle；`newtab.js` 已不再被页面加载；不要把首页已卸载的脚本当成生效入口 |
 | Vue 装配 | 单根 SPA、懒加载、能力/命令注册、窗口与全屏卡片调度 | `src/intro/main.ts`, `src/App.vue`, `src/core/navigation-state.ts`, `src/core/ui-features.ts`, `src/core/ui-commands.ts`, `src/core/window-manager.store.ts`, `src/core/fullscreen-cards.store.ts` |
-| 内置 Dock 模块 | 以 `src/modules/builtins.ts` 的实际登记为准，不以所有残留 `module.ts` 推断启用 | 当前登记 chat、multica、obsidian、stickers、siren、music 六个浮窗，以及 todoist、B站、GitHub、AI HOT、YouTube、模型价格六个卡片；旧迁移数量不再适用 |
+| 内置 Dock 模块 | 以 `src/modules/builtins.ts` 的实际登记为准，不以所有残留 `module.ts` 推断启用 | 历史原时点记录：旧迁移包含 multica/obsidian；现行 1.0.8 已彻底物理删除 multica/obsidian，收敛为 9 个登记模块。 |
 | 数据服务 | 与界面分离的网络、存储和业务计算 | `src/services/{bilibili,todoist,launcher,obsidian,music,sync,wallpaper}.service.ts`；保留尚未迁移的经典兼容边界 |
 | 构建/验证 | Vue 类型检查、多入口构建与差异检查；不是浏览器验收 | `package.json` / Vite 配置；使用 `npm run check`、`git diff --check` 与按需语法检查。禁止执行历史断言/无头 E2E，`tests/` 中存在文件不构成授权 |
 | 生成产物 | 浏览器直接加载的 Vite bundle | `generated/`；由构建刷新，不直接手改；注意源文件改动可能使 chunk 哈希变化 |

@@ -1,6 +1,6 @@
 @keyframes lw-loading-spin { to { transform: rotate(360deg); } }
 
-/* Obsidian tables are edited in place; the full Markdown editor is intentionally hidden from the reading workflow. */
+/* Markdown tables are edited in place; the full editor is hidden from the reading workflow. */
 .obs-table-wrap { position:relative;padding-bottom:18px; }
 .obs-table-wrap td[contenteditable] { min-width:80px;outline:none;cursor:text;transition:background .15s,box-shadow .15s; }
 .obs-table-wrap td[contenteditable]:hover { background:rgba(168,85,247,.06); }

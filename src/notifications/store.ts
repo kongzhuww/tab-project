@@ -2,7 +2,7 @@ import { reactive, readonly } from "vue";
 import { archiveToast } from "./history-store";
 import { safeTarget, biliVideoTargetFromText, type NotificationLevel, type NotificationTarget } from "./history-contract";
 
-export type NotificationAppType = "chat" | "qq" | "bili" | "phone" | "fetch" | string;
+export type NotificationAppType = "chat" | "bili" | "phone" | "fetch" | string;
 
 export interface NotificationOptions {
   id?: string;
@@ -63,7 +63,6 @@ function shouldArchive(options: NotificationOptions, text: string): boolean {
 
 const APP_DEFAULTS: Record<string, { name: string; icon: string; action: string }> = {
   chat: { name: "海狸聊天室", icon: "assets/icon-48.png", action: "查看消息" },
-  qq: { name: "QQ", icon: "assets/qq.png", action: "查看消息" },
   bili: { name: "哔哩哔哩", icon: "assets/bilibili.svg", action: "查看消息" },
   phone: { name: "手机文件", icon: "assets/nav-traffic.svg", action: "复制文件" },
   fetch: { name: "LogicWeaver", icon: "assets/icon-48.png", action: "" }

@@ -3,7 +3,7 @@ import { MUSIC_SETTINGS_KEYS } from "./settings-keys";
 import { musicModuleState, pauseMusicReads } from "./module-state";
 
 export const musicDockModule = {
-  schemaVersion: 1, id: "music", title: "网易云模块", icon: "assets/netease.svg", dockBefore: "qq",
+  schemaVersion: 1, id: "music", title: "网易云模块", icon: "assets/netease.svg",
   rootId: "vue-music-workspace-root", settingsKeys: MUSIC_SETTINGS_KEYS,
   capabilities: ["catalog:read", "settings:endpoint", "account:explicit-login-logout", "playback:shared-home-controls"],
   loadView: () => import("./NeteaseWorkspaceDialog.vue").then(module => module.default),

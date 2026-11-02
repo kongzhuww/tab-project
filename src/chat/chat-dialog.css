@@ -141,7 +141,7 @@
   color: #fff;
 }
 
-/* ================= QQ 式三栏架构 ================= */
+/* ================= 经典三栏架构 ================= */
 .chat-three-column-layout {
   flex: 1 1 0;
   display: flex;
@@ -614,7 +614,7 @@
 .dm-inline-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--muted); margin-right: 4px; }
 .dm-inline-dot.online { background: #10b981; }
 
-/* QQ 风格：一起听派对顶栏 */
+/* 一起听派对顶栏 */
 .party-top-bar {
   display: flex;
   align-items: center;

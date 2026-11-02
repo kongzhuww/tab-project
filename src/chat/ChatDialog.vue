@@ -1126,7 +1126,7 @@ function formatMsgTime(ts: number): string {
         </div>
       </div>
 
-      <!-- 页面 2：QQ / KOOK 经典三栏自习室架构 -->
+      <!-- 页面 2：经典三栏自习室架构 -->
       <template v-else>
         <div class="chat-three-column-layout">
           <SharedRoomNavigation @settings="state.showProfileEdit = true">
@@ -1229,7 +1229,7 @@ function formatMsgTime(ts: number): string {
               </div>
             </div>
 
-            <!-- QQ 风格：一起听派对顶栏 (当房间有人开启一起听时常驻呈现) -->
+            <!-- 一起听派对顶栏 (当房间有人开启一起听时常驻呈现) -->
             <div v-if="togetherPartyState.isActive && togetherPartyState.track" class="party-top-bar">
               <div class="party-bar-info" @click="openDjModal">
                 <span class="party-disc-icon" :class="{ spinning: togetherPartyState.isPlaying }">💿</span>

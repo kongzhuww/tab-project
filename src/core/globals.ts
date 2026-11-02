@@ -224,7 +224,7 @@ export function installGlobalControllers(commands: CommandRegistry, features: Fe
   window.LogicWeaverBiliMessagePanel = biliMessagePanelController;
   window.LogicWeaverStickerBoard = stickerBoardController;
   window.LogicWeaverStickersService = stickersService;
-  // Shared QQ/standalone data only; each mounted board owns its Vue action subscription.
+  // Shared standalone data only; each mounted board owns its Vue action subscription.
   window.LogicWeaverPricing = pricingController;
   window.LogicWeaverBiliFavorites = biliFavoritesController;
   window.LogicWeaverBiliRadioTape = radioTapeController;

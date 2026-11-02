@@ -55,14 +55,11 @@ html {
   -webkit-touch-callout: none !important;
 }
 
-/* 保证用户在 input、textarea、可编辑文本区及 Obsidian 编辑器中依然能正常选择文字、打字与复制 */
+/* 保证用户在 input、textarea、可编辑文本区及文档内容中依然能正常选择文字、打字与复制 */
 input,
 textarea,
 [contenteditable="true"],
-.allow-copy,
-.obsidian-editor-textarea,
-.obsidian-editor-content,
-.obsidian-view-content {
+.allow-copy {
   user-select: text !important;
   -webkit-user-select: text !important;
 }

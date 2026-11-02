@@ -7,7 +7,6 @@ export const syncDockModule = {
   id: "sync",
   title: "同步模块",
   emoji: "☁️",
-  dockBefore: "qq",
   rootId: "vue-sync-workspace-root",
   settingsKeys: WEBDAV_SETTINGS_KEYS,
   capabilities: ["settings:local", "backup:webdav", "backup:native"],

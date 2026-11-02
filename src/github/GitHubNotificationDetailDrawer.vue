@@ -145,7 +145,7 @@
 
               <!-- 主贴正文 Markdown 排版 (双保险渲染，确保 100% 完整展示全部任务清单) -->
               <div
-                class="gh-post-markdown obsidian-markdown-rendered"
+                class="gh-post-markdown markdown-rendered"
                 v-html="renderedBodyHtml"
               ></div>
 
@@ -201,7 +201,7 @@
 
                   <!-- 主评论正文 -->
                   <div
-                    class="gh-post-markdown obsidian-markdown-rendered"
+                    class="gh-post-markdown markdown-rendered"
                     v-html="comment.bodyHtml"
                   ></div>
 
@@ -245,7 +245,7 @@
                       </div>
 
                       <div
-                        class="gh-post-markdown gh-reply-markdown obsidian-markdown-rendered"
+                        class="gh-post-markdown gh-reply-markdown markdown-rendered"
                         v-html="reply.bodyHtml"
                       ></div>
 
@@ -868,7 +868,7 @@ onUnmounted(() => {
   background: var(--border, rgba(0, 0, 0, 0.08));
 }
 
-/* Markdown 排版区 (高质感 GitHub + Obsidian 原生排版) */
+/* Markdown 排版区 (高质感 GitHub 原生排版) */
 .gh-post-markdown {
   padding: 16px 20px;
   font-size: 13.5px;
