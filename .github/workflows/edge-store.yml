@@ -73,4 +73,5 @@ jobs:
           EDGE_API_KEY: ${{ secrets.EDGE_API_KEY }}
           EDGE_PRODUCT_ID: ${{ vars.EDGE_PRODUCT_ID }}
           EDGE_RELEASE_TAG: ${{ inputs.tag }}
+        continue-on-error: true
         run: node scripts/edge-store-publish.mjs

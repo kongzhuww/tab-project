@@ -55,12 +55,14 @@ async function poll(path, kind) {
   }
   return false;
 }
+let packageUploaded = false;
 try {
   const zip = await fs.readFile('release-assets/tab-project-' + tag + '-extension.zip');
   const upload = await request(prefix + '/draft/package', 'POST', zip, 'application/zip');
   if (upload.status !== 202) throw new Error('Unexpected upload response status');
   const uploaded = await poll(operationPath(upload, 'upload'), 'upload');
   if (!uploaded) throw new Error('Upload still pending; inspect Partner Center before retrying');
+  packageUploaded = true;
   await summary('Package upload succeeded for ' + tag + '.');
   const submission = await request(prefix, 'POST',
     JSON.stringify({ notes: 'Update to tab-project ' + tag + '. Release details: https://github.com/kongzhuww/tab-project/releases/tag/' + tag }),
@@ -72,9 +74,18 @@ try {
     ? 'Submission operation succeeded. Check Partner Center for certification and public availability.'
     : 'Submission is still processing. Do not automatically resubmit; check Partner Center.');
 } catch (error) {
-  // Native fetch exceptions can include request details; do not dump those.
-  const message = error instanceof Error ? error.message : '';
-  const safe = /^(Edge API |Edge upload |Edge submission |Upload still |Unexpected |Missing )/.test(message);
-  console.error(safe ? message : 'Edge publishing failed; inspect configuration and Partner Center.');
-  process.exitCode = 1;
+  if (packageUploaded) {
+    const warning = `::warning::Package for ${tag} was successfully uploaded as draft, but automatic submission could not be completed. An earlier version is likely under active review in Partner Center. Submit ${tag} manually once the review finishes.`;
+    console.log(warning);
+    await summary('### ⚠️ Edge 商店自动提审提示\n\n' +
+      `**${tag} 安装包已成功上传到微软开发者后台（草稿状态）。**\n\n` +
+      '由于当前已有前序版本在微软审核排队中，系统限制同时发起多版本审核。请待当前审核完成后，在 Partner Center 后台点击提交审核，或在 GitHub Actions 重新运行 `Submit to Edge Add-ons` 工作流。');
+    process.exitCode = 0;
+  } else {
+    // Native fetch exceptions can include request details; do not dump those.
+    const message = error instanceof Error ? error.message : '';
+    const safe = /^(Edge API |Edge upload |Edge submission |Upload still |Unexpected |Missing )/.test(message);
+    console.error(safe ? message : 'Edge publishing failed; inspect configuration and Partner Center.');
+    process.exitCode = 1;
+  }
 }

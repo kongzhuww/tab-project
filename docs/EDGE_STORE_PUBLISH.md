@@ -5,7 +5,7 @@
 - 推送正式版本 Tag（例如 `v1.0.9`）：现有 Release 工作流先检查、隔离构建并发布附件，再调用 `Submit to Edge Add-ons` 工作流上传同一 Release ZIP 并提交审核。
 - 普通 main 提交不送审。GitHub Release 工作流使用内置 GITHUB_TOKEN，因此不依赖另一个 `release.published` 事件触发工作流。
 - 补交已有版本：在 Actions 的 `Submit to Edge Add-ons` 中选择 Run workflow，填写已有正式 Release Tag，例如 `v1.0.8`。不要重复提交正在审核或已经上架的相同版本。
-- GitHub Release 成功与 Edge 提交是独立状态；Edge 提交失败不会删除已发布附件，应先检查后台状态再决定是否重试。
+- GitHub Release 成功与 Edge 提交是独立状态；Edge 提交失败不会删除已发布附件，应先检查后台状态再决定是否重试。若安装包已成功上传为草稿，但因前序版本正在审核中导致自动提审排队受阻，脚本会输出警告与 Job Summary，不阻断 GitHub 发行流水线。
 
 ## GitHub Release 不可覆盖保护
 
