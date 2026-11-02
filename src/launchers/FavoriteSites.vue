@@ -931,19 +931,19 @@ async function onFolderDrop(targetGroupName: string, event: DragEvent) {
           @keydown="onPageInputKeydown"
           @blur="finishAddPage"
         />
-
-        <button
-          class="launcher-page-help"
-          type="button"
-          title="使用指南：如何创建文件夹与整理网站"
-          aria-label="使用指南与技巧"
-          @click="openGuide"
-        >
-          ?
-        </button>
-
       </div>
       <div v-if="sitesView === 'bookmarks'" id="bookmark-board-header" class="launcher-page-tabs"></div>
+
+      <!-- 固定吸附在最右侧的帮助指南按钮 -->
+      <button
+        class="launcher-page-help"
+        type="button"
+        title="使用指南：如何创建文件夹与整理网站"
+        aria-label="使用指南与技巧"
+        @click="openGuide"
+      >
+        ?
+      </button>
     </header>
 
     <BookmarkBoard v-if="sitesView === 'bookmarks'" header-target="#bookmark-board-header" @busy="bookmarkSaving = $event" />

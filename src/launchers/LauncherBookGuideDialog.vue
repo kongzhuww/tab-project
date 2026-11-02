@@ -24,12 +24,14 @@ interface PageTopic {
 }
 
 interface Spread {
+  chapterTitle: string;
   left: PageTopic;
   right: PageTopic;
 }
 
 const spreads: Spread[] = [
   {
+    chapterTitle: "基础篇 · 文件夹与整理",
     left: {
       tag: "第 1 篇 · 结构搭建",
       title: "🗂️ 文件夹怎么创建？",
@@ -78,6 +80,7 @@ const spreads: Spread[] = [
     }
   },
   {
+    chapterTitle: "进阶篇 · 分区与快捷技巧",
     left: {
       tag: "第 3 篇 · 分区分流",
       title: "📑 分区管理与快速流转",
@@ -164,124 +167,123 @@ onUnmounted(() => {
 <template>
   <Teleport to="body">
     <Transition name="book-fade">
-      <div v-if="open" class="launcher-book-backdrop" @pointerdown.self="emit('close')">
-        <div class="launcher-book-modal" role="dialog" aria-modal="true" aria-label="常用网站使用手册">
-          <!-- 书本外壳容器 -->
-          <div class="launcher-book-case">
-            <!-- 书本顶部装饰丝带与关闭 -->
-            <button
-              type="button"
-              class="launcher-book-close-ribbon"
-              title="合上说明书 (Esc)"
-              aria-label="关闭指南"
-              @click="emit('close')"
-            >
-              <span class="ribbon-tail"></span>
-              <span class="ribbon-icon">✕</span>
-            </button>
+      <!-- 采用非模态设计：无全局黑色背景遮罩，零模糊，允许与外界视觉清晰互动 -->
+      <aside
+        v-if="open"
+        class="launcher-book-window"
+        role="region"
+        aria-label="常用网站使用手册"
+      >
+        <div class="launcher-book-case">
+          <!-- 书本顶部装饰丝带与关闭 -->
+          <button
+            type="button"
+            class="launcher-book-close-ribbon"
+            title="合上说明书 (Esc)"
+            aria-label="关闭指南"
+            @click="emit('close')"
+          >
+            <span class="ribbon-tail"></span>
+            <span class="ribbon-icon">✕</span>
+          </button>
 
-            <!-- 展开的双页主体 -->
-            <div class="launcher-book-spread">
-              <!-- 左页 -->
-              <div class="launcher-book-page page-left">
-                <header class="page-header">
-                  <div class="page-meta">
-                    <span class="page-tag">{{ currentSpread.left.tag }}</span>
-                    <span v-if="currentSpread.left.badge" class="page-badge">{{ currentSpread.left.badge }}</span>
-                  </div>
-                  <span class="page-number">{{ currentSpreadIndex * 2 + 1 }}</span>
-                </header>
+          <!-- 展开的双页主体 -->
+          <div class="launcher-book-spread">
+            <!-- 左页 -->
+            <div class="launcher-book-page page-left">
+              <header class="page-header">
+                <div class="page-meta">
+                  <span class="page-tag">{{ currentSpread.left.tag }}</span>
+                  <span v-if="currentSpread.left.badge" class="page-badge">{{ currentSpread.left.badge }}</span>
+                </div>
+                <span class="page-number">P. {{ currentSpreadIndex * 2 + 1 }}</span>
+              </header>
 
-                <div class="page-body">
-                  <h3 class="page-title">{{ currentSpread.left.title }}</h3>
-                  <div class="page-steps">
-                    <div v-for="(step, i) in currentSpread.left.steps" :key="i" class="step-card">
-                      <div class="step-icon">{{ step.icon }}</div>
-                      <div class="step-detail">
-                        <div class="step-title">{{ step.title }}</div>
-                        <div class="step-desc">{{ step.desc }}</div>
-                        <div v-if="step.tip" class="step-tip">
-                          <span class="tip-dot"></span>
-                          <span>{{ step.tip }}</span>
-                        </div>
+              <div class="page-body">
+                <h3 class="page-title">{{ currentSpread.left.title }}</h3>
+                <div class="page-steps">
+                  <div v-for="(step, i) in currentSpread.left.steps" :key="i" class="step-card">
+                    <div class="step-icon">{{ step.icon }}</div>
+                    <div class="step-detail">
+                      <div class="step-title">{{ step.title }}</div>
+                      <div class="step-desc">{{ step.desc }}</div>
+                      <div v-if="step.tip" class="step-tip">
+                        <span class="tip-dot"></span>
+                        <span>{{ step.tip }}</span>
                       </div>
                     </div>
                   </div>
                 </div>
-
-                <div class="page-corner page-corner-left"></div>
               </div>
 
-              <!-- 中轴装订线与立体书脊折痕 (Spine Crease) -->
-              <div class="launcher-book-spine">
-                <div class="spine-shade-left"></div>
-                <div class="spine-line">
-                  <span class="spine-stitch"></span>
-                  <span class="spine-stitch"></span>
-                  <span class="spine-stitch"></span>
-                  <span class="spine-stitch"></span>
-                </div>
-                <div class="spine-shade-right"></div>
-              </div>
+              <div class="page-corner page-corner-left"></div>
+            </div>
 
-              <!-- 右页 -->
-              <div class="launcher-book-page page-right">
-                <header class="page-header">
-                  <div class="page-meta">
-                    <span class="page-tag">{{ currentSpread.right.tag }}</span>
-                    <span v-if="currentSpread.right.badge" class="page-badge">{{ currentSpread.right.badge }}</span>
-                  </div>
-                  <span class="page-number">{{ currentSpreadIndex * 2 + 2 }}</span>
-                </header>
-
-                <div class="page-body">
-                  <h3 class="page-title">{{ currentSpread.right.title }}</h3>
-                  <div class="page-steps">
-                    <div v-for="(step, i) in currentSpread.right.steps" :key="i" class="step-card">
-                      <div class="step-icon">{{ step.icon }}</div>
-                      <div class="step-detail">
-                        <div class="step-title">{{ step.title }}</div>
-                        <div class="step-desc">{{ step.desc }}</div>
-                        <div v-if="step.tip" class="step-tip">
-                          <span class="tip-dot"></span>
-                          <span>{{ step.tip }}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div class="page-corner page-corner-right"></div>
+            <!-- 中轴装订线与立体书脊折痕 (Spine Crease) -->
+            <div class="launcher-book-spine">
+              <div class="spine-line">
+                <span class="spine-stitch"></span>
+                <span class="spine-stitch"></span>
+                <span class="spine-stitch"></span>
+                <span class="spine-stitch"></span>
               </div>
             </div>
 
-            <!-- 书页底部多层纸张厚度装饰 (Page Deckle Edge) -->
-            <div class="launcher-book-edge-shadow"></div>
+            <!-- 右页 -->
+            <div class="launcher-book-page page-right">
+              <header class="page-header">
+                <div class="page-meta">
+                  <span class="page-tag">{{ currentSpread.right.tag }}</span>
+                  <span v-if="currentSpread.right.badge" class="page-badge">{{ currentSpread.right.badge }}</span>
+                </div>
+                <span class="page-number">P. {{ currentSpreadIndex * 2 + 2 }}</span>
+              </header>
+
+              <div class="page-body">
+                <h3 class="page-title">{{ currentSpread.right.title }}</h3>
+                <div class="page-steps">
+                  <div v-for="(step, i) in currentSpread.right.steps" :key="i" class="step-card">
+                    <div class="step-icon">{{ step.icon }}</div>
+                    <div class="step-detail">
+                      <div class="step-title">{{ step.title }}</div>
+                      <div class="step-desc">{{ step.desc }}</div>
+                      <div v-if="step.tip" class="step-tip">
+                        <span class="tip-dot"></span>
+                        <span>{{ step.tip }}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="page-corner page-corner-right"></div>
+            </div>
           </div>
 
-          <!-- 翻页与页码控制栏 -->
-          <footer class="launcher-book-controller">
+          <!-- 一体化书页底栏（翻页与高对比度章节指示，黑白分明超清晰） -->
+          <footer class="launcher-book-footer">
             <button
               type="button"
               class="book-flip-btn"
               :disabled="currentSpreadIndex === 0"
               @click="prevSpread"
             >
-              <span>‹</span>
+              <span class="arrow">◀</span>
               <span>上一章</span>
             </button>
 
-            <div class="book-progress">
+            <div class="book-chapter-switcher">
               <button
-                v-for="(_, idx) in spreads"
+                v-for="(s, idx) in spreads"
                 :key="idx"
                 type="button"
-                class="progress-tab"
+                class="chapter-tab"
                 :class="{ active: idx === currentSpreadIndex }"
-                :title="`第 ${idx * 2 + 1} - ${idx * 2 + 2} 页`"
                 @click="currentSpreadIndex = idx"
               >
-                第 {{ idx * 2 + 1 }} ~ {{ idx * 2 + 2 }} 页
+                <span class="chapter-dot"></span>
+                <span class="chapter-name">{{ s.chapterTitle }}</span>
+                <span class="chapter-pages">（{{ idx * 2 + 1 }}~{{ idx * 2 + 2 }}页）</span>
               </button>
             </div>
 
@@ -292,59 +294,51 @@ onUnmounted(() => {
               @click="nextSpread"
             >
               <span>下一章</span>
-              <span>›</span>
+              <span class="arrow">▶</span>
             </button>
           </footer>
         </div>
-      </div>
+      </aside>
     </Transition>
   </Teleport>
 </template>
 
 <style scoped>
-.launcher-book-backdrop {
+/* 无模态窗口：取消全屏黑色模糊遮罩，直接悬浮在页面中央，背景完全清晰可见 */
+.launcher-book-window {
   position: fixed;
-  inset: 0;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
   z-index: 2147483640;
-  background: rgba(15, 23, 42, 0.55);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 24px;
-}
-
-.launcher-book-modal {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 16px;
   max-width: 960px;
-  width: 100%;
+  width: calc(100vw - 48px);
+  pointer-events: auto;
 }
 
-/* 书本硬壳外封与立体阴影 */
+/* 书本硬壳外封与多层立体投影 */
 .launcher-book-case {
   position: relative;
   width: 100%;
   border-radius: 12px;
-  background: var(--card-bg, #fcfaf7);
+  background: var(--surface, #ffffff);
+  border: 1px solid var(--border, rgba(148, 163, 184, 0.35));
   box-shadow:
-    0 24px 60px -12px rgba(15, 23, 42, 0.35),
-    0 0 0 1px var(--border, rgba(148, 163, 184, 0.28)),
-    0 8px 16px -4px rgba(0, 0, 0, 0.08);
+    0 24px 64px -12px rgba(15, 23, 42, 0.4),
+    0 4px 18px rgba(0, 0, 0, 0.12),
+    0 0 0 1px rgba(255, 255, 255, 0.2);
   overflow: visible;
-  transition: background 0.2s ease, border-color 0.2s ease;
+  display: flex;
+  flex-direction: column;
 }
 
 /* 右上角书签丝带关闭按钮 */
 .launcher-book-close-ribbon {
   position: absolute;
-  top: -10px;
+  top: -8px;
   right: 28px;
   width: 34px;
-  height: 44px;
+  height: 42px;
   background: #e11d48;
   color: #ffffff;
   border: none;
@@ -352,7 +346,7 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4px 10px rgba(225, 29, 72, 0.35);
+  box-shadow: 0 4px 10px rgba(225, 29, 72, 0.4);
   border-radius: 3px 3px 0 0;
   z-index: 20;
   transition: transform 0.15s ease, background 0.15s ease;
@@ -360,9 +354,6 @@ onUnmounted(() => {
 .launcher-book-close-ribbon:hover {
   transform: translateY(-2px);
   background: #be123c;
-}
-.launcher-book-close-ribbon:active {
-  transform: translateY(0);
 }
 .ribbon-icon {
   font-size: 14px;
@@ -386,28 +377,26 @@ onUnmounted(() => {
 /* 双页布局容器 */
 .launcher-book-spread {
   display: flex;
-  min-height: 520px;
+  min-height: 490px;
   position: relative;
 }
 
 /* 单个书页 */
 .launcher-book-page {
   flex: 1;
-  padding: 36px 36px 28px 36px;
+  padding: 34px 34px 20px 34px;
   display: flex;
   flex-direction: column;
   position: relative;
   background: var(--surface, #ffffff);
 }
 .page-left {
-  border-top-left-radius: 10px;
-  border-bottom-left-radius: 10px;
-  background: linear-gradient(to right, var(--surface, #ffffff) 96%, rgba(0, 0, 0, 0.03) 100%);
+  border-top-left-radius: 11px;
+  background: linear-gradient(to right, var(--surface, #ffffff) 96%, rgba(0, 0, 0, 0.035) 100%);
 }
 .page-right {
-  border-top-right-radius: 10px;
-  border-bottom-right-radius: 10px;
-  background: linear-gradient(to left, var(--surface, #ffffff) 96%, rgba(0, 0, 0, 0.03) 100%);
+  border-top-right-radius: 11px;
+  background: linear-gradient(to left, var(--surface, #ffffff) 96%, rgba(0, 0, 0, 0.035) 100%);
 }
 
 /* 翻页角褶皱装饰 */
@@ -421,46 +410,44 @@ onUnmounted(() => {
 .page-corner-left {
   left: 0;
   background: linear-gradient(135deg, rgba(0, 0, 0, 0.05) 45%, transparent 50%);
-  border-bottom-left-radius: 10px;
 }
 .page-corner-right {
   right: 0;
   background: linear-gradient(225deg, rgba(0, 0, 0, 0.05) 45%, transparent 50%);
-  border-bottom-right-radius: 10px;
 }
 
 /* 书脊中轴线装订区 (Spine & Stitches) */
 .launcher-book-spine {
-  width: 44px;
+  width: 36px;
   position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
   background: var(--panel, #f1f5f9);
-  border-left: 1px solid var(--border, rgba(148, 163, 184, 0.2));
-  border-right: 1px solid var(--border, rgba(148, 163, 184, 0.2));
+  border-left: 1px solid var(--border, rgba(148, 163, 184, 0.25));
+  border-right: 1px solid var(--border, rgba(148, 163, 184, 0.25));
   box-shadow:
-    inset 4px 0 10px -2px rgba(0, 0, 0, 0.12),
-    inset -4px 0 10px -2px rgba(0, 0, 0, 0.12);
+    inset 4px 0 8px -2px rgba(0, 0, 0, 0.1),
+    inset -4px 0 8px -2px rgba(0, 0, 0, 0.1);
   z-index: 5;
 }
 .spine-line {
   position: relative;
-  height: 80%;
+  height: 85%;
   width: 2px;
-  background: var(--border, rgba(148, 163, 184, 0.4));
+  background: var(--border, rgba(148, 163, 184, 0.45));
   display: flex;
   flex-direction: column;
   justify-content: space-around;
   align-items: center;
 }
 .spine-stitch {
-  width: 8px;
-  height: 4px;
+  width: 7px;
+  height: 3px;
   border-radius: 2px;
   background: #d97706;
-  opacity: 0.85;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+  opacity: 0.9;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
 }
 
 /* 书页头部与页码 */
@@ -468,9 +455,9 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  border-bottom: 1px dashed var(--border, rgba(148, 163, 184, 0.25));
-  padding-bottom: 12px;
-  margin-bottom: 20px;
+  border-bottom: 1px dashed var(--border, rgba(148, 163, 184, 0.3));
+  padding-bottom: 10px;
+  margin-bottom: 18px;
 }
 .page-meta {
   display: flex;
@@ -488,16 +475,15 @@ onUnmounted(() => {
   font-size: 10px;
   padding: 1px 6px;
   border-radius: 4px;
-  background: rgba(2, 132, 199, 0.1);
+  background: rgba(2, 132, 199, 0.12);
   color: var(--primary, #0284c7);
-  font-weight: 600;
+  font-weight: 700;
 }
 .page-number {
   font-size: 13px;
   font-family: serif, ui-serif, Georgia;
   font-weight: 700;
-  color: var(--muted, #64748b);
-  opacity: 0.7;
+  color: var(--heading, #0f172a);
 }
 
 /* 页面内容与步骤卡片 */
@@ -507,8 +493,8 @@ onUnmounted(() => {
   flex-direction: column;
 }
 .page-title {
-  margin: 0 0 18px 0;
-  font-size: 18px;
+  margin: 0 0 16px 0;
+  font-size: 17px;
   font-weight: 700;
   color: var(--heading, #0f172a);
   letter-spacing: -0.2px;
@@ -516,7 +502,7 @@ onUnmounted(() => {
 .page-steps {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
 }
 .step-card {
   display: flex;
@@ -525,12 +511,12 @@ onUnmounted(() => {
   padding: 10px 12px;
   border-radius: 8px;
   background: var(--panel, #f8fafc);
-  border: 1px solid var(--border, rgba(148, 163, 184, 0.18));
+  border: 1px solid var(--border, rgba(148, 163, 184, 0.25));
   transition: transform 0.15s ease, background 0.15s ease;
 }
 .step-card:hover {
   transform: translateX(2px);
-  background: var(--card-hover-bg, rgba(241, 245, 249, 0.8));
+  background: var(--card-hover-bg, rgba(241, 245, 249, 0.9));
 }
 .step-icon {
   font-size: 20px;
@@ -544,19 +530,20 @@ onUnmounted(() => {
 .step-title {
   font-size: 13px;
   font-weight: 700;
-  color: var(--text, #1e293b);
+  color: var(--heading, #0f172a);
   margin-bottom: 3px;
 }
 .step-desc {
   font-size: 12px;
   line-height: 1.5;
-  color: var(--muted, #64748b);
+  color: var(--text, #334155);
 }
 .step-tip {
   margin-top: 6px;
   padding-top: 5px;
-  border-top: 1px dashed var(--border, rgba(148, 163, 184, 0.2));
+  border-top: 1px dashed var(--border, rgba(148, 163, 184, 0.25));
   font-size: 11px;
+  font-weight: 600;
   color: var(--primary, #0284c7);
   display: flex;
   align-items: center;
@@ -570,81 +557,120 @@ onUnmounted(() => {
   flex-shrink: 0;
 }
 
-/* 控制栏与翻页 */
-.launcher-book-controller {
+/* 一体化书页底栏：黑白分明，对比强烈，清晰易读 */
+.launcher-book-footer {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 16px;
-  padding: 8px 16px;
-  border-radius: 30px;
-  background: var(--surface, #ffffff);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
-  border: 1px solid var(--border, rgba(148, 163, 184, 0.25));
+  justify-content: space-between;
+  padding: 12px 24px;
+  background: var(--panel, #f8fafc);
+  border-top: 1px solid var(--border, rgba(148, 163, 184, 0.3));
+  border-bottom-left-radius: 11px;
+  border-bottom-right-radius: 11px;
+  gap: 12px;
 }
 .book-flip-btn {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 14px;
+  padding: 6px 16px;
   border-radius: 20px;
-  border: 1px solid var(--border, rgba(148, 163, 184, 0.25));
-  background: var(--panel, #f1f5f9);
-  color: var(--text, #1e293b);
-  font-size: 12px;
-  font-weight: 600;
+  border: 1px solid var(--border, rgba(148, 163, 184, 0.4));
+  background: var(--surface, #ffffff);
+  color: var(--heading, #0f172a);
+  font-size: 13px;
+  font-weight: 700;
   cursor: pointer;
   transition: all 0.15s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+.book-flip-btn .arrow {
+  font-size: 11px;
+  color: var(--primary, #0284c7);
 }
 .book-flip-btn:not(:disabled):hover {
   background: var(--primary, #0284c7);
   color: #ffffff;
   border-color: var(--primary, #0284c7);
-  box-shadow: 0 2px 8px rgba(2, 132, 199, 0.25);
+  box-shadow: 0 3px 10px rgba(2, 132, 199, 0.3);
+}
+.book-flip-btn:not(:disabled):hover .arrow {
+  color: #ffffff;
 }
 .book-flip-btn:disabled {
   opacity: 0.35;
   cursor: not-allowed;
+  box-shadow: none;
 }
-.book-progress {
+
+/* 章节指示切换器 */
+.book-chapter-switcher {
   display: flex;
   align-items: center;
   gap: 8px;
 }
-.progress-tab {
-  padding: 4px 10px;
-  border-radius: 12px;
-  border: none;
-  background: transparent;
-  color: var(--muted, #64748b);
+.chapter-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 16px;
+  border: 1px solid var(--border, rgba(148, 163, 184, 0.3));
+  background: var(--surface, #ffffff);
+  color: var(--text, #334155);
   font-size: 12px;
-  font-weight: 500;
+  font-weight: 600;
   cursor: pointer;
   transition: all 0.15s ease;
 }
-.progress-tab.active {
+.chapter-tab .chapter-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--muted, #94a3b8);
+}
+.chapter-tab .chapter-pages {
+  font-size: 11px;
+  color: var(--muted, #64748b);
+  opacity: 0.85;
+}
+.chapter-tab:hover {
+  border-color: var(--primary, #0284c7);
+  color: var(--primary, #0284c7);
+}
+.chapter-tab.active {
   background: var(--primary, #0284c7);
+  border-color: var(--primary, #0284c7);
   color: #ffffff;
   font-weight: 700;
+  box-shadow: 0 2px 8px rgba(2, 132, 199, 0.3);
+}
+.chapter-tab.active .chapter-dot {
+  background: #ffffff;
+}
+.chapter-tab.active .chapter-pages {
+  color: #ffffff;
+  opacity: 0.9;
 }
 
 /* 转场动画 */
 .book-fade-enter-active,
 .book-fade-leave-active {
-  transition: opacity 0.2s ease, transform 0.2s ease;
+  transition: opacity 0.2s cubic-bezier(0.16, 1, 0.3, 1), transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 .book-fade-enter-from,
 .book-fade-leave-to {
   opacity: 0;
-  transform: scale(0.97);
+  transform: translate(-50%, -48%) scale(0.96);
 }
 
 /* 暗色与终末地主题适配 */
 :global(html[data-theme="dark"]) .launcher-book-case,
 :global(html[data-theme="endfield"]) .launcher-book-case {
   box-shadow:
-    0 24px 60px -12px rgba(0, 0, 0, 0.65),
-    0 0 0 1px rgba(255, 255, 255, 0.1);
+    0 24px 64px -12px rgba(0, 0, 0, 0.75),
+    0 4px 18px rgba(0, 0, 0, 0.4),
+    0 0 0 1px rgba(255, 255, 255, 0.12);
 }
 :global(html[data-theme="dark"]) .page-left,
 :global(html[data-theme="endfield"]) .page-left {
@@ -657,7 +683,17 @@ onUnmounted(() => {
 :global(html[data-theme="dark"]) .launcher-book-spine,
 :global(html[data-theme="endfield"]) .launcher-book-spine {
   box-shadow:
-    inset 4px 0 10px -2px rgba(0, 0, 0, 0.4),
-    inset -4px 0 10px -2px rgba(0, 0, 0, 0.4);
+    inset 4px 0 8px -2px rgba(0, 0, 0, 0.5),
+    inset -4px 0 8px -2px rgba(0, 0, 0, 0.5);
+}
+:global(html[data-theme="dark"]) .chapter-tab:not(.active),
+:global(html[data-theme="endfield"]) .chapter-tab:not(.active) {
+  background: var(--panel);
+  color: var(--text);
+}
+:global(html[data-theme="dark"]) .book-flip-btn,
+:global(html[data-theme="endfield"]) .book-flip-btn {
+  background: var(--panel);
+  color: var(--heading);
 }
 </style>

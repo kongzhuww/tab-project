@@ -1974,6 +1974,7 @@ html[data-theme="dark"] .launcher-page-tab[data-page="工作区"].active {
   color: #fff !important;
 }
 .launcher-page-help {
+  margin-left: auto;
   width: 27px;
   height: 27px;
   padding: 0;
