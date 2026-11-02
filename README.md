@@ -11,7 +11,8 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/kongzhuww/tab-project/releases/latest">下载最新版本</a> ·
+  <a href="https://microsoftedge.microsoft.com/addons/detail/tabproject-%E6%96%B0%E6%A0%87%E7%AD%BE%E9%A1%B5/dbkaiojfbolnkpaegflocfbdgpmhjcco"><strong>从 Edge 商店安装</strong></a> ·
+  <a href="https://github.com/kongzhuww/tab-project/releases/latest">Release 下载</a> ·
   <a href="CHANGELOG.md">更新日志</a> ·
   <a href="#快速指引如何选择适合你的路径">快速起步</a> ·
   <a href="#安装">安装指南</a> ·
@@ -20,7 +21,9 @@
 
 > **核心定位**：tab-project 是一个基于 **Vue 3、TypeScript 和 Chromium Manifest V3** 的浏览器新标签页工作台（面向 Edge / Chrome）。它优先解决**常用网站、书签看板、日常任务和多媒体工具分散在多个页面**的割裂痛点，在一个清爽、自适应主题的统一界面中聚合高频工作流。
 
-> **版本说明**：当前版本为 **1.0.5**。本次更新 GitHub 快捷频道全新「我的仓库 · Topic 看板」工作区、双向拖拽与远端 Topics 自动同步、边缘自动滚动与滚轮横向联动、原生右键级联移动菜单系统、防压缩卡片布局及多项交互细节优化。保留用户数据，不恢复已退役的调试桥接。构建检查不代表浏览器或商店审核已通过。详见 [更新日志](CHANGELOG.md)及[发行说明](docs/RELEASE_1.0.5.md)。
+> **已上架 Microsoft Edge 加载项商店**：[安装 tab-project 新标签页](https://microsoftedge.microsoft.com/addons/detail/tabproject-%E6%96%B0%E6%A0%87%E7%AD%BE%E9%A1%B5/dbkaiojfbolnkpaegflocfbdgpmhjcco)，无需开启开发者模式。商店安装由 Edge 管理自动更新；每次新版本仍需单独提交商店审核，GitHub 提交或 Release 不会立即更新商店版。
+
+> **仓库版本**：**1.0.8**，新增不挤压网页的覆盖式侧栏、GitHub 原生 Lists 与多列表归属，并调整 B站收藏搜索。商店版本以商店页面及实际安装版本为准，可能与 GitHub Release 存在时间差。详见 [更新日志](CHANGELOG.md)及[发行说明](docs/RELEASE_1.0.8.md)。
 
 ## 核心功能概览与状态分级
 
@@ -65,7 +68,8 @@
 
 根据你的使用场景，选择最适合的指引快速起步：
 
-- **只想在浏览器中日常使用**：直接阅读 [推荐：使用 Release 下载包](#推荐使用-release-下载包)，下载解压缩包后导入浏览器即可开始使用。
+- **Edge 日常使用**：推荐直接[从 Edge 商店安装](https://microsoftedge.microsoft.com/addons/detail/tabproject-%E6%96%B0%E6%A0%87%E7%AD%BE%E9%A1%B5/dbkaiojfbolnkpaegflocfbdgpmhjcco)，无需下载解压或开启开发者模式。
+- **Chrome 或手动安装**：阅读 [手动安装：使用 Release 下载包](#手动安装使用-release-下载包)。
 - **想参与功能开发或本地修改**：请阅读 [从源码构建](#从源码构建) 与 [本地开发指令](#开发)。
 - **想部署或接入海狸私有聊天室**：请阅读 [私有聊天室服务端部署指南](server/private-chat/README.md)。
 - **想了解移动端状况**：当前项目仅专注维护桌面 Chromium 扩展（Edge / Chrome），独立 Android / Capacitor 移动应用已退役归档，无需单独构建；桌面窗口已内置窄屏自适应布局。
@@ -73,11 +77,21 @@
 
 ## 安装
 
-### 推荐：使用 Release 下载包
+### 推荐：从 Edge 商店安装
 
-如果你只想使用扩展，直接下载最新 Release 附件。如果你想参与开发或使用尚未发布的源码，再按照下方步骤从源码构建。
+1. 打开 [tab-project 新标签页 · Microsoft Edge 加载项商店](https://microsoftedge.microsoft.com/addons/detail/tabproject-%E6%96%B0%E6%A0%87%E7%AD%BE%E9%A1%B5/dbkaiojfbolnkpaegflocfbdgpmhjcco)。
+2. 点击“获取”，按浏览器提示确认添加扩展。
+3. 打开新标签页；若 Edge 提示确认新标签页更改，请确认保留本扩展。
 
-1. 打开 [最新发行版](https://github.com/kongzhuww/tab-project-next/releases/latest)。
+商店安装无需开发者模式，后续通过 Edge 自动更新。GitHub 的源码提交、Release 发布与商店审核发布是独立流程，商店版可能稍晚上线。
+
+**已有解压安装用户**：商店版可能使用不同的扩展 ID，不会自动继承开发版的本地数据。切换前请先导出重要配置，保留原安装，确认可恢复后再停用旧版；不要先卸载或清空原数据。
+
+### 手动安装：使用 Release 下载包
+
+适用于 Chrome、开发调试或需要手动管理版本的用户。下载最新 Release 附件；想参与开发或使用尚未发布的源码，再按下方步骤从源码构建。
+
+1. 打开 [最新发行版](https://github.com/kongzhuww/tab-project/releases/latest)。
 2. 下载 `tab-project-v版本号-extension.zip`，解压到一个固定文件夹。
 3. 打开 `edge://extensions` 或 `chrome://extensions`，开启“开发者模式”。
 4. 点击“加载解压缩的扩展”，选择解压后包含 `manifest.json` 的目录。
@@ -89,8 +103,8 @@
 ### 从源码构建
 
 ```bash
-git clone https://github.com/kongzhuww/tab-project-next.git
-cd tab-project-next
+git clone https://github.com/kongzhuww/tab-project.git
+cd tab-project
 npm ci
 npm run check
 ```
@@ -98,6 +112,12 @@ npm run check
 构建完成后，按上方开发者模式加载仓库根目录。已有源码副本需要先保护自己的未提交改动，不要直接覆盖整个目录。
 
 ## 最近更新
+
+### v1.0.8 · 覆盖式侧栏与 GitHub 原生 Lists
+
+- 新标签页和普通网页采用不挤压视口的覆盖式侧栏，支持扩展图标、Alt+W、× 与 Esc；受保护页面不支持注入。
+- GitHub 收藏分类采用官方 Lists，同一仓库可归属多个列表；移除“正在使用”特殊分类。
+- B站收藏搜索改为按回车或搜索按钮执行。详见 [v1.0.8 发行说明](docs/RELEASE_1.0.8.md)。
 
 ### v1.0.5 · 我的仓库 Topic 看板、双向拖拽与远端标签同步
 

@@ -11,7 +11,8 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/kongzhuww/tab-project/releases/latest">Download Latest Release</a> ·
+  <a href="https://microsoftedge.microsoft.com/addons/detail/tabproject-%E6%96%B0%E6%A0%87%E7%AD%BE%E9%A1%B5/dbkaiojfbolnkpaegflocfbdgpmhjcco"><strong>Install from Edge Add-ons</strong></a> ·
+  <a href="https://github.com/kongzhuww/tab-project/releases/latest">Release Downloads</a> ·
   <a href="CHANGELOG.md">Changelog</a> ·
   <a href="#quick-guide-which-path-fits-you">Quick Start</a> ·
   <a href="#installation">Installation Guide</a> ·
@@ -20,7 +21,9 @@
 
 > **Core Concept**: `tab-project` is a browser new-tab workspace extension built with **Vue 3, TypeScript, and Chromium Manifest V3** (for Microsoft Edge and Google Chrome). It unifies frequently visited websites, bookmark kanban boards, daily tasks, and multimedia widgets—which are typically scattered across different tabs and apps—into a clean, responsive, theme-adaptive command center for your daily workflows.
 
-> **Current Version**: **1.0.5**. This release introduces the brand new GitHub workspace with a "My Repositories · Topic Kanban", bidirectional drag-and-drop with remote GitHub Topics synchronization, edge auto-scrolling with horizontal wheel support, a native cascading right-click context menu, compression-resistant card layouts, and numerous interaction refinements. User data is strictly preserved without restoring deprecated debug bridges. Passing build checks does not imply browser or web store review completion. See the [Changelog](CHANGELOG.md) and [Release Notes](docs/RELEASE_1.0.5.md).
+> **Now available on Microsoft Edge Add-ons**: [Install tab-project](https://microsoftedge.microsoft.com/addons/detail/tabproject-%E6%96%B0%E6%A0%87%E7%AD%BE%E9%A1%B5/dbkaiojfbolnkpaegflocfbdgpmhjcco) without Developer mode. Edge manages automatic updates for store installations. Each new version still requires a separate store submission and review; GitHub commits and releases do not immediately update the store version.
+
+> **Repository Version**: **1.0.8**, featuring a non-resizing overlay sidebar, native GitHub Lists with multi-list membership, and revised Bilibili favorites search. The store listing and installed version are authoritative for store users and may lag behind GitHub Releases. See the [Changelog](CHANGELOG.md) and [Release Notes](docs/RELEASE_1.0.8.md).
 
 ---
 
@@ -69,7 +72,8 @@
 
 Choose the best path for your needs:
 
-- **Daily User**: Read [Recommended: Using Prebuilt Release Packages](#recommended-using-prebuilt-release-packages), download the unpacked archive, and load it into your browser in seconds.
+- **Everyday Edge User**: [Install from Edge Add-ons](https://microsoftedge.microsoft.com/addons/detail/tabproject-%E6%96%B0%E6%A0%87%E7%AD%BE%E9%A1%B5/dbkaiojfbolnkpaegflocfbdgpmhjcco); no extraction or Developer mode required.
+- **Chrome / Manual Installation**: Read [Manual Installation: Prebuilt Release Packages](#manual-installation-prebuilt-release-packages).
 - **Developer / Contributor**: Read [Building from Source](#building-from-source) and [Development Commands](#development).
 - **Self-Hosting Beaver Chatroom**: Read the [Private Chat Server Deployment Guide](server/private-chat/README.md).
 - **Mobile Support Inquiries**: The project focuses solely on desktop Chromium browsers (Edge / Chrome). Standalone Android / Capacitor builds are retired; the desktop layout features responsive mobile-width adaptation.
@@ -79,9 +83,19 @@ Choose the best path for your needs:
 
 ## 📦 Installation
 
-### Recommended: Using Prebuilt Release Packages
+### Recommended: Install from Edge Add-ons
 
-If you only want to use the extension, download the latest Release asset directly.
+1. Open [tab-project on Microsoft Edge Add-ons](https://microsoftedge.microsoft.com/addons/detail/tabproject-%E6%96%B0%E6%A0%87%E7%AD%BE%E9%A1%B5/dbkaiojfbolnkpaegflocfbdgpmhjcco).
+2. Click **Get** and confirm adding the extension.
+3. Open a new tab. If Edge asks you to confirm the new-tab change, choose to keep this extension.
+
+No Developer mode is required. Edge manages future automatic updates. GitHub commits, GitHub Releases, and store review/publication are separate workflows, so store updates may arrive later.
+
+**Switching from an unpacked installation?** The store version may use a different extension ID and will not automatically inherit local data from the development installation. Export important settings first, keep the original installation, and confirm recovery before disabling it. Do not uninstall or clear the original data first.
+
+### Manual Installation: Prebuilt Release Packages
+
+For Chrome users, development, or manual version management, download the latest Release asset.
 
 1. Open [Latest Releases](https://github.com/kongzhuww/tab-project/releases/latest).
 2. Download `tab-project-v<version>-extension.zip` and extract it to a persistent local folder.
@@ -107,6 +121,12 @@ Once built, load the repository root directory as an unpacked extension followin
 ---
 
 ## 🚀 Recent Updates
+
+### v1.0.8 · Overlay Sidebar & Native GitHub Lists
+
+- A non-resizing overlay sidebar on new tabs and ordinary webpages, with extension icon, Alt+W, close button, and Esc controls; protected pages do not support injection.
+- Star categories use official GitHub Lists with multi-list membership; the special “Currently Using” category has been removed.
+- Bilibili favorites search runs on Enter or the search button. See [v1.0.8 Release Notes](docs/RELEASE_1.0.8.md).
 
 ### v1.0.5 · My Repositories Topic Kanban, Two-Way Drag & Drop, and Remote Topic Sync
 
