@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from "vue";
-import { biliUpPreviewController as controller, biliUpPreviewState as state } from "./up-preview-store";
+import { biliMiniPlayerController } from "./mini-player-store";
+import { biliUpPreviewController as controller, biliUpPreviewState as state, type BiliUpPreviewVideo } from "./up-preview-store";
 const fallbackAvatar = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2394a3b8'%3E%3Cpath d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/%3E%3C/svg%3E";
 
 const armUnfollow = ref(false);
@@ -26,6 +27,30 @@ function handleButtonClick() {
 function handleClose() {
   armUnfollow.value = false;
   controller.close();
+}
+
+function handleVideoClick(event: MouseEvent, video: BiliUpPreviewVideo) {
+  // 如果按住 Ctrl / Meta 键，保留浏览器新标签页默认行为
+  if (event.ctrlKey || event.metaKey) {
+    return;
+  }
+  event.preventDefault();
+  event.stopPropagation();
+
+  if (video.bvid) {
+    biliMiniPlayerController.openVideo({
+      bvid: video.bvid,
+      title: video.title,
+      cover: video.cover,
+      author: state.name,
+      authorFace: state.face,
+      mid: state.mid,
+      url: video.url
+    });
+    handleClose();
+  } else if (video.url && video.url !== "#") {
+    window.open(video.url, "_blank");
+  }
 }
 </script>
 
@@ -54,7 +79,7 @@ function handleClose() {
         <button type="button" class="fo-up-preview-close" aria-label="关闭预览" @click="handleClose">✕</button>
       </div>
       <div class="fo-up-preview-title-tag">近期投稿视频（最新 2~3 个）</div>
-      <div class="fo-up-preview-videos"><div v-if="state.loading" class="fo-up-preview-loading"><i></i><span>正在读取近期投稿…</span></div><p v-else-if="state.error" class="fo-up-preview-empty">{{ state.error }}</p><p v-else-if="!state.videos.length" class="fo-up-preview-empty">该 UP 主近期暂无视频动态</p><article v-for="video in state.videos" v-else :key="video.bvid" class="fo-up-preview-video"><a class="fo-up-preview-thumb" :href="video.url" target="_blank" rel="noreferrer"><img :src="video.cover" alt="" loading="lazy" referrerpolicy="no-referrer" /><span v-if="video.duration" class="fo-bili-duration">{{ video.duration }}</span></a><div class="fo-up-preview-video-info"><a class="fo-up-preview-video-title" :href="video.url" target="_blank" rel="noreferrer">{{ video.title }}</a><div class="fo-up-preview-video-meta"><span>▣ {{ video.playCount }}</span><span>{{ video.published }}</span></div></div></article></div>
+      <div class="fo-up-preview-videos"><div v-if="state.loading" class="fo-up-preview-loading"><i></i><span>正在读取近期投稿…</span></div><p v-else-if="state.error" class="fo-up-preview-empty">{{ state.error }}</p><p v-else-if="!state.videos.length" class="fo-up-preview-empty">该 UP 主近期暂无视频动态</p><article v-for="video in state.videos" v-else :key="video.bvid" class="fo-up-preview-video"><a class="fo-up-preview-thumb" :href="video.url" :title="`就地播放「${video.title}」（Ctrl+点击在网页打开）`" @click="handleVideoClick($event, video)"><img :src="video.cover" alt="" loading="lazy" referrerpolicy="no-referrer" /><span v-if="video.duration" class="fo-bili-duration">{{ video.duration }}</span></a><div class="fo-up-preview-video-info"><a class="fo-up-preview-video-title" :href="video.url" :title="`就地播放「${video.title}」（Ctrl+点击在网页打开）`" @click="handleVideoClick($event, video)">{{ video.title }}</a><div class="fo-up-preview-video-meta"><span>▣ {{ video.playCount }}</span><span>{{ video.published }}</span></div></div></article></div>
     </aside>
   </div>
 </template>
@@ -82,6 +107,18 @@ function handleClose() {
 }
 .fo-up-preview-video-title:hover {
   color: #00aeec !important;
+}
+.fo-up-preview-thumb {
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  border-radius: 4px;
+}
+.fo-up-preview-thumb img {
+  transition: transform 0.2s ease;
+}
+.fo-up-preview-thumb:hover img {
+  transform: scale(1.05);
 }
 :global(html[data-theme="dark"]) .fo-up-preview-name,
 :global(html[data-theme="endfield"]) .fo-up-preview-name {
