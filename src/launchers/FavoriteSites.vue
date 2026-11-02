@@ -1,8 +1,16 @@
 <script setup lang="ts">
 import { ref, reactive, computed, nextTick, onMounted, onUnmounted, TransitionGroup, defineAsyncComponent } from "vue";
 const BookmarkBoard = defineAsyncComponent(() => import("../bookmarks/BookmarkBoard.vue"));
+const LauncherBookGuideDialog = defineAsyncComponent(() => import("./LauncherBookGuideDialog.vue"));
 const sitesView = ref<"sites" | "bookmarks">("sites");
 const bookmarkSaving = ref(false);
+const isGuideOpen = ref(false);
+function openGuide() {
+  isGuideOpen.value = true;
+}
+function closeGuide() {
+  isGuideOpen.value = false;
+}
 import LauncherFavicon from "./LauncherFavicon.vue";
 import LauncherTileContent from "./LauncherTileContent.vue";
 import { TILE_DRAG_THRESHOLD, TILE_SWAP_COOLDOWN, inFolderDropCore, inTileSwapCore } from './tile-drag-geometry';
@@ -924,6 +932,16 @@ async function onFolderDrop(targetGroupName: string, event: DragEvent) {
           @blur="finishAddPage"
         />
 
+        <button
+          class="launcher-page-help"
+          type="button"
+          title="使用指南：如何创建文件夹与整理网站"
+          aria-label="使用指南与技巧"
+          @click="openGuide"
+        >
+          ?
+        </button>
+
       </div>
       <div v-if="sitesView === 'bookmarks'" id="bookmark-board-header" class="launcher-page-tabs"></div>
     </header>
@@ -1059,6 +1077,9 @@ async function onFolderDrop(targetGroupName: string, event: DragEvent) {
       </template>
     </div>
   </Teleport>
+
+  <!-- 常用网站使用手册（双页立体翻页书本） -->
+  <LauncherBookGuideDialog :open="isGuideOpen" @close="closeGuide" />
 </template>
 
 <style scoped>

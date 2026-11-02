@@ -1973,6 +1973,30 @@ html[data-theme="dark"] .launcher-page-tab[data-page="工作区"].active {
   background: #0284c7 !important;
   color: #fff !important;
 }
+.launcher-page-help {
+  width: 27px;
+  height: 27px;
+  padding: 0;
+  border-radius: 999px;
+  border: 1px solid var(--border, rgba(148, 163, 184, 0.3));
+  background: var(--surface, #ffffff);
+  color: var(--muted, #64748b) !important;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  flex: none;
+}
+.launcher-page-help:hover {
+  background: var(--primary, #0284c7) !important;
+  color: #ffffff !important;
+  border-color: var(--primary, #0284c7);
+  box-shadow: 0 2px 6px rgba(2, 132, 199, 0.25);
+  transform: translateY(-1px);
+}
 .launcher-page-rename { width:90px;min-width:0;padding:3px 6px;border:0;border-bottom:1px solid #0284c7;background:transparent;color:#0f172a;font:inherit;outline:0;text-align:center; }
 .launcher-page-input { width:105px;height:27px;flex:none;padding:0 8px;border:1px solid rgba(2, 132, 199, 0.55);border-radius:999px;background:#fff;color:#0f172a;font-size:10px;outline:none; }
 .launcher-page-panel { display:flex;min-height:0;flex:1; }
