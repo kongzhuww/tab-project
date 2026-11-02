@@ -27,7 +27,7 @@
 
 > **Now available on Microsoft Edge Add-ons**: [Install tab-project](https://microsoftedge.microsoft.com/addons/detail/tabproject-%E6%96%B0%E6%A0%87%E7%AD%BE%E9%A1%B5/dbkaiojfbolnkpaegflocfbdgpmhjcco) without Developer mode. Edge manages automatic updates for store installations. Each new version still requires a separate store submission and review; GitHub commits and releases do not immediately update the store version.
 
-> **Repository Version**: **1.0.8**, featuring a non-resizing overlay sidebar, native GitHub Lists with multi-list membership, and revised Bilibili favorites search. The store listing and installed version are authoritative for store users and may lag behind GitHub Releases. See the [Changelog](CHANGELOG.md) and [Release Notes](docs/RELEASE_1.0.8.md).
+> **Repository Version**: **1.0.9**, featuring Manifest permission minimization, immutable release safety, 51 offline regression tests, and full cleanup of legacy styles and residues. The store listing and installed version are authoritative for store users and may lag behind GitHub Releases. See the [Changelog](CHANGELOG.md) and [Release Notes](docs/RELEASE_1.0.9.md).
 
 ---
 
@@ -149,6 +149,12 @@ Once built, load the repository root directory as an unpacked extension followin
 ---
 
 ## 🚀 Recent Updates
+
+### v1.0.9 · Permission Minimization, Immutable Release Safety & Code Cleanup
+
+- **Manifest Permission Minimization**: Narrowed broad `<all_urls>` to explicit `https://*/*` and `http://*/*`; purged 13 retired domain declarations.
+- **Immutable Release & Automated Policy Gates**: Removed `--clobber` overwrite logic in the release workflow; added 51 offline regression tests integrated into CI.
+- **Legacy Code & Style Cleanup**: Purged nearly 3,000 lines of retired workspace styles from `newtab-workspaces.css` (reducing bundle size by 66.4KB); generalized Markdown classes; removed all QQ residues. See [v1.0.9 Release Notes](docs/RELEASE_1.0.9.md).
 
 ### v1.0.8 · Overlay Sidebar & Native GitHub Lists
 

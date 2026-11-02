@@ -27,7 +27,7 @@
 
 > **已上架 Microsoft Edge 加载项商店**：[安装 tab-project 新标签页](https://microsoftedge.microsoft.com/addons/detail/tabproject-%E6%96%B0%E6%A0%87%E7%AD%BE%E9%A1%B5/dbkaiojfbolnkpaegflocfbdgpmhjcco)，无需开启开发者模式。商店安装由 Edge 管理自动更新；每次新版本仍需单独提交商店审核，GitHub 提交或 Release 不会立即更新商店版。
 
-> **仓库版本**：**1.0.8**，新增不挤压网页的覆盖式侧栏、GitHub 原生 Lists 与多列表归属，并调整 B站收藏搜索。商店版本以商店页面及实际安装版本为准，可能与 GitHub Release 存在时间差。详见 [更新日志](CHANGELOG.md)及[发行说明](docs/RELEASE_1.0.8.md)。
+> **仓库版本**：**1.0.9**，实现 Manifest 权限收敛与退役域名清理、不可变发布防护、51 项回归测试套件，并全面收口历史样式与废弃代码。商店版本以商店页面及实际安装版本为准，可能与 GitHub Release 存在时间差。详见 [更新日志](CHANGELOG.md)及[发行说明](docs/RELEASE_1.0.9.md)。
 
 ## 反馈与更新
 
@@ -134,6 +134,12 @@ npm run check
 构建完成后，按上方开发者模式加载仓库根目录。已有源码副本需要先保护自己的未提交改动，不要直接覆盖整个目录。
 
 ## 最近更新
+
+### v1.0.9 · 权限最小化、不可变发布防护与代码收口
+
+- **Manifest 权限最小化**：广域 `<all_urls>` 收敛为明确的 `https://*/*` 与 `http://*/*`，彻底清除已退役模块的 13 个遗留域名声明。
+- **不可变 Release 与自动化门禁**：移除发布工作流中的 `--clobber` 覆盖逻辑，新增 51 项离线回归断言测试并全面接入 CI。
+- **历史代码大清洗**：清理 `newtab-workspaces.css` 中近 3000 行废弃工作区与监控样式（体积缩减 66.4KB），将 Markdown 排版通用化，清除全部 QQ 残留配置与资产。详见 [v1.0.9 发行说明](docs/RELEASE_1.0.9.md)。
 
 ### v1.0.8 · 覆盖式侧栏与 GitHub 原生 Lists
 
