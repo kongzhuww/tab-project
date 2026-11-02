@@ -155,19 +155,32 @@ function handleKeydown(e: KeyboardEvent) {
   }
 }
 
+function onWindowPointerDown(e: PointerEvent) {
+  if (!props.open) return;
+  const target = e.target as HTMLElement | null;
+  // 点击问号按钮本身时不重复处理
+  if (target?.closest(".launcher-page-help")) return;
+  const bookEl = document.querySelector(".launcher-book-case");
+  if (bookEl && !bookEl.contains(target as Node)) {
+    emit("close");
+  }
+}
+
 onMounted(() => {
   window.addEventListener("keydown", handleKeydown);
+  window.addEventListener("pointerdown", onWindowPointerDown, true);
 });
 
 onUnmounted(() => {
   window.removeEventListener("keydown", handleKeydown);
+  window.removeEventListener("pointerdown", onWindowPointerDown, true);
 });
 </script>
 
 <template>
   <Teleport to="body">
     <Transition name="book-fade">
-      <!-- 采用非模态设计：无全局黑色背景遮罩，零模糊，允许与外界视觉清晰互动 -->
+      <!-- 纯无模态独立悬浮书本窗口：100% 实体纸张，绝不透光，无任何背景遮罩 -->
       <aside
         v-if="open"
         class="launcher-book-window"
@@ -187,7 +200,7 @@ onUnmounted(() => {
             <span class="ribbon-icon">✕</span>
           </button>
 
-          <!-- 展开的双页主体 -->
+          <!-- 展开的双页主体（100% 实心纸面） -->
           <div class="launcher-book-spread">
             <!-- 左页 -->
             <div class="launcher-book-page page-left">
@@ -219,7 +232,7 @@ onUnmounted(() => {
               <div class="page-corner page-corner-left"></div>
             </div>
 
-            <!-- 中轴装订线与立体书脊折痕 (Spine Crease) -->
+            <!-- 中轴装订线与立体书脊折痕 (Spine & Stitches) -->
             <div class="launcher-book-spine">
               <div class="spine-line">
                 <span class="spine-stitch"></span>
@@ -260,7 +273,7 @@ onUnmounted(() => {
             </div>
           </div>
 
-          <!-- 一体化书页底栏（翻页与高对比度章节指示，黑白分明超清晰） -->
+          <!-- 一体化书页底栏：黑白分明，对比强烈，清晰易读 -->
           <footer class="launcher-book-footer">
             <button
               type="button"
@@ -316,17 +329,17 @@ onUnmounted(() => {
   pointer-events: auto;
 }
 
-/* 书本硬壳外封与多层立体投影 */
+/* 书本硬壳外封与多层立体投影：100% 实心纯白，坚决不透光 */
 .launcher-book-case {
   position: relative;
   width: 100%;
   border-radius: 12px;
-  background: var(--surface, #ffffff);
-  border: 1px solid var(--border, rgba(148, 163, 184, 0.35));
+  background: #ffffff !important;
+  border: 1px solid rgba(148, 163, 184, 0.4);
   box-shadow:
     0 24px 64px -12px rgba(15, 23, 42, 0.4),
     0 4px 18px rgba(0, 0, 0, 0.12),
-    0 0 0 1px rgba(255, 255, 255, 0.2);
+    0 0 0 1px rgba(0, 0, 0, 0.05);
   overflow: visible;
   display: flex;
   flex-direction: column;
@@ -379,24 +392,25 @@ onUnmounted(() => {
   display: flex;
   min-height: 490px;
   position: relative;
+  background: #ffffff !important;
 }
 
-/* 单个书页 */
+/* 单个书页：100% 实心纸面 */
 .launcher-book-page {
   flex: 1;
   padding: 34px 34px 20px 34px;
   display: flex;
   flex-direction: column;
   position: relative;
-  background: var(--surface, #ffffff);
+  background: #ffffff !important;
 }
 .page-left {
   border-top-left-radius: 11px;
-  background: linear-gradient(to right, var(--surface, #ffffff) 96%, rgba(0, 0, 0, 0.035) 100%);
+  background: linear-gradient(to right, #ffffff 96%, rgba(0, 0, 0, 0.035) 100%) !important;
 }
 .page-right {
   border-top-right-radius: 11px;
-  background: linear-gradient(to left, var(--surface, #ffffff) 96%, rgba(0, 0, 0, 0.035) 100%);
+  background: linear-gradient(to left, #ffffff 96%, rgba(0, 0, 0, 0.035) 100%) !important;
 }
 
 /* 翻页角褶皱装饰 */
@@ -409,33 +423,33 @@ onUnmounted(() => {
 }
 .page-corner-left {
   left: 0;
-  background: linear-gradient(135deg, rgba(0, 0, 0, 0.05) 45%, transparent 50%);
+  background: linear-gradient(135deg, rgba(0, 0, 0, 0.06) 45%, transparent 50%);
 }
 .page-corner-right {
   right: 0;
-  background: linear-gradient(225deg, rgba(0, 0, 0, 0.05) 45%, transparent 50%);
+  background: linear-gradient(225deg, rgba(0, 0, 0, 0.06) 45%, transparent 50%);
 }
 
-/* 书脊中轴线装订区 (Spine & Stitches) */
+/* 书脊中轴线装订区 (Spine & Stitches)：100% 实心 */
 .launcher-book-spine {
   width: 36px;
   position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--panel, #f1f5f9);
-  border-left: 1px solid var(--border, rgba(148, 163, 184, 0.25));
-  border-right: 1px solid var(--border, rgba(148, 163, 184, 0.25));
+  background: #f1f5f9 !important;
+  border-left: 1px solid rgba(148, 163, 184, 0.25);
+  border-right: 1px solid rgba(148, 163, 184, 0.25);
   box-shadow:
-    inset 4px 0 8px -2px rgba(0, 0, 0, 0.1),
-    inset -4px 0 8px -2px rgba(0, 0, 0, 0.1);
+    inset 4px 0 8px -2px rgba(0, 0, 0, 0.08),
+    inset -4px 0 8px -2px rgba(0, 0, 0, 0.08);
   z-index: 5;
 }
 .spine-line {
   position: relative;
   height: 85%;
   width: 2px;
-  background: var(--border, rgba(148, 163, 184, 0.45));
+  background: rgba(148, 163, 184, 0.5);
   display: flex;
   flex-direction: column;
   justify-content: space-around;
@@ -455,7 +469,7 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  border-bottom: 1px dashed var(--border, rgba(148, 163, 184, 0.3));
+  border-bottom: 1px dashed rgba(148, 163, 184, 0.35);
   padding-bottom: 10px;
   margin-bottom: 18px;
 }
@@ -469,24 +483,24 @@ onUnmounted(() => {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  color: var(--primary, #0284c7);
+  color: #0284c7;
 }
 .page-badge {
   font-size: 10px;
   padding: 1px 6px;
   border-radius: 4px;
   background: rgba(2, 132, 199, 0.12);
-  color: var(--primary, #0284c7);
+  color: #0284c7;
   font-weight: 700;
 }
 .page-number {
   font-size: 13px;
   font-family: serif, ui-serif, Georgia;
   font-weight: 700;
-  color: var(--heading, #0f172a);
+  color: #0f172a;
 }
 
-/* 页面内容与步骤卡片 */
+/* 页面内容与步骤卡片：100% 实心浅色背景 */
 .page-body {
   flex: 1;
   display: flex;
@@ -496,7 +510,7 @@ onUnmounted(() => {
   margin: 0 0 16px 0;
   font-size: 17px;
   font-weight: 700;
-  color: var(--heading, #0f172a);
+  color: #0f172a;
   letter-spacing: -0.2px;
 }
 .page-steps {
@@ -508,15 +522,15 @@ onUnmounted(() => {
   display: flex;
   align-items: flex-start;
   gap: 12px;
-  padding: 10px 12px;
+  padding: 11px 13px;
   border-radius: 8px;
-  background: var(--panel, #f8fafc);
-  border: 1px solid var(--border, rgba(148, 163, 184, 0.25));
+  background: #f8fafc !important;
+  border: 1px solid rgba(148, 163, 184, 0.3);
   transition: transform 0.15s ease, background 0.15s ease;
 }
 .step-card:hover {
   transform: translateX(2px);
-  background: var(--card-hover-bg, rgba(241, 245, 249, 0.9));
+  background: #f1f5f9 !important;
 }
 .step-icon {
   font-size: 20px;
@@ -530,21 +544,21 @@ onUnmounted(() => {
 .step-title {
   font-size: 13px;
   font-weight: 700;
-  color: var(--heading, #0f172a);
+  color: #0f172a;
   margin-bottom: 3px;
 }
 .step-desc {
   font-size: 12px;
   line-height: 1.5;
-  color: var(--text, #334155);
+  color: #334155;
 }
 .step-tip {
   margin-top: 6px;
   padding-top: 5px;
-  border-top: 1px dashed var(--border, rgba(148, 163, 184, 0.25));
+  border-top: 1px dashed rgba(148, 163, 184, 0.3);
   font-size: 11px;
   font-weight: 600;
-  color: var(--primary, #0284c7);
+  color: #0284c7;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -553,18 +567,18 @@ onUnmounted(() => {
   width: 4px;
   height: 4px;
   border-radius: 50%;
-  background: var(--primary, #0284c7);
+  background: #0284c7;
   flex-shrink: 0;
 }
 
-/* 一体化书页底栏：黑白分明，对比强烈，清晰易读 */
+/* 一体化书页底栏：100% 实心纯净底色 */
 .launcher-book-footer {
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 12px 24px;
-  background: var(--panel, #f8fafc);
-  border-top: 1px solid var(--border, rgba(148, 163, 184, 0.3));
+  background: #f8fafc !important;
+  border-top: 1px solid rgba(148, 163, 184, 0.3);
   border-bottom-left-radius: 11px;
   border-bottom-right-radius: 11px;
   gap: 12px;
@@ -575,9 +589,9 @@ onUnmounted(() => {
   gap: 6px;
   padding: 6px 16px;
   border-radius: 20px;
-  border: 1px solid var(--border, rgba(148, 163, 184, 0.4));
-  background: var(--surface, #ffffff);
-  color: var(--heading, #0f172a);
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  background: #ffffff !important;
+  color: #0f172a;
   font-size: 13px;
   font-weight: 700;
   cursor: pointer;
@@ -586,12 +600,12 @@ onUnmounted(() => {
 }
 .book-flip-btn .arrow {
   font-size: 11px;
-  color: var(--primary, #0284c7);
+  color: #0284c7;
 }
 .book-flip-btn:not(:disabled):hover {
-  background: var(--primary, #0284c7);
-  color: #ffffff;
-  border-color: var(--primary, #0284c7);
+  background: #0284c7 !important;
+  color: #ffffff !important;
+  border-color: #0284c7;
   box-shadow: 0 3px 10px rgba(2, 132, 199, 0.3);
 }
 .book-flip-btn:not(:disabled):hover .arrow {
@@ -615,9 +629,9 @@ onUnmounted(() => {
   gap: 6px;
   padding: 6px 14px;
   border-radius: 16px;
-  border: 1px solid var(--border, rgba(148, 163, 184, 0.3));
-  background: var(--surface, #ffffff);
-  color: var(--text, #334155);
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  background: #ffffff !important;
+  color: #334155;
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
@@ -627,21 +641,21 @@ onUnmounted(() => {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: var(--muted, #94a3b8);
+  background: #94a3b8;
 }
 .chapter-tab .chapter-pages {
   font-size: 11px;
-  color: var(--muted, #64748b);
+  color: #64748b;
   opacity: 0.85;
 }
 .chapter-tab:hover {
-  border-color: var(--primary, #0284c7);
-  color: var(--primary, #0284c7);
+  border-color: #0284c7;
+  color: #0284c7;
 }
 .chapter-tab.active {
-  background: var(--primary, #0284c7);
-  border-color: var(--primary, #0284c7);
-  color: #ffffff;
+  background: #0284c7 !important;
+  border-color: #0284c7;
+  color: #ffffff !important;
   font-weight: 700;
   box-shadow: 0 2px 8px rgba(2, 132, 199, 0.3);
 }
@@ -664,36 +678,93 @@ onUnmounted(() => {
   transform: translate(-50%, -48%) scale(0.96);
 }
 
-/* 暗色与终末地主题适配 */
+/* 暗色与终末地主题适配：实心质感纸张，严禁透明混叠 */
 :global(html[data-theme="dark"]) .launcher-book-case,
-:global(html[data-theme="endfield"]) .launcher-book-case {
+:global(html[data-theme="dark"]) .launcher-book-page,
+:global(html[data-theme="dark"]) .launcher-book-spread {
+  background: #1e293b !important;
+  border-color: rgba(255, 255, 255, 0.15) !important;
   box-shadow:
-    0 24px 64px -12px rgba(0, 0, 0, 0.75),
-    0 4px 18px rgba(0, 0, 0, 0.4),
+    0 24px 64px -12px rgba(0, 0, 0, 0.8),
+    0 4px 18px rgba(0, 0, 0, 0.5),
     0 0 0 1px rgba(255, 255, 255, 0.12);
 }
-:global(html[data-theme="dark"]) .page-left,
+:global(html[data-theme="dark"]) .page-left {
+  background: linear-gradient(to right, #1e293b 96%, rgba(0, 0, 0, 0.25) 100%) !important;
+}
+:global(html[data-theme="dark"]) .page-right {
+  background: linear-gradient(to left, #1e293b 96%, rgba(0, 0, 0, 0.25) 100%) !important;
+}
+:global(html[data-theme="dark"]) .launcher-book-spine {
+  background: #0f172a !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+}
+:global(html[data-theme="dark"]) .launcher-book-footer {
+  background: #0f172a !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+}
+:global(html[data-theme="dark"]) .step-card {
+  background: #273549 !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+}
+:global(html[data-theme="dark"]) .step-card:hover {
+  background: #33435c !important;
+}
+:global(html[data-theme="dark"]) .page-title,
+:global(html[data-theme="dark"]) .step-title,
+:global(html[data-theme="dark"]) .page-number {
+  color: #f8fafc !important;
+}
+:global(html[data-theme="dark"]) .step-desc {
+  color: #cbd5e1 !important;
+}
+:global(html[data-theme="dark"]) .chapter-tab:not(.active) {
+  background: #273549 !important;
+  color: #cbd5e1 !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+}
+:global(html[data-theme="dark"]) .book-flip-btn {
+  background: #273549 !important;
+  color: #f8fafc !important;
+  border-color: rgba(255, 255, 255, 0.15) !important;
+}
+
+:global(html[data-theme="endfield"]) .launcher-book-case,
+:global(html[data-theme="endfield"]) .launcher-book-page,
+:global(html[data-theme="endfield"]) .launcher-book-spread {
+  background: #182234 !important;
+  border-color: rgba(255, 255, 255, 0.15) !important;
+}
 :global(html[data-theme="endfield"]) .page-left {
-  background: linear-gradient(to right, var(--surface) 96%, rgba(255, 255, 255, 0.02) 100%);
+  background: linear-gradient(to right, #182234 96%, rgba(0, 0, 0, 0.25) 100%) !important;
 }
-:global(html[data-theme="dark"]) .page-right,
 :global(html[data-theme="endfield"]) .page-right {
-  background: linear-gradient(to left, var(--surface) 96%, rgba(255, 255, 255, 0.02) 100%);
+  background: linear-gradient(to left, #182234 96%, rgba(0, 0, 0, 0.25) 100%) !important;
 }
-:global(html[data-theme="dark"]) .launcher-book-spine,
-:global(html[data-theme="endfield"]) .launcher-book-spine {
-  box-shadow:
-    inset 4px 0 8px -2px rgba(0, 0, 0, 0.5),
-    inset -4px 0 8px -2px rgba(0, 0, 0, 0.5);
+:global(html[data-theme="endfield"]) .launcher-book-spine,
+:global(html[data-theme="endfield"]) .launcher-book-footer {
+  background: #0f1622 !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
 }
-:global(html[data-theme="dark"]) .chapter-tab:not(.active),
-:global(html[data-theme="endfield"]) .chapter-tab:not(.active) {
-  background: var(--panel);
-  color: var(--text);
+:global(html[data-theme="endfield"]) .step-card {
+  background: #202d42 !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
 }
-:global(html[data-theme="dark"]) .book-flip-btn,
+:global(html[data-theme="endfield"]) .step-card:hover {
+  background: #2a3a54 !important;
+}
+:global(html[data-theme="endfield"]) .page-title,
+:global(html[data-theme="endfield"]) .step-title,
+:global(html[data-theme="endfield"]) .page-number {
+  color: #f8fafc !important;
+}
+:global(html[data-theme="endfield"]) .step-desc {
+  color: #cbd5e1 !important;
+}
+:global(html[data-theme="endfield"]) .chapter-tab:not(.active),
 :global(html[data-theme="endfield"]) .book-flip-btn {
-  background: var(--panel);
-  color: var(--heading);
+  background: #202d42 !important;
+  color: #f8fafc !important;
+  border-color: rgba(255, 255, 255, 0.15) !important;
 }
 </style>
