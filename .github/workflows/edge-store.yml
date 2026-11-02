@@ -1,0 +1,76 @@
+name: Submit to Edge Add-ons
+
+on:
+  workflow_call:
+    inputs:
+      tag:
+        required: true
+        type: string
+    secrets:
+      EDGE_CLIENT_ID:
+        required: true
+      EDGE_API_KEY:
+        required: true
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing stable Release tag to submit (for example v1.0.8)'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: edge-store-submission
+  cancel-in-progress: false
+
+jobs:
+  submit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+          sparse-checkout: scripts/edge-store-publish.mjs
+          sparse-checkout-cone-mode: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '22'
+      - name: Download and validate published Release package
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+)?$ ]] || exit 1
+          gh release view "$RELEASE_TAG" --json isDraft,isPrerelease > release.json
+          node --input-type=module -e '
+            import fs from "node:fs";
+            const r = JSON.parse(fs.readFileSync("release.json", "utf8"));
+            if (r.isDraft || r.isPrerelease) throw new Error("Stable published Release required");
+          '
+          mkdir release-assets
+          gh release download "$RELEASE_TAG" --dir release-assets \
+            --pattern "tab-project-${RELEASE_TAG}-extension.zip" --pattern SHA256SUMS.txt
+          cd release-assets
+          # Validate exactly the intended archive; do not trust arbitrary checksum paths.
+          expected=$(awk -v f="tab-project-${RELEASE_TAG}-extension.zip" '($2 == f || $2 == "./" f) && $1 ~ /^[0-9a-f]+$/ && length($1) == 64 {print $1}' SHA256SUMS.txt)
+          [[ "$expected" =~ ^[0-9a-f]{64}$ ]] || exit 1
+          printf '%s  %s\n' "$expected" "tab-project-${RELEASE_TAG}-extension.zip" | sha256sum --check -
+          unzip -p "tab-project-${RELEASE_TAG}-extension.zip" manifest.json > ../store-manifest.json
+          node --input-type=module -e '
+            import fs from "node:fs";
+            const m = JSON.parse(fs.readFileSync("../store-manifest.json", "utf8"));
+            if ("v" + m.version !== process.env.RELEASE_TAG || m.manifest_version !== 3)
+              throw new Error("Release tag and MV3 package version must match");
+          '
+      - name: Upload package and submit for certification
+        env:
+          EDGE_CLIENT_ID: ${{ secrets.EDGE_CLIENT_ID }}
+          EDGE_API_KEY: ${{ secrets.EDGE_API_KEY }}
+          EDGE_PRODUCT_ID: ${{ vars.EDGE_PRODUCT_ID }}
+          EDGE_RELEASE_TAG: ${{ inputs.tag }}
+        run: node scripts/edge-store-publish.mjs
