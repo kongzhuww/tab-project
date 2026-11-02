@@ -2,7 +2,7 @@
 
 > **调试桥接退役**：开发版与商店版均移除内建 CLI/Broker、主页/搜索/后台轮询、任意 JS 调试入口和 Jev 页面协作链路。历史 CLI、Broker、eval 验收记录不再是可用工具说明，不恢复这些入口。正常业务通信保留，详见 [DEBUG_BRIDGE_REMOVAL.md](DEBUG_BRIDGE_REMOVAL.md)。
 
-> **tab-project-next 迁移说明**：本仓库从 2.3.0 当前代码创建全新历史，不带旧 Git 历史或个人截图。ArkPets、Neuro / Evil、Spine、角色素材、桌宠快捷栏和独立设置页已按用户要求删除；下文历史描述不代表它们仍存在。新仓库主入口和更新源指向 `kongzhuww/tab-project-next`。
+> **tab-project-next 迁移说明**：本仓库从 2.3.0 当前代码创建全新历史，不带旧 Git 历史或个人截图。ArkPets、Neuro / Evil、Spine、角色素材、桌宠快捷栏和独立设置页已按用户要求删除；下文历史描述不代表它们仍存在。正式仓库现为 `kongzhuww/tab-project`，产品名为 tab-project 新标签页；旧仓库名仅属历史说明。产品已上架 Edge 商店，Tag 发行后的自动上传及审核提交见 [EDGE_STORE_PUBLISH.md](EDGE_STORE_PUBLISH.md)。仓库版本与商店在线版本分别核对，不把提交成功当作审核通过。
 
 > 这是开发阅读入口，不是运行验收报告。协作约束见 [AGENTS.md](../AGENTS.md)；页面/构建事实以 `manifest.json`、HTML、Vite 配置和当前源码为准。下面列的是本次静态核对结果，后续改动时需要同步更新。
 

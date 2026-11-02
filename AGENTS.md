@@ -1,6 +1,8 @@
-# AGENTS.md — LogicWeaver 协作准则与系统架构规范
+# AGENTS.md — tab-project 协作准则与系统架构规范
 
-> **tab-project-next 当前范围优先**：本仓库是 2.3.0 的全新历史迁移副本。按用户要求已彻底移除 ArkPets、Neuro / Evil、Web Mascot、Spine、角色素材、桌宠快捷栏、独立设置页和控制命令。下文历史台账中的桌宠描述不代表当前能力，禁止据此恢复代码、素材或依赖。旧仓库与本地个人预览图不迁移；公开前检查参见 `docs/PUBLICATION_REVIEW.md`。
+> **现行产品与发布入口**：产品名为 **tab-project 新标签页**，正式仓库为 `kongzhuww/tab-project`；`tab-project-next` 和 `LogicWeaver` 是历史名称，现存内部标识不据此批量重命名。仓库当前版本以 `manifest.json` 与 `package.json` 为准，不使用下文历史版本号推断现行发布状态。产品已上架 Microsoft Edge 加载项商店，正式安装入口：https://microsoftedge.microsoft.com/addons/detail/tabproject-%E6%96%B0%E6%A0%87%E7%AD%BE%E9%A1%B5/dbkaiojfbolnkpaegflocfbdgpmhjcco 。自动提交规则见第 6.1 节及 `docs/EDGE_STORE_PUBLISH.md`。
+
+> **当前范围优先**：本仓库源自旧 2.3.0 代码的全新历史迁移副本，旧版本号仅说明来源，不是当前产品版本。按用户要求已彻底移除 ArkPets、Neuro / Evil、Web Mascot、Spine、角色素材、桌宠快捷栏、独立设置页和控制命令。下文历史台账中的桌宠描述不代表当前能力，禁止据此恢复代码、素材或依赖。旧仓库与本地个人预览图不迁移；公开前检查参见 `docs/PUBLICATION_REVIEW.md`。
 
 > **网易云登录链路（用户已确认账户连接成功）**：网易云模块提供“官网登录”和“连接官网账户”，使用固定 music.163.com 的浏览器会话只读请求；不提取 Cookie、不连接旧 localhost 节点、不生成第三方二维码。未接入的写入/历史/榜单操作不假称支持，详情见 docs/NETEASE_WEBSITE_SESSION.md。用户授权纳入1.0.0同版本重发，其他接口未全面验收。
 
@@ -17,9 +19,9 @@
 ## 1. 核心架构事实与运行前提
 
 1. **Chromium Manifest V3 扩展运行架构**：
-   - 主页由 `newtab.html` → `generated/vue-ui.js` → `src/App.vue` 单根 Vue 3 SPA 驱动；
+   - 新标签页入口以 manifest 为准：`newtab-bootstrap.html` → `newtab.html` → `generated/vue-ui.js` → `src/intro/main.ts` / `src/App.vue`；不要因旧文档省略引导页；
    - B站、GitHub、AI HOT、模型价格、设置等**独立标签页为产品既有功能**，拥有独立入口，切勿强行合并或随意关闭用户已有标签；已有主页时优先切回，避免凭空新建第二个主页；
-   - `background.js` 是 MV3 Service Worker，生命周期受浏览器动态回收管理；不要将后台 worker 当作永久长驻无状态进程；
+   - manifest 当前加载 `generated/background.js`，源文件为 `src/background/index.ts`；根 `background.js` 也是构建输出，但不是 manifest 当前入口。MV3 Service Worker 会被浏览器回收，不依赖永久驻留或仅内存状态；
    - 当前仅维护桌面 Chromium 扩展；独立移动端应用已按用户要求删除，不提供 Android / iOS 构建或 APK 更新入口。
 2. **验证与安全铁律**：
    - **严格禁止编写与运行任何断言/无头 E2E 测试**（用户明确指示）；
@@ -150,7 +152,7 @@
    - 构建后检查源码、新生成入口与隔离发布包不含退役通道。历史发布目录不覆写，已打开的旧页面不会自动更新；仍由用户另行刷新验收。
 2. **纯浏览器扩展架构（无 Native Messaging）**：
    - 项目已彻底移除 `native-host/` 辅助程序及 `manifest.json` 中的 `nativeMessaging` 权限；
-   - 网页桌宠（Spine 2D/WebGL）、表情包/视频缓存（File System Access API）、海狸聊天室等全部由浏览器标准 API 独立驱动，绝不依赖外部 EXE、PowerShell 脚本或注册表；
+   - 表情包/视频缓存（File System Access API）、海狸聊天室等由浏览器标准 API 驱动，不依赖外部 EXE、PowerShell 脚本或注册表；网页桌宠及 Spine 已移除，不根据这段历史描述恢复；
    - 严禁引入任何未授权的系统级提权机制或本地常驻进程依赖。
 
 ---
@@ -166,6 +168,17 @@
   3. 下一步建议的 1–3 个明确方向。
 
 ---
+
+### 6.1 Edge 商店、GitHub 发行与描述维护
+
+- **三个描述位置分开维护**：GitHub About 是仓库简介，README 是使用说明，`manifest.json.description` 是安装包内描述；工具栏悬停提示由 `action.default_title` 决定。Partner Center 的商店详情、截图等元数据另在后台维护；修改 README 或 manifest 不等于已修改在线商店详情。
+- **正式发布链路**：`.github/workflows/release.yml` 在正式版本 Tag 推送后完成检查、隔离构建和 GitHub Release，再调用 `.github/workflows/edge-store.yml` 上传同一发行 ZIP 并提交审核；普通 main 提交和 PR 不自动送审。不要仅依赖由内置 GITHUB_TOKEN 创建的 Release 再触发 `release.published` 工作流。
+- **补交已有正式版本**：可手动触发 `Submit to Edge Add-ons` 并提供 Release Tag；先检查 Partner Center，不重复提交正在审核或已上线的相同版本。上传/提交结果不明时不自动重试写请求、不假称撤回。
+- **凭据边界**：发布凭据仅放 GitHub Actions Secrets 的 `EDGE_CLIENT_ID`、`EDGE_API_KEY`；后台产品 ID 放 Actions Variable `EDGE_PRODUCT_ID`，不得与公开扩展 ID 混用。不将真实凭据、个人后台信息或聊天中提供的密钥复制进文档、源码、日志与构建包；轮换只更新 Secret，不改代码。
+- **发行包不可偷换**：Tag、package 与 manifest 版本必须一致。发布过的版本或审核中的 ZIP 不因本地改动而自动变新；描述修订默认纳入后续版本，未经明确授权不覆盖已发行附件、不移动旧 Tag、不取消当前审核。提交、发布 Tag 和商店送审须符合用户当次授权范围。
+- **校验与状态口径**：提交前验证正式 Release、目标 ZIP 校验和、根 manifest 的 MV3 与版本。API 的 202、上传 Succeeded、提交 Succeeded、审核通过、商店公开上线及用户浏览器更新是不同阶段；只能报告实际确认的阶段，不把 Actions 绿灯当成审核通过。
+- **用户更新行为**：商店安装在新版审核发布后由 Edge 检查并自动更新，不承诺立即到达；权限增加时可能需要用户确认。保留原扩展 ID 与存储兼容性，不要求用户卸载重装。解压安装不跟随商店自动更新；切换商店版可能不同 ID，先备份并保留原安装，不自动迁移或清空用户数据。
+- **已验证基线**：v1.0.8 的上传与提交操作已在 Actions 实际返回 Succeeded（运行 41451858658）；这只是一次提交验证记录，不代表未来版本或当前商店审核结果。后续状态仍需核对后台。
 
 ## 7. 海狸聊天室：现行架构与不可回退的交互约束
 
@@ -275,7 +288,7 @@
 
 ### 浏览器侧边栏与快捷键
 
-- 用户确认Alt+W用于浏览器右侧侧边栏（sidepanel.html），不是新标签页内的书签面板。manifest的open-side-panel命令建议Alt+W，后台在用户命令手势中打开；不再用Alt+W关闭窗口、工作区或轮盘。
+- Alt+W 用于覆盖式侧边栏，不是新标签页内的书签面板或浏览器原生 sidePanel。manifest 的 `open-side-panel` 命令建议 Alt+W，与扩展图标共用切换入口；主页直接切换页面内抽屉，普通 HTTP(S) 网页按需注入容器与 `sidepanel.html`。不挤压网页，不恢复 `side_panel` / `sidePanel` 权限，不用 Alt+W 关闭其他窗口、工作区或轮盘。
 - 浏览器级绑定从chrome.commands.getAll读取，在Edge/Chrome的extensions/shortcuts页面修改；不要假称页面录制框可改浏览器级命令，或把manifest建议键当作实际绑定。设置提供实际按键展示和浏览器管理入口；页面书签面板保留独立录制配置。
 - manifest命令变更须用户重载扩展后验收；未分配或冲突时由用户在浏览器管理页调整，不自动改用户已有绑定或启动浏览器。
 
@@ -312,7 +325,7 @@
 ### 顶栏工作区整条与专属设备链路已删除
 
 - 用户确认完整移除整条工作区及专属链路：课表导入/本地回退/向Google批量同步、热点流量、VPS探针、手机状态/短信与系统通知。已删除schedule/traffic/system/phone视图与store/runtime/service，App启动、Overlay、island注册、全局桥接、命令及专属CSS不再引用。
-- AppTopBar不留工作区占位，顶栏高度变量从92px收紧为64px并去掉42px底部预留。保留头像/书签/滚动立方体/桌宠快捷栏/监控快捷栏/设置/主题、Dock、大屏/工作台、通用天气及Google/Todoist日历；WeatherWidget独立初始化天气，不依赖旧工作区runtime。
+- AppTopBar不留工作区占位，顶栏高度变量从92px收紧为64px并去掉42px底部预留。保留头像/书签/滚动立方体/设置/主题、Dock、大屏/工作台、通用天气及Google/Todoist日历；桌宠快捷栏与监控快捷栏已按后续要求移除，不恢复；WeatherWidget独立初始化天气，不依赖旧工作区runtime。
 - 通用日历只投影原有Google事件与Todoist任务，不再读取ClassIsland私有JSON或课程配置，不导入/批量创建课程事件，已存在云端事件原样保留。个人classisland-schedule.local.json未读/未删，Git忽略且干净发布输入排除；公开示例已删除。旧浏览器存储不读取、不迁移、不自动清空，不为“清理”触碰真实凭据。
 - 手机文件通知/复制及原生 Native 宿主链路已按用户指示全量彻底删除：移除 `native-host/` 整个目录及所有相关 C# 源码、PowerShell 脚本与二进制，`manifest.json` 中删除 `nativeMessaging` 高危权限。手机端文件接收、短信与电话监听、纯净 Edge 启动、任务栏歌词、旧版 Codex/AI 桥接均已清理，不留任何原生常驻进程或提权代码。
 - manifest 移除热点专用 LAN 条目与 nativeMessaging 权限；既有 `<all_urls>` 等其它广泛权限仍需按需收窄。干净发布排除 .local/.env 与旧 generated 块；不要清空整个 generated、Git 历史、本机配置或已有发布目录。构建/编译和静态核对不代替真实浏览器/硬件/云端验收。
