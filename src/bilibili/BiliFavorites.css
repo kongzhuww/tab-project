@@ -3169,6 +3169,16 @@ html[data-theme="endfield"] .gh-inline-remark-btn.cancel {
   background: #b91c1c !important;
 }
 
+.nav-wheel-hub {
+  cursor: grab !important;
+  user-select: none;
+  touch-action: none;
+}
+.nav-wheel-hub.dragging {
+  cursor: grabbing !important;
+  box-shadow: 0 0 24px rgba(56, 189, 248, 0.7) !important;
+}
+
 .nav-wheel-hub * {
   pointer-events: none !important;
 }

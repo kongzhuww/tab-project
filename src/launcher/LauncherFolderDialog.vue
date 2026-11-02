@@ -488,7 +488,7 @@ async function onFolderDrop(event: DragEvent, target = state.activeFolder) {
             :data-launcher-id="link.id"
             :class="{
               'is-pointer-dragging': dragGhost && String(dragGhost.link.id) === String(link.id),
-              'is-wheel-picked': navWheelRuntime.isEditingShortcuts && navWheelRuntime.isLinkSelected(String(link.id || link.url))
+              'is-wheel-picked': navWheelRuntime.isEditingShortcuts && navWheelRuntime.isLinkInWheel(link.url)
             }"
             draggable="false"
             @pointerdown="onDialogLinkPointerDown(link, $event)"

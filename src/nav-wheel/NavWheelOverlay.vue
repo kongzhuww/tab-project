@@ -48,8 +48,60 @@ function handleIconError(e: Event, sector: NavWheelSector) {
   img.style.display = "none";
 }
 
+let isDraggingHub = false;
+let hubStartX = 0;
+let hubStartY = 0;
+let hubInitialBallX = 0;
+let hubInitialBallY = 0;
+let hubHasMoved = false;
+
+function onHubPointerDown(e: PointerEvent) {
+  if (e.button !== 0) return;
+  e.stopPropagation();
+  isDraggingHub = true;
+  hubHasMoved = false;
+  hubStartX = e.clientX;
+  hubStartY = e.clientY;
+  hubInitialBallX = state.ballPosition.x;
+  hubInitialBallY = state.ballPosition.y;
+
+  try {
+    (e.currentTarget as HTMLElement)?.setPointerCapture?.(e.pointerId);
+  } catch {}
+  window.addEventListener("pointermove", onHubPointerMove);
+  window.addEventListener("pointerup", onHubPointerUp);
+  window.addEventListener("pointercancel", onHubPointerUp);
+}
+
+function onHubPointerMove(e: PointerEvent) {
+  if (!isDraggingHub) return;
+  const dx = e.clientX - hubStartX;
+  const dy = e.clientY - hubStartY;
+  if (!hubHasMoved && Math.hypot(dx, dy) > 4) {
+    hubHasMoved = true;
+  }
+  if (hubHasMoved) {
+    const radius = state.isExpanded ? 160 : 24;
+    const nextX = Math.max(radius + 8, Math.min(window.innerWidth - radius - 8, hubInitialBallX + dx));
+    const nextY = Math.max(radius + 8, Math.min(window.innerHeight - radius - 8, hubInitialBallY + dy));
+    navWheelController.setBallPosition(nextX, nextY);
+  }
+}
+
+function onHubPointerUp(e: PointerEvent) {
+  if (!isDraggingHub) return;
+  isDraggingHub = false;
+  window.removeEventListener("pointermove", onHubPointerMove);
+  window.removeEventListener("pointerup", onHubPointerUp);
+  window.removeEventListener("pointercancel", onHubPointerUp);
+}
+
 function handleHubClick(e: MouseEvent) {
   e.stopPropagation();
+  if (hubHasMoved) {
+    hubHasMoved = false;
+    return;
+  }
   navWheelController.dispatch("hub:click");
 }
 
@@ -150,14 +202,15 @@ function handleContextMenu(sector: NavWheelSector, e: MouseEvent) {
         </g>
       </svg>
 
-      <!-- 中心导航悬浮球与详情 Hub -->
+      <!-- 中心导航悬浮球与详情 Hub（支持按住拖动位置） -->
       <div
         id="nav-wheel-hub"
         class="nav-wheel-hub"
-        :class="{ active: state.hub.active }"
+        :class="{ active: state.hub.active, dragging: isDraggingHub }"
         role="button"
         tabindex="0"
-        title="导航悬浮球 (点击展开/收起轮盘，快捷键可移至当前鼠标)"
+        title="按住中心可拖拽移动轮盘位置；点击返回上级或收起"
+        @pointerdown="onHubPointerDown"
         @click="handleHubClick"
       >
         <div id="nav-wheel-hub-icon" class="nav-wheel-hub-icon">

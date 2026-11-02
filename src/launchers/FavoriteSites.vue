@@ -977,7 +977,7 @@ async function onFolderDrop(targetGroupName: string, event: DragEvent) {
             class="launcher-link"
             :class="{
               'is-dragging': activeDragLinkId === String(item.link.id),
-              'is-wheel-picked': navWheelRuntime.isEditingShortcuts && navWheelRuntime.isLinkSelected(String(item.link.id || item.link.url))
+              'is-wheel-picked': navWheelRuntime.isEditingShortcuts && navWheelRuntime.isLinkInWheel(item.link.url)
             }"
             :href="item.link.url"
             :title="item.link.title + (item.link.note ? '\n📝 ' + item.link.note : '') + '\n🔗 ' + item.link.url"
