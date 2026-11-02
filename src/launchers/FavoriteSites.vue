@@ -679,8 +679,8 @@ function onLinkMouseDown(event: MouseEvent) {
 function onLinkClick(link: LauncherLink, event: MouseEvent) {
   event.preventDefault();
   event.stopPropagation();
-  if (navWheelRuntime.isPickingShortcut) {
-    void navWheelRuntime.handlePickedLink(link);
+  if (navWheelRuntime.isEditingShortcuts) {
+    navWheelRuntime.handleLinkSelection(link);
     return;
   }
   if (!activePointerId) {
@@ -976,7 +976,8 @@ async function onFolderDrop(targetGroupName: string, event: DragEvent) {
             :key="item.key"
             class="launcher-link"
             :class="{
-              'is-dragging': activeDragLinkId === String(item.link.id)
+              'is-dragging': activeDragLinkId === String(item.link.id),
+              'is-wheel-picked': navWheelRuntime.isEditingShortcuts && navWheelRuntime.isLinkSelected(String(item.link.id || item.link.url))
             }"
             :href="item.link.url"
             :title="item.link.title + (item.link.note ? '\n📝 ' + item.link.note : '') + '\n🔗 ' + item.link.url"

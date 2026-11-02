@@ -195,9 +195,9 @@ function handleContextMenu(sector: NavWheelSector, e: MouseEvent) {
           @click="(e) => handleSectorClick(sector, e)"
           @contextmenu="(e) => handleContextMenu(sector, e)"
         >
-          <!-- 快捷网站删除按钮 (✕) -->
+          <!-- 快捷网站删除按钮 (✕) 仅在编辑模式下显示 -->
           <span
-            v-if="state.mode === 'shortcuts' && sector.isShortcut"
+            v-if="state.mode === 'shortcuts' && sector.isShortcut && navWheelRuntime.isEditingShortcuts"
             role="button"
             tabindex="0"
             class="nav-wheel-sector-del"

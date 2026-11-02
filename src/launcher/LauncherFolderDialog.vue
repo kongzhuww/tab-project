@@ -338,10 +338,10 @@ async function onDialogPointerUp(event: PointerEvent) {
   }
 }
 function handleLinkClick(link: LauncherFolderLink, event: MouseEvent) {
-  if (navWheelRuntime.isPickingShortcut) {
+  if (navWheelRuntime.isEditingShortcuts) {
     event.preventDefault();
     event.stopPropagation();
-    void navWheelRuntime.handlePickedLink(link);
+    navWheelRuntime.handleLinkSelection(link);
     return;
   }
   if (moved || Date.now() < suppressUntil) { event.preventDefault(); event.stopPropagation(); return; }
@@ -486,7 +486,10 @@ async function onFolderDrop(event: DragEvent, target = state.activeFolder) {
             rel="noreferrer"
             :title="`${link.title}${link.note ? '\n📝 ' + link.note : ''}\n🔗 ${link.url}`"
             :data-launcher-id="link.id"
-            :class="{ 'is-pointer-dragging': dragGhost && String(dragGhost.link.id) === String(link.id) }"
+            :class="{
+              'is-pointer-dragging': dragGhost && String(dragGhost.link.id) === String(link.id),
+              'is-wheel-picked': navWheelRuntime.isEditingShortcuts && navWheelRuntime.isLinkSelected(String(link.id || link.url))
+            }"
             draggable="false"
             @pointerdown="onDialogLinkPointerDown(link, $event)"
             @dragstart.prevent
