@@ -33,6 +33,10 @@ jobs:
       - name: Typecheck and isolated extension build
         id: build
         run: npm run release:build
+      - name: Verify in-tree build artifacts have no drift
+        run: |
+          npm run ui:build
+          git diff --exit-code generated/ background.js bookmarks-worker.js
       - name: Working-tree whitespace check
         run: git diff --check
       - name: Upload unpacked extension for manual review
