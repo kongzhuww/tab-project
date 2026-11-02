@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { navWheelState, navWheelController, type NavWheelSector } from "./store";
+import { navWheelRuntime } from "./runtime";
 
 const state = navWheelState;
 
@@ -70,6 +71,10 @@ function handleSectorLeave(sector: NavWheelSector) {
 function handleSectorClick(sector: NavWheelSector, e: MouseEvent) {
   e.stopPropagation();
   navWheelController.dispatch("sector:click", sector);
+}
+
+function handleSectorDelete(sector: NavWheelSector) {
+  void navWheelRuntime.removeShortcut(sector.id);
 }
 
 function handleContextMenu(sector: NavWheelSector, e: MouseEvent) {
@@ -190,6 +195,20 @@ function handleContextMenu(sector: NavWheelSector, e: MouseEvent) {
           @click="(e) => handleSectorClick(sector, e)"
           @contextmenu="(e) => handleContextMenu(sector, e)"
         >
+          <!-- 快捷网站删除按钮 (✕) -->
+          <span
+            v-if="state.mode === 'shortcuts' && sector.isShortcut"
+            role="button"
+            tabindex="0"
+            class="nav-wheel-sector-del"
+            :title="`从快捷轮盘移除「${sector.title}」`"
+            :aria-label="`删除 ${sector.title}`"
+            @pointerdown.stop
+            @click.stop.prevent="handleSectorDelete(sector)"
+          >
+            ✕
+          </span>
+
           <span class="nav-wheel-sector-icon">
             <img
               v-if="isImageIcon(sector.icon)"

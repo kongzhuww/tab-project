@@ -3,6 +3,7 @@ import { fullscreenCardsController } from "../core/fullscreen-cards.store";
 import { launcherService } from "../services/launcher.service";
 import { PLUGIN_CATALOG } from "../modules/market-store";
 import { isEnabledDockEntry, shortcutCaptureState } from "../services/shortcut-catalog";
+import { notifications } from "../sdk/notifications";
 
 type WheelMode = "main" | "tools" | "shortcuts";
 type WheelItem = { id: string; title: string; desc: string; icon: string; url?: string; tool?: string; mode?: WheelMode };
@@ -30,6 +31,8 @@ let showBall = false;
 let initialized = false;
 let storageListener: ((changes: Record<string, any>, area: string) => void) | null = null;
 
+let isPicking = false;
+
 function storage(): any { return (globalThis as any).chrome?.storage; }
 function setBall(x: number, y: number): void {
   const radius = navWheelState.isExpanded ? 160 : 24;
@@ -40,8 +43,21 @@ function setBall(x: number, y: number): void {
 }
 function publish(): void {
   const mode = navWheelState.mode as WheelMode;
+  let shortcutItems: WheelItem[] = [];
+  if (mode === "shortcuts") {
+    shortcutItems = [...links];
+    // 允许添加网站：显示添加扇区
+    if (shortcutItems.length < 10) {
+      shortcutItems.push({
+        id: "add-shortcut",
+        title: "添加网站",
+        desc: "点击后点选常用网站或文件夹内网站加入轮盘",
+        icon: "➕"
+      });
+    }
+  }
   items = mode === "tools" ? enabledToolItems() : mode === "shortcuts" ?
-    [...(links.length ? links : [{ id: "shortcut-empty", title: "暂无快捷项", desc: "常用网站可放入快捷轮盘", icon: "📭" }]),
+    [...shortcutItems,
       { id: "back-to-main", title: "返回主轮盘", desc: "返回页面电梯导航", icon: "🔙", mode: "main" }] : enabledMainItems();
   const count = items.length;
   const orbit = count > 12 ? 118 : count > 9 ? 114 : 110;
@@ -76,6 +92,10 @@ function open(x = navWheelState.ballPosition.x, y = navWheelState.ballPosition.y
   navWheelController.setVisibility(true);
 }
 function perform(item: WheelItem): void {
+  if (item.id === "add-shortcut") {
+    startPickingShortcut();
+    return;
+  }
   if ((item.tool && !isEnabledDockEntry(item.tool)) || (!item.url && !item.mode && item.id !== "launcher" && !isEnabledDockEntry(item.id))) return;
   if (item.mode) { setMode(item.mode); return; }
   close();
@@ -90,6 +110,97 @@ function perform(item: WheelItem): void {
   } else fullscreenCardsController.enter(item.id);
 }
 
+function startPickingShortcut(): void {
+  isPicking = true;
+  close();
+  notifications.show({
+    appName: "快捷轮盘",
+    title: "点选添加模式已开启",
+    message: "请在常用网站或展开的文件夹中点击要加入的网站（按 Esc 键取消）",
+    duration: 8000
+  });
+}
+
+function cancelPickingShortcut(): void {
+  if (!isPicking) return;
+  isPicking = false;
+  notifications.show({
+    appName: "快捷轮盘",
+    title: "已退出点选模式",
+    message: "未添加任何网站",
+    duration: 2000
+  });
+}
+
+async function handlePickedLink(link: any): Promise<boolean> {
+  if (!isPicking) return false;
+  isPicking = false;
+  if (!link || !link.url) return false;
+
+  try {
+    const raw = await storage()?.local?.get(["siteShelfLinks", "logicweaverNavWheelShortcutsV1"]);
+    const prev = Array.isArray(raw?.siteShelfLinks) ? raw.siteShelfLinks : (Array.isArray(raw?.logicweaverNavWheelShortcutsV1) ? raw.logicweaverNavWheelShortcutsV1 : []);
+
+    // 检查是否已存在相同 url
+    const exists = prev.some((item: any) => item.url === link.url);
+    if (exists) {
+      notifications.show({
+        appName: "快捷轮盘",
+        title: "已存在",
+        message: `「${link.title || link.url}」已经在快捷轮盘中`,
+        duration: 3000
+      });
+      open(undefined, undefined, "shortcuts");
+      return true;
+    }
+
+    const newEntry = {
+      id: String(link.id || `wheel-${Date.now()}`),
+      title: link.title || "快捷网站",
+      url: link.url,
+      icon: link.icon || "",
+      customIcon: link.customIcon || ""
+    };
+    const next = [...prev, newEntry];
+    await storage()?.local?.set({ siteShelfLinks: next, logicweaverNavWheelShortcutsV1: next });
+    await navWheelRuntime.loadShortcuts();
+    notifications.show({
+      appName: "快捷轮盘",
+      title: "添加成功",
+      message: `已将「${newEntry.title}」添加到快捷轮盘！`,
+      duration: 3000
+    });
+    // 重新展开轮盘回到快捷方式页，让用户直接看到新增结果
+    open(undefined, undefined, "shortcuts");
+    return true;
+  } catch (error) {
+    console.warn("[NavWheel] 添加快捷方式失败", error);
+    return false;
+  }
+}
+
+async function removeShortcut(id: string): Promise<void> {
+  try {
+    const raw = await storage()?.local?.get(["siteShelfLinks", "logicweaverNavWheelShortcutsV1"]);
+    const prev = Array.isArray(raw?.siteShelfLinks) ? raw.siteShelfLinks : (Array.isArray(raw?.logicweaverNavWheelShortcutsV1) ? raw.logicweaverNavWheelShortcutsV1 : []);
+    const removedItem = prev.find((item: any) => String(item.id) === String(id));
+    const next = prev.filter((item: any) => String(item.id) !== String(id));
+    await storage()?.local?.set({ siteShelfLinks: next, logicweaverNavWheelShortcutsV1: next });
+    await navWheelRuntime.loadShortcuts();
+    publish();
+    if (removedItem) {
+      notifications.show({
+        appName: "快捷轮盘",
+        title: "已移除",
+        message: `已从轮盘移除「${removedItem.title || '快捷网站'}」`,
+        duration: 2500
+      });
+    }
+  } catch (error) {
+    console.warn("[NavWheel] 删除快捷方式失败", error);
+  }
+}
+
 function onPointerMove(event: PointerEvent): void { lastMouse = { x: event.clientX, y: event.clientY }; }
 function onMouseDown(event: MouseEvent): void {
   if (event.button !== 1) return;
@@ -101,8 +212,14 @@ function onMouseDown(event: MouseEvent): void {
 }
 function onAuxClick(event: MouseEvent): void { if (event.button === 1) event.preventDefault(); }
 function onKeyDown(event: KeyboardEvent): void {
-  if (!navWheelState.isExpanded || shortcutCaptureState.active) return;
   if (event.key === "Escape") {
+    if (isPicking) {
+      event.preventDefault();
+      event.stopPropagation();
+      cancelPickingShortcut();
+      return;
+    }
+    if (!navWheelState.isExpanded || shortcutCaptureState.active) return;
     event.preventDefault(); event.stopPropagation();
     if (navWheelState.mode === "shortcuts") setMode("main");
     else close();
@@ -210,6 +327,11 @@ export const navWheelRuntime = {
   },
   open(x?: number, y?: number): void { open(x ?? lastMouse.x, y ?? lastMouse.y); },
   close,
+  get isPickingShortcut(): boolean { return isPicking; },
+  startPickingShortcut,
+  cancelPickingShortcut,
+  handlePickedLink,
+  removeShortcut,
   toggle(atMouse = false): void {
     if (navWheelState.isExpanded) close();
     else if (atMouse) open(lastMouse.x, lastMouse.y);

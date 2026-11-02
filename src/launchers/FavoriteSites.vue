@@ -26,6 +26,7 @@ import { launcherMenusController } from "../launcher/menus-store";
 import { folderState } from "../launcher/folder-store";
 import { folderParent } from "../launcher/folder-tree";
 import { notifications } from "../sdk/notifications";
+import { navWheelRuntime } from "../nav-wheel/runtime";
 
 function onWindowBlurOrHide() {
   cleanupPointerDrag();
@@ -678,6 +679,10 @@ function onLinkMouseDown(event: MouseEvent) {
 function onLinkClick(link: LauncherLink, event: MouseEvent) {
   event.preventDefault();
   event.stopPropagation();
+  if (navWheelRuntime.isPickingShortcut) {
+    void navWheelRuntime.handlePickedLink(link);
+    return;
+  }
   if (!activePointerId) {
     isDraggingTile = false;
   }

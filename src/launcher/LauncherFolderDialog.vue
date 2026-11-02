@@ -9,6 +9,7 @@ import { launcherGroupsController } from "../launchers/store";
 import LauncherFavicon from "../launchers/LauncherFavicon.vue";
 import LauncherFolderSurface from "./LauncherFolderSurface.vue";
 import LauncherTileContent from "../launchers/LauncherTileContent.vue";
+import { navWheelRuntime } from "../nav-wheel/runtime";
 
 const state = folderState;
 const wasAlreadyOpen = ref(false);
@@ -337,6 +338,12 @@ async function onDialogPointerUp(event: PointerEvent) {
   }
 }
 function handleLinkClick(link: LauncherFolderLink, event: MouseEvent) {
+  if (navWheelRuntime.isPickingShortcut) {
+    event.preventDefault();
+    event.stopPropagation();
+    void navWheelRuntime.handlePickedLink(link);
+    return;
+  }
   if (moved || Date.now() < suppressUntil) { event.preventDefault(); event.stopPropagation(); return; }
   launcherFolderController.dispatch("link:click", { link, event });
 }
