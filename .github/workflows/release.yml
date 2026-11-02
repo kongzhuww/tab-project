@@ -15,7 +15,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: release-${{ github.ref }}
+  group: extension-release-publish
   cancel-in-progress: false
 
 jobs:
@@ -47,6 +47,8 @@ jobs:
               throw new Error("Tag, package and manifest versions must match");
             }
           '
+      - name: Release policy regression tests
+        run: npm test
       - run: npm ci
       - name: Typecheck and isolated extension build
         id: build
@@ -82,39 +84,107 @@ jobs:
         with:
           name: release-assets
           path: release-assets
-      - name: Verify archive checksum
-        working-directory: release-assets
-        run: sha256sum --check SHA256SUMS.txt
-      - name: Create or publish release
+      - name: Verify new release, provenance and tag
+        id: guard
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           RELEASE_TAG: ${{ github.ref_name }}
           VERSION: ${{ needs.build.outputs.version }}
+          SOURCE_SHA: ${{ github.sha }}
+        run: |
+          # BEGIN RELEASE GUARD
+          node <<'NODE'
+          const fs = require('node:fs');
+          const crypto = require('node:crypto');
+          const { execFileSync } = require('node:child_process');
+
+          async function main() {
+            const { VERSION: version, GH_REPO: repo, GH_TOKEN: token,
+              SOURCE_SHA: sourceSha, RELEASE_TAG: ref, GITHUB_REF_TYPE: refType } = process.env;
+            if (!/^\d+\.\d+\.\d+(?:\.\d+)?$/.test(version || ''))
+              throw new Error('Invalid release version');
+            if (!/^[\w.-]+\/[\w.-]+$/.test(repo || '') || !token ||
+                !/^[0-9a-f]{40}$/.test(sourceSha || ''))
+              throw new Error('Invalid release identity');
+            const tag = 'v' + version;
+            if (refType === 'tag' && ref !== tag)
+              throw new Error('Release tag and version differ');
+
+            const archive = 'tab-project-' + tag + '-extension.zip';
+            const assets = fs.readdirSync('release-assets').sort();
+            const expected = ['SHA256SUMS.txt', 'build-info.json', archive].sort();
+            if (JSON.stringify(assets) !== JSON.stringify(expected))
+              throw new Error('Unexpected release asset set');
+            for (const name of assets) {
+              if (!fs.lstatSync('release-assets/' + name).isFile())
+                throw new Error('Release assets must be regular files');
+            }
+            const sums = fs.readFileSync('release-assets/SHA256SUMS.txt', 'utf8').trim().split(/\r?\n/);
+            const match = sums.length === 1 && sums[0].match(/^([a-f0-9]{64})  (?:\.\/)?([^/\\]+)$/);
+            if (!match || match[2] !== archive)
+              throw new Error('Invalid release checksum manifest');
+            const digest = crypto.createHash('sha256')
+              .update(fs.readFileSync('release-assets/' + archive)).digest('hex');
+            if (digest !== match[1]) throw new Error('Release checksum mismatch');
+            const info = JSON.parse(fs.readFileSync('release-assets/build-info.json', 'utf8'));
+            if (info.version !== version || info.commit !== sourceSha ||
+                info.environment !== 'github-actions')
+              throw new Error('Release provenance mismatch');
+            const manifest = JSON.parse(execFileSync('unzip',
+              ['-p', 'release-assets/' + archive, 'manifest.json'],
+              { encoding: 'utf8', maxBuffer: 1024 * 1024 }));
+            if (manifest.version !== version || manifest.manifest_version !== 3)
+              throw new Error('Release package version or format mismatch');
+
+            async function api(path, allowMissing = false) {
+              const response = await fetch('https://api.github.com/repos/' + repo + path, {
+                headers: { Authorization: 'Bearer ' + token, Accept: 'application/vnd.github+json',
+                  'X-GitHub-Api-Version': '2022-11-28' },
+                redirect: 'error', signal: AbortSignal.timeout(30000),
+              });
+              if (allowMissing && response.status === 404) return null;
+              if (!response.ok) throw new Error('Release preflight HTTP ' + response.status);
+              const data = await response.json();
+              if (!data || typeof data !== 'object' || Array.isArray(data))
+                throw new Error('Malformed release API response');
+              return data;
+            }
+            // Check access first: auth/repository errors must not be mistaken for an absent release.
+            await api('');
+            const existing = await api('/releases/tags/' + encodeURIComponent(tag), true);
+            if (existing !== null) throw new Error('Release already exists; no assets will be changed');
+            let object = (await api('/git/ref/tags/' + encodeURIComponent(tag))).object;
+            for (let depth = 0; object?.type === 'tag' && depth < 5; depth++) {
+              if (!/^[0-9a-f]{40}$/.test(object.sha || '')) throw new Error('Invalid annotated tag');
+              object = (await api('/git/tags/' + object.sha)).object;
+            }
+            if (object?.type !== 'commit' || object.sha !== sourceSha)
+              throw new Error('Tag does not point to the built commit');
+            fs.appendFileSync(process.env.GITHUB_OUTPUT, 'tag=' + tag + '\n');
+            console.log('Verified new immutable release ' + tag);
+          }
+          main().catch(error => {
+            console.error(error.message);
+            process.exitCode = 1;
+          });
+          NODE
+          # END RELEASE GUARD
+      - name: Create new release without replacing existing assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ steps.guard.outputs.tag }}
+          VERSION: ${{ needs.build.outputs.version }}
+          PUBLISH_LATEST: ${{ github.event_name != 'workflow_dispatch' || inputs.publish_latest }}
         run: |
           set -euo pipefail
-          # 自动计算规范 Tag：若为 Tag 触发则取 tag 名，若为手动触发则取 v+version，防止出现 main tag 错误
-          if [ "${GITHUB_REF_TYPE:-}" = "tag" ]; then
-            TAG="${RELEASE_TAG}"
-          else
-            TAG="v${VERSION}"
-          fi
-
-          if gh release view "$TAG" >/dev/null 2>&1; then
-            echo "Release $TAG already exists; uploading assets and setting latest."
-            gh release upload "$TAG" \
-              "release-assets/tab-project-v${VERSION}-extension.zip" \
-              release-assets/SHA256SUMS.txt release-assets/build-info.json \
-              --clobber
-            gh release edit "$TAG" --title "tab-project-next ${TAG}" --draft=false --latest
-          else
-            gh release create "$TAG" \
-              "release-assets/tab-project-v${VERSION}-extension.zip" \
-              release-assets/SHA256SUMS.txt release-assets/build-info.json \
-              --verify-tag --latest --generate-notes \
-              --title "tab-project-next ${TAG}"
-          fi
-
+          # Create only: an existing release or asset collision must fail, never update or retry.
+          gh release create "$TAG" \
+            "release-assets/tab-project-v${VERSION}-extension.zip" \
+            release-assets/SHA256SUMS.txt release-assets/build-info.json \
+            --verify-tag --latest="$PUBLISH_LATEST" --generate-notes \
+            --title "tab-project ${TAG}"
   edge-store:
     needs: [build, publish]
     if: github.ref_type == 'tag'

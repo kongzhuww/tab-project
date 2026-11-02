@@ -7,6 +7,16 @@
 - 补交已有版本：在 Actions 的 `Submit to Edge Add-ons` 中选择 Run workflow，填写已有正式 Release Tag，例如 `v1.0.8`。不要重复提交正在审核或已经上架的相同版本。
 - GitHub Release 成功与 Edge 提交是独立状态；Edge 提交失败不会删除已发布附件，应先检查后台状态再决定是否重试。
 
+## GitHub Release 不可覆盖保护
+
+- 发行工作流只创建新 Release，不上传、编辑、删除或覆盖已有 Release；相同版本已存在（含草稿、预发布版）时失败退出。重跑失败任务不会自动替换附件，也不会继续商店提交。
+- 写权限任务不检出项目源码、不安装 npm 依赖、不执行发行包内脚本；只运行工作流内联校验和固定的 `gh release create` 命令。
+- 创建前校验：附件恰为指定 ZIP、SHA256SUMS.txt、build-info.json，均是普通文件；ZIP 哈希、根 manifest 的 MV3/版本、构建来源的 version/commit/github-actions 环境均匹配；现存远端 Tag（支持有限层级注解 Tag）必须指向该次工作流的提交。
+- 先核对仓库访问权限，再确认版本确实返回 404；鉴权失败、限流、网络故障、异常响应与缺少 Tag 均停止，不尝试自动建 Tag 或把错误当成版本不存在。
+- 手动触发只允许发布已有且指向本次构建提交的版本 Tag；`publish_latest` 控制是否设为 Latest。已有 Release 不可借手动触发补写附件；残缺发行应先核对原因并另行授权处理，默认发布新版本。
+- 发行运行串行执行，检查后若其他操作者创建同名 Release，创建命令应失败，不使用覆盖分支或自动重试。该策略不等于已经开启 GitHub 服务端 Immutable Releases 或 Tag 保护，也不承诺对外部操作者移动 Tag 的零竞态保护。
+- `npm test` 执行无外网/真实凭据的发行策略回归，并已接入 CI 与发行构建前门禁。测试范围与限制见 [TESTING.md](TESTING.md)。商店任务自身的重试、审核及在线状态仍按下文边界处理。
+
 ## 一次性配置
 
 仓库 Actions Secrets：`EDGE_CLIENT_ID`、`EDGE_API_KEY`。
