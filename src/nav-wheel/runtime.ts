@@ -151,7 +151,7 @@ async function handleLinkSelection(link: any): Promise<boolean> {
 
     if (existingIndex >= 0) {
       // 已经存在：点击即刻从轮盘中移除
-      const next = prev.filter((_, idx) => idx !== existingIndex);
+      const next = prev.filter((_: any, idx: number) => idx !== existingIndex);
       await storage()?.local?.set({ siteShelfLinks: next, logicweaverNavWheelShortcutsV1: next });
       await navWheelRuntime.loadShortcuts();
       publish();
