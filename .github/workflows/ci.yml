@@ -35,8 +35,8 @@ jobs:
         run: npm run release:build
       - name: Verify in-tree build artifacts have no drift
         run: |
-          npm run ui:build
-          git diff --exit-code generated/ background.js bookmarks-worker.js tests/generated/
+          npm run build:bg
+          git diff --exit-code background.js bookmarks-worker.js tests/generated/
       - name: Working-tree whitespace check
         run: git diff --check
       - name: Upload unpacked extension for manual review
