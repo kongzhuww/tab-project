@@ -78,6 +78,24 @@ Include your installed extension version, browser version, and reproduction step
 
 ---
 
+## Screenshots
+
+These screenshots use fictional demo data rather than personal tasks or collections. AI news headlines on the home screen are fictional examples, not factual news or model-release claims. Available features depend on the installed version.
+
+### Home
+
+![Light-theme home with clock, weather, search, favorite sites, and demo AI news](docs/images/demo-home.png)
+
+### Bilibili Plugin
+
+![Bilibili favorites with fictional demo videos and collections](docs/images/demo-bilibili.png)
+
+### Todoist Task Kanban
+
+![Todoist calendar and multi-column kanban with fictional tasks](docs/images/demo-todoist.png)
+
+---
+
 ## 🧭 Quick Guide: Which Path Fits You?
 
 Choose the best path for your needs:
