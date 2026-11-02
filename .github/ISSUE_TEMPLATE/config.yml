@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: 使用交流 / Discussions
+    url: https://github.com/kongzhuww/tab-project/discussions
+    about: 分享使用体验与工作流；可复现故障请优先使用问题反馈模板。
+  - name: 版本更新 / Releases
+    url: https://github.com/kongzhuww/tab-project/releases
+    about: 查看发行记录；商店在线版本以商店页面和实际安装版本为准。

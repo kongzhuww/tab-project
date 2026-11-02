@@ -7,6 +7,10 @@
 <p align="center"><strong>A Browser New-Tab Personal Productivity Workspace</strong></p>
 
 <p align="center">
+  <a href="https://microsoftedge.microsoft.com/addons/detail/tabproject-%E6%96%B0%E6%A0%87%E7%AD%BE%E9%A1%B5/dbkaiojfbolnkpaegflocfbdgpmhjcco"><img src="https://img.shields.io/badge/Microsoft_Edge-Install-0078D4?style=for-the-badge" alt="Install from Microsoft Edge Add-ons" /></a>
+</p>
+
+<p align="center">
   <strong>English</strong> · <a href="README.md">简体中文</a>
 </p>
 
@@ -26,6 +30,12 @@
 > **Repository Version**: **1.0.8**, featuring a non-resizing overlay sidebar, native GitHub Lists with multi-list membership, and revised Bilibili favorites search. The store listing and installed version are authoritative for store users and may lag behind GitHub Releases. See the [Changelog](CHANGELOG.md) and [Release Notes](docs/RELEASE_1.0.8.md).
 
 ---
+
+## Feedback & Updates
+
+[Report a bug](https://github.com/kongzhuww/tab-project/issues/new?template=bug_report.yml) · [Request a feature](https://github.com/kongzhuww/tab-project/issues/new?template=feature_request.yml) · [Discussions](https://github.com/kongzhuww/tab-project/discussions) · [Releases](https://github.com/kongzhuww/tab-project/releases)
+
+Include your installed extension version, browser version, and reproduction steps. Redact private data before sharing screenshots; never post tokens, cookies, or API keys. Edge checks for approved store updates automatically. To follow GitHub releases, select **Watch → Custom → Releases** on this repository.
 
 ## Core Features & Module Status
 

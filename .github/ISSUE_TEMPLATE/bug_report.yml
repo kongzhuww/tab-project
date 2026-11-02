@@ -1,0 +1,51 @@
+name: 问题反馈 / Bug report
+description: 报告可复现的问题，请勿提交个人凭据或未脱敏截图。
+title: "[Bug] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        请勿提交 Token、Cookie、API Key、邀请凭证或包含个人数据的截图。
+        安装来源、安装版本与仓库最新版本可能不同，请填写真实安装信息。
+  - type: input
+    id: extension-version
+    attributes:
+      label: 扩展版本 / Extension version
+      placeholder: "例如 1.0.8，见扩展管理页"
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: 浏览器与系统 / Browser and OS
+      placeholder: "例如 Edge 版本号、Windows 11"
+    validations:
+      required: true
+  - type: dropdown
+    id: installation
+    attributes:
+      label: 安装来源 / Installation source
+      options:
+        - Microsoft Edge 商店 / Edge Add-ons
+        - Release ZIP 解压安装 / Unpacked release
+        - 源码构建 / Source build
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: 复现步骤 / Steps to reproduce
+      description: 写明操作的模块、步骤和出现频率，不要附带凭据。
+    validations:
+      required: true
+  - type: textarea
+    id: expected-actual
+    attributes:
+      label: 预期与实际结果 / Expected and actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: 已脱敏截图与错误信息 / Redacted screenshots and errors
+      description: 可选；遮挡账号、任务、私有仓库、通知及凭据后再上传。

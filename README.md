@@ -7,6 +7,10 @@
 <p align="center"><strong>以浏览器新标签页为核心的个人生产力工作台</strong></p>
 
 <p align="center">
+  <a href="https://microsoftedge.microsoft.com/addons/detail/tabproject-%E6%96%B0%E6%A0%87%E7%AD%BE%E9%A1%B5/dbkaiojfbolnkpaegflocfbdgpmhjcco"><img src="https://img.shields.io/badge/Microsoft_Edge-Install-0078D4?style=for-the-badge" alt="从 Microsoft Edge 商店安装" /></a>
+</p>
+
+<p align="center">
   <a href="README_en.md">English</a> · <strong>简体中文</strong>
 </p>
 
@@ -24,6 +28,12 @@
 > **已上架 Microsoft Edge 加载项商店**：[安装 tab-project 新标签页](https://microsoftedge.microsoft.com/addons/detail/tabproject-%E6%96%B0%E6%A0%87%E7%AD%BE%E9%A1%B5/dbkaiojfbolnkpaegflocfbdgpmhjcco)，无需开启开发者模式。商店安装由 Edge 管理自动更新；每次新版本仍需单独提交商店审核，GitHub 提交或 Release 不会立即更新商店版。
 
 > **仓库版本**：**1.0.8**，新增不挤压网页的覆盖式侧栏、GitHub 原生 Lists 与多列表归属，并调整 B站收藏搜索。商店版本以商店页面及实际安装版本为准，可能与 GitHub Release 存在时间差。详见 [更新日志](CHANGELOG.md)及[发行说明](docs/RELEASE_1.0.8.md)。
+
+## 反馈与更新
+
+[报告问题](https://github.com/kongzhuww/tab-project/issues/new?template=bug_report.yml) · [功能建议](https://github.com/kongzhuww/tab-project/issues/new?template=feature_request.yml) · [使用交流](https://github.com/kongzhuww/tab-project/discussions) · [版本更新](https://github.com/kongzhuww/tab-project/releases)
+
+反馈时请填写实际安装版本、浏览器版本与复现步骤；截图请先遮挡私人信息，勿提交 Token、Cookie 或密钥。商店安装会由 Edge 检查并获取已审核上线的更新；想收到 GitHub 发行通知，可在仓库 **Watch → Custom → Releases** 中订阅。
 
 ## 核心功能概览与状态分级
 
