@@ -288,6 +288,7 @@ export const macDockController: MacDockController = {
       }
       if (document.body) {
         document.body.dataset.page = "home";
+        document.body.classList.remove("has-card-fullscreen");
       }
       const dailyBtn = document.getElementById("daily-toggle");
       if (dailyBtn && dailyBtn.classList.contains("active")) {
@@ -295,6 +296,7 @@ export const macDockController: MacDockController = {
       }
 
       (window as any).exitFullscreenCard?.();
+      (window as any).LogicWeaverFullscreen?.exit?.();
 
       if (typeof window !== "undefined") {
         window.scrollTo({ top: 0, left: 0, behavior: "instant" as ScrollBehavior });

@@ -39,6 +39,10 @@ export const fullscreenCardsController = {
     pauseBackgroundVideo();
     try { sessionStorage.setItem(ACTIVE_CARD_SESSION_KEY, id); } catch {}
     fullscreenCardState.activeId = id as CardId;
+    if (typeof document !== "undefined") {
+      document.body.classList.add("has-card-fullscreen");
+      document.body.dataset.page = "daily";
+    }
     const win = window as any;
     if (id === "daily-bilibili") {
       win.LogicWeaverBiliFavorites?.loadOrganizer?.();
@@ -55,6 +59,10 @@ export const fullscreenCardsController = {
     }
     fullscreenCardState.activeId = null;
     try { sessionStorage.removeItem(ACTIVE_CARD_SESSION_KEY); } catch {}
+    if (typeof document !== "undefined") {
+      document.body.classList.remove("has-card-fullscreen");
+      document.body.dataset.page = "home";
+    }
     windowManagerController.releaseFocus(leavingId);
     resumeBackgroundVideo();
   },

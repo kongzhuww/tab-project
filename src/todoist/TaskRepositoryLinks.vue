@@ -102,7 +102,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { gitHubService } from '../services/github.service';
-import { readRepositoryLinks, writeRepositoryLinks, validRepositoryName as valid, type RepositoryLink as RepoLink } from './repository-links';
+import { readRepositoryLinks, writeRepositoryLinks, validRepositoryName as valid, getTaskRepositoryLinks, type RepositoryLink as RepoLink } from './repository-links';
 import { readBiliVideoLinks, unlinkBiliVideo, getTaskBiliVideoLinks, type BiliVideoLink } from './bili-video-links';
 import { biliMiniPlayerController } from '../bilibili/mini-player-store';
 import { githubRepoDetailController } from '../github/repo-detail-store';
@@ -119,7 +119,7 @@ const hasAnyLinks = computed(() => links.value.length > 0 || biliVideos.value.le
 
 function reloadLinks() {
   try {
-    links.value = readRepositoryLinks(props.taskId);
+    links.value = getTaskRepositoryLinks(props.taskId, props.description);
     biliVideos.value = getTaskBiliVideoLinks(props.taskId, props.description, props.title);
     readable.value = true;
   } catch {
