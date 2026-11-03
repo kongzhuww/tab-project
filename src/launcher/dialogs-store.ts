@@ -1,14 +1,7 @@
 import { reactive } from "vue";
-import { searchLauncherIcons } from "../services/launcher-icon-search.service";
 import { launcherService } from "../services/launcher.service";
 import { appDialog } from "../core/app-dialog.store";
 import { notifications } from "../sdk/notifications";
-
-export interface IconPickerItem {
-  url: string;
-  source?: string;
-  name?: string;
-}
 
 export interface MoveOptionItem {
   id: string;
@@ -25,23 +18,6 @@ export interface LauncherDialogsState {
     group: string;
     note: string;
     isNew: boolean;
-  };
-  iconPicker: {
-    isOpen: boolean;
-    query: string;
-    targetUrl: string;
-    targetId: string;
-    results: IconPickerItem[];
-    currentPage: number;
-    pageSize: number;
-    totalPages: number;
-    selectedIconUrl: string;
-    isSaving: boolean;
-    session: number;
-    previewTargetTitle: string;
-    customUrl: string;
-    isCustomPanelOpen: boolean;
-    isLoading: boolean;
   };
   linkMove: {
     isOpen: boolean;
@@ -82,23 +58,6 @@ export const launcherDialogsState = reactive<LauncherDialogsState>({
     group: "",
     note: "",
     isNew: true
-  },
-  iconPicker: {
-    isOpen: false,
-    query: "",
-    targetUrl: "",
-    targetId: "",
-    results: [],
-    currentPage: 1,
-    pageSize: 8,
-    totalPages: 1,
-    selectedIconUrl: "",
-    isSaving: false,
-    session: 0,
-    previewTargetTitle: "",
-    customUrl: "",
-    isCustomPanelOpen: false,
-    isLoading: false
   },
   linkMove: {
     isOpen: false,
@@ -205,80 +164,6 @@ export const launcherDialogsController = {
     } catch (error) {
       console.warn("[Launcher] 删除网站失败", error);
       void appDialog.alert({ title: "删除失败", message: "删除失败，请重试。" });
-    }
-  },
-
-  // --- 2. 图标选择弹窗 ---
-  openIconPicker(targetTitle: string, initialQuery: string = "", targetUrl: string = "", targetId: string = "", saveIcon?: (icon: string) => Promise<void>) {
-    if (state.iconPicker.isSaving) return;
-    iconSaveHandler = saveIcon;
-    state.iconPicker.session++;
-    iconSearchVersion++;
-    state.iconPicker.targetUrl = targetUrl;
-    state.iconPicker.targetId = targetId;
-    state.iconPicker.customUrl = "";
-    state.iconPicker.isLoading = false;
-    state.iconPicker.totalPages = 1;
-    state.iconPicker.results = [];
-    state.iconPicker.isOpen = true;
-    state.iconPicker.previewTargetTitle = targetTitle;
-    state.iconPicker.query = initialQuery || targetTitle;
-    state.iconPicker.selectedIconUrl = "";
-    state.iconPicker.isCustomPanelOpen = false;
-    state.iconPicker.currentPage = 1;
-    this.dispatch("icon-picker", "open", { targetTitle, query: state.iconPicker.query });
-  },
-
-  closeIconPicker() {
-    if (state.iconPicker.isSaving) return;
-    iconSaveHandler = undefined;
-    state.iconPicker.session++;
-    iconSearchVersion++;
-    state.iconPicker.isOpen = false;
-    this.dispatch("icon-picker", "close");
-  },
-
-  async searchIcons(query: string, url: string = state.iconPicker.targetUrl): Promise<void> {
-    if (state.iconPicker.isSaving) return;
-    const version = ++iconSearchVersion;
-    state.iconPicker.query = query;
-    state.iconPicker.results = [];
-    state.iconPicker.currentPage = 1;
-    state.iconPicker.isLoading = true;
-    try {
-      const results = await searchLauncherIcons(query, url, (batch) => {
-        if (version === iconSearchVersion && state.iconPicker.isOpen) this.setIconPickerResults(batch);
-      });
-      if (version === iconSearchVersion && state.iconPicker.isOpen) this.setIconPickerResults(results);
-    } finally {
-      if (version === iconSearchVersion) state.iconPicker.isLoading = false;
-    }
-  },
-
-  setIconPickerResults(results: IconPickerItem[], totalPages?: number) {
-    state.iconPicker.results = results;
-    state.iconPicker.totalPages = totalPages || Math.max(1, Math.ceil(results.length / state.iconPicker.pageSize));
-    state.iconPicker.isLoading = false;
-  },
-
-  selectIcon(url: string) {
-    state.iconPicker.selectedIconUrl = url;
-  },
-
-  async confirmIcon(): Promise<void> {
-    const { targetId, selectedIconUrl, isOpen, isSaving } = state.iconPicker;
-    const save = iconSaveHandler;
-    if (!isOpen || isSaving || (!targetId && !save) || !selectedIconUrl) return;
-    state.iconPicker.isSaving = true;
-    try {
-      if (save) await save(selectedIconUrl);
-      else await launcherService.setLinkIcon(targetId, selectedIconUrl);
-      state.iconPicker.isSaving = false;
-      this.closeIconPicker();
-    } catch (error) {
-      notifications.show({ appName: '网站头像', title: '保存未完成', message: error instanceof Error ? error.message : '请核对存储状态后再操作。' });
-    } finally {
-      state.iconPicker.isSaving = false;
     }
   },
 

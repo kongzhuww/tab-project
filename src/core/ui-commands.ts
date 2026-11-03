@@ -202,12 +202,6 @@ export function registerUiCommands(commands: CommandRegistry): void {
     run: () => window.LogicWeaverLauncherDialogs?.openEditDialog({})
   });
   commands.register({
-    id: "launcher.open-icon-picker", title: "打开网站图标选择器", category: "启动器", description: "搜索并选用网站高清图标或上传自定义图片",
-    keywords: ["图标选择", "网站头像", "icon picker"], concurrency: "drop",
-    enabled: () => typeof window.LogicWeaverLauncherDialogs?.openIconPicker === "function",
-    run: () => window.LogicWeaverLauncherDialogs?.openIconPicker("新网站")
-  });
-  commands.register({
     id: "settings.open", title: "打开设置中心", category: "设置", description: "打开全局新标签页偏好设置对话框",
     keywords: ["偏好设置", "options", "settings"], concurrency: "drop",
     enabled: () => typeof window.LogicWeaverSettings?.open === "function",

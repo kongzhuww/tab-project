@@ -16,7 +16,7 @@ const props = defineProps<{
   remove: (item: BookmarkBoardItem) => Promise<void>;
   move: (item: BookmarkBoardItem, parentId: string) => Promise<void>;
 }>();
-const emit = defineEmits<{ close: []; toggleSize: [id: string]; refresh: []; changeIcon: [item: BookmarkBoardItem] }>();
+const emit = defineEmits<{ close: []; toggleSize: [id: string]; refresh: [] }>();
 const confirming = ref(false), flyout = ref(false), actionError = ref('');
 const detachedError = (message: string) => notifications.show({ appName: '书签', title: '保存未完成', message });
 const liveItem = shallowRef(props.target.item);
@@ -144,7 +144,6 @@ async function runPluginAction(action: MenuSlotAction, target: { id: string; tit
           :vertical-budget="280" empty-text="暂无其他可移动分区" @select="moveTo" />
         <button id="link-menu-rename" type="button" :disabled="actionsBlocked" @click="startTitle">重命名</button>
         <button id="link-menu-edit" type="button" :disabled="actionsBlocked" @click="startUrl">编辑</button>
-        <button id="link-menu-change-icon" type="button" :disabled="actionsBlocked" @click="liveItem && emit('changeIcon', liveItem)">获取头像</button>
         <button v-for="action in pluginLinkActions" :key="action.id" type="button" :disabled="actionsBlocked || action.disabled?.({ id: target.item.id, title: target.item.title, url: target.item.url, kind: 'link' })"
           @click="runPluginAction(action, { id: target.item.id, title: target.item.title, url: target.item.url, kind: 'link' })">
           <span v-if="action.icon" style="margin-right: 6px;">{{ action.icon }}</span>

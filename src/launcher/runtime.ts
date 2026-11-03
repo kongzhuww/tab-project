@@ -66,12 +66,6 @@ export const launcherRuntime = {
     launcherMenusController.openPageMenu(page, launcherService.getPageLabel(page),
       launcherService.getPageNames().length > 1, event?.clientX || 0, event?.clientY || 0);
   },
-  openIconPicker(link: LauncherLink): void {
-    if (!link) return;
-    const query = link.title || launcherService.hostOf(link.url);
-    launcherDialogsController.openIconPicker(link.title || "网站", query, link.url, String(link.id));
-    void launcherDialogsController.searchIcons(query);
-  },
   render(): void {
     const data = launcherService.getState();
     const pages = launcherService.getPageNames();

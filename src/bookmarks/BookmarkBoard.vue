@@ -210,18 +210,6 @@ function saveText(item: BookmarkBoardItem, field: 'title' | 'url', value: string
   catch (err) { return Promise.reject(err); }
   return mutate(() => saveBookmarkText(item, field, value));
 }
-function changeIcon(item: BookmarkBoardItem) {
-  if (item.kind !== 'link' || writeBlocked.value || !closeMenu()) return;
-  const target = { ...item };
-  const query = target.title || target.url;
-  launcherDialogsController.openIconPicker(target.title || '网站', query, target.url, '', async icon => {
-    if (!mounted) throw new Error('书签界面已关闭，请重新打开后选择头像。');
-    await mutate(() => saveBookmarkIcon(target, icon));
-  });
-  void launcherDialogsController.searchIcons(query, target.url).catch(() => {
-    notifications.show({ appName: '书签', title: '头像搜索未完成', message: '请在现有选择器内手动搜索或选择图片。' });
-  });
-}
 function deleteFolderRecursiveIcons(folder: BookmarkBoardFolder) {
   for (const child of folder.items) {
     if (child.kind === 'link') removeBookmarkIcon(child.id);
@@ -279,7 +267,7 @@ onUnmounted(() => { mounted = false; ++generation; unsubscribe(); clearTimeout(r
     <BookmarkBoardMenu v-if="menu" :key="`${menu.item?.id || menu.parentId}:${menu.x}:${menu.y}`" ref="menuRef" :target="menu"
       :busy="saving" :blocked="loading || writeUncertain" :size="sizes[menu.item?.id || ''] || 'small'" :outer-parent-id="outerParentId"
       :destinations="destinations" :save-text="saveText" :create-folder="createFolder" :remove="remove" :move="moveItem"
-      @close="menu = null" @toggle-size="toggleSize" @refresh="refresh" @change-icon="changeIcon" />
+      @close="menu = null" @toggle-size="toggleSize" @refresh="refresh" />
     <Teleport to="body">
       <div v-if="ghost" class="launcher-drag-ghost bookmark-drag-ghost" :style="{ left: ghost.x + 'px', top: ghost.y + 'px', width: ghost.width + 'px', height: ghost.height + 'px' }" aria-hidden="true">
         <div v-if="ghost.item.kind === 'folder'" class="launcher-folder" :class="'size-' + (sizes[ghost.item.id] || 'small')"><LauncherTileContent :folder="ghost.item" :size="sizes[ghost.item.id] || 'small'" /></div>

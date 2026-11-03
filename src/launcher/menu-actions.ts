@@ -72,19 +72,6 @@ export async function runLauncherMenuAction(action: string, payload?: {
       }))?.trim();
       if (title && title !== link.title) await launcherService.saveLink({ ...link, title });
     } else if (action === "link:create-large-folder") {
-      const defaultName = `${link.title || "新"}大文件夹`;
-      const name = (await appDialog.prompt({
-        title: "创建大文件夹",
-        message: `为「${link.title}」创建大文件夹名称：`,
-        defaultValue: defaultName
-      }))?.trim();
-      if (name) {
-        await launcherService.createLargeFolderFromLink(link.id, name);
-      }
-    } else if (action === "link:change-icon") {
-      const query = link.title || launcherService.hostOf(link.url);
-      launcherDialogsController.openIconPicker(link.title || "网站", query, link.url, link.id);
-      await launcherDialogsController.searchIcons(query);
     } else if (action === "link:move" && payload.page) {
       await launcherService.moveLinkTo(link.id, payload.page, link.group || "常用网站");
     } else if (action === "link:move-out") {

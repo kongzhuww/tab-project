@@ -231,12 +231,6 @@ function handleLinkRename() {
   startEditLinkTitle();
 }
 
-function handleLinkChangeIcon() {
-  const link = state.linkMenu.link;
-  launcherMenusController.closeLinkMenu();
-  launcherMenusController.dispatch("link:change-icon", { link });
-}
-
 function handleCreateLargeFolder() {
   const link = state.linkMenu.link;
   launcherMenusController.closeLinkMenu();
@@ -405,9 +399,6 @@ watch(() => [state.pageMenu, state.pageMenu.isOpen], () => {
         重命名
       </button>
       <ChatShareMenu id="link-menu-send" :visible="state.linkMenu.isOpen" :disabled="linkMenuBusy" @open="state.linkMenu.flyoutOpen = false" @select="shareLink" />
-      <button id="link-menu-change-icon" type="button" @click="handleLinkChangeIcon">
-        获取头像
-      </button>
       <button v-for="action in pluginLinkActions" :key="action.id" type="button"
         :disabled="action.disabled?.({ id: String(state.linkMenu.link?.id), title: state.linkMenu.link?.title || '', url: state.linkMenu.link?.url, kind: 'link' })"
         @click="state.linkMenu.link && runPluginAction(action, { id: String(state.linkMenu.link.id), title: state.linkMenu.link.title || '', url: state.linkMenu.link.url, kind: 'link' })">

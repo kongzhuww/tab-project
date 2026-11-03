@@ -41,7 +41,6 @@ const mountBookmarkNoteMenu = useRetainedMount(() => bookmarkMenuController.stat
 const mountLauncherFolder = useRetainedMount(() => folderState.isOpen);
 const mountLauncherDialogs = useRetainedMount(() => (
   launcherDialogsState.editDialog.isOpen ||
-  launcherDialogsState.iconPicker.isOpen ||
   launcherDialogsState.linkMove.isOpen ||
   launcherDialogsState.folderMove.isOpen ||
   launcherDialogsState.groupMerge.isOpen ||
