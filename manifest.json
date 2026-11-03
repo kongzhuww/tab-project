@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "minimum_chrome_version": "120",
   "name": "tab-project 新标签页",
-  "version": "1.0.9",
+  "version": "1.0.10",
   "description": "tab-project 新标签页：聚合搜索、常用网站与书签管理，整合 GitHub、Todoist、B站、音乐和 AI 资讯，支持多主题与覆盖式侧栏。",
   "chrome_url_overrides": {
     "newtab": "newtab-bootstrap.html"
