@@ -816,7 +816,7 @@ onUnmounted(() => {
           @mouseenter="activeSubMenu = null"
           @click="handleCreateTask"
         >
-          📋 创建任务
+          创建任务
         </button>
 
         <button

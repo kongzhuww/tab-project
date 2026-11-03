@@ -63,7 +63,7 @@
         role="menuitem"
         @click="handleCreateTask"
       >
-        <b>📋 创建任务</b>
+        <b>创建任务</b>
       </button>
 
       <button

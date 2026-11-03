@@ -194,7 +194,7 @@ async function runPluginAction(action: MenuSlotAction, target: { id: string; tit
           :items="moveItems" :x="Number.parseFloat(String(style.left || 0))" :y="Number.parseFloat(String(style.top || 0))"
           :vertical-budget="280" empty-text="暂无其他可移动分区" @select="moveTo" />
         <button id="link-menu-rename" type="button" :disabled="actionsBlocked" @click="startTitle">重命名</button>
-        <button id="link-menu-create-task" type="button" :disabled="actionsBlocked" @click="handleCreateTask">📋 创建任务</button>
+        <button id="link-menu-create-task" type="button" :disabled="actionsBlocked" @click="handleCreateTask">创建任务</button>
         <button id="link-menu-edit" type="button" :disabled="actionsBlocked" @click="startUrl">编辑</button>
         <button v-for="action in pluginLinkActions" :key="action.id" type="button" :disabled="actionsBlocked || action.disabled?.({ id: target.item.id, title: target.item.title, url: target.item.url, kind: 'link' })"
           @click="runPluginAction(action, { id: target.item.id, title: target.item.title, url: target.item.url, kind: 'link' })">

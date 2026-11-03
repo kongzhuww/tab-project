@@ -357,7 +357,7 @@ const isLoading = computed(() => {
         ✏️ 编辑备注…
       </button>
       <button class="fo-cover-menu-item" type="button" @mouseenter="activeSubMenu = null" @click="openCreateTask">
-        📋 创建任务
+        创建任务
       </button>
       <ChatShareMenu
         label="💬 发送到聊天室"

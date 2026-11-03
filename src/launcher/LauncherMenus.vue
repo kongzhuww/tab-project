@@ -419,7 +419,7 @@ watch(() => [state.pageMenu, state.pageMenu.isOpen], () => {
         重命名
       </button>
       <button id="link-menu-create-task" type="button" @click="handleCreateTask">
-        📋 创建任务
+        创建任务
       </button>
       <ChatShareMenu id="link-menu-send" :visible="state.linkMenu.isOpen" :disabled="linkMenuBusy" @open="state.linkMenu.flyoutOpen = false" @select="shareLink" />
       <button v-for="action in pluginLinkActions" :key="action.id" type="button"
