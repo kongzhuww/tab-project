@@ -48,6 +48,23 @@ function handleContextMenuProfile(event: MouseEvent) {
   profileMenuController.open(event.clientX, event.clientY);
 }
 
+function handleTopBarCopy(e: ClipboardEvent) {
+  const target = e.target as HTMLElement | null;
+  if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) {
+    return;
+  }
+  e.preventDefault();
+  e.stopPropagation();
+}
+
+function handleTopBarSelectStart(e: Event) {
+  const target = e.target as HTMLElement | null;
+  if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) {
+    return;
+  }
+  e.preventDefault();
+}
+
 onMounted(() => {
   notificationHistoryController.start();
   const saved = localStorage.getItem("theme") || "light";
