@@ -18,7 +18,7 @@
         type="button"
         class="todoist-add-section-submit"
         style="padding:8px 18px; font-size:13px; cursor:pointer;"
-        @click="openCreateProjectPrompt"
+        @click="openCreateProjectPrompt($event)"
       >＋ 新建第一个项目</button>
     </div>
 
@@ -43,7 +43,7 @@
               type="button"
               class="todoist-project-new-btn"
               title="创建新项目"
-              @click="openCreateProjectPrompt"
+              @click="openCreateProjectPrompt($event)"
             >＋ 新建项目</button>
           </div>
 
@@ -53,7 +53,7 @@
               type="button"
               class="todoist-project-action-btn"
               title="重命名项目"
-              @click="openRenameProjectPrompt(activeProject)"
+              @click="openRenameProjectPrompt(activeProject, $event)"
             >
               <span class="action-icon">✏️</span>
               <span class="action-text">重命名</span>
@@ -62,7 +62,7 @@
               type="button"
               class="todoist-project-action-btn danger"
               title="删除项目"
-              @click="openDeleteProjectConfirm(activeProject)"
+              @click="openDeleteProjectConfirm(activeProject, $event)"
             >
               <span class="action-icon">🗑️</span>
               <span class="action-text">删除项目</span>
@@ -369,7 +369,7 @@
       <button
         type="button"
         class="todoist-section-menu-item"
-        @click="openRenameSectionPrompt(sectionMenu.col)"
+        @click="openRenameSectionPrompt(sectionMenu.col, $event)"
       >
         <span class="section-menu-icon">✏️</span>
         <span class="section-menu-text">重命名板块</span>
@@ -399,7 +399,7 @@
         v-if="sectionMenu.col.sectionId"
         type="button"
         class="todoist-section-menu-item danger"
-        @click="openDeleteSectionConfirm(sectionMenu.col)"
+        @click="openDeleteSectionConfirm(sectionMenu.col, $event)"
       >
         <span class="section-menu-icon">🗑️</span>
         <span class="section-menu-text">删除分组</span>
@@ -607,68 +607,92 @@
     </div>
 
     <!-- 声明式输入对话框（Prompt Dialog Modal） -->
+    <div
+      v-if="promptModal.isOpen && todoistModuleState.active"
+      class="todoist-dialog-overlay"
+      @click="closePromptModal"
+      @keydown.esc.stop.prevent="closePromptModal"
+    >
       <div
-        v-if="promptModal.isOpen && todoistModuleState.active"
-        class="todoist-dialog-overlay"
-        @keydown.esc.stop.prevent="closePromptModal"
+        class="todoist-dialog-card is-draggable"
+        :style="{
+          position: 'fixed',
+          left: `${promptModal.x}px`,
+          top: `${promptModal.y}px`,
+          width: 'min(380px, calc(100vw - 32px))',
+          margin: 0
+        }"
+        @click.stop
       >
-        <div class="todoist-dialog-card" @click.stop>
-          <div class="todoist-dialog-head">
-            <span class="todoist-dialog-icon">✏️</span>
-            <h3 class="todoist-dialog-title">{{ promptModal.title }}</h3>
-          </div>
-          <div class="todoist-dialog-body">
-            <p v-if="promptModal.message" class="todoist-dialog-desc">{{ promptModal.message }}</p>
-            <input
-              ref="promptInputRef"
-              v-model="promptModal.value"
-              type="text"
-              class="todoist-dialog-input"
-              :placeholder="promptModal.placeholder"
-              @keydown.enter.prevent="submitPromptModal"
-            />
-          </div>
-          <div class="todoist-dialog-foot">
-            <button type="button" class="todoist-dialog-btn" @click="closePromptModal">取消</button>
-            <button type="button" class="todoist-dialog-btn primary" @click="submitPromptModal">
-              {{ promptModal.confirmText || '确定' }}
-            </button>
-          </div>
+        <div class="todoist-dialog-head" @pointerdown="startDragDialog('prompt', $event)">
+          <span class="todoist-dialog-icon">✏️</span>
+          <h3 class="todoist-dialog-title">{{ promptModal.title }}</h3>
+          <span class="todoist-dialog-drag-hint" title="按住可拖动位置">⋮⋮</span>
+        </div>
+        <div class="todoist-dialog-body">
+          <p v-if="promptModal.message" class="todoist-dialog-desc">{{ promptModal.message }}</p>
+          <input
+            ref="promptInputRef"
+            v-model="promptModal.value"
+            type="text"
+            class="todoist-dialog-input"
+            :placeholder="promptModal.placeholder"
+            @keydown.enter.prevent="submitPromptModal"
+          />
+        </div>
+        <div class="todoist-dialog-foot">
+          <button type="button" class="todoist-dialog-btn" @click="closePromptModal">取消</button>
+          <button type="button" class="todoist-dialog-btn primary" @click="submitPromptModal">
+            {{ promptModal.confirmText || '确定' }}
+          </button>
         </div>
       </div>
+    </div>
 
 
     <!-- 声明式确认对话框（Confirm Dialog Modal） -->
+    <div
+      v-if="confirmModal.isOpen && todoistModuleState.active"
+      class="todoist-dialog-overlay"
+      @click="closeConfirmModal"
+      @keydown.esc.stop.prevent="closeConfirmModal"
+    >
       <div
-        v-if="confirmModal.isOpen && todoistModuleState.active"
-        class="todoist-dialog-overlay"
-        @keydown.esc.stop.prevent="closeConfirmModal"
+        class="todoist-dialog-card is-draggable"
+        :style="{
+          position: 'fixed',
+          left: `${confirmModal.x}px`,
+          top: `${confirmModal.y}px`,
+          width: 'min(380px, calc(100vw - 32px))',
+          margin: 0
+        }"
+        @click.stop
       >
-        <div class="todoist-dialog-card" @click.stop>
-          <div class="todoist-dialog-head">
-            <span class="todoist-dialog-icon">{{ confirmModal.icon || '⚠️' }}</span>
-            <h3 class="todoist-dialog-title">{{ confirmModal.title }}</h3>
+        <div class="todoist-dialog-head" @pointerdown="startDragDialog('confirm', $event)">
+          <span class="todoist-dialog-icon">{{ confirmModal.icon || '⚠️' }}</span>
+          <h3 class="todoist-dialog-title">{{ confirmModal.title }}</h3>
+          <span class="todoist-dialog-drag-hint" title="按住可拖动位置">⋮⋮</span>
+        </div>
+        <div class="todoist-dialog-body">
+          <div
+            v-if="confirmModal.danger"
+            class="todoist-dialog-danger-banner"
+          >
+            <div class="todoist-dialog-danger-text">{{ confirmModal.alertText }}</div>
           </div>
-          <div class="todoist-dialog-body">
-            <div
-              v-if="confirmModal.danger"
-              style="background:#fef2f2; padding:10px 12px; border-radius:8px; border:1px solid #fee2e2; margin-bottom:10px;"
-            >
-              <div style="font-weight:700; color:#dc2626; font-size:13.5px;">{{ confirmModal.alertText }}</div>
-            </div>
-            <p style="margin:0; color:#64748b; font-size:12.5px; line-height:1.5;">{{ confirmModal.message }}</p>
-          </div>
-          <div class="todoist-dialog-foot">
-            <button type="button" class="todoist-dialog-btn" @click="closeConfirmModal">取消</button>
-            <button
-              type="button"
-              class="todoist-dialog-btn"
-              :class="confirmModal.danger ? 'danger' : 'primary'"
-              @click="submitConfirmModal"
-            >{{ confirmModal.confirmText || '确定' }}</button>
-          </div>
+          <p class="todoist-dialog-msg">{{ confirmModal.message }}</p>
+        </div>
+        <div class="todoist-dialog-foot">
+          <button type="button" class="todoist-dialog-btn" @click="closeConfirmModal">取消</button>
+          <button
+            type="button"
+            class="todoist-dialog-btn"
+            :class="confirmModal.danger ? 'danger' : 'primary'"
+            @click="submitConfirmModal"
+          >{{ confirmModal.confirmText || '确定' }}</button>
         </div>
       </div>
+    </div>
 
   </div>
 </template>
@@ -797,6 +821,8 @@ type DeleteTarget = RenameTarget | { taskId: string; isRecurring: boolean };
 // 响应式 Prompt 对话框
 const promptModal = reactive({
   isOpen: false,
+  x: 0,
+  y: 0,
   title: "",
   message: "",
   value: "",
@@ -810,6 +836,8 @@ const promptInputRef = ref<HTMLInputElement | null>(null);
 // 响应式 Confirm 对话框
 const confirmModal = reactive({
   isOpen: false,
+  x: 0,
+  y: 0,
   title: "确认操作",
   icon: "⚠️",
   alertText: "",
@@ -1399,7 +1427,12 @@ function onMenuMoveToProject(proj: TodoistProjectOption) {
 function onMenuDeleteTask() {
   if (!taskContextMenu.task) return;
   const task = taskContextMenu.task;
+  const menuPos = { x: taskContextMenu.x, y: taskContextMenu.y };
   closeAllPopovers();
+
+  const pos = computeModalPosition(menuPos, 380, 220);
+  confirmModal.x = pos.x;
+  confirmModal.y = pos.y;
 
   if (task.isRecurring) {
     confirmModal.title = "删除重复任务确认";
@@ -1431,8 +1464,84 @@ if ((window as any).LogicWeaverTodoistTaskList) {
   };
 }
 
+// 弹窗定位与拖拽辅助函数
+function computeModalPosition(
+  trigger?: MouseEvent | { x: number; y: number } | HTMLElement,
+  modalWidth = 380,
+  modalHeight = 220
+): { x: number; y: number } {
+  let targetRect: DOMRect | null = null;
+
+  if (trigger instanceof HTMLElement) {
+    targetRect = trigger.getBoundingClientRect();
+  } else if (trigger && "currentTarget" in trigger && trigger.currentTarget instanceof HTMLElement) {
+    targetRect = trigger.currentTarget.getBoundingClientRect();
+  } else if (trigger && "target" in trigger && trigger.target instanceof HTMLElement) {
+    const btn = trigger.target.closest("button") || trigger.target;
+    targetRect = btn.getBoundingClientRect();
+  } else if (trigger && "x" in trigger && "y" in trigger && typeof trigger.x === "number" && typeof trigger.y === "number") {
+    const x = Math.max(16, Math.min(window.innerWidth - modalWidth - 16, trigger.x));
+    const y = Math.max(16, Math.min(window.innerHeight - modalHeight - 16, trigger.y + 10));
+    return { x, y };
+  }
+
+  if (targetRect) {
+    // 优先使弹窗右上角与按钮右边缘对齐（靠右展开），防止挡住按钮左侧上下文
+    let x = targetRect.right - modalWidth;
+    if (x < 16) {
+      x = Math.max(16, targetRect.left);
+    }
+    x = Math.max(16, Math.min(window.innerWidth - modalWidth - 16, x));
+
+    // 默认出现在按钮正下方紧贴处（8px 间隙）
+    let y = targetRect.bottom + 8;
+    // 若下方空间不足且上方空间充裕，则翻转至按钮上方
+    if (y + modalHeight > window.innerHeight - 16 && targetRect.top > modalHeight + 16) {
+      y = targetRect.top - modalHeight - 8;
+    }
+    y = Math.max(16, Math.min(window.innerHeight - modalHeight - 16, y));
+
+    return { x, y };
+  }
+
+  // 兜底居中偏上展示
+  return {
+    x: Math.max(16, Math.round((window.innerWidth - modalWidth) / 2)),
+    y: Math.max(40, Math.round((window.innerHeight - modalHeight) / 3))
+  };
+}
+
+function startDragDialog(modalType: "prompt" | "confirm", e: PointerEvent) {
+  if (e.button !== 0 || (e.target as HTMLElement)?.closest("button, input, textarea")) return;
+  e.preventDefault();
+
+  const startX = e.clientX;
+  const startY = e.clientY;
+  const targetModal = modalType === "prompt" ? promptModal : confirmModal;
+  const origX = targetModal.x;
+  const origY = targetModal.y;
+
+  const onPointerMove = (moveEvt: PointerEvent) => {
+    const dx = moveEvt.clientX - startX;
+    const dy = moveEvt.clientY - startY;
+    targetModal.x = Math.max(10, Math.min(window.innerWidth - 320, origX + dx));
+    targetModal.y = Math.max(10, Math.min(window.innerHeight - 120, origY + dy));
+  };
+
+  const onPointerUp = () => {
+    window.removeEventListener("pointermove", onPointerMove);
+    window.removeEventListener("pointerup", onPointerUp);
+  };
+
+  window.addEventListener("pointermove", onPointerMove);
+  window.addEventListener("pointerup", onPointerUp);
+}
+
 // 模态弹窗相关操作
-function openCreateProjectPrompt() {
+function openCreateProjectPrompt(event?: MouseEvent) {
+  const pos = computeModalPosition(event, 380, 220);
+  promptModal.x = pos.x;
+  promptModal.y = pos.y;
   promptModal.title = "新建项目";
   promptModal.message = "请输入新项目名称：";
   promptModal.value = "";
@@ -1444,7 +1553,10 @@ function openCreateProjectPrompt() {
   nextTick(() => promptInputRef.value?.focus());
 }
 
-function openRenameProjectPrompt(project: TodoistProjectOption) {
+function openRenameProjectPrompt(project: TodoistProjectOption, event?: MouseEvent) {
+  const pos = computeModalPosition(event, 380, 220);
+  promptModal.x = pos.x;
+  promptModal.y = pos.y;
   promptModal.title = "重命名项目";
   promptModal.message = `正在重命名项目「${project.name}」：`;
   promptModal.value = project.name;
@@ -1459,8 +1571,12 @@ function openRenameProjectPrompt(project: TodoistProjectOption) {
   });
 }
 
-function openRenameSectionPrompt(col: TodoistColumnItem) {
+function openRenameSectionPrompt(col: TodoistColumnItem, event?: MouseEvent) {
+  const trigger = event || { x: sectionMenu.x, y: sectionMenu.y };
   sectionMenu.isOpen = false;
+  const pos = computeModalPosition(trigger, 380, 220);
+  promptModal.x = pos.x;
+  promptModal.y = pos.y;
   promptModal.title = "重命名板块";
   promptModal.message = `正在重命名板块「${col.title}」：`;
   promptModal.value = col.title;
@@ -1494,7 +1610,10 @@ function submitPromptModal() {
   }
 }
 
-function openDeleteProjectConfirm(project: TodoistProjectOption) {
+function openDeleteProjectConfirm(project: TodoistProjectOption, event?: MouseEvent) {
+  const pos = computeModalPosition(event, 380, 240);
+  confirmModal.x = pos.x;
+  confirmModal.y = pos.y;
   confirmModal.title = "删除项目确认";
   confirmModal.icon = "🗑️";
   confirmModal.danger = true;
@@ -1506,8 +1625,12 @@ function openDeleteProjectConfirm(project: TodoistProjectOption) {
   confirmModal.isOpen = true;
 }
 
-function openDeleteSectionConfirm(col: TodoistColumnItem) {
+function openDeleteSectionConfirm(col: TodoistColumnItem, event?: MouseEvent) {
+  const trigger = event || { x: sectionMenu.x, y: sectionMenu.y };
   sectionMenu.isOpen = false;
+  const pos = computeModalPosition(trigger, 380, 240);
+  confirmModal.x = pos.x;
+  confirmModal.y = pos.y;
   confirmModal.title = "删除板块确认";
   confirmModal.icon = "🗑️";
   confirmModal.danger = true;
@@ -1803,11 +1926,60 @@ onUnmounted(() => {
 }
 
 .todoist-dialog-overlay {
-  position: fixed; inset: auto; top: 90px; right: 24px;
-  width: min(360px, calc(100vw - 32px)); height: auto;
-  background: transparent; backdrop-filter: none; pointer-events: auto;
+  position: fixed;
+  inset: 0;
+  z-index: 2147483647 !important;
+  background: rgba(15, 23, 42, 0.22);
+  backdrop-filter: blur(2px);
+  pointer-events: auto;
+  animation: todoistFadeIn 0.15s ease-out;
 }
-.todoist-dialog-card { width: 100%; max-height: calc(100vh - 120px); overflow: auto; transition: none; }
+
+.todoist-dialog-card {
+  max-height: calc(100vh - 80px);
+  overflow: auto;
+  transition: box-shadow 0.2s ease;
+  background: var(--surface, #ffffff);
+  border: 1px solid var(--border, rgba(0, 0, 0, 0.1));
+  box-shadow: 0 20px 48px -8px rgba(0, 0, 0, 0.28), 0 0 0 1px var(--border, rgba(0, 0, 0, 0.06));
+  border-radius: 14px;
+}
+
+.todoist-dialog-head {
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+}
+.todoist-dialog-head:active {
+  cursor: grabbing;
+}
+.todoist-dialog-drag-hint {
+  color: var(--muted, #94a3b8);
+  font-size: 13px;
+  letter-spacing: -1px;
+  opacity: 0.6;
+  margin-left: auto;
+  cursor: grab;
+}
+.todoist-dialog-danger-banner {
+  background: rgba(239, 68, 68, 0.1);
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  margin-bottom: 10px;
+}
+.todoist-dialog-danger-text {
+  font-weight: 700;
+  color: #dc2626;
+  font-size: 13.5px;
+  line-height: 1.4;
+}
+.todoist-dialog-msg {
+  margin: 0;
+  color: var(--muted, #64748b);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
 
 /* 智能日期识别提示条样式 (适配主题规范，严禁暗色死色) */
 .todoist-composer-date-hint {
