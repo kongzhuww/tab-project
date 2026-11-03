@@ -385,23 +385,31 @@ export class GitHubService {
       Object.entries(cached.pages).forEach(([p, items]) => {
         if (Array.isArray(items)) this.pages.set(Number(p), items as GitHubRawRepo[]);
       });
+      if (Number.isFinite(Number(cached.total))) {
+        this.total = Number(cached.total);
+      }
     }
     this.rebuildLoadedRepos();
     this.publishAll();
 
-    // 统计总数并加载第一页
-    this.actionMessage = "正在统计全部 GitHub Star…";
-    this.actionError = false;
-    this.publishStatus();
+    // 🌟 极速首屏：直接拉取第一页（20项）同时从其 Header 中解析总数，避免串行等待！
+    const hasCache = this.pages.has(1);
+    if (!hasCache) {
+      this.actionMessage = "正在读取 GitHub Star…";
+      this.actionError = false;
+      this.publishStatus();
+    }
 
     try {
-      const countResult = await this.fetchStarredWithRetry(
-        `${baseUrl}${baseUrl.includes("?") ? "&" : "?"}per_page=1&page=1`,
+      const page1Result = await this.fetchStarredWithRetry(
+        `${baseUrl}${baseUrl.includes("?") ? "&" : "?"}per_page=20&page=1`,
         headers,
-        token, session.signal
+        token,
+        session.signal
       );
       if (!current()) return;
-      this.total = this.parseStarTotal(countResult.link, countResult.items.length);
+
+      this.total = this.parseStarTotal(page1Result.link, page1Result.items.length);
       if (!this.total) {
         this.pages.clear();
         this.repos = [];
@@ -415,32 +423,37 @@ export class GitHubService {
         return;
       }
 
-      if (this.pages.has(1)) {
-        this.publishAll();
-        await this.loadPage(1, true, session);
-      } else {
-        await this.loadPage(1, false, session);
-      }
-
+      this.pages.set(1, page1Result.items);
+      this.page = 1;
+      this.rebuildLoadedRepos();
+      await this.savePageCache(current);
       if (!current()) return;
+
       this.pendingInitialization = undefined;
       this.initializing = false;
       if (!this.actionError) this.actionMessage = "";
       this.publishAll();
-      void this.ensureAllStarsLoaded();
+
+      // 列表在后台异步加载，不阻塞首屏
       void this.loadLists(session);
     } catch (error: any) {
       if (!current()) return;
-      this.actionMessage = "GitHub 同步失败，请检查网络、令牌或 API 额度。";
-      this.actionError = true;
-      this.publishStatus();
-      if ((cached?.format === 3 || (!token && cached?.format === 2)) && cached.owner === this.cacheKey && Number.isFinite(Number(cached.total))) {
-        this.total = Number(cached.total);
+      if (hasCache) {
+        // 如果有缓存，网络即使抖动也安静降级保留本地缓存，不给用户刺眼的报错
+        if (!this.actionError) this.actionMessage = "";
         this.publishAll();
       } else {
-        this.actionMessage = `GitHub 加载失败：${error.message || "频率限制或 Token 无效"}`;
+        this.actionMessage = "GitHub 同步失败，请检查网络、令牌或 API 额度。";
         this.actionError = true;
         this.publishStatus();
+        if ((cached?.format === 3 || (!token && cached?.format === 2)) && cached.owner === this.cacheKey && Number.isFinite(Number(cached.total))) {
+          this.total = Number(cached.total);
+          this.publishAll();
+        } else {
+          this.actionMessage = `GitHub 加载失败：${error.message || "频率限制或 Token 无效"}`;
+          this.actionError = true;
+          this.publishStatus();
+        }
       }
     }
 
@@ -544,7 +557,13 @@ export class GitHubService {
   private parseStarTotal(linkHeader: string, firstPageCount: number): number {
     const last = String(linkHeader || "").split(",").find((part) => /rel="last"/.test(part));
     const p = last?.match(/[?&]page=(\d+)/)?.[1];
-    return p ? Number(p) : Number(firstPageCount || 0);
+    if (p) {
+      // 提取 per_page
+      const perPageMatch = last?.match(/[?&]per_page=(\d+)/)?.[1];
+      const perPage = perPageMatch ? Number(perPageMatch) : 20;
+      return Number(p) * perPage;
+    }
+    return Number(firstPageCount || 0);
   }
 
   private rebuildLoadedRepos(): void {
@@ -1346,6 +1365,10 @@ ${repoInfo}`;
     this.searchQuery = query;
     this.page = 1;
     this.publishAll();
+    // 🌟 按需唤起：用户输入搜索关键词时，如果在前几页未完全覆盖，在后台静默补全全量 Star
+    if (query.trim() && !this.allStarsLoaded && !this.loadingAllStars) {
+      void this.ensureAllStarsLoaded();
+    }
   }
 
   public startRepositoryDrag(fullName: string, event: DragEvent): void {
