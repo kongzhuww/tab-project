@@ -94,7 +94,7 @@
       class="bookmark-context-editor"
       :hidden="state.mode !== 'launcher'"
     >
-      <label for="bookmark-launcher-group-select">选择常用网站分组</label>
+      <label for="bookmark-launcher-group-select">选择常用网站分区</label>
       <select
         id="bookmark-launcher-group-select"
         v-model="state.selectedLauncherGroup"
@@ -109,7 +109,7 @@
       </select>
       <div>
         <button id="bookmark-launcher-cancel" type="button" @click="handleSwitchMode('actions')">返回</button>
-        <button id="bookmark-launcher-save" class="primary" type="button" @click="handleSaveLauncher">确认添加</button>
+        <button id="bookmark-launcher-save" class="primary" type="button" @click="handleSaveLauncher">确认收藏</button>
       </div>
     </section>
 

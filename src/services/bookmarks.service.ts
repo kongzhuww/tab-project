@@ -631,10 +631,10 @@ export class BookmarksService {
     this.editingItem = { ...item, isFolder };
     bookmarkMenuController.setMode("actions");
 
-    const launcherGroups = (window as any).launcherState?.groups;
-    const launcherGroupNames = Array.isArray(launcherGroups)
-      ? launcherGroups.map((g: any) => g.name || g)
-      : ["常用网站"];
+    const launcherPageNames = launcherService.getPageNames().map(p => ({
+      id: p,
+      name: launcherService.getPageLabel(p)
+    }));
 
     const hostOrCount = isFolder
       ? `${this.countBookmarkLinks(this.bookmarkNodeById(this.importState.tree, item.id))} 个书签 · 浏览器文件夹`
@@ -646,7 +646,7 @@ export class BookmarksService {
       hostOrCount,
       iconUrl,
       note,
-      launcherGroups: launcherGroupNames
+      launcherGroups: launcherPageNames.map(p => p.name)
     });
   }
 

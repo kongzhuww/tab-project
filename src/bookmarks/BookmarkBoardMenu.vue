@@ -3,6 +3,7 @@ import { computed, ref, shallowRef } from 'vue';
 import LauncherMenuTitle from '../launcher/LauncherMenuTitle.vue';
 import LauncherMenuUrl from '../launcher/LauncherMenuUrl.vue';
 import LauncherMoveMenu from '../launcher/LauncherMoveMenu.vue';
+import { launcherService } from '../services/launcher.service';
 import { pluginSlots, type MenuSlotAction } from '../sdk/slots';
 import { InlineTitleInput, InlineEditStatus, useInlineTitleEdit, useContextMenu } from '../sdk/interactions';
 import { notifications } from '../sdk/notifications';
@@ -17,7 +18,7 @@ const props = defineProps<{
   move: (item: BookmarkBoardItem, parentId: string) => Promise<void>;
 }>();
 const emit = defineEmits<{ close: []; toggleSize: [id: string]; refresh: [] }>();
-const confirming = ref(false), flyout = ref(false), actionError = ref('');
+const confirming = ref(false), flyout = ref(false), favoriteFlyout = ref(false), actionError = ref('');
 const detachedError = (message: string) => notifications.show({ appName: '书签', title: '保存未完成', message });
 const liveItem = shallowRef(props.target.item);
 const titleEdit = useInlineTitleEdit<BookmarkBoardItem>({ save: (item, draft) => props.saveText(item, 'title', draft), apply: (item, saved) => { displayTitle.value = saved; liveItem.value = { ...item, title: saved }; }, detachedError });
@@ -36,10 +37,40 @@ function dismiss() {
 const { menuRef, style } = useContextMenu({ visible: () => true, anchor: () => props.target, dismiss });
 // Like the original folder-menu: allow its side flyout outside the parent box.
 const menuStyle = computed(() => ({ ...style.value,
-  overflowX: flyout.value ? 'visible' as const : 'hidden' as const,
-  overflowY: flyout.value ? 'visible' as const : 'auto' as const
+  overflowX: (flyout.value || favoriteFlyout.value) ? 'visible' as const : 'hidden' as const,
+  overflowY: (flyout.value || favoriteFlyout.value) ? 'visible' as const : 'auto' as const
 }));
 const moveItems = computed(() => props.destinations.map(item => ({ id: item.id, name: item.title, disabled: item.disabled })));
+const launcherPageItems = computed(() => {
+  return launcherService.getPageNames().map(page => ({
+    id: page,
+    name: launcherService.getPageLabel(page)
+  }));
+});
+async function collectToLauncher(pageId: string) {
+  if (!liveItem.value || liveItem.value.kind !== 'link' || actionsBlocked.value) return;
+  try {
+    const url = new URL(launcherService.normalizeUrl(liveItem.value.url));
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+      throw new Error('仅支持 HTTP/HTTPS 网站');
+    }
+    await launcherService.ready;
+    await launcherService.addLink({
+      title: liveItem.value.title || launcherService.hostOf(url.href),
+      url: url.href,
+      group: '常用网站',
+      page: pageId
+    });
+    notifications.show({
+      appName: '常用网站',
+      title: '收藏成功',
+      message: `已将「${liveItem.value.title || liveItem.value.url}」收藏到【${launcherService.getPageLabel(pageId)}】分区`
+    });
+    emit('close');
+  } catch (err: any) {
+    actionError.value = err?.message || '收藏失败，请重试';
+  }
+}
 function startTitle() {
   if (actionsBlocked.value || !liveItem.value) return;
   urlEdit.reset(); confirming.value = false;
@@ -139,6 +170,9 @@ async function runPluginAction(action: MenuSlotAction, target: { id: string; tit
 
       <!-- 单个网站右键菜单：严格对齐常用网站 link-menu 5项 -->
       <template v-else-if="target.item?.kind === 'link'">
+        <LauncherMoveMenu v-model:open="favoriteFlyout" :visible="true" :disabled="actionsBlocked || !launcherPageItems.length" label="收藏到常用网站"
+          :items="launcherPageItems" :x="Number.parseFloat(String(style.left || 0))" :y="Number.parseFloat(String(style.top || 0))"
+          :vertical-budget="280" empty-text="暂无常用网站分区" @select="collectToLauncher" />
         <LauncherMoveMenu v-model:open="flyout" :visible="true" :disabled="actionsBlocked || !moveItems.length" label="移动到分区"
           :items="moveItems" :x="Number.parseFloat(String(style.left || 0))" :y="Number.parseFloat(String(style.top || 0))"
           :vertical-budget="280" empty-text="暂无其他可移动分区" @select="moveTo" />
