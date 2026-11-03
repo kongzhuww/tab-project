@@ -7,20 +7,11 @@ import {
   type RepoHeadingItem
 } from "./repo-detail-store";
 import { images } from "../sdk/images";
-import GitHubRepositoryTasks from "./GitHubRepositoryTasks.vue";
 import { githubTaskCreation } from "../todoist/github-task-target";
 import { openTodoistTask } from "../todoist/task-navigation";
 
 const copyStatus = ref<string>("");
 const isTocOpen = ref<boolean>(false);
-const taskPaneOpen = ref(false);
-watch(() => state.fullName, () => { taskPaneOpen.value = false; });
-watch(taskPaneOpen, async () => {
-  await nextTick();
-  if (!pos.value || !windowRef.value) return;
-  const width = windowRef.value.getBoundingClientRect().width;
-  pos.value = { ...pos.value, x: Math.max(10, Math.min(pos.value.x, window.innerWidth - width - 10)) };
-});
 const readmeContainerRef = ref<HTMLElement | null>(null);
 const windowRef = ref<HTMLElement | null>(null);
 const pos = ref<{ x: number; y: number } | null>(null);
@@ -228,7 +219,6 @@ onUnmounted(() => {
     <div
       ref="windowRef"
       class="gh-modal-window"
-      :class="{ 'has-task-pane': taskPaneOpen }"
       :style="pos ? { position: 'fixed', left: `${pos.x}px`, top: `${pos.y}px`, margin: '0' } : {}"
       role="dialog"
       aria-modal="false"
@@ -255,8 +245,6 @@ onUnmounted(() => {
         <!-- 操作按钮工具栏 -->
         <div class="gh-modal-actions">
           <span v-if="copyStatus" class="gh-status-tip">{{ copyStatus }}</span>
-          <button type="button" class="gh-btn gh-btn-action" :aria-expanded="taskPaneOpen"
-            :disabled="githubTaskCreation.saving" @click="taskPaneOpen = !taskPaneOpen">任务</button>
 
           <button
             type="button"
@@ -366,9 +354,6 @@ onUnmounted(() => {
         ></article>
       </main>
       </div>
-      <GitHubRepositoryTasks v-if="taskPaneOpen" :key="state.fullName"
-        :repository="{ fullName: state.fullName, description: state.description, stars: state.stars, language: state.language, updated: state.pushedAt }"
-        @close="taskPaneOpen = false" @open-task="openCreatedTask" />
       </div>
     </div>
   </div>

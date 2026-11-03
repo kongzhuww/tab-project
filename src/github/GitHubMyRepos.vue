@@ -2,6 +2,7 @@
 import { ref, reactive, computed, onMounted, onUnmounted, watch } from "vue";
 import { myReposState, myReposController, type MyRepoItem } from "./my-repos-store";
 import { notifications } from "../sdk/notifications";
+import { githubTaskModalController } from "./github-task-modal-store";
 import { t } from "../i18n";
 
 const props = defineProps<{
@@ -149,6 +150,19 @@ function handleOpenInGitHub() {
   closeContextMenu();
   if (!repo) return;
   openRepoUrl(repo.htmlUrl);
+}
+
+function handleCreateTask() {
+  const repo = contextMenuState.repo;
+  closeContextMenu();
+  if (!repo) return;
+  githubTaskModalController.open({
+    fullName: repo.fullName,
+    description: repo.description || "",
+    stars: repo.stargazersCount,
+    language: repo.language || undefined,
+    updated: repo.pushedAt
+  });
 }
 
 function onGlobalPointerDown(event: PointerEvent): void {
@@ -796,6 +810,15 @@ onUnmounted(() => {
         </button>
 
         <!-- 4. 在 GitHub 打开 -->
+        <button
+          class="fo-cover-menu-item"
+          type="button"
+          @mouseenter="activeSubMenu = null"
+          @click="handleCreateTask"
+        >
+          📋 创建任务
+        </button>
+
         <button
           class="fo-cover-menu-item"
           type="button"

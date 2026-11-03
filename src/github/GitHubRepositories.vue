@@ -12,6 +12,7 @@ import { githubStatusState } from "./store";
 import ChatShareMenu from "../chat/ChatShareMenu.vue";
 import { chatService } from "../chat/chat.service";
 import type { ChatShareTarget } from "../chat/private-chat-client";
+import { githubTaskModalController } from "./github-task-modal-store";
 
 // 右键上下文菜单与分类选择器
 const contextMenuState = reactive<{
@@ -135,6 +136,19 @@ function shareToRoom(target: ChatShareTarget): void {
     url: repo.html_url || `https://github.com/${repo.full_name}`,
     updatedAt: repo.updated_at ? repo.updated_at.split("T")[0] : undefined
   }, target);
+}
+
+function openCreateTask(): void {
+  const repo = gitHubService.findRepository(contextMenuState.fullName);
+  closeContextMenu();
+  if (!repo) return;
+  githubTaskModalController.open({
+    fullName: repo.full_name,
+    description: repo.description || "",
+    stars: repo.stargazers_count,
+    language: repo.language || undefined,
+    updated: repo.updated_at
+  });
 }
 
 function openExternal(): void {
@@ -341,6 +355,9 @@ const isLoading = computed(() => {
       <!-- 其他普通主菜单项，鼠标滑过自动收起子菜单 -->
       <button class="fo-cover-menu-item" type="button" @mouseenter="activeSubMenu = null" @click="startInlineRemark()">
         ✏️ 编辑备注…
+      </button>
+      <button class="fo-cover-menu-item" type="button" @mouseenter="activeSubMenu = null" @click="openCreateTask">
+        📋 创建任务
       </button>
       <ChatShareMenu
         label="💬 发送到聊天室"
