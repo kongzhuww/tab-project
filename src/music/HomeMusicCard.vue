@@ -7,6 +7,7 @@ import {
 } from "./store";
 import { musicModuleState } from "./module-state";
 import { togetherPartyState } from "../chat/together-listen.store";
+import { t } from "../i18n";
 
 onMounted(() => {
   // 延后 200ms 触发音频服务初始化，脱离首屏阻塞队列
@@ -21,6 +22,20 @@ const isPartyOrConsoleActive = computed(() => {
 
 const isTogetherListening = computed(() => {
   return togetherPartyState.isActive && togetherPartyState.isJoined;
+});
+
+const displayTitle = computed(() => {
+  if (!homeMusicState.title || homeMusicState.title === "点击播放") {
+    return t("home.music.defaultTitle");
+  }
+  return homeMusicState.title;
+});
+
+const displayArtist = computed(() => {
+  if (!homeMusicState.artist || homeMusicState.artist === "作者") {
+    return t("home.music.defaultArtist");
+  }
+  return homeMusicState.artist;
 });
 
 const modeEmoji = computed(() => {
@@ -48,21 +63,21 @@ function onCoverError() {
         <div class="degraded-badge-row">
           <span class="degraded-icon">🎧</span>
           <strong class="degraded-status">
-            {{ isTogetherListening ? '正在一起听' : '后台收听中' }}
+            {{ isTogetherListening ? t('home.music.togetherListening') : t('home.music.backgroundListening') }}
           </strong>
           <span v-if="isTogetherListening" class="degraded-host-tag">
             DJ: {{ togetherPartyState.hostName }}
           </span>
           <span v-else class="degraded-host-tag">
-            工作区就绪
+            {{ t('home.music.workspaceReady') }}
           </span>
         </div>
 
         <div class="degraded-title-row">
-          <h3 class="degraded-track-title" :title="homeMusicState.title">
-            {{ homeMusicState.title || "待机中" }}
+          <h3 class="degraded-track-title" :title="displayTitle">
+            {{ displayTitle || t('home.music.standby') }}
           </h3>
-          <p class="degraded-track-artist">{{ homeMusicState.artist }}</p>
+          <p class="degraded-track-artist">{{ displayArtist }}</p>
         </div>
 
         <!-- 纯百分比驱动轻量进度条 (无复杂计算，纯 CSS 宽度平滑过渡) -->
@@ -79,7 +94,7 @@ function onCoverError() {
             class="degraded-btn"
             @click="homeMusicController.togglePlay()"
           >
-            {{ homeMusicState.playing ? '⏸ 暂停' : '▶ 播放' }}
+            {{ homeMusicState.playing ? t('home.music.pause') : t('home.music.play') }}
           </button>
           <span class="degraded-time">
             {{ homeMusicState.formattedCurrent }} / {{ homeMusicState.formattedDuration }}
@@ -122,7 +137,7 @@ function onCoverError() {
           id="home-vinyl-disc"
           class="home-vinyl-disc"
           :class="{ playing: homeMusicState.playing }"
-          title="点击播放 / 暂停"
+          :title="t('home.music.togglePlay')"
           @click="homeMusicController.togglePlay()"
         >
           <img
@@ -131,7 +146,7 @@ function onCoverError() {
             class="home-vinyl-cover"
             referrerpolicy="no-referrer"
             :src="homeMusicState.coverUrl"
-            alt="音乐封面"
+            :alt="t('home.music.coverAlt')"
             @error="onCoverError"
           />
           <div class="home-vinyl-hole"></div>
@@ -142,11 +157,11 @@ function onCoverError() {
         <h3
           id="home-music-title"
           class="home-music-meta-title"
-          :title="homeMusicState.title"
+          :title="displayTitle"
         >
-          {{ homeMusicState.title }}
+          {{ displayTitle }}
         </h3>
-        <p id="home-music-artist" class="home-music-meta-artist">{{ homeMusicState.artist }}</p>
+        <p id="home-music-artist" class="home-music-meta-artist">{{ displayArtist }}</p>
 
         <div class="home-music-seek-row">
           <span id="home-music-cur" class="home-music-time">{{ homeMusicState.formattedCurrent }}</span>
@@ -167,7 +182,7 @@ function onCoverError() {
             id="home-music-prev"
             class="home-music-btn"
             type="button"
-            title="上一首"
+            :title="t('home.music.prevTrack')"
             @click="homeMusicController.prev()"
           >
             ⏮
@@ -176,7 +191,7 @@ function onCoverError() {
             id="home-music-play"
             class="home-music-btn play-btn"
             type="button"
-            title="播放 / 暂停"
+            :title="t('home.music.togglePlay')"
             @click="homeMusicController.togglePlay()"
           >
             {{ homeMusicState.playing ? "⏸" : "▶" }}
@@ -185,7 +200,7 @@ function onCoverError() {
             id="home-music-next"
             class="home-music-btn"
             type="button"
-            title="下一首"
+            :title="t('home.music.nextTrack')"
             @click="homeMusicController.next()"
           >
             ⏭
@@ -195,7 +210,7 @@ function onCoverError() {
             class="home-music-btn like-btn"
             :class="{ liked: homeMusicState.liked }"
             type="button"
-            title="收藏"
+            :title="t('home.music.favorite')"
             @click="homeMusicController.toggleLike()"
           >
             {{ homeMusicState.liked ? "♥" : "♡" }}
@@ -204,7 +219,7 @@ function onCoverError() {
             id="home-music-mode"
             class="home-music-btn"
             type="button"
-            title="播放模式"
+            :title="t('home.music.playMode')"
             @click="homeMusicController.cycleMode()"
           >
             {{ modeEmoji }}

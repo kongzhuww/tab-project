@@ -12,10 +12,11 @@ import { formatBiliCompactNumber } from "./channel-format";
 import BiliRichText from "./BiliRichText.vue";
 import { images } from "../sdk/images";
 import { useVideoFailover } from "./use-video-failover";
+import { t } from "../i18n";
 
 const videoRef = ref<HTMLVideoElement | null>(null);
 useVideoFailover(state, videoRef, () => {
-  state.errorMsg = "视频源加载失败，备用地址已用尽，请重新获取视频流";
+  state.errorMsg = t("bili.player.loadError");
   state.isPlaying = false;
 });
 const playerRef = ref<HTMLElement | null>(null);
@@ -743,13 +744,13 @@ onUnmounted(() => {
         <div v-if="state.episodesOpen" class="bili-mini-episodes-drawer">
           <div class="bili-mini-episodes-head" @pointerdown="onPointerDown">
             <div class="bili-mini-episodes-meta">
-              <span>📑 视频选集</span>
+              <span>{{ t('bili.player.episodes') }}</span>
               <span class="bili-mini-episodes-count">({{ state.pages.length }}P)</span>
             </div>
             <button
               type="button"
               class="bili-mini-tab-btn"
-              title="收起选集"
+              :title="t('bili.player.collapseEpisodes')"
               @click.stop="controller.toggleEpisodes(false)"
             >
               ✕
@@ -765,7 +766,7 @@ onUnmounted(() => {
               @click.stop="controller.switchEpisode(idx)"
             >
               <span class="bili-mini-ep-badge">P{{ ep.page || idx + 1 }}</span>
-              <span class="bili-mini-ep-part" :title="ep.part">{{ ep.part || `第 ${idx + 1} 集` }}</span>
+              <span class="bili-mini-ep-part" :title="ep.part">{{ ep.part || t('bili.player.episodeNum', { num: idx + 1 }) }}</span>
             </button>
           </div>
         </div>
@@ -774,21 +775,21 @@ onUnmounted(() => {
         <div v-if="state.descOpen" class="bili-mini-desc-drawer">
           <div class="bili-mini-desc-head" @pointerdown="onPointerDown">
             <div class="bili-mini-desc-meta">
-              <span>📋 视频简介</span>
+              <span>{{ t('bili.player.desc') }}</span>
             </div>
             <div style="display: flex; align-items: center; gap: 4px;">
               <button
                 type="button"
                 class="bili-copy-desc-btn"
-                title="复制完整视频简介"
+                :title="t('bili.player.copyDescTitle')"
                 @click.stop="controller.copyDescription()"
               >
-                复制简介
+                {{ t('bili.player.copyDesc') }}
               </button>
               <button
                 type="button"
                 class="bili-mini-tab-btn"
-                title="收起简介"
+                :title="t('bili.player.collapseDesc')"
                 @click.stop="controller.toggleDesc(false)"
               >
                 ✕
@@ -812,13 +813,13 @@ onUnmounted(() => {
                     class="bili-mini-desc-up-name clickable"
                     title="点击查看 UP 主详情与近期投稿"
                     @click.stop="openUpPreview($event, { mid: state.authorMid, name: state.author, face: state.authorFace })"
-                  >{{ state.author || "UP主" }}</span>
+                  >{{ state.author || t("bili.upDefault") }}</span>
                 </div>
                 <div class="bili-mini-desc-up-sub">
                   <span v-if="upFansCount != null" class="bili-mini-desc-fans">
-                    {{ formatBiliCompactNumber(upFansCount) }}粉丝
+                    {{ t('bili.player.fansCount', { count: formatBiliCompactNumber(upFansCount) }) }}
                   </span>
-                  <span v-else-if="upFansLoading" class="bili-mini-desc-fans loading">粉丝加载中…</span>
+                  <span v-else-if="upFansLoading" class="bili-mini-desc-fans loading">{{ t('bili.player.fansLoading') }}</span>
                   <span v-if="state.pubdate" class="bili-mini-desc-pubdate">{{ state.pubdate }}</span>
                 </div>
               </div>
@@ -832,20 +833,20 @@ onUnmounted(() => {
                     busy: upFollowBusy
                   }"
                   :disabled="upFollowBusy"
-                  :title="isUpFollowed ? (upFollowConfirming ? '点击确认取消关注' : '已关注，点击取关') : '关注该 UP 主'"
+                  :title="isUpFollowed ? (upFollowConfirming ? t('bili.player.unfollowConfirmTitle') : t('bili.player.unfollowTitle')) : t('bili.player.followTitle')"
                   @click.stop="handleFollowClick"
                   @mouseleave="upFollowConfirming = false"
                 >
                   <template v-if="upFollowBusy">...</template>
-                  <template v-else-if="!isUpFollowed">+ 关注</template>
-                  <template v-else-if="upFollowConfirming">确定取消？</template>
-                  <template v-else>已关注</template>
+                  <template v-else-if="!isUpFollowed">{{ t('bili.player.follow') }}</template>
+                  <template v-else-if="upFollowConfirming">{{ t('bili.player.unfollowConfirm') }}</template>
+                  <template v-else>{{ t('bili.player.followed') }}</template>
                 </button>
               </div>
             </div>
             <div class="bili-mini-desc-title">{{ state.title }}</div>
             <div class="bili-mini-desc-divider"></div>
-            <div class="bili-mini-desc-text"><BiliRichText :text="state.description || '暂无简介'" /></div>
+            <div class="bili-mini-desc-text"><BiliRichText :text="state.description || t('bili.player.noDesc')" /></div>
           </div>
         </div>
 
@@ -862,7 +863,7 @@ onUnmounted(() => {
               <button
                 class="bili-mini-ep-btn prev"
                 type="button"
-                title="上一集"
+                :title="t('bili.player.prevEp')"
                 :disabled="state.currentPageIndex <= 0"
                 @click.stop="prevEpisode"
               >‹</button>
@@ -870,7 +871,7 @@ onUnmounted(() => {
                 class="bili-mini-ep-label"
                 :class="{ active: state.episodesOpen }"
                 type="button"
-                title="展开/收起选集列表"
+                :title="t('bili.player.toggleEpisodes')"
                 @click.stop="controller.toggleEpisodes()"
               >
                 P{{ state.currentPageIndex + 1 }}
@@ -878,7 +879,7 @@ onUnmounted(() => {
               <button
                 class="bili-mini-ep-btn next"
                 type="button"
-                title="下一集"
+                :title="t('bili.player.nextEp')"
                 :disabled="state.currentPageIndex >= state.pages.length - 1"
                 @click.stop="nextEpisode"
               >›</button>

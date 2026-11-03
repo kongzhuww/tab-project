@@ -3,11 +3,11 @@
     id="todoist-calendar-sidebar"
     class="todoist-calendar-sidebar"
     :class="{ collapsed: state.collapsed }"
-    aria-label="Todoist 任务日历"
+    :aria-label="t('todoist.calendar.sidebarLabel')"
   >
     <div class="todoist-cal-head">
       <div class="todoist-cal-title-row">
-        <span class="todoist-cal-logo">📅 <strong>任务日历</strong></span>
+        <span class="todoist-cal-logo">📅 <strong>{{ t('todoist.calendar.title') }}</strong></span>
         <span id="todoist-cal-month-badge" class="todoist-cal-badge">{{ state.badgeText }}</span>
       </div>
       <div class="todoist-cal-head-actions">
@@ -16,7 +16,7 @@
           class="todoist-cal-today-btn"
           type="button"
           @click="onToday"
-        >返回今天</button>
+        >{{ t('todoist.calendar.today') }}</button>
       </div>
     </div>
 
@@ -26,7 +26,7 @@
           id="todoist-cal-prev-month"
           type="button"
           class="cal-nav-btn"
-          title="上个月"
+          :title="t('todoist.calendar.prevMonth')"
           @click="onPrevMonth"
         >‹</button>
         <span id="todoist-cal-month-label" class="cal-nav-label">{{ state.monthLabel }}</span>
@@ -34,7 +34,7 @@
           id="todoist-cal-next-month"
           type="button"
           class="cal-nav-btn"
-          title="下个月"
+          :title="t('todoist.calendar.nextMonth')"
           @click="onNextMonth"
         >›</button>
       </div>
@@ -43,7 +43,7 @@
           id="todoist-cal-prev-year"
           type="button"
           class="cal-nav-btn"
-          title="上一年"
+          :title="t('todoist.calendar.prevYear')"
           @click="onPrevYear"
         >‹</button>
         <span id="todoist-cal-year-label" class="cal-nav-label">{{ state.yearLabel }}</span>
@@ -51,14 +51,14 @@
           id="todoist-cal-next-year"
           type="button"
           class="cal-nav-btn"
-          title="下一年"
+          :title="t('todoist.calendar.nextYear')"
           @click="onNextYear"
         >›</button>
       </div>
     </div>
 
     <div class="todoist-cal-weekdays">
-      <span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span>
+      <span>{{ t('todoist.calendar.weekdays.mon') }}</span><span>{{ t('todoist.calendar.weekdays.tue') }}</span><span>{{ t('todoist.calendar.weekdays.wed') }}</span><span>{{ t('todoist.calendar.weekdays.thu') }}</span><span>{{ t('todoist.calendar.weekdays.fri') }}</span><span>{{ t('todoist.calendar.weekdays.sat') }}</span><span>{{ t('todoist.calendar.weekdays.sun') }}</span>
     </div>
 
     <div id="todoist-cal-grid" class="todoist-cal-grid" role="grid">
@@ -89,20 +89,20 @@
     <div class="todoist-cal-agenda">
       <div class="todoist-cal-agenda-head">
         <strong class="todoist-cal-agenda-title">{{ state.agendaTitle }}</strong>
-        <span id="todoist-cal-agenda-count" class="agenda-count">{{ state.todoItems.length }} 项</span>
+        <span id="todoist-cal-agenda-count" class="agenda-count">{{ t('todoist.calendar.itemCount', { count: state.todoItems.length }) }}</span>
       </div>
       <p v-if="state.writeError" class="todoist-cal-empty" role="alert">{{ state.writeError }}</p>
       <div v-if="state.emptyText" class="todoist-cal-empty" role="status">
         {{ state.emptyText }}
         <button type="button" class="todoist-cal-retry" :disabled="state.todoLoading || todoistModuleState.pendingWrites > 0"
-          @click="todoistCalendarSidebarController.loadTodosForDate(state.selectedDate, true)">重试读取</button>
+          @click="todoistCalendarSidebarController.loadTodosForDate(state.selectedDate, true)">{{ t('todoist.calendar.retryLoad') }}</button>
       </div>
       <div id="todoist-cal-todo-list" class="todoist-cal-agenda-list todoist-cal-todos">
         <div v-if="state.todoLoading && !state.todoItems.length" class="todoist-cal-empty">
-          正在读取待办与完成历史…
+          {{ t('todoist.calendar.loading') }}
         </div>
         <div v-else-if="state.todoItems.length === 0 && !state.emptyText" class="todoist-cal-empty">
-          当天没有待办或完成任务 ☕
+          {{ t('todoist.calendar.emptyDay') }}
         </div>
         <template v-else>
           <div
@@ -118,7 +118,7 @@
                 class="todoist-cal-check"
                 :class="{ checked: item.completed }"
                 :disabled="todoistModuleState.pendingWrites > 0"
-                :title="item.completed ? '已完成 · 点击撤销(Reopen)' : '点击标记完成'"
+                :title="item.completed ? t('todoist.calendar.clickToReopen') : t('todoist.calendar.clickToComplete')"
                 @click.stop="onToggleTodo(item)"
               >
                 <span v-if="item.completed" class="check-icon">✓</span>
@@ -127,18 +127,18 @@
                 {{ item.content }}
               </span>
               <small v-if="item.time" class="todoist-cal-task-time">{{ item.time }}</small>
-              <span v-if="item.completed" class="todoist-cal-completed-tag">已完成</span>
+              <span v-if="item.completed" class="todoist-cal-completed-tag">{{ t('todoist.calendar.completedTag') }}</span>
             </div>
 
             <!-- 🖼️ 若任务附带照片，在日历卡片下方直接展示小缩略图 -->
             <div
               v-if="item.thumbUrl"
               class="todoist-cal-thumb-box"
-              title="点击在小窗查看原图"
+              :title="t('todoist.calendar.viewPhoto')"
               @click.stop="imageViewerController.open(item.thumbUrl, item.content)"
             >
-              <img :src="item.thumbUrl" class="todoist-cal-thumb-img" alt="任务照片" loading="lazy" />
-              <span class="todoist-cal-thumb-tag">🖼️ 照片</span>
+              <img :src="item.thumbUrl" class="todoist-cal-thumb-img" :alt="t('todoist.calendar.taskPhoto')" loading="lazy" />
+              <span class="todoist-cal-thumb-tag">{{ t('todoist.calendar.photoTag') }}</span>
             </div>
           </div>
         </template>
@@ -158,6 +158,7 @@ import {
   type CalendarTodoItem
 } from "./calendar-sidebar-store";
 import { todoistInspectorController } from "./inspector-store";
+import { t } from "../i18n";
 
 import { useTaskInvalidation } from "./use-task-invalidation";
 const state = todoistCalendarSidebarState;

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { githubHeroController as controller, githubHeroState as state } from "./hero";
 import { githubStatusState as status, githubStatusController } from "./store";
+import { t } from "../i18n";
 const emit = defineEmits<{ "open-ai-settings": [] }>();
 </script>
 
@@ -15,18 +16,18 @@ const emit = defineEmits<{ "open-ai-settings": [] }>();
       <h3 id="gh-hero-title" :title="state.title">{{ state.title }}</h3>
       <div v-if="status.actionText" class="gh-hero-inline-status" :class="{ 'is-error': status.actionError }" :role="status.actionError ? 'alert' : 'status'" :aria-live="status.actionError ? 'assertive' : 'polite'" aria-atomic="true">
         <span class="gh-hero-status-text" :title="status.actionText">{{ status.actionText }}</span>
-        <button type="button" title="关闭提示" aria-label="关闭状态提示" @click="githubStatusController.update({ actionText: '', actionError: false })">×</button>
+        <button type="button" :title="t('github.hero.closeTip')" :aria-label="t('github.hero.closeTip')" @click="githubStatusController.update({ actionText: '', actionError: false })">×</button>
       </div>
     </div>
     <p id="gh-hero-desc">{{ state.description }}</p>
   </div>
   <div class="gh-bili-actions">
-    <button id="gh-batch-toggle-btn" type="button" class="gh-hero-btn gh-batch-toggle-btn" :class="{ active: state.batchMode }" title="批量多选操作" @click="controller.toggleBatch()">
+    <button id="gh-batch-toggle-btn" type="button" class="gh-hero-btn gh-batch-toggle-btn" :class="{ active: state.batchMode }" :title="t('github.hero.batchToggle')" @click="controller.toggleBatch()">
       <span class="gh-batch-btn-icon">☑</span>
-      <span class="gh-batch-btn-text">{{ state.batchMode ? '返回' : '批量操作' }}</span>
+      <span class="gh-batch-btn-text">{{ state.batchMode ? t('github.hero.batchBack') : t('github.hero.batch') }}</span>
     </button>
-    <button id="gh-refresh-btn" type="button" class="gh-hero-btn" title="只读核对未确认的 Star 状态并刷新列表，不重发远端操作" @click="controller.refresh()">↻ 刷新 / 核对</button>
-    <button id="gh-hero-add-folder-btn" type="button" class="gh-hero-btn primary" title="在 GitHub 官网上创建新 List" @click="controller.createFolder()">＋ 新建列表</button>
+    <button id="gh-refresh-btn" type="button" class="gh-hero-btn" :title="t('github.hero.refreshTitle')" @click="controller.refresh()">{{ t('github.hero.refresh') }}</button>
+    <button id="gh-hero-add-folder-btn" type="button" class="gh-hero-btn primary" :title="t('github.hero.addFolderTitle')" @click="controller.createFolder()">{{ t('github.hero.addFolder') }}</button>
   </div>
 </template>
 

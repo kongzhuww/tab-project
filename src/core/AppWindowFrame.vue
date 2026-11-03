@@ -51,8 +51,8 @@
               v-if="showMinimize"
               type="button"
               class="lw-win-btn lw-win-minimize"
-              title="最小化"
-              aria-label="最小化窗口"
+              :title="t('window.minimize')"
+              :aria-label="t('window.minimize')"
               @click.stop="handleMinimize"
             >
               −
@@ -61,8 +61,8 @@
               v-if="showMaximize && resizable"
               type="button"
               class="lw-win-btn lw-win-maximize"
-              :title="isMaximized ? '向下还原' : '最大化'"
-              aria-label="最大化或还原窗口"
+              :title="isMaximized ? t('window.restore') : t('window.maximize')"
+              :aria-label="isMaximized ? t('window.restore') : t('window.maximize')"
               @click.stop="toggleMaximize"
             >
               {{ isMaximized ? '❐' : '□' }}
@@ -71,8 +71,8 @@
               v-if="showClose"
               type="button"
               class="lw-win-btn lw-win-close"
-              title="关闭窗口"
-              aria-label="关闭窗口"
+              :title="t('window.closeWindow')"
+              :aria-label="t('window.closeWindow')"
               @click.stop="handleClose"
             >
               ✕
@@ -87,17 +87,17 @@
       <div v-if="hasRenderError" class="lw-window-error-boundary">
         <div class="lw-error-card">
           <span class="lw-error-icon">⚠️</span>
-          <h3 class="lw-error-title">{{ title }} 遇到了局部渲染错误</h3>
-          <p class="lw-error-desc">已自动拦截异常，主屏与其他窗口运行正常。</p>
+          <h3 class="lw-error-title">{{ t('window.renderError', { title }) }}</h3>
+          <p class="lw-error-desc">{{ t('window.renderErrorDesc') }}</p>
           <div class="lw-error-details">
             <code>{{ renderErrorMessage }}</code>
           </div>
           <div class="lw-error-actions">
             <button type="button" class="lw-error-btn primary" @click="resetError">
-              🔄 尝试恢复运行
+              {{ t('window.retry') }}
             </button>
             <button type="button" class="lw-error-btn secondary" @click="handleClose">
-              关闭此窗口
+              {{ t('window.closeThis') }}
             </button>
           </div>
         </div>
@@ -128,6 +128,7 @@
 import { ref, computed, onMounted, onUnmounted, onErrorCaptured, watch } from "vue";
 import { useWindowDraggable } from "./useWindowDraggable";
 import { windowManagerController, windowManagerState } from "./window-manager.store";
+import { t } from "../i18n";
 
 const props = withDefaults(
   defineProps<{

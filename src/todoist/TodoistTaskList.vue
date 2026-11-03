@@ -1,9 +1,9 @@
 <template>
   <div id="todoist-workspace-body" class="todoist-workspace-body" @click="closeAllPopovers">
     <p v-if="state.moveError && state.moveMessage" class="todoist-move-status error" role="alert">{{ state.moveMessage }}</p>
-    <p v-if="state.emptyText && state.columns.length > 0 && !state.loading" class="todoist-move-status error" role="status">{{ state.emptyText }} 已显示的任务保留。</p>
+    <p v-if="state.emptyText && state.columns.length > 0 && !state.loading" class="todoist-move-status error" role="status">{{ t('todoist.tasksRetained', { text: state.emptyText }) }}</p>
     <!-- 加载中或全屏空态提示 -->
-    <p v-if="state.loading && state.columns.length === 0" class="todoist-empty">加载中…</p>
+    <p v-if="state.loading && state.columns.length === 0" class="todoist-empty">{{ t('common.loading') }}</p>
     <p v-else-if="state.emptyText && state.columns.length === 0" class="todoist-empty">{{ state.emptyText }}</p>
 
     <!-- 项目视图空状态 -->
@@ -12,14 +12,14 @@
       class="todoist-projects-empty-state"
     >
       <div class="empty-icon">📁</div>
-      <h3>暂无自定义项目</h3>
-      <p>你还没有创建任何 Todoist 项目，现在创建一个专属项目来组织任务吧！</p>
+      <h3>{{ t('todoist.emptyProjects') }}</h3>
+      <p>{{ t('todoist.emptyProjectsDesc') }}</p>
       <button
         type="button"
         class="todoist-add-section-submit"
         style="padding:8px 18px; font-size:13px; cursor:pointer;"
         @click="openCreateProjectPrompt($event)"
-      >＋ 新建第一个项目</button>
+      >{{ t('todoist.createFirstProject') }}</button>
     </div>
 
     <!-- 正常看板内容区 -->
@@ -162,7 +162,7 @@
             </div>
 
             <div class="todoist-inline-actions">
-              <button type="button" :disabled="isSubmittingComposer" @click="closeComposer">取消</button>
+              <button type="button" :disabled="isSubmittingComposer" @click="closeComposer">{{ t('common.cancel') }}</button>
               <button type="submit" class="primary" :disabled="isSubmittingComposer">{{ isSubmittingComposer ? (composerPastedImages.length ? '图片上传中…' : '添加中…') : '添加任务' }}</button>
             </div>
           </form>
@@ -352,7 +352,7 @@
                 type="button"
                 class="todoist-add-section-cancel"
                 @click="cancelAddSection"
-              >取消</button>
+              >{{ t('common.cancel') }}</button>
             </div>
           </div>
         </div>
@@ -372,7 +372,7 @@
         @click="openRenameSectionPrompt(sectionMenu.col, $event)"
       >
         <span class="section-menu-icon">✏️</span>
-        <span class="section-menu-text">重命名板块</span>
+        <span class="section-menu-text">{{ t('todoist.menu.renameSection') }}</span>
       </button>
 
       <div v-if="sectionMenu.col.sectionId" class="todoist-section-menu-move-row">
@@ -382,7 +382,7 @@
           :disabled="!sectionMenu.canMoveLeft"
           title="向左移动板块"
           @click="onMoveSection(sectionMenu.col, -1)"
-        >◀ 左移</button>
+        >{{ t('todoist.menu.moveLeft') }}</button>
         <span class="move-btn-divider"></span>
         <button
           type="button"
@@ -390,7 +390,7 @@
           :disabled="!sectionMenu.canMoveRight"
           title="向右移动板块"
           @click="onMoveSection(sectionMenu.col, 1)"
-        >右移 ▶</button>
+        >{{ t('todoist.menu.moveRight') }}</button>
       </div>
 
       <div v-if="sectionMenu.col.sectionId" class="todoist-section-menu-divider"></div>
@@ -402,7 +402,7 @@
         @click="openDeleteSectionConfirm(sectionMenu.col, $event)"
       >
         <span class="section-menu-icon">🗑️</span>
-        <span class="section-menu-text">删除分组</span>
+        <span class="section-menu-text">{{ t('todoist.menu.deleteSection') }}</span>
       </button>
     </div>
 
@@ -416,7 +416,7 @@
     >
       <!-- 菜单标题头 -->
       <div class="todoist-task-menu-header">
-        <span class="todoist-task-menu-title">{{ taskContextMenu.task.content || '任务操作' }}</span>
+        <span class="todoist-task-menu-title">{{ taskContextMenu.task.content || t('todoist.menu.taskOps') }}</span>
       </div>
 
       <!-- 🏷️ 云端标签管理 -->
@@ -427,9 +427,9 @@
         @click="toggleTaskSubpanel('labels')"
       >
         <span class="todoist-menu-icon">🏷️</span>
-        <span class="todoist-menu-text">云端标签</span>
+        <span class="todoist-menu-text">{{ t('todoist.menu.cloudLabels') }}</span>
         <span class="todoist-menu-badge">
-          {{ (taskContextMenu.task.labels && taskContextMenu.task.labels.length) ? `已选 ${taskContextMenu.task.labels.length}` : '无' }}
+          {{ (taskContextMenu.task.labels && taskContextMenu.task.labels.length) ? t('todoist.menu.labelsSelected', { count: taskContextMenu.task.labels.length }) : t('todoist.menu.labelsNone') }}
         </span>
       </button>
 
@@ -439,7 +439,7 @@
           <input
             v-model="taskContextMenu.newLabelText"
             type="text"
-            placeholder="新建或添加标签…"
+            :placeholder="t('todoist.menu.newLabelPlaceholder')"
             class="todoist-label-input"
             @keydown.enter.prevent="onMenuAddNewLabel"
           />
@@ -468,11 +468,11 @@
         @click="toggleTaskSubpanel('recur')"
       >
         <span class="todoist-menu-icon">🔄</span>
-        <span class="todoist-menu-text">设置循环周期</span>
+        <span class="todoist-menu-text">{{ t('todoist.menu.setRecur') }}</span>
         <span
           class="todoist-menu-badge"
           :style="taskContextMenu.task.isRecurring ? 'color:#7c3aed;font-weight:700;' : ''"
-        >{{ taskContextMenu.task.isRecurring ? (taskContextMenu.task.dueString || '循环') : '无' }}</span>
+        >{{ taskContextMenu.task.isRecurring ? (taskContextMenu.task.dueString || t('todoist.recur.recurring')) : t('todoist.menu.labelsNone') }}</span>
       </button>
 
       <!-- 循环子面板 -->
@@ -505,7 +505,7 @@
           type="button"
           class="todoist-recur-clear-btn"
           @click="onMenuClearRecur"
-        >❌ 清除循环（转为单次任务）</button>
+        >{{ t('todoist.menu.clearRecur') }}</button>
       </div>
 
       <!-- 7. 选择标签颜色 -->
@@ -516,7 +516,7 @@
         @click="toggleTaskSubpanel('color')"
       >
         <span class="todoist-menu-icon">🎨</span>
-        <span class="todoist-menu-text">选择标签颜色</span>
+        <span class="todoist-menu-text">{{ t('todoist.menu.pickColor') }}</span>
         <span class="todoist-menu-badge" style="display:inline-flex;align-items:center;gap:5px;">
           <span
             v-if="getCurrentColorObj.id === 'none'"
@@ -568,7 +568,7 @@
         @click="toggleTaskSubpanel('project')"
       >
         <span class="todoist-menu-icon">📁</span>
-        <span class="todoist-menu-text">移动到项目…</span>
+        <span class="todoist-menu-text">{{ t('todoist.menu.moveToProject') }}</span>
         <span class="todoist-menu-arrow">›</span>
       </button>
 
@@ -590,7 +590,7 @@
         >
           <span class="todoist-menu-icon">📁</span>
           <span class="todoist-project-flyout-name">{{ p.name }}</span>
-          <span v-if="String(p.id) === contextTaskProjectId" class="todoist-menu-badge">当前</span>
+          <span v-if="String(p.id) === contextTaskProjectId" class="todoist-menu-badge">{{ t('todoist.menu.currentBadge') }}</span>
         </button>
       </div>
 
@@ -602,7 +602,7 @@
         @click="onMenuDeleteTask"
       >
         <span class="todoist-menu-icon">🗑️</span>
-        <span class="todoist-menu-text">{{ taskContextMenu.task.isRecurring ? '删除重复任务…' : '删除任务' }}</span>
+        <span class="todoist-menu-text">{{ taskContextMenu.task.isRecurring ? t('todoist.menu.deleteRecurringTask') : t('todoist.menu.deleteTask') }}</span>
       </button>
     </div>
 
@@ -623,7 +623,7 @@
       <div class="todoist-dialog-head" @pointerdown="startDragDialog('prompt', $event)">
         <span class="todoist-dialog-icon">✏️</span>
         <h3 class="todoist-dialog-title">{{ promptModal.title }}</h3>
-        <span class="todoist-dialog-drag-hint" title="按住可拖动位置">⋮⋮</span>
+        <span class="todoist-dialog-drag-hint" :title="t('todoist.dragDialogHint')">⋮⋮</span>
       </div>
       <div class="todoist-dialog-body">
         <p v-if="promptModal.message" class="todoist-dialog-desc">{{ promptModal.message }}</p>
@@ -638,9 +638,9 @@
         />
       </div>
       <div class="todoist-dialog-foot">
-        <button type="button" class="todoist-dialog-btn" @click="closePromptModal">取消</button>
+        <button type="button" class="todoist-dialog-btn" @click="closePromptModal">{{ t('common.cancel') }}</button>
         <button type="button" class="todoist-dialog-btn primary" @click="submitPromptModal">
-          {{ promptModal.confirmText || '确定' }}
+          {{ promptModal.confirmText || t('common.confirm') }}
         </button>
       </div>
     </div>
@@ -663,7 +663,7 @@
       <div class="todoist-dialog-head" @pointerdown="startDragDialog('confirm', $event)">
         <span class="todoist-dialog-icon">{{ confirmModal.icon || '⚠️' }}</span>
         <h3 class="todoist-dialog-title">{{ confirmModal.title }}</h3>
-        <span class="todoist-dialog-drag-hint" title="按住可拖动位置">⋮⋮</span>
+        <span class="todoist-dialog-drag-hint" :title="t('todoist.dragDialogHint')">⋮⋮</span>
       </div>
       <div class="todoist-dialog-body">
         <div
@@ -675,13 +675,13 @@
         <p class="todoist-dialog-msg">{{ confirmModal.message }}</p>
       </div>
       <div class="todoist-dialog-foot">
-        <button type="button" class="todoist-dialog-btn" @click="closeConfirmModal">取消</button>
+        <button type="button" class="todoist-dialog-btn" @click="closeConfirmModal">{{ t('common.cancel') }}</button>
         <button
           type="button"
           class="todoist-dialog-btn"
           :class="confirmModal.danger ? 'danger' : 'primary'"
           @click="submitConfirmModal"
-        >{{ confirmModal.confirmText || '确定' }}</button>
+        >{{ confirmModal.confirmText || t('common.confirm') }}</button>
       </div>
     </div>
 

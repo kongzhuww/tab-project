@@ -6,11 +6,11 @@
     :style="{ left: state.x + 'px', top: state.y + 'px' }"
   >
     <div class="clock-menu-head">
-      <span class="clock-menu-title">🕒 时钟个性化设置</span>
-      <button class="clock-menu-close" type="button" title="关闭" @click="handleClose">✕</button>
+      <span class="clock-menu-title">{{ t('clock.menuTitle') }}</span>
+      <button class="clock-menu-close" type="button" :title="t('common.close')" @click="handleClose">✕</button>
     </div>
 
-    <div class="clock-menu-section-title">🔤 字体样式</div>
+    <div class="clock-menu-section-title">{{ t('clock.fontStyle') }}</div>
     <div class="clock-menu-font-list">
       <button
         v-for="f in CLOCK_FONTS"
@@ -27,7 +27,7 @@
       </button>
     </div>
 
-    <div class="clock-menu-section-title">🎨 时钟颜色</div>
+    <div class="clock-menu-section-title">{{ t('clock.clockColor') }}</div>
     <div class="clock-menu-color-row">
       <button
         v-for="c in CLOCK_COLORS"
@@ -42,7 +42,7 @@
       ></button>
     </div>
 
-    <div class="clock-menu-section-title">🌐 显示时区</div>
+    <div class="clock-menu-section-title">{{ t('clock.timezone') }}</div>
     <div class="clock-menu-tz-list">
       <button
         v-for="tz in CLOCK_TIMEZONES"
@@ -68,6 +68,7 @@ import {
   CLOCK_COLORS,
   CLOCK_TIMEZONES
 } from "./settings-store";
+import { t } from "../i18n";
 
 // 时钟设置菜单响应式状态
 const state = clockSettingsController.state;

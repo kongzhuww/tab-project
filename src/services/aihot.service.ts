@@ -175,7 +175,9 @@ export class AiHotService {
           }
           return {
             id: String(it.id || it.externalId || crypto.randomUUID()),
-            title: it.title || it.headline || "无标题", summary: it.summary || it.description || "",
+            title: it.title || it.headline || "无标题",
+            originalTitle: it.originalTitle || undefined,
+            summary: it.summary || it.description || "",
             sourceName: it.source?.name || it.sourceName || it.site || "AI 资讯",
             published, category: it.category || "综合",
             url: it.links?.aihot || it.links?.original || it.url || it.link || "#", raw: it

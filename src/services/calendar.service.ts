@@ -53,7 +53,18 @@ export interface TodoistTaskItem {
   [key: string]: any;
 }
 
-const CHINESE_MONTHS = ["一月", "二月", "三月", "四月", "五月", "六月", "七月", "八月", "九月", "十月", "十一月", "十二月"];
+import { t } from "../i18n";
+
+const MONTH_KEYS = [
+  "calendar.month.1", "calendar.month.2", "calendar.month.3", "calendar.month.4",
+  "calendar.month.5", "calendar.month.6", "calendar.month.7", "calendar.month.8",
+  "calendar.month.9", "calendar.month.10", "calendar.month.11", "calendar.month.12"
+] as const;
+
+function getMonthLabel(monthIndex: number): string {
+  const key = MONTH_KEYS[monthIndex];
+  return key ? t(key) : "";
+}
 
 function storageGetLocal(keys: string[]): Promise<Record<string, any>> {
   if (typeof (window as any).storageGet === "function") {
@@ -616,7 +627,7 @@ export class CalendarService {
       };
     });
     todoistCalendarSidebarController.updateState({
-      badgeText: "Todoist", monthLabel: CHINESE_MONTHS[month], yearLabel: String(year),
+      badgeText: "Todoist", monthLabel: getMonthLabel(month), yearLabel: String(year),
       cells, selectedDate: selected
     });
   }

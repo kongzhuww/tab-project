@@ -12,6 +12,7 @@ import {
   type WeatherDayItem,
   type WeatherDetailInfo
 } from "../weather/store";
+import { t } from "../i18n";
 
 declare const chrome: any;
 
@@ -77,17 +78,17 @@ export const WEATHER_COMMON_CITIES: WeatherCityItem[] = [
 ];
 
 export function getWmoWeatherInfo(code: number): WeatherCodeInfo {
-  if (code === 0) return { emoji: "☀️", label: "晴" };
-  if (code <= 2) return { emoji: "🌤️", label: "少云" };
-  if (code === 3) return { emoji: "☁️", label: "多云" };
-  if (code === 45 || code === 48) return { emoji: "🌫️", label: "雾" };
-  if (code >= 51 && code <= 57) return { emoji: "🌦️", label: "毛毛雨" };
-  if (code >= 61 && code <= 67) return { emoji: "🌧️", label: "雨" };
-  if (code >= 71 && code <= 77) return { emoji: "🌨️", label: "雪" };
-  if (code >= 80 && code <= 82) return { emoji: "🌧️", label: "阵雨" };
-  if (code >= 85 && code <= 86) return { emoji: "🌨️", label: "阵雪" };
-  if (code >= 95) return { emoji: "⛈️", label: "雷雨" };
-  return { emoji: "🌡️", label: "—" };
+  if (code === 0) return { emoji: "☀️", label: t("weather.condition.clear") };
+  if (code <= 2) return { emoji: "🌤️", label: t("weather.condition.mainlyClear") };
+  if (code === 3) return { emoji: "☁️", label: t("weather.condition.cloudy") };
+  if (code === 45 || code === 48) return { emoji: "🌫️", label: t("weather.condition.fog") };
+  if (code >= 51 && code <= 57) return { emoji: "🌦️", label: t("weather.condition.drizzle") };
+  if (code >= 61 && code <= 67) return { emoji: "🌧️", label: t("weather.condition.rain") };
+  if (code >= 71 && code <= 77) return { emoji: "🌨️", label: t("weather.condition.snow") };
+  if (code >= 80 && code <= 82) return { emoji: "🌧️", label: t("weather.condition.rainShower") };
+  if (code >= 85 && code <= 86) return { emoji: "🌨️", label: t("weather.condition.snowShower") };
+  if (code >= 95) return { emoji: "⛈️", label: t("weather.condition.thunderstorm") };
+  return { emoji: "🌡️", label: t("weather.condition.unknown") };
 }
 
 export class WeatherService {
@@ -95,6 +96,7 @@ export class WeatherService {
   private currentCity: string = "武汉";
   private isRefreshing: boolean = false;
   private activeRequestId: number = 0;
+  private lastRawForecastData: { city: string; loc: any; d: any } | null = null;
 
   public static getInstance(): WeatherService {
     if (!WeatherService.instance) {
@@ -142,6 +144,102 @@ export class WeatherService {
     }
 
     await this.loadWeather(clean);
+  }
+
+  public reformatCurrentWeather(): void {
+    if (!this.lastRawForecastData) return;
+    const { city, loc, d } = this.lastRawForecastData;
+    this.applyForecastPayload(city, loc, d);
+  }
+
+  private applyForecastPayload(city: string, loc: any, d: any): void {
+    const curInfo = getWmoWeatherInfo(d.current?.weather_code ?? 0);
+    const currentTemp = Math.round(d.current?.temperature_2m ?? 0);
+
+    const times: string[] = d.hourly?.time || [];
+    const nowMs = Date.now();
+    let startIdx = times.findIndex((t) => new Date(t).getTime() >= nowMs);
+    if (startIdx < 0) startIdx = 0;
+
+    const hoursList: WeatherHourItem[] = [];
+    for (let i = startIdx; i < Math.min(startIdx + 5, times.length); i++) {
+      const hTime = i === startIdx ? t("weather.now") : t("weather.hourSuffix", { hour: new Date(times[i]).getHours() });
+      const hInfo = getWmoWeatherInfo(d.hourly.weather_code[i]);
+      const hTemp = Math.round(d.hourly.temperature_2m[i]);
+      hoursList.push({ time: hTime, emoji: hInfo.emoji, temp: hTemp });
+    }
+
+    let rainText = t("weather.noRain12h");
+    for (let i = startIdx; i < Math.min(startIdx + 12, times.length); i++) {
+      const c = d.hourly.weather_code[i];
+      const p = d.hourly.precipitation_probability?.[i] || 0;
+      if (c >= 51 || p >= 60) {
+        const hr = new Date(times[i]).getHours();
+        const snow = (c >= 71 && c <= 77) || c === 85 || c === 86;
+        const typeStr = snow ? t("weather.snow") : t("weather.rain");
+        const probStr = p ? ` (${p}%)` : "";
+        rainText = t("weather.expectPrecip", { time: `${hr}:00`, type: typeStr, prob: probStr });
+        break;
+      }
+    }
+
+    const labels = [t("weather.today"), t("weather.tomorrow"), t("weather.afterTomorrow")];
+    const daysList: WeatherDayItem[] = [];
+    const dailyLen = d.daily?.time?.length || 0;
+    for (let i = 1; i < Math.min(3, dailyLen); i++) {
+      const dLabel = labels[i] || t("weather.plusDays", { count: i });
+      const dInfo = getWmoWeatherInfo(d.daily.weather_code[i]);
+      const dRange = `${Math.round(d.daily.temperature_2m_max[i])}°/${Math.round(d.daily.temperature_2m_min[i])}°`;
+      daysList.push({ label: dLabel, emoji: dInfo.emoji, tempRange: dRange });
+    }
+
+    const maxT = Math.round(d.daily?.temperature_2m_max?.[0] ?? currentTemp);
+    const minT = Math.round(d.daily?.temperature_2m_min?.[0] ?? currentTemp);
+    const subText = t("weather.tempRange", { cond: curInfo.label, max: maxT, min: minT });
+
+    const readyData: WeatherData = {
+      cityName: loc.name || city,
+      currentEmoji: curInfo.emoji,
+      currentTemp,
+      subText,
+      rainText,
+      hours: hoursList,
+      days: daysList
+    };
+
+    weatherController.ready(readyData, city);
+
+    if (d.daily?.time) {
+      const weekdays = [
+        t("weather.weekday.sun"), t("weather.weekday.mon"), t("weather.weekday.tue"),
+        t("weather.weekday.wed"), t("weather.weekday.thu"), t("weather.weekday.fri"),
+        t("weather.weekday.sat")
+      ];
+      const forecastDays: WeatherForecastItem[] = [];
+      for (let i = 0; i < d.daily.time.length; i++) {
+        const dateObj = new Date(d.daily.time[i]);
+        const dayName = i === 0 ? t("weather.today") : i === 1 ? t("weather.tomorrow") : i === 2 ? t("weather.afterTomorrow") : weekdays[dateObj.getDay()];
+        const info = getWmoWeatherInfo(d.daily.weather_code[i]);
+        forecastDays.push({
+          date: `${dateObj.getMonth() + 1}/${dateObj.getDate()}`,
+          dayName,
+          emoji: info.emoji,
+          condition: info.label,
+          highTemp: Math.round(d.daily.temperature_2m_max[i]),
+          lowTemp: Math.round(d.daily.temperature_2m_min[i]),
+          rainProb: d.daily.precipitation_probability_max?.[i] || 0
+        });
+      }
+      weatherController.setForecastDays(forecastDays);
+    }
+
+    const detail: WeatherDetailInfo = {
+      humidity: d.current?.relative_humidity_2m ? `${d.current.relative_humidity_2m}%` : "60%",
+      wind: d.current?.wind_speed_10m ? `${Math.round(d.current.wind_speed_10m)} km/h` : t("weather.detail.windLight"),
+      uvIndex: t("weather.detail.uvNormal"),
+      airQuality: t("weather.detail.airGood")
+    };
+    weatherController.setDetailInfo(detail);
   }
 
   public filterCities(query: string, limit = 8): WeatherCityItem[] {
@@ -202,92 +300,10 @@ export class WeatherService {
         return;
       }
       const d = await forecastRes.json();
-
-      const curInfo = getWmoWeatherInfo(d.current?.weather_code ?? 0);
-      const currentTemp = Math.round(d.current?.temperature_2m ?? 0);
-
-      // 小时预报
-      const times: string[] = d.hourly?.time || [];
-      const nowMs = Date.now();
-      let startIdx = times.findIndex((t) => new Date(t).getTime() >= nowMs);
-      if (startIdx < 0) startIdx = 0;
-
-      const hoursList: WeatherHourItem[] = [];
-      for (let i = startIdx; i < Math.min(startIdx + 5, times.length); i++) {
-        const hTime = i === startIdx ? "现在" : new Date(times[i]).getHours() + "时";
-        const hInfo = getWmoWeatherInfo(d.hourly.weather_code[i]);
-        const hTemp = Math.round(d.hourly.temperature_2m[i]);
-        hoursList.push({ time: hTime, emoji: hInfo.emoji, temp: hTemp });
-      }
-
-      // 降水预测
-      let rainText = "未来 12 小时暂无降水 ☂️";
-      for (let i = startIdx; i < Math.min(startIdx + 12, times.length); i++) {
-        const c = d.hourly.weather_code[i];
-        const p = d.hourly.precipitation_probability?.[i] || 0;
-        if (c >= 51 || p >= 60) {
-          const hr = new Date(times[i]).getHours();
-          const snow = (c >= 71 && c <= 77) || c === 85 || c === 86;
-          rainText = `预计 ${hr}:00 ${snow ? "有雪" : "有雨"}${p ? `（${p}%）` : ""} 🌧️`;
-          break;
-        }
-      }
-
-      // 简明未来日间预报
-      const labels = ["今天", "明天", "后天"];
-      const daysList: WeatherDayItem[] = [];
-      const dailyLen = d.daily?.time?.length || 0;
-      for (let i = 1; i < Math.min(3, dailyLen); i++) {
-        const dLabel = labels[i] || `+${i}天`;
-        const dInfo = getWmoWeatherInfo(d.daily.weather_code[i]);
-        const dRange = `${Math.round(d.daily.temperature_2m_max[i])}°/${Math.round(d.daily.temperature_2m_min[i])}°`;
-        daysList.push({ label: dLabel, emoji: dInfo.emoji, tempRange: dRange });
-      }
-
-      const subText = `${curInfo.label} · 最高 ${Math.round(d.daily?.temperature_2m_max?.[0] ?? currentTemp)}° / 最低 ${Math.round(d.daily?.temperature_2m_min?.[0] ?? currentTemp)}°`;
-
-      const readyData: WeatherData = {
-        cityName: loc.name || city,
-        currentEmoji: curInfo.emoji,
-        currentTemp,
-        subText,
-        rainText,
-        hours: hoursList,
-        days: daysList
-      };
+      this.lastRawForecastData = { city, loc, d };
 
       if (reqId === this.activeRequestId && (weatherState.state as string) !== "unconfigured") {
-        weatherController.ready(readyData, city);
-
-        // 7 天全量趋势弹窗数据
-        if (d.daily?.time) {
-          const weekdays = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
-          const forecastDays: WeatherForecastItem[] = [];
-          for (let i = 0; i < d.daily.time.length; i++) {
-            const dateObj = new Date(d.daily.time[i]);
-            const dayName = i === 0 ? "今天" : i === 1 ? "明天" : i === 2 ? "后天" : weekdays[dateObj.getDay()];
-            const info = getWmoWeatherInfo(d.daily.weather_code[i]);
-            forecastDays.push({
-              date: `${dateObj.getMonth() + 1}/${dateObj.getDate()}`,
-              dayName,
-              emoji: info.emoji,
-              condition: info.label,
-              highTemp: Math.round(d.daily.temperature_2m_max[i]),
-              lowTemp: Math.round(d.daily.temperature_2m_min[i]),
-              rainProb: d.daily.precipitation_probability_max?.[i] || 0
-            });
-          }
-          weatherController.setForecastDays(forecastDays);
-        }
-
-        // 空气质量与风力详情
-        const detail: WeatherDetailInfo = {
-          humidity: d.current?.relative_humidity_2m ? `${d.current.relative_humidity_2m}%` : "60%",
-          wind: d.current?.wind_speed_10m ? `${Math.round(d.current.wind_speed_10m)} km/h` : "微风",
-          uvIndex: "正常",
-          airQuality: "优良"
-        };
-        weatherController.setDetailInfo(detail);
+        this.applyForecastPayload(city, loc, d);
       }
     } catch (err: any) {
       if (reqId === this.activeRequestId && (weatherState.state as string) !== "unconfigured") {

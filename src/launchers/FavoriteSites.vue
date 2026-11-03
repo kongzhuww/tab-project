@@ -27,6 +27,7 @@ import { folderState } from "../launcher/folder-store";
 import { folderParent } from "../launcher/folder-tree";
 import { notifications } from "../sdk/notifications";
 import { navWheelRuntime } from "../nav-wheel/runtime";
+import { t } from "../i18n";
 
 function onWindowBlurOrHide() {
   cleanupPointerDrag();
@@ -891,11 +892,11 @@ async function onFolderDrop(targetGroupName: string, event: DragEvent) {
       @pointerdown.stop
       @contextmenu="onHeadContextMenu"
     >
-      <div class="sites-view-switch" role="group" aria-label="网站与书签切换">
-        <button type="button" :disabled="bookmarkSaving" :aria-pressed="sitesView === 'sites'" @click="sitesView = 'sites'">常用网站</button>
-        <button type="button" :disabled="bookmarkSaving" :aria-pressed="sitesView === 'bookmarks'" @click="sitesView = 'bookmarks'">书签</button>
+      <div class="sites-view-switch" role="group" :aria-label="t('home.sites.switchAria')">
+        <button type="button" :disabled="bookmarkSaving" :aria-pressed="sitesView === 'sites'" @click="sitesView = 'sites'">{{ t('home.sites.favoriteSites') }}</button>
+        <button type="button" :disabled="bookmarkSaving" :aria-pressed="sitesView === 'bookmarks'" @click="sitesView = 'bookmarks'">{{ t('home.sites.bookmarks') }}</button>
       </div>
-      <div v-show="sitesView === 'sites'" class="launcher-page-tabs" role="tablist" aria-label="常用网站分区">
+      <div v-show="sitesView === 'sites'" class="launcher-page-tabs" role="tablist" :aria-label="t('home.sites.pagesAria')">
         <button
           v-for="pageName in launcherGroupsState.pages"
           :key="pageName"
@@ -904,7 +905,7 @@ async function onFolderDrop(targetGroupName: string, event: DragEvent) {
           :class="{ active: pageName === launcherGroupsState.activePage }"
           :data-page="pageName"
           role="tab"
-          :title="`切换到${pageLabel(pageName)}；拖动网站到这里可移动分区；右键管理分区`"
+          :title="t('home.sites.pageTabTitle', { label: pageLabel(pageName) })"
           @pointerdown.stop
           @click.prevent.stop="setPage(pageName)"
           @contextmenu.prevent.stop="openPageMenu(pageName, $event)"

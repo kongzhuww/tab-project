@@ -5,6 +5,7 @@ import deploymentGuide from "../../server/private-chat/README.md?raw";
 import { chatModuleState as state } from "./chat-state";
 import { privateChatConfig, disablePrivateChat, reloadPrivatePublicConfig } from "./private-chat-config";
 import { privateChatState, previewPrivateInvite, joinPrivateInvite, listPrivateMembers, invitePrivateMember, revokePrivateMember } from "./private-chat-client";
+import { t } from "../i18n";
 
 const input = ref("");
 const preview = ref("");
@@ -195,21 +196,21 @@ function disconnect() {
         <div class="summary-left">
           <span class="accordion-icon">🆔</span>
           <div class="summary-text-wrap">
-            <strong class="summary-title">我的聊天 ID</strong>
-            <small class="summary-sub">让服主知道邀请谁 · 本机唯一身份码</small>
+            <strong class="summary-title">{{ t('chat.setup.myChatId') }}</strong>
+            <small class="summary-sub">{{ t('chat.setup.myChatIdSub') }}</small>
           </div>
         </div>
         <span class="chevron-arrow">›</span>
       </summary>
       <div class="accordion-body">
-        <p class="body-tip">这是当前浏览器的聊天 ID，用于服主生成绑定你的专属邀请。ID 本身不是密码或访问凭据，邀请中才包含授权 Token。</p>
+        <p class="body-tip">{{ t('chat.setup.myChatIdTip') }}</p>
         <div class="uid-display-row">
           <code class="uid-code" title="点击即可全选复制">{{ state.currentUser.uid }}</code>
           <button type="button" class="btn-copy-uid" @click="copyUid">
-            {{ uidCopied ? '✅ 已复制' : '📋 复制我的 ID' }}
+            {{ uidCopied ? t('chat.setup.uidCopied') : t('chat.setup.copyUidBtn') }}
           </button>
         </div>
-        <small class="field-footnote">💡 换浏览器或重置数据可能产生新 ID；ID 改变后，请让服主为新 ID 生成邀请，原邀请不能用于其他 ID。</small>
+        <small class="field-footnote">{{ t('chat.setup.uidFootnote') }}</small>
       </div>
     </details>
 
@@ -219,19 +220,19 @@ function disconnect() {
         <div class="summary-left">
           <span class="accordion-icon">✉️</span>
           <div class="summary-text-wrap">
-            <strong class="summary-title">{{ privateChatConfig.room ? '使用另一份邀请 / 切换房间' : '加入朋友的聊天室' }}</strong>
-            <small class="summary-sub">粘贴服主为你生成的专属加入邀请凭据</small>
+            <strong class="summary-title">{{ privateChatConfig.room ? t('chat.setup.joinTitleSwitch') : t('chat.setup.joinTitleNew') }}</strong>
+            <small class="summary-sub">{{ t('chat.setup.joinSub') }}</small>
           </div>
         </div>
         <span class="chevron-arrow">›</span>
       </summary>
       <div class="accordion-body">
-        <p class="body-tip">先把你的聊天 ID 发给朋友，服主生成专属邀请后，将整段 <code>BEAVER-PRIVATE1:</code> 凭据粘贴于此。</p>
+        <p class="body-tip">{{ t('chat.setup.joinTip') }}</p>
         <div class="invite-input-group">
           <div class="input-label-row">
-            <span class="field-label-text">你的专属邀请密钥</span>
+            <span class="field-label-text">{{ t('chat.setup.tokenLabel') }}</span>
             <button type="button" class="btn-text-link" @click="copyUid">
-              {{ uidCopied ? '✅ ID 已复制' : '复制我的聊天 ID 给服主' }}
+              {{ uidCopied ? t('chat.setup.idCopied') : t('chat.setup.copyIdToFriend') }}
             </button>
           </div>
           <input
@@ -239,23 +240,23 @@ function disconnect() {
             type="password"
             class="setup-modern-input"
             autocomplete="off"
-            placeholder="粘贴 BEAVER-PRIVATE1: 开头的完整邀请"
+            :placeholder="t('chat.setup.tokenPlaceholder')"
           />
         </div>
         <div class="action-row">
           <button type="button" class="btn-modern-secondary" :disabled="busy || !input.trim()" @click="inspect">
-            🔍 检查邀请
+            {{ t('chat.setup.inspectBtn') }}
           </button>
-          <small class="action-hint">仅在本机安全校验与解析，不会立即发起网络连接。</small>
+          <small class="action-hint">{{ t('chat.setup.inspectHint') }}</small>
         </div>
         <div v-if="preview" class="invite-preview-card">
           <div class="preview-text">
             <span class="preview-icon">🌐</span>
             <p>{{ preview }}</p>
           </div>
-          <small v-if="privateChatConfig.room" class="switch-warning-tip">⚠️ 确认连接后将切换至新聊天室，原房间本地消息仍会妥善归档保留。</small>
+          <small v-if="privateChatConfig.room" class="switch-warning-tip">{{ t('chat.setup.switchWarning') }}</small>
           <button type="button" class="btn-modern-primary" :disabled="busy" @click="run(join)">
-            🚀 确认并立即连接
+            {{ t('chat.setup.confirmConnect') }}
           </button>
         </div>
       </div>
@@ -267,8 +268,8 @@ function disconnect() {
         <div class="summary-left">
           <span class="accordion-icon">👥</span>
           <div class="summary-text-wrap">
-            <strong class="summary-title">邀请与管理房间成员</strong>
-            <small class="summary-sub">服主专用 · 一人一码定向发信，保障私密性</small>
+            <strong class="summary-title">{{ t('chat.setup.manageMembersTitle') }}</strong>
+            <small class="summary-sub">{{ t('chat.setup.manageMembersSub') }}</small>
           </div>
         </div>
         <span class="chevron-arrow">›</span>
@@ -276,37 +277,37 @@ function disconnect() {
       <div class="accordion-body">
         <p class="body-tip">让朋友复制他的聊天 ID 给你，在此输入后生成一份 30 天有效的专属邀请，绝不要把服主自己的邀请公开出去。</p>
         <div class="form-field">
-          <label>朋友的聊天 ID</label>
-          <input v-model="uid" class="setup-modern-input" maxlength="160" placeholder="粘贴朋友发来的专属 ID" />
+          <label>{{ t('chat.setup.friendId') }}</label>
+          <input v-model="uid" class="setup-modern-input" maxlength="160" :placeholder="t('chat.setup.friendIdPlaceholder')" />
         </div>
         <div class="action-row">
           <button type="button" class="btn-modern-primary" :disabled="busy || !uid.trim()" @click="run(create)">
-            ✨ 生成专属邀请
+            {{ t('chat.setup.createInviteBtn') }}
           </button>
           <button v-if="invite" type="button" class="btn-modern-success" :disabled="busy" @click="run(copy)">
-            📋 复制邀请给朋友
+            {{ t('chat.setup.copyInviteBtn') }}
           </button>
           <button type="button" class="btn-modern-secondary" :disabled="busy" @click="run(load)">
-            🔄 刷新成员列表
+            {{ t('chat.setup.refreshMembers') }}
           </button>
         </div>
         <div v-if="membersLoaded && !members.length" class="empty-members-tip">
-          暂无受邀成员，生成邀请发送给好友后即可在此管理。
+          {{ t('chat.setup.emptyMembers') }}
         </div>
         <div v-if="members.length" class="members-manager-list">
           <div v-for="m in members" :key="m.id" class="member-manage-row">
             <div class="member-manage-info">
               <strong class="member-manage-name">{{ m.name }}</strong>
-              <small class="member-manage-uid">{{ m.revoked ? '已撤销访问权限' : m.uid }}</small>
+              <small class="member-manage-uid">{{ m.revoked ? t('chat.setup.revoked') : m.uid }}</small>
             </div>
             <div class="member-manage-actions">
               <button v-if="!m.revoked && revoke !== m.id" type="button" class="btn-revoke-step" :disabled="busy" @click="revoke = m.id">
-                撤销
+                {{ t('chat.setup.revokeBtn') }}
               </button>
               <template v-if="revoke === m.id">
-                <span class="revoke-confirm-text">确定撤销？</span>
-                <button type="button" class="btn-revoke-danger" :disabled="busy" @click="run(remove)">确认</button>
-                <button type="button" class="btn-cancel-flat" @click="revoke = ''">取消</button>
+                <span class="revoke-confirm-text">{{ t('chat.setup.confirmRevoke') }}</span>
+                <button type="button" class="btn-revoke-danger" :disabled="busy" @click="run(remove)">{{ t('common.confirm') }}</button>
+                <button type="button" class="btn-cancel-flat" @click="revoke = ''">{{ t('common.cancel') }}</button>
               </template>
             </div>
           </div>
@@ -320,8 +321,8 @@ function disconnect() {
         <div class="summary-left">
           <span class="accordion-icon">🛠️</span>
           <div class="summary-text-wrap">
-            <strong class="summary-title">我想自建聊天室</strong>
-            <small class="summary-sub">手动部署 Python / SQLite 服务 · 公网需要 HTTPS</small>
+            <strong class="summary-title">{{ t('chat.setup.hostMyselfTitle') }}</strong>
+            <small class="summary-sub">{{ t('chat.setup.hostMyselfSub') }}</small>
           </div>
         </div>
         <span class="chevron-arrow">›</span>

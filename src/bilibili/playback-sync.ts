@@ -1,5 +1,6 @@
 import { bilibiliService, type BiliSubtitleCue } from "../services/bilibili.service";
 import { biliFavoritesController } from "./bili-favorites-store";
+import { t } from "../i18n";
 
 type PlaybackVideo = { bvid: string; title?: string; cover?: string };
 type PlaybackState = { video: PlaybackVideo; media: HTMLMediaElement; cues: BiliSubtitleCue[]; cueIndex: number };
@@ -11,7 +12,7 @@ function updateLyrics(): void {
   const state = active ? states.get(active) : undefined;
   const cue = state && state.cueIndex >= 0 ? state.cues[state.cueIndex] : undefined;
   const title = state?.video.title || "";
-  let text = "点击视频播放，实时台词在此居中呈现";
+  let text = t("bili.hero.defaultLyric");
   let status = "支持 B站 收藏夹与订阅视频";
   if (cue) {
     text = cue.content;

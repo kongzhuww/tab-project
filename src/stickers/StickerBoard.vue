@@ -10,23 +10,23 @@
           v-show="!isNarrow || isFolderDrawerOpen"
           class="sticker-sidebar"
           :class="{ 'is-drawer': isNarrow }"
-          aria-label="图片分类导航"
+          :aria-label="t('stickers.sidebarAria')"
           @wheel.passive="onSidebarWheel"
         >
           <div class="sticker-sidebar-top">
             <div class="sticker-sidebar-heading">
-              <span class="sidebar-heading-title">🏷️ 分类</span>
+              <span class="sidebar-heading-title">🏷️ {{ t('stickers.categories') }}</span>
             </div>
             <form id="sticker-pack-form" class="sticker-pack-form" @submit.prevent="onCreateFolder">
               <input
                 id="sticker-pack-name"
                 v-model="newFolderName"
                 maxlength="40"
-                placeholder="＋ 新建分类"
+                :placeholder="t('stickers.newCategoryPlaceholder')"
                 autocomplete="off"
                 required
               />
-              <button type="submit" title="创建新分类">新建</button>
+              <button type="submit" :title="t('stickers.createTitle')">{{ t('stickers.create') }}</button>
             </form>
           </div>
 
@@ -41,15 +41,15 @@
           >
             <span class="subfolder-card-icon" aria-hidden="true">{{ state.parentPath !== null ? '⬅' : '🗂️' }}</span>
             <span class="subfolder-card-info">
-              <strong class="subfolder-card-name">{{ state.parentPath !== null ? '返回上一级' : '全部表情' }}</strong>
-              <span class="subfolder-card-count">{{ state.parentPath !== null ? `当前：${state.displayTitle}` : `${totalStickersCount} 张图片` }}</span>
+              <strong class="subfolder-card-name">{{ state.parentPath !== null ? t('stickers.backToParent') : t('stickers.allStickers') }}</strong>
+              <span class="subfolder-card-count">{{ state.parentPath !== null ? t('stickers.currentFolder', { name: state.displayTitle }) : t('stickers.countText', { count: totalStickersCount }) }}</span>
             </span>
             <span class="subfolder-card-arrow" aria-hidden="true">{{ state.parentPath !== null ? '‹' : '›' }}</span>
           </button>
 
           <nav ref="folderList" id="sticker-packs" class="sticker-packs" aria-label="表情包分类列表">
             <div v-if="!state.hasFolder && (!state.subFolders || state.subFolders.length === 0)" class="sticker-empty">
-              {{ state.loading ? '正在读取图片库…' : '图片库尚未就绪，请重新加载页面或重载本模块' }}
+              {{ state.loading ? t('stickers.reading') : t('stickers.notReady') }}
             </div>
             <template v-else>
               <StickerFolderCards
@@ -216,17 +216,17 @@
         @click.stop
       >
         <button type="button" class="sticker-menu-item" @click="handleMenuCopy">
-          <span class="menu-icon">📋</span> 复制图片
+          <span class="menu-icon">📋</span> {{ t('stickers.menu.copyImage') }}
         </button>
         <button type="button" class="sticker-menu-item" @click="handleMenuView">
-          <span class="menu-icon">🔍</span> 查看大图
+          <span class="menu-icon">🔍</span> {{ t('stickers.menu.viewLarge') }}
         </button>
         <div v-if="state.storageKind === 'directory'" class="sticker-menu-classify">
           <select v-model="classificationTarget" aria-label="选择图片分类" :disabled="busy">
-            <option value="__choose__" disabled>归类到…</option>
+            <option value="__choose__" disabled>{{ t('stickers.menu.chooseCategory') }}</option>
             <option v-for="folder in state.folders" :key="folder.path" :value="folder.path">{{ folder.path ? `${'－'.repeat(folder.depth)}${folder.name}` : '未分类（全部中保留）' }}</option>
           </select>
-          <button type="button" class="sticker-menu-item" :disabled="busy || classificationTarget === '__choose__'" @click="handleMenuClassify">保存分类（不移动原图）</button>
+          <button type="button" class="sticker-menu-item" :disabled="busy || classificationTarget === '__choose__'" @click="handleMenuClassify">{{ t('stickers.menu.saveCategory') }}</button>
         </div>
         <div class="sticker-menu-divider"></div>
         <button
@@ -235,7 +235,7 @@
           :class="{ 'is-confirming': contextMenu.isConfirmingDelete }"
           @click="handleMenuDelete($event)"
         >
-          <span class="menu-icon">🗑️</span> {{ state.storageKind === "directory" ? "删除磁盘原图…" : (contextMenu.isConfirmingDelete ? "确定删除内置副本？" : "删除内置图片") }}
+          <span class="menu-icon">🗑️</span> {{ state.storageKind === "directory" ? t('stickers.menu.deleteDiskOriginal') : (contextMenu.isConfirmingDelete ? t('stickers.menu.confirmDeleteBuiltin') : t('stickers.menu.deleteBuiltin')) }}
         </button>
       </div>
     </Teleport>
@@ -293,6 +293,7 @@ import { stickersModuleState, withStickersWrite, onStickersPause } from "./modul
 import { windowManagerController } from "../core/window-manager.store";
 import StickerFolderCards from "./StickerFolderCards.vue";
 import { settingsController } from "../settings/store";
+import { t } from "../i18n";
 function openLibrarySettings() { settingsController.open("storage", "stickers"); windowManagerController.activate("settings"); }
 const classificationTarget = ref("__choose__");
 async function handleMenuClassify() {

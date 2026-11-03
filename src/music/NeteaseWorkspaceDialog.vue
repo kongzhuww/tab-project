@@ -2,7 +2,7 @@
   <AppWindowFrame
     id="music-workspace"
     window-id="music"
-    title="网易云模块"
+    :title="t('netease.title')"
     icon="🎵"
     :visible="musicModuleState.visible"
     :default-width="960"
@@ -30,34 +30,34 @@
                 {{ workspaceState.neteaseUser.nickname }}
                 <span v-if="workspaceState.neteaseUser.isVip" class="ms-netease-vip-badge">VIP</span>
               </span>
-              <span class="ms-netease-status-text">已连接网易云音乐账户</span>
+              <span class="ms-netease-status-text">{{ t('netease.connected') }}</span>
             </div>
           </template>
           <template v-else>
             <div class="ms-netease-meta">
-              <span class="ms-netease-name">免登录模式</span>
-              <span class="ms-netease-status-text">畅听精选榜单与全网搜索</span>
+              <span class="ms-netease-name">{{ t('netease.guestMode') }}</span>
+              <span class="ms-netease-status-text">{{ t('netease.guestSub') }}</span>
             </div>
           </template>
         </div>
         <div style="display: flex; gap: 8px; align-items: center;">
-          <button type="button" class="ms-netease-logout-btn" :disabled="musicModuleState.pendingWrites > 0" @click="refreshNetease">⟳ 刷新列表</button>
+          <button type="button" class="ms-netease-logout-btn" :disabled="musicModuleState.pendingWrites > 0" @click="refreshNetease">{{ t('netease.refreshList') }}</button>
           <button
             type="button"
             class="ms-netease-logout-btn"
             style="color: #f43f5e; border-color: rgba(244, 63, 94, 0.4); font-weight: 600;"
             @click="openOfficialWebsite"
           >
-            官网登录
+            {{ t('netease.webLogin') }}
           </button>
-          <button type="button" class="ms-netease-logout-btn" :disabled="websiteConnecting" @click="connectWebsite">{{ websiteConnecting ? "正在连接…" : "连接官网账户" }}</button>
+          <button type="button" class="ms-netease-logout-btn" :disabled="websiteConnecting" @click="connectWebsite">{{ websiteConnecting ? t('netease.connecting') : t('netease.connectWebsite') }}</button>
           <button
             v-if="workspaceState.neteaseUser?.nickname"
             type="button"
             class="ms-netease-logout-btn"
             @click="logoutNetease"
           >
-            退出登录
+            {{ t('netease.logout') }}
           </button>
         </div>
       </div>
@@ -67,7 +67,7 @@
         <!-- 左侧歌单列表 -->
         <div class="ms-netease-playlists">
           <!-- 莱茵唱片专区 -->
-          <div class="ms-netease-section-title">官方原声</div>
+          <div class="ms-netease-section-title">{{ t('netease.officialSoundtrack') }}</div>
           <button
             type="button"
             class="ms-netease-pl-item ms-netease-pl-rhine"
@@ -76,7 +76,7 @@
           >
             <div class="ms-netease-pl-icon-box" style="background: linear-gradient(135deg, rgba(245, 158, 11, 0.2), rgba(234, 88, 12, 0.2)); color: #f59e0b;">💿</div>
             <div class="ms-netease-pl-info">
-              <div class="ms-netease-pl-name">莱茵唱片</div>
+              <div class="ms-netease-pl-name">{{ t('netease.rhineMusic') }}</div>
               <div class="ms-netease-pl-count">{{ homeMusicState.albums?.length || 0 }} 张官方专辑</div>
             </div>
           </button>
@@ -482,6 +482,7 @@
 <script setup lang="ts">
 import { CACHED_FAVORITES_KEY, CACHED_PLAYLISTS_KEY, removePlaylistCache } from "./playlist-cache";
 import { ref, computed, onMounted, onBeforeUnmount, watch } from "vue";
+import { t } from "../i18n";
 import { createMusicWorkspaceData } from "./workspace-data";
 import { musicModuleState, onMusicPause } from "./module-state";
 const pageVisible = ref(!document.hidden);

@@ -14,6 +14,7 @@ export interface AiHotLeaderboardItem {
 export interface AiHotFeedArticle {
   id?: string | number;
   title: string;
+  originalTitle?: string;
   summary?: string;
   sourceName: string;
   published: string;

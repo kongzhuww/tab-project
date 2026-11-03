@@ -17,6 +17,7 @@
 import { ref, watch, defineAsyncComponent, onMounted } from "vue";
 import { settingsController } from "./store";
 import { windowManagerController } from "../core/window-manager.store";
+import { t } from "../i18n";
 
 const SettingsView = defineAsyncComponent(() => import("./SettingsView.vue"));
 
@@ -36,7 +37,7 @@ onMounted(() => {
   // 注册到 WindowManager
   windowManagerController.register({
     id: "settings",
-    title: "设置",
+    title: t("common.settings"),
     icon: "⚙",
     element: dialogEl,
     getElement: () => dialogRef.value,

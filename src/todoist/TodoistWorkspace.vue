@@ -25,6 +25,7 @@ import { getDockModuleTransition } from "../modules/registry";
 import { fullscreenCardState } from "../core/fullscreen-card-state";
 import { hideRegisteredCard } from "../core/fullscreen-card-state";
 import { useTaskInvalidation } from "./use-task-invalidation";
+import { t } from "../i18n";
 const taskNavigationMounted = ref(false);
 const TodoistAccountSettings = defineAsyncComponent(() => import("./TodoistAccountSettings.vue"));
 const accountSettingsOpen = ref(false);
@@ -117,7 +118,7 @@ watch([active, taskNavigationMounted, pendingTodoistTask], ([visible, mounted, r
   pendingTodoistTask.value = null;
   if (getDockModuleTransition("todoist") !== request.transition) return;
   if (todoistModuleState.pendingWrites || (todoistInspectorState.isOpen && todoistInspectorState.taskId !== request.id)) {
-    notificationController.show({ appName: "Todoist", title: "任务详情已保留", message: "请先完成当前操作并关闭已有任务详情，再点击日历任务。", showActions: false });
+    notificationController.show({ appName: "Todoist", title: t("todoist.retainDetailTitle"), message: t("todoist.retainDetailMsg"), showActions: false });
     return;
   }
   if (todoistInspectorState.isOpen && todoistInspectorState.taskId === request.id) return;
@@ -141,7 +142,7 @@ onUnmounted(() => {
   todoistInspectorController.close();
   Object.assign(todoistInspectorState, { title: "", description: "", taskId: "", comments: [], availableLabels: [], labels: [], error: "" });
   todoistTaskListController.updateState({ loading: false, addingSection: false, activeComposerSectionId: null });
-  todoistMainWorkspaceController.updateState({ title: "收件箱", isSaving: false, isCalendarOpen: true, isLabelPopoverOpen: false });
+  todoistMainWorkspaceController.updateState({ title: t("todoist.inbox"), isSaving: false, isCalendarOpen: true, isLabelPopoverOpen: false });
   todoistLabelController.update([]);
 });
 
@@ -175,7 +176,7 @@ function handleClose() {
       ref="panelRef"
       class="card wide todoist-workspace"
       :style="initialStyle"
-      aria-label="Todoist 工作区"
+      :aria-label="t('todoist.workspaceAria')"
       v-show="todoistModuleState.visible"
     >
       <header ref="headerRef" class="todoist-workspace-head" @pointerdown="onHeaderPointerDown($event)">
@@ -184,7 +185,7 @@ function handleClose() {
           <h2 id="todoist-workspace-title">{{ state.title }}</h2>
         </div>
 
-        <nav id="todoist-view-tabs" class="todoist-view-tabs" aria-label="Todoist 视图">
+        <nav id="todoist-view-tabs" class="todoist-view-tabs" :aria-label="t('todoist.viewAria')">
           <TodoistWorkspaceTabs />
         </nav>
 
@@ -194,22 +195,22 @@ function handleClose() {
           class="todoist-shelf-tool todoist-calendar-toggle-btn"
           :class="{ on: state.isCalendarOpen }"
           type="button"
-          title="展开/收起左侧 DayLine 日历拓展"
+          :title="t('todoist.calendarToggleTitle')"
           @click="handleToggleCalendar"
         >
-          📅 日历
+          📅 {{ t('todoist.calendar') }}
         </button>
 
         <span class="grow"></span>
 
-        <span class="muted small" role="status">{{ todoistModuleState.pendingWrites ? "写入处理中；可以隐藏，暂不能退出" : "隐藏保留草稿；退出保留首页限时任务" }}</span>
+        <span class="muted small" role="status">{{ todoistModuleState.pendingWrites ? t('todoist.pendingWrites') : t('todoist.idleStatus') }}</span>
 
         <button
           id="todoist-settings-open"
           ref="accountSettingsButton"
           type="button"
           class="no-drag"
-          title="Todoist 模组设置"
+          :title="t('todoist.settingsTitle')"
           :aria-expanded="accountSettingsOpen"
           @click.stop="accountSettingsOpen = !accountSettingsOpen"
         >
@@ -221,7 +222,7 @@ function handleClose() {
         <button
           id="todoist-workspace-refresh"
           type="button"
-          title="刷新"
+          :title="t('common.refresh')"
           @click="handleRefresh"
         >
           ↻
@@ -231,7 +232,7 @@ function handleClose() {
           id="todoist-workspace-minimize"
           class="no-drag"
           type="button"
-          title="最小化（标签保留）"
+          :title="t('todoist.minimizeHint')"
           @pointerdown.stop
           @click.stop="handleMinimize"
         >
@@ -242,7 +243,7 @@ function handleClose() {
           id="todoist-workspace-close"
           class="no-drag"
           type="button"
-          title="隐藏窗口 (Esc)；Dock 退出释放窗口资源"
+          :title="t('todoist.closeHint')"
           @pointerdown.stop
           @click.stop="handleClose"
         >
@@ -253,10 +254,10 @@ function handleClose() {
       <AccountSetupGuide
         v-if="todoistTaskListState.accountConfigured === false"
         icon="✅"
-        title="尚未配置 Todoist Token"
-        description="在设置中填写 Todoist API Token，即可读取和管理你的任务。"
+        :title="t('todoist.tokenMissingTitle')"
+        :description="t('todoist.tokenMissingDesc')"
         secondary-url="https://app.todoist.com/app/settings/integrations/developer"
-        secondary-label="获取 Todoist Token"
+        :secondary-label="t('todoist.getToken')"
         @configure="accountSettingsOpen = true"
       />
       <div v-else class="todoist-workspace-main-wrap">

@@ -2,6 +2,7 @@
 import { nextTick, onBeforeUnmount, onMounted, ref } from "vue";
 import { notificationController, notificationItems, type NotificationItem } from "./store";
 import { notificationHistoryController } from "./history-store";
+import { t } from "../i18n";
 
 const timers = new Map<string, number>();
 const startedAt = new Map<string, number>();
@@ -112,8 +113,8 @@ onBeforeUnmount(() => {
         <header class="win-toast-head">
           <img :src="item.icon" class="win-toast-icon" alt="">
           <span class="win-toast-app">{{ item.appName }}</span>
-          <span class="win-toast-time">刚刚</span>
-          <button type="button" class="win-toast-close" title="关闭" aria-label="关闭通知" @click="close(item)">✕</button>
+          <span class="win-toast-time">{{ t('notifications.justNow') }}</span>
+          <button type="button" class="win-toast-close" :title="t('common.close')" :aria-label="t('common.close')" @click="close(item)">✕</button>
         </header>
         <button type="button" class="win-toast-body win-toast-body-button" @click="activate(item)">
           <span class="win-toast-title">{{ item.title }}</span>
@@ -122,7 +123,7 @@ onBeforeUnmount(() => {
         </button>
         <footer v-if="item.showActions && item.actionLabel" class="win-toast-actions">
           <button type="button" class="win-toast-btn primary" @click="activate(item)">{{ item.actionLabel }}</button>
-          <button type="button" class="win-toast-btn" @click="close(item)">关闭</button>
+          <button type="button" class="win-toast-btn" @click="close(item)">{{ t('common.close') }}</button>
         </footer>
         <div class="win-toast-progress" :style="progressStyle(item)"></div>
       </article>

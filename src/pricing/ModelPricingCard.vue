@@ -4,7 +4,7 @@
       <header class="card-head">
         <span class="bar" style="background: linear-gradient(180deg,#fbbf24,#f59e0b)"></span>
         <h2 id="pricing-title">
-          {{ state.view === "rank" ? "模型排行" : state.view === "image-eval" ? "AI 评分全景 (图灵坐标)" : "模型价格" }}
+          {{ state.view === "rank" ? t("pricing.view.rank") : state.view === "image-eval" ? t("pricing.view.imageEval") : t("pricing.view.price") }}
         </h2>
         <div class="pricing-view-switch" role="tablist" aria-label="模型数据视图">
           <button
@@ -15,7 +15,7 @@
             :aria-selected="state.view === 'price'"
             @click="handleSwitchView('price')"
           >
-            模型价格
+            {{ t("pricing.view.price") }}
           </button>
           <button
             type="button"
@@ -25,7 +25,7 @@
             :aria-selected="state.view === 'rank'"
             @click="handleSwitchView('rank')"
           >
-            模型排行
+            {{ t("pricing.view.rank") }}
           </button>
           <button
             type="button"
@@ -35,15 +35,15 @@
             :aria-selected="state.view === 'image-eval'"
             @click="handleSwitchView('image-eval')"
           >
-            🎯 AI 评分
+            {{ t("pricing.view.imageTab") }}
           </button>
         </div>
-        <button id="pricing-settings-open" ref="settingsAnchor" class="icon-btn" type="button" title="模型数据设置" :aria-expanded="settingsOpen" @click="settingsOpen = !settingsOpen">⚙️</button>
+        <button id="pricing-settings-open" ref="settingsAnchor" class="icon-btn" type="button" :title="t('pricing.settingsTitle')" :aria-expanded="settingsOpen" @click="settingsOpen = !settingsOpen">⚙️</button>
         <button
           id="pricing-refresh"
           class="icon-btn"
           type="button"
-          title="当前为内置示例，实时数据刷新尚未接入"
+          :title="t('pricing.refreshDisabledTitle')"
           disabled
         >
           ↻
@@ -59,10 +59,10 @@
           v-model="state.sortMode"
           @change="handleSortChange"
         >
-          <option value="cheap-in">输入最便宜</option>
-          <option value="cheap-out">输出最便宜</option>
-          <option value="free">免费模型</option>
-          <option value="context">上下文最大</option>
+          <option value="cheap-in">{{ t("pricing.sort.cheapIn") }}</option>
+          <option value="cheap-out">{{ t("pricing.sort.cheapOut") }}</option>
+          <option value="free">{{ t("pricing.sort.free") }}</option>
+          <option value="context">{{ t("pricing.sort.context") }}</option>
         </select>
         <input
           id="pricing-search"
@@ -350,6 +350,7 @@ import { loadPricingConnectionStatus, PRICING_SETTINGS_KEYS } from "./settings";
 const PricingSettingsPanel = defineAsyncComponent(() => import("./PricingSettingsPanel.vue"));
 import { pricingState, pricingController, type PricingState } from "./pricing-store";
 import { fullscreenCardState } from "../core/fullscreen-card-state";
+import { t } from "../i18n";
 const ImageBenchmarkView = defineAsyncComponent(() => import("./ImageBenchmarkView.vue"));
 
 

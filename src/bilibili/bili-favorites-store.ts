@@ -11,6 +11,7 @@ import {
   type BiliOrganizerFolderView
 } from "../services/bilibili.service";
 import { appDialog } from "../core/app-dialog.store";
+import { t } from "../i18n";
 
 export interface BiliVideoItem {
   bvid: string;
@@ -225,7 +226,7 @@ export const biliFavoritesState = reactive<BiliFavoritesState>({
     folderSubtitle: "选择左侧收藏夹以浏览内容",
     folderCover: "",
     heroTrackTitle: "暂无播放视频",
-    heroLyricText: "点击视频播放，实时台词在此居中呈现",
+    heroLyricText: t("bili.hero.defaultLyric"),
     heroLyricStatus: "支持 B站 收藏夹与订阅视频",
     folders: [],
     videos: [],

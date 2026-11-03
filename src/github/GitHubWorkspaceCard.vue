@@ -22,6 +22,7 @@ const GitHubSettingsModal = defineAsyncComponent(() => import("./GitHubSettingsM
 import { gitHubService, type GitHubSearchRule } from "../services/github.service";
 import { fullscreenCardState } from "../core/fullscreen-card-state";
 import { gitHubTrendingController } from "./trending-store";
+import { t } from "../i18n";
 
 
 const { active, standalone } = useCardActivity("card-github", "/github.html");
@@ -60,17 +61,17 @@ function handleSelectFolder() {
   activeChannel.value = "stars";
 }
 
-const SEARCH_RULES = [
-  { id: "exact", icon: "🎯", name: "精确", desc: "严格匹配完整关键词" },
-  { id: "fuzzy", icon: "🔍", name: "模糊", desc: "多词拆解自由容错" },
-  { id: "topic", icon: "🏷️", name: "标签", desc: "优先匹配Topic与分类" },
-  { id: "smart", icon: "✨", name: "语义", desc: "技术近义词与联想" }
-] as const;
+const SEARCH_RULES = computed(() => [
+  { id: "exact", icon: "🎯", name: t("search.rule.exact"), desc: t("search.rule.exactDesc") },
+  { id: "fuzzy", icon: "🔍", name: t("search.rule.fuzzy"), desc: t("search.rule.fuzzyDesc") },
+  { id: "topic", icon: "🏷️", name: t("search.rule.topic"), desc: t("search.rule.topicDesc") },
+  { id: "smart", icon: "✨", name: t("search.rule.smart"), desc: t("search.rule.smartDesc") }
+] as const);
 
 const currentRule = ref<GitHubSearchRule>(gitHubService.searchRule || "exact");
 
 const activeRuleMeta = computed(() => {
-  return SEARCH_RULES.find((r) => r.id === currentRule.value) || SEARCH_RULES[0];
+  return SEARCH_RULES.value.find((r) => r.id === currentRule.value) || SEARCH_RULES.value[0];
 });
 
 function cycleSearchRule(): void {
@@ -79,8 +80,8 @@ function cycleSearchRule(): void {
 }
 
 const searchPlaceholder = computed(() => {
-  if (searchScope.value === "global") return "在 GitHub 全网搜索开源仓库…";
-  return `在当前分类中${activeRuleMeta.value.name}搜索 Star 仓库…`;
+  if (searchScope.value === "global") return t("github.searchGlobalPlaceholder");
+  return t("github.searchLocalPlaceholder", { rule: activeRuleMeta.value.name });
 });
 
 function switchTab(tab: "stars" | "trending") {
@@ -137,7 +138,7 @@ watch(active, async visible => {
   } catch {
     if (!active.value || version !== initialVersion) return;
     initialized = false;
-    initialError.value = "GitHub 初始化失败；请检查设置，或重新进入后重试。";
+    initialError.value = t("github.initError");
   }
 }, { immediate: true, flush: "sync" });
 onBeforeUnmount(() => { gitHubService.setAiViewActive(false); ++initialVersion; repositoryReadScope?.abort(); clearTimeout(searchTimer); });
@@ -152,9 +153,9 @@ onBeforeUnmount(() => { gitHubService.setAiViewActive(false); ++initialVersion; 
       <span id="gh-user" class="muted small" style="margin-left: 8px;"></span>
       <div class="card-fullscreen-gh-search" id="gh-head-search-wrap">
         <form id="gh-search-form" class="gh-search-box" @submit.prevent="submitSearch">
-          <button type="button" id="gh-search-mode-toggle" class="gh-search-mode-toggle" :title="searchScope === 'local' ? '切换为 GitHub 全站搜索' : '切换为当前分类搜索'" @click="toggleSearchScope">
+          <button type="button" id="gh-search-mode-toggle" class="gh-search-mode-toggle" :title="searchScope === 'local' ? t('github.searchScope.toGlobal') : t('github.searchScope.toLocal')" @click="toggleSearchScope">
             <span id="gh-mode-icon" class="gh-mode-icon">{{ searchScope === 'local' ? '⭐' : '🌐' }}</span>
-            <span id="gh-mode-text" class="gh-mode-text">{{ searchScope === 'local' ? '当前分类' : 'GitHub 全站' }}</span>
+            <span id="gh-mode-text" class="gh-mode-text">{{ searchScope === 'local' ? t('github.searchScope.local') : t('github.searchScope.global') }}</span>
             <span class="gh-mode-arrow">▾</span>
           </button>
           <input id="gh-search-input" v-model="searchText" :placeholder="searchPlaceholder" autocomplete="off" @input="updateLocalSearch" />
@@ -165,14 +166,14 @@ onBeforeUnmount(() => { gitHubService.setAiViewActive(false); ++initialVersion; 
             type="button"
             class="gh-search-rule-btn"
             :class="`rule-${activeRuleMeta.id}`"
-            :title="`当前匹配规则：${activeRuleMeta.name}（${activeRuleMeta.desc}）\n点击切换下一个规则`"
+            :title="t('github.ruleHint', { rule: activeRuleMeta.name, desc: activeRuleMeta.desc })"
             @click.stop="cycleSearchRule"
           >
             <span class="gh-search-rule-icon">{{ activeRuleMeta.icon }}</span>
             <span class="gh-search-rule-text">{{ activeRuleMeta.name }}</span>
           </button>
 
-          <button v-show="searchText" type="button" id="gh-search-clear-btn" class="gh-search-clear-btn" title="清空搜索" @click="clearSearch">✕</button>
+          <button v-show="searchText" type="button" id="gh-search-clear-btn" class="gh-search-clear-btn" :title="t('github.clearSearch')" @click="clearSearch">✕</button>
           <button type="submit" id="gh-search-submit-btn" title="搜索">⌕</button>
         </form>
         <div id="gh-search-options" class="gh-search-options" aria-label="搜索来源" hidden>
@@ -191,11 +192,11 @@ onBeforeUnmount(() => { gitHubService.setAiViewActive(false); ++initialVersion; 
         class="gh-header-msg-btn"
         type="button"
         :class="{ 'has-unread': gitHubNotificationsState.unreadCount > 0, 'is-active': gitHubNotificationsState.isOpen }"
-        :title="gitHubNotificationsState.unreadCount > 0 ? `GitHub 消息通知 (${gitHubNotificationsState.unreadCount} 条未读)` : 'GitHub 消息通知中心'"
+        :title="gitHubNotificationsState.unreadCount > 0 ? t('github.header.msgUnread', { count: gitHubNotificationsState.unreadCount }) : t('github.header.msgCenter')"
         @click="gitHubNotificationsController.toggle()"
       >
         <span class="gh-header-msg-icon">🔔</span>
-        <span class="gh-header-msg-label">消息</span>
+        <span class="gh-header-msg-label">{{ t('github.header.msg') }}</span>
         <span v-if="gitHubNotificationsState.unreadCount > 0" class="gh-header-msg-badge">
           {{ gitHubNotificationsState.unreadCount > 99 ? '99+' : gitHubNotificationsState.unreadCount }}
         </span>
@@ -207,9 +208,9 @@ onBeforeUnmount(() => { gitHubService.setAiViewActive(false); ++initialVersion; 
           type="button"
           ref="settingsButton"
           :aria-expanded="isSettingsOpen"
-          aria-label="GitHub 设置"
+          :aria-label="t('github.settings')"
           class="gh-head-settings-btn"
-          title="GitHub 模组偏好设置 (账号、Token、AI模型、缓存)"
+          :title="t('github.header.settings')"
           @click="isSettingsOpen = !isSettingsOpen"
         >
           ⚙️
@@ -228,21 +229,21 @@ onBeforeUnmount(() => { gitHubService.setAiViewActive(false); ++initialVersion; 
           <div
             class="fo-sidebar-toggle-bar"
             :class="{ 'is-collapsed': isChannelsCollapsed }"
-            :title="isChannelsCollapsed ? '点击展开快捷频道' : '点击收起快捷频道'"
+            :title="isChannelsCollapsed ? t('github.channel.toggleExpand') : t('github.channel.toggleCollapse')"
             @click="isChannelsCollapsed = !isChannelsCollapsed"
           >
             <div class="fo-sidebar-toggle-title">
               <span class="fo-sidebar-toggle-icon">⚡</span>
-              <span>快捷频道</span>
+              <span>{{ t('github.channel.channels') }}</span>
               <span v-if="isChannelsCollapsed" class="fo-sidebar-toggle-pill">3</span>
             </div>
             <button
               type="button"
               class="fo-sidebar-toggle-action"
               :aria-expanded="!isChannelsCollapsed"
-              :title="isChannelsCollapsed ? '展开' : '收起'"
+              :title="isChannelsCollapsed ? t('github.expand') : t('github.collapse')"
             >
-              <span>{{ isChannelsCollapsed ? '展开' : '收起' }}</span>
+              <span>{{ isChannelsCollapsed ? t('github.expand') : t('github.collapse') }}</span>
               <span class="fo-sidebar-toggle-chevron">{{ isChannelsCollapsed ? "▾" : "▴" }}</span>
             </button>
           </div>
@@ -255,14 +256,14 @@ onBeforeUnmount(() => { gitHubService.setAiViewActive(false); ++initialVersion; 
                 type="button"
                 class="fo-sidebar-sub-btn"
                 :class="{ on: activeChannel === 'stars' }"
-                title="查看与管理 Star 星标仓库"
+                :title="t('github.channel.starsTitle')"
                 @click="switchChannel('stars')"
               >
                 <div class="fo-sidebar-sub-main">
                   <span class="fo-sidebar-sub-icon">⭐</span>
                   <div class="fo-sidebar-sub-text">
-                    <strong>Star 收藏</strong>
-                    <small>星标项目 · 文件夹管理</small>
+                    <strong>{{ t('github.channel.stars') }}</strong>
+                    <small>{{ t('github.channel.starsSub') }}</small>
                   </div>
                 </div>
                 <span class="fo-sidebar-sub-badge" style="background: linear-gradient(135deg, #f59e0b, #d97706);">STAR</span>
@@ -276,14 +277,14 @@ onBeforeUnmount(() => { gitHubService.setAiViewActive(false); ++initialVersion; 
                 type="button"
                 class="fo-sidebar-sub-btn"
                 :class="{ on: activeChannel === 'trending' }"
-                title="查看 GitHub 实时趋势项目"
+                :title="t('github.channel.trendingTitle')"
                 @click="switchChannel('trending')"
               >
                 <div class="fo-sidebar-sub-main">
                   <span class="fo-sidebar-sub-icon">🔥</span>
                   <div class="fo-sidebar-sub-text">
-                    <strong>趋势榜单</strong>
-                    <small>开源风向标 · 今日/近7天</small>
+                    <strong>{{ t('github.channel.trending') }}</strong>
+                    <small>{{ t('github.channel.trendingSub') }}</small>
                   </div>
                 </div>
                 <span class="fo-sidebar-sub-badge" style="background: linear-gradient(135deg, #ef4444, #f97316);">HOT</span>
@@ -297,14 +298,14 @@ onBeforeUnmount(() => { gitHubService.setAiViewActive(false); ++initialVersion; 
                 type="button"
                 class="fo-sidebar-sub-btn"
                 :class="{ on: activeChannel === 'awesome' }"
-                title="查看 Awesome 精选开源资源清单"
+                :title="t('github.channel.awesomeTitle')"
                 @click="switchChannel('awesome')"
               >
                 <div class="fo-sidebar-sub-main">
                   <span class="fo-sidebar-sub-icon">🌟</span>
                   <div class="fo-sidebar-sub-text">
-                    <strong>资源专区</strong>
-                    <small>神级清单 · 全球精选</small>
+                    <strong>{{ t('github.channel.awesome') }}</strong>
+                    <small>{{ t('github.channel.awesomeSub') }}</small>
                   </div>
                 </div>
                 <span class="fo-sidebar-sub-badge" style="background: linear-gradient(135deg, #6366f1, #a855f7);">AWESOME</span>
@@ -318,14 +319,14 @@ onBeforeUnmount(() => { gitHubService.setAiViewActive(false); ++initialVersion; 
                 type="button"
                 class="fo-sidebar-sub-btn"
                 :class="{ on: activeChannel === 'repos' }"
-                title="查看与管理我的仓库及 Topic 看板"
+                :title="t('github.channel.reposTitle')"
                 @click="switchChannel('repos')"
               >
                 <div class="fo-sidebar-sub-main">
                   <span class="fo-sidebar-sub-icon">📦</span>
                   <div class="fo-sidebar-sub-text">
-                    <strong>我的仓库</strong>
-                    <small>个人项目 · Topic 看板</small>
+                    <strong>{{ t('github.channel.repos') }}</strong>
+                    <small>{{ t('github.channel.reposSub') }}</small>
                   </div>
                 </div>
                 <span class="fo-sidebar-sub-badge" style="background: linear-gradient(135deg, #0284c7, #0ea5e9);">REPOS</span>
@@ -336,10 +337,10 @@ onBeforeUnmount(() => { gitHubService.setAiViewActive(false); ++initialVersion; 
           <!-- 2. 文件夹列表 -->
           <header class="gh-bili-sidebar-head">
             <div>
-              <b style="font-size: 13px; display: flex; align-items: center; gap: 6px;"><i class="fo-folder-icon"></i> GitHub 列表</b>
-              <small style="color: var(--dim); font-size: 9.5px;">GitHub 官方 Lists · 云端实时同步</small>
+              <b style="font-size: 13px; display: flex; align-items: center; gap: 6px;"><i class="fo-folder-icon"></i> {{ t('github.lists.title') }}</b>
+              <small style="color: var(--dim); font-size: 9.5px;">{{ t('github.lists.sub') }}</small>
             </div>
-            <button class="fo-sidebar-add" id="gh-folder-add-btn" type="button" title="新建 GitHub 列表" aria-label="新建 GitHub 列表" @click="gitHubService.promptCreateFolder()">＋</button>
+            <button class="fo-sidebar-add" id="gh-folder-add-btn" type="button" :title="t('github.lists.new')" :aria-label="t('github.lists.new')" @click="gitHubService.promptCreateFolder()">＋</button>
           </header>
           <nav class="gh-bili-folder-list" id="gh-folder-list" @click="handleSelectFolder">
             <GitHubFolders :active="active" />

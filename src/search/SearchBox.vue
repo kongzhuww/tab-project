@@ -3,20 +3,30 @@ import { ref, computed, onMounted, onUnmounted } from "vue";
 import { searchState, searchController } from "./store";
 import { searchService } from "../services/search.service";
 import { gitHubService, type GitHubSearchRule } from "../services/github.service";
+import { t } from "../i18n";
+
+const searchPlaceholder = computed(() => {
+  if (searchState.mode === "web") return t("search.web.placeholder");
+  if (searchState.mode === "bilibili") return t("search.bilibili.placeholder");
+  if (searchState.mode === "github") return t("search.github.placeholder");
+  if (searchState.mode === "netease") return t("search.netease.placeholder");
+  if (searchState.mode === "qcc") return t("search.qcc.placeholder");
+  return searchState.placeholder;
+});
 
 const currentGhRule = ref<GitHubSearchRule>(gitHubService.searchRule || "exact");
-const webStatus = computed(() => !searchState.hasQuery ? "历史记录" :
-  /^\/bm[\s:]/i.test(searchState.query.trim()) ? "书签结果" :
-  /^\/sites[\s:]/i.test(searchState.query.trim()) ? "网站结果" : "全部结果");
-const GH_SEARCH_RULES = [
-  { id: "exact", icon: "🎯", name: "精确", desc: "严格匹配完整关键词" },
-  { id: "fuzzy", icon: "🔍", name: "模糊", desc: "多词拆解自由容错" },
-  { id: "topic", icon: "🏷️", name: "标签", desc: "优先匹配Topic与分类" },
-  { id: "smart", icon: "✨", name: "语义", desc: "技术近义词与联想" }
-] as const;
+const webStatus = computed(() => !searchState.hasQuery ? t("search.status.history") :
+  /^\/bm[\s:]/i.test(searchState.query.trim()) ? t("search.status.bookmarks") :
+  /^\/sites[\s:]/i.test(searchState.query.trim()) ? t("search.status.sites") : t("search.status.all"));
+const GH_SEARCH_RULES = computed(() => [
+  { id: "exact", icon: "🎯", name: t("search.rule.exact"), desc: t("search.rule.exactDesc") },
+  { id: "fuzzy", icon: "🔍", name: t("search.rule.fuzzy"), desc: t("search.rule.fuzzyDesc") },
+  { id: "topic", icon: "🏷️", name: t("search.rule.topic"), desc: t("search.rule.topicDesc") },
+  { id: "smart", icon: "✨", name: t("search.rule.smart"), desc: t("search.rule.smartDesc") }
+] as const);
 
 const activeGhRuleMeta = computed(() => {
-  return GH_SEARCH_RULES.find((r) => r.id === currentGhRule.value) || GH_SEARCH_RULES[0];
+  return GH_SEARCH_RULES.value.find((r) => r.id === currentGhRule.value) || GH_SEARCH_RULES.value[0];
 });
 
 function onCycleGhRule(e: MouseEvent) {
@@ -25,7 +35,7 @@ function onCycleGhRule(e: MouseEvent) {
   const next = gitHubService.cycleSearchRule();
   currentGhRule.value = next;
   searchController.update({
-    placeholder: `${activeGhRuleMeta.value.name}搜索 GitHub 仓库…`
+    placeholder: t("search.placeholder.gh", { rule: activeGhRuleMeta.value.name })
   });
   if (searchState.query) {
     searchService.scheduleSuggestions(searchState.query);
@@ -168,7 +178,7 @@ onUnmounted(() => {
   <input
     id="search-input"
     ref="inputRef"
-    :placeholder="searchState.placeholder"
+    :placeholder="searchPlaceholder"
     :value="searchState.query"
     autocomplete="off"
     aria-autocomplete="list"
@@ -181,7 +191,7 @@ onUnmounted(() => {
   <span
     v-if="searchState.mode === 'web'"
     class="search-web-status"
-    :title="searchState.hasQuery ? '按匹配度排序；普通关键词同时匹配历史、书签和常用网站，/bm 与 /sites 可明确限定范围' : '点击搜索栏显示最近点击记录；输入后搜索全部来源'"
+    :title="searchState.hasQuery ? t('search.webStatus.query') : t('search.webStatus.idle')"
   >{{ webStatus }}</span>
   <button
     v-if="searchState.mode === 'netease'"
@@ -189,8 +199,8 @@ onUnmounted(() => {
     class="search-history-btn"
     :class="{ active: isHistoryActive }"
     type="button"
-    title="历史记录（点击加载或收起最近播放）"
-    aria-label="历史记录"
+    :title="t('search.historyBtnTip')"
+    :aria-label="t('search.historyBtn')"
     @click="onToggleHistory"
   >
     <svg
@@ -207,7 +217,7 @@ onUnmounted(() => {
       <circle cx="12" cy="12" r="10"></circle>
       <polyline points="12 6 12 12 16 14"></polyline>
     </svg>
-    <span>历史记录</span>
+    <span>{{ t('search.historyBtn') }}</span>
   </button>
   <button
     v-if="searchState.mode === 'github'"
@@ -228,8 +238,8 @@ onUnmounted(() => {
     class="search-history-btn search-bili-btn"
     :class="{ active: isBiliRecActive }"
     type="button"
-    title="热门推荐（点击加载或收起B站热门推荐）"
-    aria-label="热门推荐"
+    :title="t('search.biliRecBtnTip')"
+    :aria-label="t('search.biliRecBtn')"
     @click="onToggleBiliRec"
   >
     <svg
@@ -245,7 +255,7 @@ onUnmounted(() => {
     >
       <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
     </svg>
-    <span>推荐</span>
+    <span>{{ t('search.biliRecBtn') }}</span>
   </button>
   <button
     v-if="searchState.mode === 'qcc'"
@@ -253,19 +263,19 @@ onUnmounted(() => {
     class="search-history-btn search-qcc-btn"
     :class="{ active: isQccActive }"
     type="button"
-    title="查企业指南（点击查看企查查/老板/税号检索指引）"
-    aria-label="企业查询指引"
+    :title="t('search.qccTipsBtnTip')"
+    :aria-label="t('search.qccTipsAria')"
     @click="onToggleQccTips"
   >
     <span class="gh-search-rule-icon">🏢</span>
-    <span>查企业</span>
+    <span>{{ t('search.qccTipsBtn') }}</span>
   </button>
   <button
     id="search-clear-btn"
     class="search-clear-btn"
     type="button"
-    title="清空搜索内容"
-    aria-label="清空搜索内容"
+    :title="t('search.clearBtnTip')"
+    :aria-label="t('search.clearBtnTip')"
     :hidden="!searchState.hasQuery"
     @click="onClearClick"
   >

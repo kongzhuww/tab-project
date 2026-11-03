@@ -7,14 +7,14 @@
           id="settings-minimize"
           type="button"
           class="settings-win-btn"
-          title="最小化（标签保留）"
+          :title="t('window.minimizeKeepTabs')"
           @click.stop="handleMinimize"
         >−</button>
         <button
           id="settings-close"
           type="button"
           class="settings-win-btn close"
-          title="关闭"
+          :title="t('window.close')"
           @click.stop="handleClose"
         >✕</button>
       </div>
@@ -29,7 +29,7 @@
           </div>
         </div>
 
-        <p class="settings-nav-label">设置分类</p>
+        <p class="settings-nav-label">{{ t('settings.navCategory') }}</p>
         <nav class="settings-nav-links">
           <button
             v-for="tab in tabs"
@@ -52,9 +52,9 @@
             :class="{ active: isGuestPreviewActive }"
             @click="handleToggleGuestPreview"
           >
-            <span>{{ isGuestPreviewActive ? '👀 恢复真实数据' : '🧪 页面内空态预览' }}</span>
+            <span>{{ isGuestPreviewActive ? t('settings.guestPreviewOn') : t('settings.guestPreviewOff') }}</span>
           </button>
-          <p>零数据空态视角，体验新用户初次打开的开箱状态。</p>
+          <p>{{ t('settings.guestPreviewDesc') }}</p>
         </div>
       </aside>
 
@@ -68,7 +68,7 @@
           <div class="settings-hero-copy">
             <p class="settings-kicker">CONTROL CENTER / PERSONAL SETTINGS</p>
             <h1>{{ currentTabTitle }}</h1>
-            <p>集中管理首页组件、服务连接、快捷键与多端云同步。开关即时保存，输入项可完成编辑后统一保存。</p>
+            <p>{{ t('settings.subtitle') }}</p>
           </div>
         </header>
 
@@ -78,63 +78,63 @@
           <header class="panel-head">
             <span class="panel-index">01</span>
             <div>
-              <h2>模块与功能</h2>
-              <p>决定新标签页首页显示哪些核心卡片与启动行为。</p>
+              <h2>{{ t('settings.modules.title') }}</h2>
+              <p>{{ t('settings.modules.desc') }}</p>
             </div>
           </header>
 
           <!-- 1. 界面布局与基础行为 -->
           <div class="settings-subgroup">
             <div class="settings-subgroup-title">
-              <span>🧭 界面布局与基础交互</span>
+              <span>{{ t('settings.layout.title') }}</span>
               <small>LAYOUT & BEHAVIOR</small>
             </div>
 
             <div class="field full-width">
-              <label>Dock 栏停靠位置 <em>DOCK POSITION</em></label>
+              <label>{{ t('settings.dockPos.label') }} <em>DOCK POSITION</em></label>
               <select v-model="form.dockPosition" @change="onDockPositionChange">
-                <option value="bottom">⬇️ 屏幕底部居中（默认 · 经典 Dock）</option>
-                <option value="left">⬅️ 屏幕左侧居中（紧凑垂直侧边栏）</option>
-                <option value="right">➡️ 屏幕右侧居中（紧凑垂直侧边栏）</option>
-                <option value="top">⬆️ 屏幕顶部悬浮（顶栏下方居中）</option>
+                <option value="bottom">{{ t('settings.dockPos.bottom') }}</option>
+                <option value="left">{{ t('settings.dockPos.left') }}</option>
+                <option value="right">{{ t('settings.dockPos.right') }}</option>
+                <option value="top">{{ t('settings.dockPos.top') }}</option>
               </select>
-              <p class="hint">自由切换底部、顶部、左侧或右侧停靠，满足多显示器与不同屏幕的使用习惯。</p>
+              <p class="hint">{{ t('settings.dockPos.hint') }}</p>
             </div>
 
             <div class="field full-width" style="margin-top: 8px;">
-              <label>默认搜索引擎 <em>SEARCH ENGINE</em></label>
+              <label>{{ t('settings.searchEngine.label') }} <em>SEARCH ENGINE</em></label>
               <select v-model="form.searchEngine" @change="saveImmediate('searchEngine')">
-                <option value="bing">🔷 必应 (Bing) · 国内外综合智能检索</option>
-                <option value="google">🌐 谷歌 (Google) · 全球学术与开发生态检索</option>
-                <option value="baidu">🐾 百度 (Baidu) · 中文资讯与本土生活搜索</option>
-                <option value="duckduckgo">🦆 DuckDuckGo · 隐私保护与零追踪搜索</option>
+                <option value="bing">{{ t('settings.searchEngine.bing') }}</option>
+                <option value="google">{{ t('settings.searchEngine.google') }}</option>
+                <option value="baidu">{{ t('settings.searchEngine.baidu') }}</option>
+                <option value="duckduckgo">{{ t('settings.searchEngine.duckduckgo') }}</option>
               </select>
-              <p class="hint">新标签页搜索栏回车或选择第一项直达时，将调用所选的默认搜索引擎。</p>
+              <p class="hint">{{ t('settings.searchEngine.hint') }}</p>
             </div>
 
             <div class="field full-width" style="margin-top: 8px;">
-              <label>开屏动画风格 <em>STARTUP STYLE</em></label>
+              <label>{{ t('settings.startupStyle.label') }} <em>STARTUP STYLE</em></label>
               <div style="display:flex;gap:10px;align-items:center;">
                 <select v-model="form.startupAnimationStyle" style="flex:1;" @change="handleStartupStyleChange">
-                  <option value="endfield">终末地 (Endfield) · 工业高能黑黄动效</option>
-                  <option value="rhinelab">莱茵生命 (Rhine Lab) · 科研终端科技动效 (Joyce Moore)</option>
+                  <option value="endfield">{{ t('settings.startupStyle.endfield') }}</option>
+                  <option value="rhinelab">{{ t('settings.startupStyle.rhinelab') }}</option>
                 </select>
-                <button type="button" class="btn-secondary" style="min-width:110px;" @click="previewStartup">预览动效 ↗</button>
+                <button type="button" class="btn-secondary" style="min-width:110px;" @click="previewStartup">{{ t('settings.startupStyle.preview') }}</button>
               </div>
-              <p class="hint">可自由切换明日方舟「终末地」黑黄工业动效，或「莱茵生命」科研终端动效。</p>
+              <p class="hint">{{ t('settings.startupStyle.hint') }}</p>
             </div>
 
             <div class="module-toggles" style="margin-top: 10px;">
               <label class="toggle-card">
                 <span class="toggle-copy">
-                  <b>开屏启动动画</b>
-                  <small>新标签页启动进度与品牌动画</small>
+                  <b>{{ t('settings.toggle.startupAnim') }}</b>
+                  <small>{{ t('settings.toggle.startupAnimSub') }}</small>
                 </span>
                 <input v-model="form.showStartupAnimation" type="checkbox" @change="handleToggleStartupAnimation" />
                 <i class="switch"></i>
               </label>
               <label class="toggle-card">
-                <span class="toggle-copy"><b>仅保留一个主界面</b><small>后续标签打开大号搜索</small></span>
+                <span class="toggle-copy"><b>{{ t('settings.toggle.singleTab') }}</b><small>{{ t('settings.toggle.singleTabSub') }}</small></span>
                 <input v-model="form.singleNewTab" type="checkbox" @change="saveImmediate('singleNewTab')" />
                 <i class="switch"></i>
               </label>
@@ -349,8 +349,8 @@
           <header class="panel-head">
             <span class="panel-index">02</span>
             <div>
-              <h2>快捷键</h2>
-              <p>按用途管理，仅显示可用功能。点击按键槽录入，Esc 取消；× 取消绑定，↺ 恢复默认。</p>
+              <h2>{{ t('settings.shortcuts.title') }}</h2>
+              <p>{{ t('settings.shortcuts.desc') }}</p>
             </div>
           </header>
 
@@ -361,25 +361,25 @@
                 <span class="shortcut-label">{{ tool.label }}</span>
                 <div class="shortcut-actions">
                   <button type="button" class="shortcut-key-btn" :class="{ recording: recordingToolId === tool.id }" @click="startRecordShortcut(tool.id)">
-                    {{ recordingToolId === tool.id ? '请按下按键…' : (effectiveShortcut(customShortcuts, tool) || '未分配') }}
+                    {{ recordingToolId === tool.id ? t('settings.shortcuts.recording') : (effectiveShortcut(customShortcuts, tool) || t('settings.shortcuts.unassigned')) }}
                   </button>
-                  <button v-if="effectiveShortcut(customShortcuts, tool)" type="button" class="shortcut-clear-btn" :title="`取消${tool.label}的快捷键`" :aria-label="`取消${tool.label}的快捷键`" @click="clearShortcut(tool.id)">×</button>
-                  <button v-if="Object.prototype.hasOwnProperty.call(customShortcuts, tool.id)" type="button" class="shortcut-clear-btn" :title="`恢复${tool.label}的默认键`" :aria-label="`恢复${tool.label}的默认键`" @click="resetShortcut(tool.id)">↺</button>
+                  <button v-if="effectiveShortcut(customShortcuts, tool)" type="button" class="shortcut-clear-btn" :title="t('settings.shortcuts.clearTitle', { label: tool.label })" :aria-label="t('settings.shortcuts.clearTitle', { label: tool.label })" @click="clearShortcut(tool.id)">×</button>
+                  <button v-if="Object.prototype.hasOwnProperty.call(customShortcuts, tool.id)" type="button" class="shortcut-clear-btn" :title="t('settings.shortcuts.resetTitle', { label: tool.label })" :aria-label="t('settings.shortcuts.resetTitle', { label: tool.label })" @click="resetShortcut(tool.id)">↺</button>
                 </div>
               </div>
             </div>
           </div>
-          <p class="hint">组件停用后，不显示也不触发对应快捷键；原绑定保留，重新启用后恢复。导航轮盘与工具轮盘同样只列出已启用组件。</p>
+          <p class="hint">{{ t('settings.shortcuts.disabledHint') }}</p>
 
           <div class="fixed-shortcuts-card" style="margin-top: 18px;">
-            <div class="fixed-shortcuts-head">浏览器快捷键（在浏览器中修改）</div>
+            <div class="fixed-shortcuts-head">{{ t('settings.shortcuts.browserHead') }}</div>
             <div class="fixed-shortcuts-grid">
-              <div class="fixed-row"><span class="fs-desc">侧边栏（浏览器右侧）</span><button type="button" class="shortcut-key-btn" @click="openBrowserShortcutSettings">{{ browserShortcutLabel('open-side-panel') }}</button></div>
-              <div class="fixed-row"><span class="fs-desc">回到新标签页</span><button type="button" class="shortcut-key-btn" @click="openBrowserShortcutSettings">{{ browserShortcutLabel('focus-newtab') }}</button></div>
+              <div class="fixed-row"><span class="fs-desc">{{ t('settings.shortcuts.sidebarDesc') }}</span><button type="button" class="shortcut-key-btn" @click="openBrowserShortcutSettings">{{ browserShortcutLabel('open-side-panel') }}</button></div>
+              <div class="fixed-row"><span class="fs-desc">{{ t('settings.shortcuts.focusNewTab') }}</span><button type="button" class="shortcut-key-btn" @click="openBrowserShortcutSettings">{{ browserShortcutLabel('focus-newtab') }}</button></div>
             </div>
-            <p class="hint">侧边栏默认 Alt+W，回到新标签页默认 Alt+H；以上显示浏览器实际绑定。点击按键可前往浏览器修改。若未分配，请在那里手动设置。</p>
-            <button type="button" class="shortcut-key-btn" @click="refreshBrowserShortcuts">重读浏览器绑定</button>
-            <p class="hint">Esc：取消录制 / 退出当前浮层。Alt+W 不再关闭工作区或窗口。</p>
+            <p class="hint">{{ t('settings.shortcuts.browserHint') }}</p>
+            <button type="button" class="shortcut-key-btn" @click="refreshBrowserShortcuts">{{ t('settings.shortcuts.refreshBrowser') }}</button>
+            <p class="hint">{{ t('settings.shortcuts.escHint') }}</p>
           </div>
         </section>
 
@@ -388,20 +388,20 @@
           <header class="panel-head">
             <span class="panel-index">03</span>
             <div>
-              <h2>搜索与书签过滤</h2>
-              <p>排除特定书签文件夹，避免其出现在主搜索框的实时联想建议中。</p>
+              <h2>{{ t('settings.privacy.title') }}</h2>
+              <p>{{ t('settings.privacy.desc') }}</p>
             </div>
           </header>
 
           <div class="fields-grid">
             <div class="field full-width">
-              <label>排除书签文件夹 <em>SEARCH FILTER</em></label>
+              <label>{{ t('settings.privacy.filterLabel') }} <em>SEARCH FILTER</em></label>
               <div style="display:flex;gap:10px;align-items:center;">
                 <select v-model="selectedFolderToAdd" style="flex:1;">
-                  <option value="">{{ availableFolders.length ? '选择要排除的书签文件夹…' : '正在读取浏览器书签…' }}</option>
+                  <option value="">{{ availableFolders.length ? t('settings.privacy.selectPlaceholder') : t('settings.privacy.reading') }}</option>
                   <option v-for="f in availableFolders" :key="f.id" :value="f.id">{{ f.path }}</option>
                 </select>
-                <button type="button" class="btn-secondary" :disabled="!selectedFolderToAdd" @click="addIgnoredFolder">＋ 添加到排除</button>
+                <button type="button" class="btn-secondary" :disabled="!selectedFolderToAdd" @click="addIgnoredFolder">{{ t('settings.privacy.addFolder') }}</button>
               </div>
 
               <div class="ignored-folders-list" style="margin-top: 14px;">
@@ -409,7 +409,7 @@
                   <span class="folder-path">{{ folder.path }}</span>
                   <button type="button" class="icon-btn-danger" @click="removeIgnoredFolder(folder.id)">✕</button>
                 </div>
-                <p v-if="legacyIgnoredCount" class="hint">另有 {{ legacyIgnoredCount }} 条旧格式规则原样保留，本面板不编辑或清理它们。</p>
+                <p v-if="legacyIgnoredCount" class="hint">{{ t('settings.privacy.legacyCount', { count: legacyIgnoredCount }) }}</p>
               </div>
             </div>
           </div>
@@ -481,19 +481,19 @@
 
             <!-- 快捷导入与工具栏 -->
             <div class="field full-width">
-              <label>导入与管理 <em>IMPORT & ACTIONS</em></label>
+              <label>{{ t('settings.wallpaper.actions') }} <em>IMPORT & ACTIONS</em></label>
               <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
                 <button type="button" class="btn-primary" @click="handleImportWallpaperImage">
-                  ＋ 导入本地图片
+                  {{ t('settings.wallpaper.importImage') }}
                 </button>
                 <button type="button" class="btn-primary" @click="handleImportWallpaperVideo">
-                  ▶ 导入动态视频 (MP4/WebM)
+                  {{ t('settings.wallpaper.importVideo') }}
                 </button>
                 <button type="button" class="btn-secondary" @click="handleImportWallpaperFolder">
-                  📁 批量导入文件夹
+                  {{ t('settings.wallpaper.importFolder') }}
                 </button>
                 <button type="button" class="btn-secondary" :disabled="wallpaperLoading" @click="loadWallpaperData">
-                  🔄 刷新壁纸库
+                  {{ t('settings.wallpaper.refresh') }}
                 </button>
               </div>
               <div v-if="wallpaperStatusMsg" style="margin-top: 8px; font-size: 11px; padding: 6px 10px; border-radius: 6px; background: var(--panel); border: 1px solid var(--border); color: var(--text);">
@@ -503,7 +503,7 @@
 
             <!-- 1. 精选风格与内置预设 -->
             <div class="field full-width">
-              <label>精选预设与风格 <em>BUILTIN PRESETS</em></label>
+              <label>{{ t('settings.wallpaper.builtinTitle') }} <em>BUILTIN PRESETS</em></label>
               <div class="wallpaper-presets-grid">
                 <div
                   v-for="item in BUILTIN_WALLPAPERS"
@@ -517,7 +517,7 @@
                     :style="item.style ? item.style : (item.thumb ? { backgroundImage: `url(${item.thumb})` } : {})"
                   >
                     <span class="wallpaper-card-badge">{{ item.kind }}</span>
-                    <span v-if="isWallpaperActive(item)" class="wallpaper-card-active-pill">✓ 使用中</span>
+                    <span v-if="isWallpaperActive(item)" class="wallpaper-card-active-pill">✓ {{ t('common.inUse') }}</span>
                   </div>
                   <div class="wallpaper-card-meta">
                     <span class="wallpaper-card-title">{{ item.title }}</span>
@@ -529,7 +529,7 @@
             <!-- 2. 我的壁纸库 (用户自导入) -->
             <div class="field full-width">
               <div style="display: flex; justify-content: space-between; align-items: center;">
-                <label style="margin-bottom: 0;">本地与自导入壁纸库 <em>MY WALLPAPERS ({{ wallpaperHistory.length }})</em></label>
+                <label style="margin-bottom: 0;">{{ t('settings.wallpaper.myWallpapers') }} <em>MY WALLPAPERS ({{ wallpaperHistory.length }})</em></label>
                 <!-- 分页操作 -->
                 <div v-if="totalWallpaperPages > 1" style="display: flex; gap: 6px; align-items: center; font-size: 11px;">
                   <button
@@ -730,21 +730,21 @@
 
             <!-- 3. 插件版本控制与更新 -->
             <div class="field full-width">
-              <label>🚀 插件版本与 GitHub 在线更新 <em>RELEASE & GIT</em></label>
+              <label>{{ t('settings.release.title') }} <em>RELEASE & GIT</em></label>
               <div class="sync-banner">
                 <div>
                   <div style="font-weight:700;font-size:13px;color:var(--heading);">{{ currentVersionText }}</div>
                   <div style="font-size:10px;color:var(--dim);margin-top:4px;">{{ currentCommitText }}</div>
                 </div>
                 <div style="display:flex;gap:8px;align-items:center;">
-                  <button v-if="needsReloadToApply" type="button" class="btn-save-green" title="本地文件已更新，点击一键重新载入扩展生效" @click="reloadExtension">
-                    🔄 立即重新载入扩展
+                  <button v-if="needsReloadToApply" type="button" class="btn-save-green" :title="t('settings.release.reloadTip')" @click="reloadExtension">
+                    {{ t('settings.release.reloadNow') }}
                   </button>
                   <button type="button" class="btn-secondary" :disabled="checkingUpdate || isDownloading" @click="checkAllUpdates">
-                    {{ checkingUpdate ? '正在检测最新版…' : '🔍 检查最新版本' }}
+                    {{ checkingUpdate ? t('settings.release.checking') : t('settings.release.checkBtn') }}
                   </button>
                   <button v-if="canApplyUpdate" type="button" class="btn-primary" @click="applyGitUpdate">
-                    一键本地拉取 (Git)
+                    {{ t('settings.release.applyGit') }}
                   </button>
                 </div>
               </div>
@@ -778,7 +778,7 @@
                     :disabled="isDownloading"
                     @click="downloadReleaseAsset"
                   >
-                    {{ isDownloading ? '下载中…' : '⬇️ 一键下载更新包' }}
+                    {{ isDownloading ? t('settings.release.downloading') : t('settings.release.downloadPackage') }}
                   </button>
                 </div>
 

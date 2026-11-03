@@ -90,7 +90,7 @@ onMounted(() => {
         :title="t('topbar.notifications')"
         aria-controls="notification-center"
         :aria-expanded="notificationHistoryState.isOpen"
-        :aria-label="notificationUnreadCount ? `${t('topbar.notifications')}，${notificationUnreadCount} 条未读` : t('topbar.notifications')"
+        :aria-label="notificationUnreadCount ? t('topbar.notificationsUnread', { count: notificationUnreadCount }) : t('topbar.notifications')"
         @click="handleOpenProfile"
         @contextmenu.prevent="handleContextMenuProfile($event)"
       >

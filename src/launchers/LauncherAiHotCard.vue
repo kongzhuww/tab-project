@@ -1,10 +1,12 @@
 <script setup lang="ts">
-import { ref, onMounted } from "vue";
+import { ref, onMounted, computed } from "vue";
 import { aihotViewerController } from "../viewers/store";
+import { t, currentLanguage } from "../i18n";
 
 interface AiHotNewsItem {
   id: string;
   title: string;
+  originalTitle?: string;
   summary?: string;
   category?: string;
   sourceName?: string;
@@ -15,15 +17,15 @@ interface AiHotNewsItem {
   url?: string;
 }
 
-const CATEGORY_NAMES: Record<string, string> = {
-  "ai-models": "🤖 模型",
-  "ai-products": "🚀 产品",
-  "industry": "🏢 行业",
-  "paper": "📄 论文",
-  "tip": "💡 观点",
-  "code": "💻 开源",
-  "hardware": "⚡ 算力",
-  "robot": "🦾 具身"
+const CATEGORY_KEYS: Record<string, string> = {
+  "ai-models": "aihot.card.cat.models",
+  "ai-products": "aihot.card.cat.products",
+  "industry": "aihot.card.cat.industry",
+  "paper": "aihot.card.cat.paper",
+  "tip": "aihot.card.cat.tip",
+  "code": "aihot.card.cat.code",
+  "hardware": "aihot.card.cat.hardware",
+  "robot": "aihot.card.cat.robot"
 };
 
 const newsPool = ref<AiHotNewsItem[]>([]);
@@ -32,17 +34,53 @@ const pageSize = 6;
 const isLoading = ref(true);
 const errorMessage = ref("");
 
+function getItemTitle(it: AiHotNewsItem): string {
+  if (currentLanguage.value === "en" && it.originalTitle) {
+    return it.originalTitle;
+  }
+  return it.title;
+}
+
+function getItemSourceName(it: AiHotNewsItem): string {
+  const name = it.source?.name || it.sourceName || "AI HOT";
+  if (currentLanguage.value === "en") {
+    if (name.includes("：")) {
+      const parts = name.split("：");
+      return parts[0].trim();
+    }
+  }
+  return name;
+}
+
 function getCategoryName(it: AiHotNewsItem): string {
   if (!it.category) return "";
-  return CATEGORY_NAMES[it.category] || it.category;
+  const key = CATEGORY_KEYS[it.category];
+  if (key) {
+    try { return t(key as any); } catch {}
+  }
+  return it.category;
 }
+
+// 排序与筛选：若在英文模式下，优先将具备原生英文标题（originalTitle）或来自海外技术源的文章排在前面
+const displayedPool = computed(() => {
+  if (currentLanguage.value !== "en") {
+    return newsPool.value;
+  }
+  return [...newsPool.value].sort((a, b) => {
+    const aEn = Boolean(a.originalTitle && /[a-zA-Z]{3,}/.test(a.originalTitle));
+    const bEn = Boolean(b.originalTitle && /[a-zA-Z]{3,}/.test(b.originalTitle));
+    if (aEn && !bEn) return -1;
+    if (!aEn && bEn) return 1;
+    return 0;
+  });
+});
 
 function formatTime(it: AiHotNewsItem): string {
   const raw = it.publishedAt || it.published || "";
-  if (!raw) return "最新";
+  if (!raw) return currentLanguage.value === "en" ? "Latest" : "最新";
   const num = Number(raw);
   const d = Number.isFinite(num) && num > 0 ? new Date(num > 1e12 ? num : num * 1000) : new Date(raw);
-  if (isNaN(d.getTime())) return String(raw).slice(0, 16) || "最新";
+  if (isNaN(d.getTime())) return String(raw).slice(0, 16) || (currentLanguage.value === "en" ? "Latest" : "最新");
   const pad = (n: number) => String(n).padStart(2, "0");
   const year = d.getFullYear();
   const month = pad(d.getMonth() + 1);
@@ -57,9 +95,10 @@ const FALLBACK_AIHOT_NEWS: AiHotNewsItem[] = [
   {
     id: "fb-1",
     title: "DeepSeek 发布新一代推理与开源模型架构，算力能效与推理表现获全球瞩目",
+    originalTitle: "DeepSeek Unveils Next-Generation Open Reasoning Architecture",
     summary: "新一代模型在长文本理解、复杂数学推导与代码生成领域实现大幅跃升，全面革新开源生态格局与部署成本。",
     category: "ai-models",
-    sourceName: "AI 科技评论",
+    sourceName: "AI Research",
     publishedAt: new Date(Date.now() - 3600000).toISOString(),
     links: { original: "https://aihot.virxact.com" },
     url: "https://aihot.virxact.com"
@@ -67,9 +106,10 @@ const FALLBACK_AIHOT_NEWS: AiHotNewsItem[] = [
   {
     id: "fb-2",
     title: "Anthropic 正式推出 Claude 3.7 Sonnet 混合推理模型与交互演进",
+    originalTitle: "Anthropic Releases Claude 3.7 Sonnet with Hybrid Reasoning",
     summary: "业界首创结合瞬时直答与长思维链展开模式，兼顾极速响应与深层次逻辑推理，编码能力刷新多项基准。",
     category: "ai-models",
-    sourceName: "机器之心",
+    sourceName: "Anthropic Blog",
     publishedAt: new Date(Date.now() - 7200000).toISOString(),
     links: { original: "https://aihot.virxact.com" },
     url: "https://aihot.virxact.com"
@@ -77,9 +117,10 @@ const FALLBACK_AIHOT_NEWS: AiHotNewsItem[] = [
   {
     id: "fb-3",
     title: "OpenAI 发布 GPT-4.5 预研与多模态感知前沿技术进展报告",
+    originalTitle: "OpenAI Frontier Multimodal & System Progress Technical Brief",
     summary: "更大规模的世界知识储备与常识对齐，进一步缩减幻觉率，带来更自然的上下文情感感知与工具调用精度。",
     category: "industry",
-    sourceName: "量子位",
+    sourceName: "OpenAI Research",
     publishedAt: new Date(Date.now() - 10800000).toISOString(),
     links: { original: "https://aihot.virxact.com" },
     url: "https://aihot.virxact.com"
@@ -87,9 +128,10 @@ const FALLBACK_AIHOT_NEWS: AiHotNewsItem[] = [
   {
     id: "fb-4",
     title: "具身智能开源机器人开源框架发布，多模态大模型进入物理现实交互新阶段",
+    originalTitle: "End-to-End Embodied AI Framework Advances Dexterous Manipulation",
     summary: "从视觉语言感知到肢体灵巧操作的端到端神经驱动方案，大幅降低机器人动作泛化与仿真学习门槛。",
     category: "robot",
-    sourceName: "新智元",
+    sourceName: "Robotics Weekly",
     publishedAt: new Date(Date.now() - 14400000).toISOString(),
     links: { original: "https://aihot.virxact.com" },
     url: "https://aihot.virxact.com"
@@ -97,9 +139,10 @@ const FALLBACK_AIHOT_NEWS: AiHotNewsItem[] = [
   {
     id: "fb-5",
     title: "AI 编程智能体大规模落地开发团队，软件工程流水线迈向全面自动化",
+    originalTitle: "Autonomous Coding Agents Reshape Modern Software Engineering Pipelines",
     summary: "代码检索、自动修复测试用例、全景架构审查及一键重构工具已无缝嵌入主流 IDE 与 Git 工作流。",
     category: "code",
-    sourceName: "InfoQ",
+    sourceName: "Hacker News",
     publishedAt: new Date(Date.now() - 18000000).toISOString(),
     links: { original: "https://aihot.virxact.com" },
     url: "https://aihot.virxact.com"
@@ -107,9 +150,10 @@ const FALLBACK_AIHOT_NEWS: AiHotNewsItem[] = [
   {
     id: "fb-6",
     title: "多模态大模型芯片与集群能效优化报告：端侧低功耗推理成为新焦点",
+    originalTitle: "Edge LLM Acceleration & Speculative Decoding Efficiency Report",
     summary: "混合量化与投机解码技术走向成熟，在普通消费级终端与嵌入式边缘硬件上实现高质量全尺寸模型流畅运行。",
     category: "hardware",
-    sourceName: "极客公园",
+    sourceName: "Semiconductor Insights",
     publishedAt: new Date(Date.now() - 21600000).toISOString(),
     links: { original: "https://aihot.virxact.com" },
     url: "https://aihot.virxact.com"
@@ -183,13 +227,13 @@ async function fetchNews(force = false) {
 }
 
 function rotateNews() {
-  if (!newsPool.value.length) {
+  if (!displayedPool.value.length) {
     isLoading.value = true;
     void fetchNews(true);
     return;
   }
   pageOffset.value += pageSize;
-  if (pageOffset.value >= newsPool.value.length) {
+  if (pageOffset.value >= displayedPool.value.length) {
     pageOffset.value = 0;
   }
 }
@@ -215,9 +259,9 @@ function handleOpenArticle(item: AiHotNewsItem, event: MouseEvent) {
   aihotViewerController.openArticle(
     {
       id: item.id,
-      title: item.title,
+      title: getItemTitle(item),
       summary: item.summary,
-      sourceName: item.source?.name || item.sourceName || "AI HOT",
+      sourceName: getItemSourceName(item),
       published: formatTime(item),
       url
     },
@@ -234,37 +278,37 @@ onMounted(() => {
   <section class="launcher-group launcher-aihot launcher-todoist size-large" id="launcher-todoist">
     <header class="card-head aihot-home-head">
       <span class="bar cyan"></span>
-      <strong class="title">AI HOT 资讯</strong>
+      <strong class="title">{{ t('aihot.card.title') }}</strong>
       <span class="grow"></span>
-      <button class="aihot-home-btn" type="button" title="换一批最新资讯" @click="rotateNews">
-        换一批 ↻
+      <button class="aihot-home-btn" type="button" :title="t('aihot.card.refreshBtnTip')" @click="rotateNews">
+        {{ t('aihot.card.refreshBtn') }}
       </button>
-      <button class="aihot-home-btn aihot-home-more-btn" type="button" title="查看完整 AI HOT 榜单" @click="scrollToDiscovery">
-        热榜 ↗
+      <button class="aihot-home-btn aihot-home-more-btn" type="button" :title="t('aihot.card.hotlistBtnTip')" @click="scrollToDiscovery">
+        {{ t('aihot.card.hotlistBtn') }}
       </button>
     </header>
 
     <!-- 原版纯粹的 AI HOT 资讯视图 -->
     <div class="aihot-home-body" id="aihot-home-body">
-      <p v-if="isLoading && !newsPool.length" class="muted small">正在加载精选资讯…</p>
-      <p v-else-if="errorMessage && !newsPool.length" class="notice small">{{ errorMessage }}</p>
-      <p v-else-if="!newsPool.length" class="muted small aihot-home-empty">暂无精选资讯，请点击换一批重试</p>
+      <p v-if="isLoading && !displayedPool.length" class="muted small">{{ t('aihot.card.loading') }}</p>
+      <p v-else-if="errorMessage && !displayedPool.length" class="notice small">{{ errorMessage }}</p>
+      <p v-else-if="!displayedPool.length" class="muted small aihot-home-empty">{{ t('aihot.card.empty') }}</p>
       <div v-else class="aihot-home-rich-list">
         <a
-          v-for="(item, idx) in newsPool.slice(pageOffset, pageOffset + pageSize)"
+          v-for="(item, idx) in displayedPool.slice(pageOffset, pageOffset + pageSize)"
           :key="item.id || item.title"
           class="aihot-home-rich-card"
           :href="item.links?.original || item.links?.aihot || item.url || '#'"
           target="_blank"
           rel="noreferrer"
-          :title="`${item.title}\n${item.summary || ''}\n点击在阅读器中查看`"
+          :title="`${getItemTitle(item)}\n${item.summary || ''}\n${t('aihot.card.viewInReader')}`"
           @click="handleOpenArticle(item, $event)"
         >
           <span class="aihot-home-rich-rank" :class="{ top: (pageOffset + idx) < 3 }">
             {{ pageOffset + idx + 1 }}
           </span>
           <div class="aihot-home-rich-main">
-            <h3 class="aihot-home-rich-title">{{ item.title }}</h3>
+            <h3 class="aihot-home-rich-title">{{ getItemTitle(item) }}</h3>
             <p v-if="item.summary" class="aihot-home-rich-summary">
               {{ item.summary }}
             </p>
@@ -274,7 +318,7 @@ onMounted(() => {
                   {{ getCategoryName(item) }}
                 </span>
                 <span class="aihot-home-rich-source">
-                  {{ item.source?.name || item.sourceName || 'AI HOT' }}
+                  {{ getItemSourceName(item) }}
                 </span>
               </div>
               <time class="aihot-home-rich-time">{{ formatTime(item) }}</time>

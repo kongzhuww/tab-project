@@ -6,6 +6,7 @@ import {
   getActiveWebTab, isWebTab, loadLauncherPages,
   saveQuickLink, tabHost, type PopupTab
 } from "../services/quick-links-export.service";
+import { t } from "../i18n";
 
 const props = withDefaults(defineProps<{ inDrawer?: boolean }>(), { inDrawer: false });
 const emit = defineEmits<{ (e: "close"): void }>();
@@ -56,13 +57,13 @@ function parseDomain(urlStr: string, firstTabTitle = ""): { domain: string; titl
     if (protocol.includes("extension")) {
       return {
         domain: "tab-project",
-        title: "tab-project 新标签页",
+        title: "tab-project",
         favIcon: "assets/bilibili.svg"
       };
     }
 
     if (hostStr === "localhost" || hostStr === "127.0.0.1" || /^192\.168\./.test(hostStr) || /^10\./.test(hostStr) || /^172\.(1[6-9]|2\d|3[01])\./.test(hostStr)) {
-      return { domain: hostStr, title: `局域网服务 (${hostStr})` };
+      return { domain: hostStr, title: t('sidepanel.localService', { host: hostStr }) };
     }
 
     const parts = hostStr.split(".");
@@ -105,7 +106,7 @@ function parseDomain(urlStr: string, firstTabTitle = ""): { domain: string; titl
 
     return { domain: rootDomain, title: brandTitle };
   } catch {
-    return { domain: "other", title: "其它网页" };
+    return { domain: "other", title: t('sidepanel.otherWeb') };
   }
 }
 
@@ -540,12 +541,12 @@ onUnmounted(() => {
     <header class="sp-global-nav">
       <div class="sp-nav-title">
         <span class="sp-nav-title-icon">⚡</span>
-        <span class="sp-nav-title-text">网页工具与收集箱</span>
+        <span class="sp-nav-title-text">{{ t('sidepanel.title') }}</span>
       </div>
       <button
         type="button"
         class="sp-nav-icon-btn"
-        :title="props.inDrawer ? '关闭侧栏' : '打开完整新标签页仪表盘'"
+        :title="props.inDrawer ? t('sidepanel.closeDrawerTip') : t('sidepanel.openDashboardTip')"
         @click="openDashboard"
       >
         {{ props.inDrawer ? '✕' : '⌂' }}
@@ -561,25 +562,25 @@ onUnmounted(() => {
           <span v-else>🌐</span>
         </div>
         <div class="sp-page-meta">
-          <small>当前活跃标签页</small>
-          <strong :title="currentWebTab?.title">{{ currentWebTab?.title || '正在读取网页…' }}</strong>
-          <span>{{ currentHost || '内部或本地页面' }}</span>
+          <small>{{ t('sidepanel.activeTab') }}</small>
+          <strong :title="currentWebTab?.title">{{ currentWebTab?.title || t('sidepanel.readingPage') }}</strong>
+          <span>{{ currentHost || t('sidepanel.internalPage') }}</span>
         </div>
         <div class="sp-page-actions">
           <button
             class="sp-collect-btn"
             type="button"
             :disabled="busy"
-            :title="isWebTab(currentWebTab) ? `一键收藏至「${targetPage}」` : `手动添加到「${targetPage}」`"
+            :title="isWebTab(currentWebTab) ? t('sidepanel.collectTipWeb', { page: targetPage }) : t('sidepanel.collectTipManual', { page: targetPage })"
             @click="saveCurrentPage"
           >
-            ⭐ 收藏
+            {{ t('sidepanel.collectBtn') }}
           </button>
           <button
             class="sp-target-picker-btn"
             type="button"
             :class="{ active: pagePickerOpen }"
-            :title="`点击切换保存分区（当前：${getPageDisplayName(targetPage)}）`"
+            :title="t('sidepanel.switchTargetPartitionTip', { page: getPageDisplayName(targetPage) })"
             @click="pagePickerOpen = !pagePickerOpen"
           >
             <span class="picker-label">{{ getPageDisplayName(targetPage) }}</span>
@@ -591,8 +592,8 @@ onUnmounted(() => {
       <!-- 分区快速切换气泡菜单 -->
       <div v-show="pagePickerOpen" class="sp-page-picker-dropdown">
         <div class="dropdown-header">
-          <span>切换目标保存分区</span>
-          <button type="button" title="关闭" @click="pagePickerOpen = false">✕</button>
+          <span>{{ t('sidepanel.switchTargetPartition') }}</span>
+          <button type="button" :title="t('common.close')" @click="pagePickerOpen = false">✕</button>
         </div>
         <div class="dropdown-list">
           <button
@@ -613,24 +614,24 @@ onUnmounted(() => {
       <!-- 手动添加面板 -->
       <div v-show="manualOpen" class="sp-manual-panel">
         <div class="manual-head">
-          <span>✏️ 手动输入网址</span>
+          <span>{{ t('sidepanel.manualInputTitle') }}</span>
           <button type="button" @click="manualOpen = false">✕</button>
         </div>
         <input
           ref="manualUrlInput"
           v-model="manualUrl"
           type="text"
-          placeholder="如 bilibili.com 或 https://..."
+          :placeholder="t('sidepanel.manualUrlPlaceholder')"
           @keydown.enter.prevent="submitManualLink"
         />
         <input
           v-model="manualTitle"
           type="text"
-          placeholder="网站名称（选填）"
+          :placeholder="t('sidepanel.manualTitlePlaceholder')"
           @keydown.enter.prevent="submitManualLink"
         />
         <button class="manual-submit-btn" type="button" :disabled="busy" @click="submitManualLink">
-          确定添加
+          {{ t('sidepanel.manualConfirmBtn') }}
         </button>
       </div>
 
@@ -644,7 +645,7 @@ onUnmounted(() => {
             :class="{ active: activeViewTab === 'tabs' }"
             @click="activeViewTab = 'tabs'"
           >
-            📑 打开的标签页 ({{ flatTabs.length }})
+            {{ t('sidepanel.tabOpen', { count: flatTabs.length }) }}
           </button>
           <button
             type="button"
@@ -652,29 +653,29 @@ onUnmounted(() => {
             :class="{ active: activeViewTab === 'todoist' }"
             @click="activeViewTab = 'todoist'"
           >
-            📋 Todoist 待办
+            {{ t('sidepanel.todoistOpen') }}
           </button>
         </div>
 
         <!-- 视图 A：打开的标签页（默认激活） -->
         <div v-show="activeViewTab === 'tabs'" class="sp-switcher-view-content">
           <div class="sp-view-subheader">
-            <span class="subheader-title">全网智能聚合 ({{ domainGroups.length }} 个分组)</span>
+            <span class="subheader-title">{{ t('sidepanel.aggregation', { count: domainGroups.length }) }}</span>
             <button
               type="button"
               class="sp-tab-refresh-btn"
-              title="刷新标签页列表"
+              :title="t('sidepanel.refreshTabsTip')"
               @click.stop="loadOpenTabs"
             >
-              ↻ 刷新
+              {{ t('sidepanel.refreshTabs') }}
             </button>
           </div>
 
           <div v-if="tabLoading" class="tab-status-box muted small">
-            <span>正在读取标签页…</span>
+            <span>{{ t('sidepanel.loadingTabs') }}</span>
           </div>
           <div v-else-if="flatTabs.length === 0" class="tab-status-box muted small">
-            <span>暂无打开的标签页</span>
+            <span>{{ t('sidepanel.noTabs') }}</span>
           </div>
           <div v-else class="tab-group-container">
             <div v-for="grp in domainGroups" :key="grp.domain" class="tab-group-block">
@@ -698,29 +699,29 @@ onUnmounted(() => {
 
               <div v-if="!isDomainCollapsed(grp.domain)" class="tab-group-items">
                 <div
-                  v-for="t in grp.tabs"
-                  :key="t.id"
+                  v-for="tab in grp.tabs"
+                  :key="tab.id"
                   class="tab-tree-row"
-                  :class="{ 'is-active-tab': t.active }"
-                  :title="`${t.title}\n${t.url}`"
-                  @click="handleSwitchTab(t)"
+                  :class="{ 'is-active-tab': tab.active }"
+                  :title="`${tab.title}\n${tab.url}`"
+                  @click="handleSwitchTab(tab)"
                 >
                   <img
-                    v-if="t.favIconUrl && !t.favIconUrl.startsWith('chrome://')"
-                    :src="t.favIconUrl"
+                    v-if="tab.favIconUrl && !tab.favIconUrl.startsWith('chrome://')"
+                    :src="tab.favIconUrl"
                     class="tab-favicon"
                     alt=""
                     loading="lazy"
                     @error="($event.target as HTMLElement).style.display = 'none'"
                   />
                   <span v-else class="tab-favicon-fallback">🌐</span>
-                  <span class="tab-title-text">{{ t.title || '未命名网页' }}</span>
-                  <span v-if="t.active" class="tab-current-pill">当前</span>
+                  <span class="tab-title-text">{{ tab.title || t('sidepanel.unnamedPage') }}</span>
+                  <span v-if="tab.active" class="tab-current-pill">{{ t('sidepanel.currentTabPill') }}</span>
                   <button
                     type="button"
                     class="tab-close-btn"
-                    title="关闭此标签页"
-                    @click.stop="handleCloseTab(t.id)"
+                    :title="t('sidepanel.closeTabTip')"
+                    @click.stop="handleCloseTab(tab.id)"
                   >
                     ✕
                   </button>
@@ -733,22 +734,22 @@ onUnmounted(() => {
         <!-- 视图 B：Todoist 待办看板 -->
         <div v-show="activeViewTab === 'todoist'" class="sp-switcher-view-content todoist-view-body">
           <div class="sp-view-subheader">
-            <span class="subheader-title">{{ currentMountedColumn ? currentMountedColumn.title : '加载中…' }}</span>
+            <span class="subheader-title">{{ currentMountedColumn ? currentMountedColumn.title : t('common.loading') }}</span>
             <button
               type="button"
               class="todoist-switch-btn"
-              title="选择要挂载到侧边栏的板块"
+              :title="t('sidepanel.todoistSwitchTip')"
               @click.stop="sectionPickerOpen = !sectionPickerOpen"
             >
-              ⚙️ 切换板块
+              {{ t('sidepanel.todoistSwitchBtn') }}
             </button>
           </div>
 
           <!-- 切换板块下拉面板 -->
           <div v-show="sectionPickerOpen" class="sp-page-picker-dropdown todoist-section-dropdown">
             <div class="dropdown-header">
-              <span>选择挂载到侧边栏的板块</span>
-              <button type="button" title="关闭" @click="sectionPickerOpen = false">✕</button>
+              <span>{{ t('sidepanel.todoistSectionHeader') }}</span>
+              <button type="button" :title="t('common.close')" @click="sectionPickerOpen = false">✕</button>
             </div>
             <div class="dropdown-list">
               <button
@@ -770,7 +771,7 @@ onUnmounted(() => {
             <input
               v-model="newTodoText"
               type="text"
-              placeholder="随手记任务… 按 Enter 添加"
+              :placeholder="t('sidepanel.todoistQuickInput')"
               class="todoist-quick-input"
               @keydown.enter.prevent="submitQuickTodo"
             />
@@ -780,7 +781,7 @@ onUnmounted(() => {
               :disabled="!newTodoText.trim()"
               @click="submitQuickTodo"
             >
-              添加
+              {{ t('sidepanel.todoistAddBtn') }}
             </button>
           </div>
 
@@ -796,7 +797,7 @@ onUnmounted(() => {
                 type="button"
                 class="todoist-checkbox"
                 :class="{ checked: task.completed }"
-                :title="task.completed ? '已完成' : '点击划去完成'"
+                :title="task.completed ? t('sidepanel.todoistCheckDone') : t('sidepanel.todoistCheckTip')"
                 @click="onToggleTodoCheck(task)"
               >
                 <span v-if="task.completed">✓</span>
@@ -808,10 +809,10 @@ onUnmounted(() => {
             </div>
           </div>
           <div v-else-if="todoLoading" class="todoist-empty-state">
-            ⏳ 加载任务中…
+            {{ t('sidepanel.todoistLoading') }}
           </div>
           <div v-else class="todoist-empty-state">
-            ✨ 当前板块暂无待办任务，可在上方随时登记添加
+            {{ t('sidepanel.todoistEmpty') }}
           </div>
         </div>
       </div>

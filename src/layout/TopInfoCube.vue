@@ -8,6 +8,7 @@ import { useContextMenu } from "../core/useContextMenu";
 import { notifications } from "../sdk/notifications";
 import { musicModuleState } from "../music/module-state";
 import { togetherPartyState } from "../chat/together-listen.store";
+import { t } from "../i18n";
 
 const props = withDefaults(defineProps<{ active?: boolean }>(), { active: true });
 
@@ -89,27 +90,41 @@ function runCubeAction(action: () => void) {
 }
 
 function formatCountdownDays(dateStr?: string): string {
-  if (!dateStr) return "未设置目标日";
+  if (!dateStr) return t("cube.countdown.noTarget");
   const target = new Date(dateStr).getTime();
   const diffMs = target - nowTs.value;
   const days = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
-  if (days > 0) return `还剩 ${days} 天`;
-  if (days === 0) return `就是今天！`;
-  return `已过去 ${Math.abs(days)} 天`;
+  if (days > 0) return t("cube.countdown.remaining", { days });
+  if (days === 0) return t("cube.countdown.today");
+  return t("cube.countdown.passed", { days: Math.abs(days) });
 }
 
 // 1. Music Face State
+const displayTitle = computed(() => {
+  if (!homeMusicState.title || homeMusicState.title === "点击播放") {
+    return t("home.music.defaultTitle");
+  }
+  return homeMusicState.title;
+});
+
+const displayArtist = computed(() => {
+  if (!homeMusicState.artist || homeMusicState.artist === "作者") {
+    return t("home.music.defaultArtist");
+  }
+  return homeMusicState.artist;
+});
+
 const musicSourceText = computed(() => {
-  if (homeMusicState.isBiliRadio) return "B站电台";
-  if (homeMusicState.isNetease) return "网易云";
-  if (homeMusicState.playing) return "塞壬";
-  return "待机";
+  if (homeMusicState.isBiliRadio) return t("cube.source.biliRadio");
+  if (homeMusicState.isNetease) return t("cube.source.netease");
+  if (homeMusicState.playing) return t("cube.source.siren");
+  return t("cube.source.idle");
 });
 
 const displayLyric = computed(() => {
   if (homeMusicState.currentLyric) return homeMusicState.currentLyric;
-  if (homeMusicState.playing) return "♪ 伴奏播放中…";
-  return "选择塞壬歌曲、网易云或B站电台后在这里显示歌词";
+  if (homeMusicState.playing) return t("cube.defaultPlayingLyric");
+  return t("cube.defaultIdleLyric");
 });
 
 function openMusicPicker() {
@@ -228,29 +243,29 @@ onUnmounted(() => {
         <section
           v-if="cubeRegistryStore.isActive('music') && activeFaceId === 'music'"
           class="ms-top-face ms-top-face-music"
-          aria-label="音乐歌词面"
+          :aria-label="t('cube.musicFaceAria')"
           :style="getActiveFaceTransform('music', 0)"
         >
           <div class="ms-top-side">
-            <button class="ms-top-prev" title="上一首" type="button" @click.stop="homeMusicController.prev()">⏮</button>
-            <button class="ms-top-play" title="播放/暂停" type="button" @click.stop="homeMusicController.togglePlay()">
+            <button class="ms-top-prev" :title="t('cube.prevTrack')" type="button" @click.stop="homeMusicController.prev()">⏮</button>
+            <button class="ms-top-play" :title="t('cube.playPause')" type="button" @click.stop="homeMusicController.togglePlay()">
               {{ homeMusicState.playing ? "⏸" : "▶" }}
             </button>
           </div>
-          <button class="ms-top-main" title="打开音乐播放器" type="button" @click.stop="openMusicPicker">
+          <button class="ms-top-main" :title="t('cube.openMusicPicker')" type="button" @click.stop="openMusicPicker">
             <!-- 降级模式：当工作区/调音台打开或一起听时，收敛为醒目极简状态，停止深层 Diff -->
             <template v-if="isPartyOrConsoleActive">
               <div class="ms-top-meta">
                 <span class="ms-top-title" style="color: #10b981; font-weight: 700;">
-                  🎧 {{ isTogetherListening ? '正在一起听' : '正在收听' }}：{{ homeMusicState.title || "待机中" }}
+                  🎧 {{ isTogetherListening ? t('cube.listeningTogether') : t('cube.listening') }}：{{ displayTitle }}
                 </span>
-                <span class="ms-top-artist">{{ homeMusicState.artist }}</span>
+                <span class="ms-top-artist">{{ displayArtist }}</span>
               </div>
             </template>
             <template v-else>
               <div class="ms-top-meta">
-                <span class="ms-top-title" :title="homeMusicState.title || '音乐播放器'">{{ homeMusicState.title || "音乐播放器" }}</span>
-                <span class="ms-top-artist" :title="homeMusicState.artist || '待机中'">{{ homeMusicState.artist || "待机中" }}</span>
+                <span class="ms-top-title" :title="displayTitle">{{ displayTitle }}</span>
+                <span class="ms-top-artist" :title="displayArtist">{{ displayArtist }}</span>
                 <span class="ms-top-source" :class="{ idle: !homeMusicState.playing }">{{ musicSourceText }}</span>
                 <span v-if="displayLyric" class="ms-top-divider"></span>
               </div>
@@ -262,8 +277,8 @@ onUnmounted(() => {
             </div>
           </button>
           <div class="ms-top-side">
-            <button class="ms-top-next" title="下一首" type="button" @click.stop="homeMusicController.next()">⏭</button>
-            <button class="ms-top-open" title="打开歌单" type="button" @click.stop="openMusicPicker">🎵</button>
+            <button class="ms-top-next" :title="t('cube.nextTrack')" type="button" @click.stop="homeMusicController.next()">⏭</button>
+            <button class="ms-top-open" :title="t('cube.openPlaylist')" type="button" @click.stop="openMusicPicker">🎵</button>
           </div>
         </section>
 
@@ -281,7 +296,7 @@ onUnmounted(() => {
             <span class="ms-cube-divider"></span>
             <!-- 便签 -->
             <span v-if="face.customType === 'memo'" class="ms-cube-custom-text" :title="face.customData?.text">
-              {{ face.customData?.text || "（点击右键配置便签内容）" }}
+              {{ face.customData?.text || t('cube.memo.clickToConfig') }}
             </span>
             <!-- 倒数日 -->
             <span v-else-if="face.customType === 'countdown'" class="ms-cube-custom-text countdown">

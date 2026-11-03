@@ -2,6 +2,7 @@
 import { ref, reactive, computed, onMounted, onUnmounted, watch } from "vue";
 import { myReposState, myReposController, type MyRepoItem } from "./my-repos-store";
 import { notifications } from "../sdk/notifications";
+import { t } from "../i18n";
 
 const props = defineProps<{
   active?: boolean;
@@ -122,8 +123,8 @@ async function handleCopyRepoUrl() {
     await navigator.clipboard.writeText(repo.htmlUrl);
     notifications.show({
       appName: "GitHub",
-      title: "已复制链接",
-      message: `已复制 ${repo.name} 仓库链接`
+      title: t("github.myRepos.copiedUrlTitle"),
+      message: t("github.myRepos.copiedUrlMsg", { name: repo.name })
     });
   } catch {}
 }
@@ -137,7 +138,7 @@ async function handleCopyCloneCommand() {
     await navigator.clipboard.writeText(cmd);
     notifications.show({
       appName: "GitHub",
-      title: "已复制克隆命令",
+      title: t("github.myRepos.copiedCloneTitle"),
       message: cmd
     });
   } catch {}
@@ -462,11 +463,11 @@ onUnmounted(() => {
       <header class="shelf-header">
         <div class="shelf-title-group">
           <span class="col-dot default-dot"></span>
-          <h3 class="shelf-title">默认板块</h3>
+          <h3 class="shelf-title">{{ t('github.myRepos.defaultShelf') }}</h3>
           <span class="badge-count">{{ defaultColumnRepos.length }}</span>
-          <span class="shelf-hint">未分类仓库 · 直接拖拽分发到下方各个 Topic 看板</span>
+          <span class="shelf-hint">{{ t('github.myRepos.defaultShelfHint') }}</span>
           <span v-if="myReposState.syncingTopic" class="sync-status">
-            <i class="spin-icon">⏳</i> 正在同步 GitHub Topics…
+            <i class="spin-icon">⏳</i> {{ t('github.myRepos.syncingTopics') }}
           </span>
         </div>
         <div class="shelf-actions">
@@ -475,7 +476,7 @@ onUnmounted(() => {
             <input
               v-model="myReposState.searchQuery"
               type="text"
-              placeholder="过滤项目 / 标签…"
+              :placeholder="t('github.myRepos.filterPlaceholder')"
               class="shelf-search-input"
             />
             <button
@@ -491,21 +492,21 @@ onUnmounted(() => {
             type="button"
             class="shelf-btn-refresh"
             :disabled="myReposState.loading || myReposState.syncingTopic"
-            title="重新从 GitHub 拉取仓库列表"
+            :title="t('github.myRepos.refreshBtnTitle')"
             @click="myReposController.load(true)"
           >
             <span :class="{ spinning: myReposState.loading }">🔄</span>
-            <span>{{ myReposState.loading ? '刷新中…' : '刷新' }}</span>
+            <span>{{ myReposState.loading ? t('github.myRepos.refreshing') : t('common.refresh') }}</span>
           </button>
 
           <!-- 折叠切换 -->
           <button
             type="button"
             class="shelf-toggle-btn"
-            :title="isDefaultShelfCollapsed ? '展开默认板块' : '收起默认板块'"
+            :title="isDefaultShelfCollapsed ? t('github.myRepos.expandShelf') : t('github.myRepos.collapseShelf')"
             @click="toggleShelfCollapse"
           >
-            {{ isDefaultShelfCollapsed ? '展开 ▼' : '收起 ▲' }}
+            {{ isDefaultShelfCollapsed ? t('github.myRepos.expandBtn') : t('github.myRepos.collapseBtn') }}
           </button>
         </div>
       </header>
@@ -559,7 +560,7 @@ onUnmounted(() => {
         </div>
 
         <div v-if="!defaultColumnRepos.length" class="empty-shelf-placeholder">
-          <span>暂无未分类仓库 (全部项目已分配至下方各个 Topic 看板)</span>
+          <span>{{ t('github.myRepos.emptyShelf') }}</span>
         </div>
       </div>
     </section>
@@ -610,17 +611,17 @@ onUnmounted(() => {
               <button
                 type="button"
                 class="col-more-btn"
-                title="板块操作（重命名 / 删除）"
+                :title="t('github.myRepos.topicActions')"
                 @click="activeMenuColumn = activeMenuColumn === topic ? null : topic"
               >•••</button>
 
               <!-- 气泡弹出菜单 -->
               <div v-if="activeMenuColumn === topic" class="col-popover-menu">
                 <button type="button" class="menu-item" @click="startRenameTopic(topic)">
-                  ✏️ 重命名 Topic 并同步
+                  {{ t('github.myRepos.renameTopicMenu') }}
                 </button>
                 <button type="button" class="menu-item danger" @click="handleDeleteTopic(topic)">
-                  🗑️ 删除板块并从远端移除
+                  {{ t('github.myRepos.deleteTopicMenu') }}
                 </button>
               </div>
             </div>
@@ -655,7 +656,7 @@ onUnmounted(() => {
                   #{{ topic }}
                   <i
                     class="remove-topic-btn"
-                    title="从当前 Topic 移除并同步到 GitHub"
+                    :title="t('github.myRepos.removeTopicTip')"
                     @click.stop="handleRemoveRepoFromTopic(repo, topic)"
                   >✕</i>
                 </span>
@@ -684,7 +685,7 @@ onUnmounted(() => {
             </div>
 
             <div v-if="!getReposForTopic(topic).length" class="empty-column-placeholder">
-              <span>暂无项目，可从其他列拖拽至此</span>
+              <span>{{ t('github.myRepos.emptyColumn') }}</span>
             </div>
           </div>
         </section>
@@ -698,21 +699,21 @@ onUnmounted(() => {
 
           <div v-else class="new-column-composer">
             <header class="composer-header">
-              <strong>新建 Topic 分组</strong>
-              <small>将作为 GitHub 远端标签同步</small>
+              <strong>{{ t('github.myRepos.newTopicTitle') }}</strong>
+              <small>{{ t('github.myRepos.newTopicSub') }}</small>
             </header>
             <input
               v-model="newTopicInput"
               type="text"
-              placeholder="例如 tools, vue3, robotics..."
+              :placeholder="t('github.myRepos.newTopicPlaceholder')"
               class="composer-input"
               @keydown.enter="handleCreateTopic"
               @keydown.esc="isCreatingTopic = false"
               autofocus
             />
             <div class="composer-actions">
-              <button type="button" class="btn-primary" @click="handleCreateTopic">创建板块</button>
-              <button type="button" class="btn-cancel" @click="isCreatingTopic = false">取消</button>
+              <button type="button" class="btn-primary" @click="handleCreateTopic">{{ t('github.myRepos.createTopicBtn') }}</button>
+              <button type="button" class="btn-cancel" @click="isCreatingTopic = false">{{ t('common.cancel') }}</button>
             </div>
           </div>
         </section>
@@ -740,7 +741,7 @@ onUnmounted(() => {
             type="button"
             @click.stop="activeSubMenu = activeSubMenu === 'folder' ? null : 'folder'"
           >
-            <span>📁 移动到分组</span>
+            <span>{{ t('github.myRepos.moveToGroup') }}</span>
             <span class="sub-arrow">›</span>
           </button>
 
@@ -757,7 +758,7 @@ onUnmounted(() => {
               type="button"
               @click="handleMoveToDefault"
             >
-              {{ !contextMenuState.repo.topics.length ? "✓ " : "  " }}＋ 设为未分类（移入默认板块）
+              {{ !contextMenuState.repo.topics.length ? "✓ " : "  " }}{{ t('github.myRepos.setUncategorized') }}
             </button>
 
             <!-- 各个 Topic 分组 -->
@@ -781,7 +782,7 @@ onUnmounted(() => {
           @mouseenter="activeSubMenu = null"
           @click="handleCopyRepoUrl"
         >
-          📋 复制仓库链接
+          {{ t('github.myRepos.copyRepoUrl') }}
         </button>
 
         <!-- 3. 复制克隆命令 -->
@@ -791,7 +792,7 @@ onUnmounted(() => {
           @mouseenter="activeSubMenu = null"
           @click="handleCopyCloneCommand"
         >
-          💻 复制克隆命令
+          {{ t('github.myRepos.copyCloneCmd') }}
         </button>
 
         <!-- 4. 在 GitHub 打开 -->
@@ -801,7 +802,7 @@ onUnmounted(() => {
           @mouseenter="activeSubMenu = null"
           @click="handleOpenInGitHub"
         >
-          ↗ 在 GitHub 打开
+          {{ t('github.myRepos.openInGitHub') }}
         </button>
       </div>
     </Teleport>

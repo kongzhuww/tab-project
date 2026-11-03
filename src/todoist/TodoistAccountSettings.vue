@@ -3,6 +3,7 @@ import { ref, watch, onUnmounted } from "vue";
 import { todoistModuleState } from "./module-state";
 import { ModuleSettingsPanel } from "../sdk/ui";
 import { loadTodoistAccountToken, saveTodoistAccountToken } from "./account-settings";
+import { t } from "../i18n";
 const props = defineProps<{ anchor: HTMLElement | null; visible: boolean }>();
 const emit = defineEmits<{ close: []; accountSaved: [] }>();
 const token = ref("");
@@ -19,13 +20,13 @@ async function load() {
     const value = await loadTodoistAccountToken();
     if (version !== loadVersion || !props.visible) return;
     initial = value; token.value = value; ready.value = true;
-  } catch { if (version === loadVersion) message.value = "读取失败，保存禁用，请重新读取。"; }
+  } catch { if (version === loadVersion) message.value = t('todoist.account.readFailed'); }
 }
 watch(() => props.visible, visible => { if (visible) void load(); else loadVersion++; }, { immediate: true });
 onUnmounted(() => { loadVersion++; token.value = ""; initial = ""; });
 async function saveAll() {
   if (!ready.value || busy.value || !props.visible) return;
-  if (todoistModuleState.pendingWrites) { message.value = "任务或配置正在写入，请稍后再保存。"; return; }
+  if (todoistModuleState.pendingWrites) { message.value = t('todoist.account.writingBusy'); return; }
   busy.value = true;
   message.value = "";
   try {
@@ -38,31 +39,31 @@ async function saveAll() {
       emit("accountSaved");
     }
 
-    message.value = changed ? "✅ 配置已成功保存！" : "配置未变动。";
+    message.value = changed ? t('todoist.account.saveSuccess') : t('todoist.account.saveUnchanged');
   } catch (err: any) {
-    message.value = `❌ 保存失败：${err?.message || "请检查输入后重试"}`;
+    message.value = t('todoist.account.saveFailed', { msg: err?.message || t('todoist.account.checkInput') });
   } finally {
     busy.value = false;
   }
 }
 </script>
 <template>
-  <ModuleSettingsPanel :anchor="anchor" :visible="visible" label="Todoist 设置" @close="emit('close')">
+  <ModuleSettingsPanel :anchor="anchor" :visible="visible" :label="t('todoist.account.settingsLabel')" @close="emit('close')">
     <div class="todoist-account-settings">
-      <header><strong>Todoist 与日程配置</strong><button type="button" aria-label="关闭设置" @click="emit('close')">✕</button></header>
-      <p>配置保存在本地浏览器；连接服务时，必要的账号信息会发送给对应服务。</p>
+      <header><strong>{{ t('todoist.account.title') }}</strong><button type="button" :aria-label="t('common.close')" @click="emit('close')">✕</button></header>
+      <p>{{ t('todoist.account.notice') }}</p>
 
       <div class="field-label-row">
         <label for="todoist-account-token">Todoist API Token</label>
-        <a href="https://app.todoist.com/app/settings/integrations/developer" target="_blank" rel="noreferrer" class="api-link">🔗 获取 Todoist Token</a>
+        <a href="https://app.todoist.com/app/settings/integrations/developer" target="_blank" rel="noreferrer" class="api-link">{{ t('todoist.account.getToken') }}</a>
       </div>
-      <input id="todoist-account-token" v-model="token" type="password" autocomplete="off" :disabled="!ready || busy" placeholder="请输入你的 Todoist API Token" />
+      <input id="todoist-account-token" v-model="token" type="password" autocomplete="off" :disabled="!ready || busy" :placeholder="t('todoist.account.tokenPlaceholder')" />
 
       <p v-if="message" role="status" class="status-msg">{{ message }}</p>
-      <button v-if="!ready" type="button" @click="load">重新读取</button>
+      <button v-if="!ready" type="button" @click="load">{{ t('todoist.account.reload') }}</button>
       <footer style="justify-content: flex-end;">
         <button type="button" class="btn-primary-save" :disabled="!ready || busy" @click="saveAll">
-          {{ busy ? '保存中…' : '💾 保存全部配置' }}
+          {{ busy ? t('todoist.account.saving') : t('todoist.account.saveBtn') }}
         </button>
       </footer>
     </div>

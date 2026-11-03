@@ -9,7 +9,7 @@
       <header class="card-head">
         <span class="bar youtube-red"></span>
         <h2>YouTube</h2>
-        <div id="youtube-view-tabs" class="youtube-view-tabs" role="tablist" aria-label="YouTube 视图">
+        <div id="youtube-view-tabs" class="youtube-view-tabs" role="tablist" :aria-label="t('youtube.viewAria')">
           <button
             type="button"
             role="tab"
@@ -17,7 +17,7 @@
             :aria-selected="state.currentView === 'favorites'"
             @click="handleSwitchView('favorites')"
           >
-            ❤️ 我的收藏 ({{ state.favorites.length }})
+            {{ t('youtube.favCount', { count: state.favorites.length }) }}
           </button>
           <button
             type="button"
@@ -26,22 +26,21 @@
             :aria-selected="state.currentView === 'recommend'"
             @click="handleSwitchView('recommend')"
           >
-            ✨ 个性推荐
+            {{ t('youtube.forYou') }}
           </button>
         </div>
-        <span id="youtube-user" class="muted small">{{ state.userName }}</span>
         <button
           id="youtube-refresh"
           class="youtube-refresh icon-btn"
           :class="{ spinning: state.isLoading }"
           type="button"
-          :title="state.currentView === 'recommend' ? '换一批推荐 (18个)' : '刷新收藏'"
+          :title="state.currentView === 'recommend' ? t('youtube.refreshRec') : t('youtube.refreshFav')"
           @click="handleRefresh"
         >
           <span class="yt-refresh-icon">↻</span>
         </button>
         <div class="yt-settings-anchor">
-          <button ref="settingsButton" type="button" class="icon-btn" title="YouTube 设置" aria-label="YouTube 设置" :aria-expanded="settingsOpen" @click="settingsOpen = !settingsOpen">⚙</button>
+          <button ref="settingsButton" type="button" class="icon-btn" :title="t('youtube.settings')" :aria-label="t('youtube.settings')" :aria-expanded="settingsOpen" @click="settingsOpen = !settingsOpen">⚙</button>
           <YouTubeSettingsPanel v-if="settingsMounted" :visible="active && settingsOpen" :anchor="settingsButton" @close="settingsOpen = false" />
         </div>
       </header>
@@ -61,8 +60,8 @@
               <div class="yt-nav-btn-main">
                 <span class="yt-nav-btn-icon">❤️</span>
                 <div class="yt-nav-btn-text">
-                  <strong>我的收藏</strong>
-                  <small>{{ state.favorites.length }} 个收藏视频</small>
+                  <strong>{{ t('youtube.myFavorites') }}</strong>
+                  <small>{{ t('youtube.favVideosCount', { count: state.favorites.length }) }}</small>
                 </div>
               </div>
               <span class="yt-nav-btn-badge">FAV</span>
@@ -77,8 +76,8 @@
               <div class="yt-nav-btn-main">
                 <span class="yt-nav-btn-icon">✨</span>
                 <div class="yt-nav-btn-text">
-                  <strong>个性推荐</strong>
-                  <small>猜你喜欢 · 每次刷新</small>
+                  <strong>{{ t('youtube.forYou') }}</strong>
+                  <small>{{ t('youtube.forYouSub') }}</small>
                 </div>
               </div>
               <span class="yt-nav-btn-badge">FOR YOU</span>
@@ -90,14 +89,14 @@
             <div class="yt-hub-title">
               <span class="yt-hub-icon">📁</span>
               <div class="yt-hub-text">
-                <strong>收藏分组</strong>
-                <small>按本地分类展示</small>
+                <strong>{{ t('youtube.groups') }}</strong>
+                <small>{{ t('youtube.groupsSub') }}</small>
               </div>
             </div>
             <button
               class="yt-hub-add-btn"
               type="button"
-              title="新建收藏分组"
+              :title="t('youtube.createGroup')"
               @click="handleCreateFavGroup"
             >
               ＋
@@ -105,7 +104,7 @@
           </div>
 
           <!-- 收藏分组列表 -->
-          <nav class="yt-sidebar-group-list" aria-label="收藏分组">
+          <nav class="yt-sidebar-group-list" :aria-label="t('youtube.groupsAria')">
             <button
               type="button"
               class="yt-group-item"
@@ -113,7 +112,7 @@
               @click="handleSelectFavGroup('全部')"
             >
               <i class="yt-group-icon">📌</i>
-              <span class="yt-group-name">全部视频</span>
+              <span class="yt-group-name">{{ t('youtube.allVideos') }}</span>
               <small class="yt-group-count">{{ state.favorites.length }}</small>
             </button>
 
@@ -124,7 +123,7 @@
               @click="handleSelectFavGroup('稍后观看')"
             >
               <i class="yt-group-icon">⏳</i>
-              <span class="yt-group-name">稍后观看</span>
+              <span class="yt-group-name">{{ t('youtube.watchLater') }}</span>
               <small class="yt-group-count">{{ getGroupCount('稍后观看') }}</small>
             </button>
 
@@ -140,7 +139,7 @@
                 <button
                   class="yt-group-del-btn"
                   type="button"
-                  title="删除分组"
+                  :title="t('youtube.deleteGroup')"
                   @click.stop="handleDeleteFavGroup(grp)"
                 >
                   ✕
@@ -154,12 +153,12 @@
             <button
               class="yt-sidebar-sync-btn"
               type="button"
-              title="自动读取 Edge 浏览器中已登录的 YouTube 账号，同步 Liked 视频"
+              :title="t('youtube.syncLikedTitle')"
               :disabled="state.favoritesBusy || state.favoritesLoading || state.favoritesNeedsReview"
               @click="handleSyncLiked"
             >
               <span class="yt-sync-icon">🔄</span>
-              <span>同步账号 Liked 视频</span>
+              <span>{{ t('youtube.syncLiked') }}</span>
             </button>
           </div>
         </aside>
@@ -170,21 +169,21 @@
           <div id="youtube-recommend-pane" v-show="state.currentView === 'recommend'">
             <div v-if="state.isLoading && state.exploreVideos.length === 0" class="muted small yt-loading-box">
               <i class="yt-spinner"></i>
-              <span>正在生成专属个性推荐流…</span>
+              <span>{{ t('youtube.recGenerating') }}</span>
             </div>
             <div v-else-if="state.error && state.exploreVideos.length === 0" class="yt-error-box">
               <p>⚠️ {{ state.error }}</p>
-              <button type="button" class="yt-retry-btn" @click="handleRefresh">↻ 重新拉取</button>
+              <button type="button" class="yt-retry-btn" @click="handleRefresh">{{ t('youtube.recReload') }}</button>
             </div>
             <div v-else-if="state.exploreVideos.length === 0" class="muted small yt-empty">
-              <p>推荐流正在同步，点击换一批即可获取推荐</p>
-              <button type="button" class="yt-retry-btn" style="margin-top: 8px;" @click="handleRefresh">↻ 换一批推荐</button>
+              <p>{{ t('youtube.recSyncing') }}</p>
+              <button type="button" class="yt-retry-btn" style="margin-top: 8px;" @click="handleRefresh">{{ t('youtube.recReload') }}</button>
             </div>
             <div v-else>
               <!-- 顶部提示条：说明当前18个，以及收藏操作指南 -->
               <div class="yt-rec-header-hint">
-                <span class="yt-rec-counter">✨ 当前为您精选 18 个推荐视频</span>
-                <span class="yt-rec-fav-tip">💡 悬浮封面点击 🤍 即可一键收藏</span>
+                <span class="yt-rec-counter">{{ t('youtube.recCurBatch') }}</span>
+                <span class="yt-rec-fav-tip">{{ t('youtube.recFavTip') }}</span>
               </div>
 
               <div class="yt-video-grid">
@@ -202,11 +201,11 @@
                       type="button"
                       :class="{ 'is-fav': isFav(v.id) }"
                       :disabled="state.favoritesBusy || state.favoritesLoading || state.favoritesNeedsReview"
-                      :title="isFav(v.id) ? '已收藏到本地（点击移出）' : '收藏到本地 YouTube 收藏夹'"
+                      :title="isFav(v.id) ? t('youtube.favRemoveTip') : t('youtube.favAddTip')"
                       @click.stop="handleToggleFav(v)"
                     >
                       <span class="yt-fav-icon">{{ isFav(v.id) ? "❤️" : "🤍" }}</span>
-                      <span class="yt-fav-text">{{ isFav(v.id) ? "已收藏" : "收藏" }}</span>
+                      <span class="yt-fav-text">{{ isFav(v.id) ? t('youtube.favorited') : t('youtube.favorite') }}</span>
                     </button>
                     <span v-if="v.views" class="yt-badge">{{ v.views }}</span>
                   </div>
@@ -232,7 +231,7 @@
                   @click="handleRefresh"
                 >
                   <span class="yt-next-batch-icon">↻</span>
-                  <span class="yt-next-batch-text">{{ state.isLoading ? "正在探索下一批推荐…" : "换一批推荐（再来 18 个）" }}</span>
+                  <span class="yt-next-batch-text">{{ state.isLoading ? t('youtube.recLoadingNext') : t('youtube.recNextBatch') }}</span>
                 </button>
               </div>
             </div>
@@ -242,37 +241,37 @@
           <div id="youtube-favorites-pane" v-show="state.currentView === 'favorites'">
             <div class="yt-fav-toolbar">
               <div class="yt-fav-hint">
-                <strong class="yt-fav-cur-group">📁 {{ state.activeFavGroup }}</strong>
-                <span class="muted small">（共 {{ currentFilteredFavorites.length }} 个收藏视频 · 每页 18 个）</span>
+                <strong class="yt-fav-cur-group">📁 {{ state.activeFavGroup === '全部' ? t('youtube.all') : (state.activeFavGroup === '稍后观看' ? t('youtube.watchLater') : state.activeFavGroup) }}</strong>
+                <span class="muted small">{{ t('youtube.favSummary', { count: currentFilteredFavorites.length }) }}</span>
               </div>
               <div class="yt-sync-actions">
                 <button
                   class="yt-sync-btn"
                   type="button"
-                  title="自动读取 Edge 浏览器中登录的 YouTube 账号，同步 Liked 视频"
+                  :title="t('youtube.syncLikedTitle')"
                   :disabled="state.favoritesBusy || state.favoritesLoading || state.favoritesNeedsReview"
                   @click="handleSyncLiked"
                 >
-                  🔄 同步账号 Liked 视频
+                  🔄 {{ t('youtube.syncLiked') }}
                 </button>
               </div>
             </div>
 
             <div v-if="state.favoritesLoading" class="muted small yt-loading-box">
               <i class="yt-spinner"></i>
-              <span>正在更新收藏列表…</span>
+              <span>{{ t('youtube.updatingFavs') }}</span>
             </div>
             <div v-else-if="currentFilteredFavorites.length === 0" class="muted small yt-empty yt-empty-fav">
               <span class="yt-empty-icon">📺</span>
-              <p>当前分组「{{ state.activeFavGroup }}」暂无视频。</p>
-              <p class="yt-empty-sub">若您在 YouTube 账号中有点赞或喜欢的视频，可直接一键同步到本地展示。</p>
+              <p>{{ t('youtube.emptyGroup', { group: state.activeFavGroup === '全部' ? t('youtube.all') : (state.activeFavGroup === '稍后观看' ? t('youtube.watchLater') : state.activeFavGroup) }) }}</p>
+              <p class="yt-empty-sub">{{ t('youtube.emptyGroupSub') }}</p>
               <button
                 type="button"
                 class="yt-sync-btn yt-empty-sync-btn"
                 :disabled="state.favoritesBusy || state.favoritesLoading || state.favoritesNeedsReview"
                 @click="handleSyncLiked"
               >
-                🔄 立即同步 YouTube 账号喜欢的视频
+                {{ t('youtube.syncLikedNow') }}
               </button>
             </div>
             <div v-else class="yt-video-grid">
@@ -289,11 +288,11 @@
                     class="yt-fav-badge is-fav"
                     type="button"
                     :disabled="state.favoritesBusy || state.favoritesLoading || state.favoritesNeedsReview"
-                    title="从收藏中移出"
+                    :title="t('youtube.removeFromFav')"
                     @click.stop="handleRemoveFavorite(v.id)"
                   >
                     <span class="yt-fav-icon">❤️</span>
-                    <span class="yt-fav-text">移出</span>
+                    <span class="yt-fav-text">{{ t('youtube.remove') }}</span>
                   </button>
                   <span v-if="v.views" class="yt-badge">{{ v.views }}</span>
                 </div>
@@ -304,12 +303,12 @@
                   <div class="yt-meta-row">
                     <span class="yt-channel" :title="v.channelTitle">{{ v.channelTitle }}</span>
                     <div class="yt-right-meta">
-                      <span class="yt-time">{{ v.publishedAt || "已收藏" }}</span>
+                      <span class="yt-time">{{ v.publishedAt || t('youtube.favorited') }}</span>
                       <button
                         class="yt-del-fav-btn"
                         type="button"
                         :disabled="state.favoritesBusy || state.favoritesLoading || state.favoritesNeedsReview"
-                        title="从收藏中删除"
+                        :title="t('youtube.deleteFromFav')"
                         @click.stop="handleRemoveFavorite(v.id)"
                       >
                         🗑️
@@ -322,9 +321,9 @@
 
             <!-- 收藏分页器 -->
             <nav class="yt-pagination" v-if="favTotalPages > 1">
-              <button type="button" :disabled="state.currentPage <= 1" @click="handlePrevPage">‹ 上一页</button>
-              <span>第 {{ state.currentPage }} / {{ favTotalPages }} 页 (共 {{ currentFilteredFavorites.length }} 条)</span>
-              <button type="button" :disabled="state.currentPage >= favTotalPages" @click="handleNextPage(favTotalPages)">下一页 ›</button>
+              <button type="button" :disabled="state.currentPage <= 1" @click="handlePrevPage">{{ t('youtube.prevPage') }}</button>
+              <span>{{ t('youtube.pageInfo', { current: state.currentPage, total: favTotalPages, count: currentFilteredFavorites.length }) }}</span>
+              <button type="button" :disabled="state.currentPage >= favTotalPages" @click="handleNextPage(favTotalPages)">{{ t('youtube.nextPage') }}</button>
             </nav>
           </div>
         </main>
@@ -371,6 +370,7 @@ import { chatService } from "../chat/chat.service";
 import ChatShareMenu from "../chat/ChatShareMenu.vue";
 import type { ChatShareTarget } from "../chat/private-chat-client";
 import { windowManagerController } from "../core/window-manager.store";
+import { t } from "../i18n";
 
 const ytContextMenu = ref<{
   visible: boolean;

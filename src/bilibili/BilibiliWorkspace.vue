@@ -22,6 +22,7 @@ import { chatService } from "../chat/chat.service";
 import ChatShareMenu from "../chat/ChatShareMenu.vue";
 import type { ChatShareTarget } from "../chat/private-chat-client";
 import { chatModuleState } from "../chat/chat-state";
+import { t } from "../i18n";
 
 const isSeriesNameError = ref(false);
 
@@ -33,7 +34,7 @@ function handleSaveSeries() {
     if (seriesInput) {
       seriesInput.focus();
     }
-    notifications.fetch("哔哩哔哩电台", "请先在输入框中填写系列名称后再保存");
+    notifications.fetch(t("bili.radioAppName"), t("bili.radioNameEmpty"));
     return;
   }
   isSeriesNameError.value = false;
@@ -45,7 +46,7 @@ async function handleRenameCurrentSeries() {
   if (seriesInput) {
     seriesInput.focus();
     seriesInput.select();
-    notifications.fetch("哔哩哔哩电台", "已聚焦系列名称输入框，直接修改后点击“💾 保存系列”即可");
+    notifications.fetch(t("bili.radioAppName"), t("bili.radioInputFocused"));
   }
 }
 
@@ -55,18 +56,18 @@ function handleShareCurrentSeries() {
   if (!series && biliFavoritesState.radioQueue.length) {
     series = {
       id: `series_${Date.now()}`,
-      name: currentName || "未命名电台系列",
+      name: currentName || t("bili.radioUntitled"),
       count: biliFavoritesState.radioQueue.length,
       items: biliFavoritesState.radioQueue
     };
   }
   if (!series || !series.items?.length) {
-    notifications.fetch("哔哩哔哩电台", "当前没有可分享的系列曲目，请先添加曲目");
+    notifications.fetch(t("bili.radioAppName"), t("bili.radioNoTracks"));
     return;
   }
   chatService.sendBiliSeriesShare(series);
   chatModuleState.visible = true;
-  notifications.fetch("哔哩哔哩电台", `已将系列「${series.name}」分享至海狸聊天室！`);
+  notifications.fetch(t("bili.radioAppName"), t("bili.radioSharedNotice", { name: series.name }));
 }
 
 function handleSeriesDropdownChange(e: Event) {
@@ -283,8 +284,18 @@ function onSearchInput(): void {
 const biliSearchQuery = ref("");
 const isSearchSuggestVisible = ref(false);
 const isSearchLoading = ref(false);
-const searchSuggestHeadTitle = ref("📺 B站 热门视频推荐");
-const searchSuggestHeadSubtitle = ref("回车可在 B站 全网搜索");
+const searchSuggestMode = ref<"hot" | "live">("hot");
+const searchSuggestKeyword = ref("");
+const searchSuggestHeadTitle = computed(() => {
+  return searchSuggestMode.value === "live"
+    ? t("bili.searchLiveTitle", { keyword: searchSuggestKeyword.value })
+    : t("bili.searchSuggestTitle");
+});
+const searchSuggestHeadSubtitle = computed(() => {
+  return searchSuggestMode.value === "live"
+    ? t("bili.searchLiveSubtitle")
+    : t("bili.searchSuggestSubtitle");
+});
 const searchSuggestResults = ref<any[]>([]);
 const searchHostRef = ref<HTMLElement | null>(null);
 
@@ -305,7 +316,7 @@ function formatBiliRawVideo(item: any) {
     : String(item.duration || "");
   const playNum = item.stat?.view || item.play || 0;
   const playText = Number(playNum) >= 10000 ? `${(Number(playNum) / 10000).toFixed(1)}万` : String(Number(playNum || 0));
-  const upper = item.owner?.name || item.name || item.author || "UP主";
+  const upper = item.owner?.name || item.name || item.author || t("bili.upDefault");
 
   return {
     bvid,
@@ -319,8 +330,7 @@ function formatBiliRawVideo(item: any) {
 }
 
 async function loadRecommendations(): Promise<void> {
-  searchSuggestHeadTitle.value = "📺 B站 热门视频推荐";
-  searchSuggestHeadSubtitle.value = "回车可在 B站 全网搜索";
+  searchSuggestMode.value = "hot";
   isSearchSuggestVisible.value = true;
   if (cachedRecommendations.value.length && Date.now() - cachedRecTime < 90000) {
     searchSuggestResults.value = cachedRecommendations.value;
@@ -371,8 +381,8 @@ function onSearchInputChange(): void {
 
 async function executeBiliLiveSearch(keyword: string): Promise<void> {
   isSearchSuggestVisible.value = true;
-  searchSuggestHeadTitle.value = `🔍 “${keyword}” 的视频`;
-  searchSuggestHeadSubtitle.value = "右键可收藏、缓存或本地播放";
+  searchSuggestMode.value = "live";
+  searchSuggestKeyword.value = keyword;
   isSearchLoading.value = true;
   try {
     let data: any = null;
@@ -705,7 +715,7 @@ function onRadioVideoDragStart(event: DragEvent, video: { bvid: string; title: s
     <header class="card-head bili-header-unified-row">
       <div class="bili-header-left">
         <span class="bar" style="background: linear-gradient(180deg,#818cf8,#f472b6)"></span>
-        <h2>B站收藏夹</h2>
+        <h2>{{ t('bili.workspace.title') }}</h2>
       </div>
 
 
@@ -716,11 +726,11 @@ function onRadioVideoDragStart(event: DragEvent, video: { bvid: string; title: s
           class="fm-tab bili-header-msg-btn"
           type="button"
           :class="{ 'is-active': biliMessagePanelState.isOpen }"
-          title="B站消息中心 (纯浏览模式)"
+          :title="t('bili.workspace.msgCenterTip')"
           @click="toggleMessagePanel"
         >
           <span class="bili-header-msg-icon">🔔</span>
-          <span class="bili-header-msg-label">消息</span>
+          <span class="bili-header-msg-label">{{ t('bili.workspace.msgBtn') }}</span>
         </button>
 
         <!-- 移到右侧的高级 B站搜索（带热门推荐与实时视频联想下拉浮层） -->
@@ -730,12 +740,12 @@ function onRadioVideoDragStart(event: DragEvent, video: { bvid: string; title: s
               v-model="biliSearchQuery"
               type="search"
               autocomplete="off"
-              placeholder="搜索 B站 视频…"
-              aria-label="搜索 B站 视频"
+              :placeholder="t('bili.workspace.searchPlaceholder')"
+              :aria-label="t('bili.workspace.searchAria')"
               @focus="onSearchFocus"
               @input="onSearchInputChange"
             />
-            <button type="submit" title="搜索视频">⌕</button>
+            <button type="submit" :title="t('bili.workspace.searchBtnTip')">⌕</button>
           </form>
 
           <div
@@ -777,10 +787,10 @@ function onRadioVideoDragStart(event: DragEvent, video: { bvid: string; title: s
           id="bili-up-group-manager-top"
           class="fm-tab bili-header-up-group-btn"
           type="button"
-          title="管理正在关注的 UP 主分组"
+          :title="t('bili.workspace.upGroupManagerTip')"
           @click="dispatch('manage-up-groups')"
         >
-          ⚙ 关注分组管理
+          {{ t('bili.workspace.upGroupManager') }}
         </button>
       </div>
     </header>
@@ -792,61 +802,61 @@ function onRadioVideoDragStart(event: DragEvent, video: { bvid: string; title: s
             <div
               class="fo-sidebar-toggle-bar"
               :class="{ 'is-collapsed': isFeaturesCollapsed }"
-              :title="isFeaturesCollapsed ? '点击展开快捷功能' : '点击收起快捷功能'"
+              :title="isFeaturesCollapsed ? t('bili.channel.expandTip') : t('bili.channel.collapseTip')"
               @click="toggleFeatures"
             >
               <div class="fo-sidebar-toggle-title">
                 <span class="fo-sidebar-toggle-icon">⚡</span>
-                <span>快捷频道</span>
+                <span>{{ t('bili.channel.title') }}</span>
                 <span v-if="isFeaturesCollapsed" class="fo-sidebar-toggle-pill">5</span>
               </div>
               <button
                 type="button"
                 class="fo-sidebar-toggle-action"
                 :aria-expanded="!isFeaturesCollapsed"
-                :title="isFeaturesCollapsed ? '展开' : '收起'"
+                :title="isFeaturesCollapsed ? t('bili.channel.expand') : t('bili.channel.collapse')"
               >
-                <span>{{ isFeaturesCollapsed ? '展开' : '收起' }}</span>
+                <span>{{ isFeaturesCollapsed ? t('bili.channel.expand') : t('bili.channel.collapse') }}</span>
                 <span class="fo-sidebar-toggle-chevron">{{ isFeaturesCollapsed ? '▾' : '▴' }}</span>
               </button>
             </div>
 
             <div v-show="!isFeaturesCollapsed" class="fo-sidebar-features-wrap">
               <div class="fo-sidebar-sub-wrap">
-                <button id="fo-sidebar-sub-btn" type="button" class="fo-sidebar-sub-btn" :class="{ on: organizer.mode === 'subscription' }" title="查看订阅视频（刹那观察室 · AI字幕与高清播放）" @click="dispatch('open-sub-video')">
-                  <div class="fo-sidebar-sub-main"><span class="fo-sidebar-sub-icon">🎬</span><div class="fo-sidebar-sub-text"><strong>订阅视频</strong><small>刹那观察室 · AI字幕</small></div></div>
+                <button id="fo-sidebar-sub-btn" type="button" class="fo-sidebar-sub-btn" :class="{ on: organizer.mode === 'subscription' }" :title="t('bili.channel.subVideoTip')" @click="dispatch('open-sub-video')">
+                  <div class="fo-sidebar-sub-main"><span class="fo-sidebar-sub-icon">🎬</span><div class="fo-sidebar-sub-text"><strong>{{ t('bili.channel.subVideo') }}</strong><small>{{ t('bili.channel.subVideoSub') }}</small></div></div>
                   <span class="fo-sidebar-sub-badge">NEW</span>
                 </button>
               </div>
               <div class="fo-sidebar-sub-wrap fo-sidebar-cache-wrap">
-                <button id="fo-sidebar-cache-btn" type="button" class="fo-sidebar-sub-btn" :class="{ on: organizer.mode === 'cache' }" title="查看已经下载到本地文件夹的视频" @click="dispatch('open-cache')">
-                  <div class="fo-sidebar-sub-main"><span class="fo-sidebar-sub-icon">💾</span><div class="fo-sidebar-sub-text"><strong>缓存视频</strong><small>本地文件夹 · 离线观看</small></div></div>
+                <button id="fo-sidebar-cache-btn" type="button" class="fo-sidebar-sub-btn" :class="{ on: organizer.mode === 'cache' }" :title="t('bili.channel.cacheVideoTip')" @click="dispatch('open-cache')">
+                  <div class="fo-sidebar-sub-main"><span class="fo-sidebar-sub-icon">💾</span><div class="fo-sidebar-sub-text"><strong>{{ t('bili.channel.cacheVideo') }}</strong><small>{{ t('bili.channel.cacheVideoSub') }}</small></div></div>
                   <span class="fo-sidebar-sub-badge">LOCAL</span>
                 </button>
               </div>
               <div class="fo-sidebar-sub-wrap fo-sidebar-following-wrap">
-                <button id="fo-sidebar-following-btn" type="button" class="fo-sidebar-sub-btn" :class="{ on: organizer.mode === 'following' }" title="查看正在关注的 UP 主及分组视频" @click="dispatch('open-following')">
-                  <div class="fo-sidebar-sub-main"><span class="fo-sidebar-sub-icon">📺</span><div class="fo-sidebar-sub-text"><strong>正在关注</strong><small>UP 主分组 · 最新投稿</small></div></div>
+                <button id="fo-sidebar-following-btn" type="button" class="fo-sidebar-sub-btn" :class="{ on: organizer.mode === 'following' }" :title="t('bili.channel.followingTip')" @click="dispatch('open-following')">
+                  <div class="fo-sidebar-sub-main"><span class="fo-sidebar-sub-icon">📺</span><div class="fo-sidebar-sub-text"><strong>{{ t('bili.channel.following') }}</strong><small>{{ t('bili.channel.followingSub') }}</small></div></div>
                   <span class="fo-sidebar-sub-badge">FEED</span>
                 </button>
               </div>
               <div class="fo-sidebar-sub-wrap fo-sidebar-recommend-wrap">
-                <button id="fo-sidebar-recommend-btn" type="button" class="fo-sidebar-sub-btn" :class="{ on: organizer.mode === 'recommendations' }" title="打开 B站个性推荐" @click="dispatch('open-recommendations')">
-                  <div class="fo-sidebar-sub-main"><span class="fo-sidebar-sub-icon">✨</span><div class="fo-sidebar-sub-text"><strong>个性推荐</strong><small>猜你喜欢 · 每次刷新</small></div></div>
+                <button id="fo-sidebar-recommend-btn" type="button" class="fo-sidebar-sub-btn" :class="{ on: organizer.mode === 'recommendations' }" :title="t('bili.channel.forYouTip')" @click="dispatch('open-recommendations')">
+                  <div class="fo-sidebar-sub-main"><span class="fo-sidebar-sub-icon">✨</span><div class="fo-sidebar-sub-text"><strong>{{ t('bili.channel.forYou') }}</strong><small>{{ t('bili.channel.forYouSub') }}</small></div></div>
                   <span class="fo-sidebar-sub-badge">FOR YOU</span>
                 </button>
               </div>
               <div class="fo-sidebar-sub-wrap fo-sidebar-radio-wrap">
-                <button id="fo-sidebar-radio-btn" type="button" class="fo-sidebar-sub-btn" :class="{ on: organizer.mode === 'radio' }" title="打开 B站电台（按收藏夹与系列自由编排连播）" @click="dispatch('open-radio')">
-                  <div class="fo-sidebar-sub-main"><span class="fo-sidebar-sub-icon">📻</span><div class="fo-sidebar-sub-text"><strong>B站电台</strong><small>连播系列 · 自由编排</small></div></div>
+                <button id="fo-sidebar-radio-btn" type="button" class="fo-sidebar-sub-btn" :class="{ on: organizer.mode === 'radio' }" :title="t('bili.channel.radioTip')" @click="dispatch('open-radio')">
+                  <div class="fo-sidebar-sub-main"><span class="fo-sidebar-sub-icon">📻</span><div class="fo-sidebar-sub-text"><strong>{{ t('bili.channel.radio') }}</strong><small>{{ t('bili.channel.radioSub') }}</small></div></div>
                   <span class="fo-sidebar-sub-badge">RADIO</span>
                 </button>
               </div>
             </div>
 
             <div class="fo-sidebar-favorite-hub">
-              <div class="fo-sidebar-sub-main"><span class="fo-sidebar-sub-icon">📁</span><div class="fo-sidebar-sub-text"><strong>收藏夹</strong><small>按本地分组展示</small></div></div>
-              <button class="fo-sidebar-hub-add" type="button" title="新建 B站真实收藏夹" aria-label="新建 B站真实收藏夹" @click="dispatch('create-bili-folder')">＋</button>
+              <div class="fo-sidebar-sub-main"><span class="fo-sidebar-sub-icon">📁</span><div class="fo-sidebar-sub-text"><strong>{{ t('bili.channel.foldersHub') }}</strong><small>{{ t('bili.channel.foldersHubSub') }}</small></div></div>
+              <button class="fo-sidebar-hub-add" type="button" :title="t('bili.channel.createFolderTip')" :aria-label="t('bili.channel.createFolderTip')" @click="dispatch('create-bili-folder')">＋</button>
             </div>
 
             <!-- 目标选择模式下的顶部取消与操作提示横幅 -->
@@ -973,14 +983,14 @@ function onRadioVideoDragStart(event: DragEvent, video: { bvid: string; title: s
                 <BiliVideoLyricDockBar inline-hero />
 
                 <div class="fo-bili-actions">
-                  <button type="button" class="primary" :disabled="!organizer.videos.length" @click="dispatch('organizer-batch-toggle')">{{ organizer.batchMode ? '返回' : '批量操作' }}</button>
-                  <button type="button" title="刷新收藏夹" @click="dispatch('organizer-refresh')">↻</button>
+                  <button type="button" class="primary" :disabled="!organizer.videos.length" @click="dispatch('organizer-batch-toggle')">{{ organizer.batchMode ? t('bili.workspace.batchBack') : t('bili.workspace.batch') }}</button>
+                  <button type="button" :title="t('bili.workspace.refreshFolderTip')" @click="dispatch('organizer-refresh')">↻</button>
                 </div>
               </header>
 
               <div class="fo-bili-toolbar">
                 <div v-if="!organizer.batchMode" class="fo-bili-sort">
-                  <button v-for="item in [{ id: 'fav_time', text: '最近收藏' }, { id: 'view', text: '最多播放' }, { id: 'pubtime', text: '最近投稿' }]" :key="item.id" type="button" :class="{ on: organizer.sort === item.id }" @click="dispatch('organizer-sort', item.id)">{{ item.text }}</button>
+                  <button v-for="item in [{ id: 'fav_time', text: t('bili.sort.favTime') }, { id: 'view', text: t('bili.sort.view') }, { id: 'pubtime', text: t('bili.sort.pubTime') }]" :key="item.id" type="button" :class="{ on: organizer.sort === item.id }" @click="dispatch('organizer-sort', item.id)">{{ item.text }}</button>
                 </div>
                 <div class="fo-mini-dock-anchor" aria-label="视频标签页">
                   <div

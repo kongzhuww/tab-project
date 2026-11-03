@@ -1,6 +1,6 @@
-import { d as w, b as d, D as b, H as _, z as k, o as y, f as S, g as t, t as a, n as E, j as D, E as x, I as $, F as C, x as c, c as L } from "./chunks/vendor-vue-wIH4jcna.js";
-import { S as B, i as H } from "./chunks/SearchBox-DK6WgUav.js";
-import { s as I } from "./chunks/search.service-B8FaDQLd.js";
+import { d as w, b as d, D as b, H as _, z as k, o as y, g as S, h as t, t as a, p as E, k as D, E as $, I as x, F as C, y as c, c as L } from "./chunks/vendor-vue-dDCd4-uG.js";
+import { S as B, i as H } from "./chunks/SearchBox-CsQlnNP-.js";
+import { s as I } from "./chunks/search.service-Ybzy778d.js";
 const T = { class: "sub-newtab-topbar" }, M = { class: "sub-newtab-center" }, N = { class: "hero-clock" }, V = { id: "greeting" }, F = {
   id: "clock",
   class: "clock"
@@ -9,18 +9,18 @@ const T = { class: "sub-newtab-topbar" }, M = { class: "sub-newtab-center" }, N 
   class: "date"
 }, P = /* @__PURE__ */ w({
   __name: "SearchLauncher",
-  setup(j) {
-    const n = d(/* @__PURE__ */ new Date()), o = d(document.documentElement.dataset.theme || "light");
+  setup(z) {
+    const o = d(/* @__PURE__ */ new Date()), n = d(document.documentElement.dataset.theme || "light");
     let l = 0;
     const m = c(() => {
-      const e = n.value.getHours();
+      const e = o.value.getHours();
       return e >= 5 && e < 9 ? "早上好" : e >= 9 && e < 12 ? "上午好" : e >= 12 && e < 14 ? "中午好" : e >= 14 && e < 18 ? "下午好" : e >= 18 && e < 23 ? "晚上好" : e >= 23 || e < 5 ? "夜深了" : "你好";
-    }), h = c(() => `${String(n.value.getHours()).padStart(2, "0")}:${String(n.value.getMinutes()).padStart(2, "0")}`), v = c(() => `:${String(n.value.getSeconds()).padStart(2, "0")}`), g = c(() => `${n.value.getFullYear()}年${n.value.getMonth() + 1}月${n.value.getDate()}日 · ${["周日", "周一", "周二", "周三", "周四", "周五", "周六"][n.value.getDay()]}`);
+    }), h = c(() => `${String(o.value.getHours()).padStart(2, "0")}:${String(o.value.getMinutes()).padStart(2, "0")}`), v = c(() => `:${String(o.value.getSeconds()).padStart(2, "0")}`), g = c(() => `${o.value.getFullYear()}年${o.value.getMonth() + 1}月${o.value.getDate()}日 · ${["周日", "周一", "周二", "周三", "周四", "周五", "周六"][o.value.getDay()]}`);
     function i() {
-      document.hidden || (n.value = /* @__PURE__ */ new Date());
+      document.hidden || (o.value = /* @__PURE__ */ new Date());
     }
     function p() {
-      o.value = o.value === "light" ? "dark" : "light", document.documentElement.dataset.theme = o.value, localStorage.setItem("theme", o.value);
+      n.value = n.value === "light" ? "dark" : "light", document.documentElement.dataset.theme = n.value, localStorage.setItem("theme", n.value);
     }
     function r(e) {
       e.altKey && e.key.toLowerCase() === "h" && (e.preventDefault(), location.href = "newtab.html");
@@ -42,7 +42,7 @@ const T = { class: "sub-newtab-topbar" }, M = { class: "sub-newtab-center" }, N 
           type: "button",
           title: "切换主题",
           onClick: p
-        }, a(o.value === "light" ? "☀" : "🌙"), 1)
+        }, a(n.value === "light" ? "☀" : "🌙"), 1)
       ]),
       t("div", M, [
         t("div", N, [
@@ -59,7 +59,7 @@ const T = { class: "sub-newtab-topbar" }, M = { class: "sub-newtab-center" }, N 
           onSubmit: s[0] || (s[0] = D(() => {
           }, ["prevent"]))
         }, [
-          x(B)
+          $(B)
         ], 32)
       ]),
       t("aside", { class: "enter-home-dock" }, [
@@ -70,7 +70,7 @@ const T = { class: "sub-newtab-topbar" }, M = { class: "sub-newtab-center" }, N 
           title: "进入主标签页（或按 Alt+H）",
           onClick: f
         }, [...s[1] || (s[1] = [
-          $('<div class="enter-home-icon">⚡</div><div class="enter-home-text"><span class="enter-home-title">进入主标签页</span><span class="enter-home-desc">播放开屏动画 ➔</span></div><span class="enter-home-arrow">➔</span>', 3)
+          x('<div class="enter-home-icon">⚡</div><div class="enter-home-text"><span class="enter-home-title">进入主标签页</span><span class="enter-home-desc">播放开屏动画 ➔</span></div><span class="enter-home-arrow">➔</span>', 3)
         ])])
       ])
     ], 64));

@@ -1,6 +1,6 @@
 {
   "name": "tab-project",
-  "version": "1.0.10",
+  "version": "1.0.11",
   "private": true,
   "type": "module",
   "description": "tab-project-next desktop Chromium browser extension with Vue UI",
@@ -14,7 +14,7 @@
     "ui:build": "vite build --config vite.ui.config.ts && vite build --config vite.sandbox.config.ts && vite build --config vite.localizer.config.ts && npm run build:bg",
     "ui:watch": "node scripts/watch-ui.mjs",
     "ui:typecheck": "vue-tsc --noEmit -p tsconfig.ui.json",
-    "ui:check": "npm run ui:typecheck && npm run ui:build"
+    "ui:check": "node scripts/validate-locales.mjs && npm run ui:typecheck && npm run ui:build"
   },
   "dependencies": {
     "vue": "^3.5.42"

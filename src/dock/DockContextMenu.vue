@@ -5,6 +5,7 @@ import { dockLifecycleController } from "./dock-lifecycle.store";
 import { macDockState } from "./store";
 import { notificationController } from "../notifications/store";
 import { pluginMarketController } from "../modules/market-store";
+import { t } from "../i18n";
 
 export interface ContextTarget {
   type: "tool" | "card" | "home";
@@ -69,8 +70,8 @@ async function handleQuit() {
   if (result?.ok === false) { emit("close"); return; }
   notificationController.show({
     appName: target.title,
-    title: "已退出应用",
-    subtitle: "当前页面的应用已请求退出，不代表外部进程或远端任务已停止",
+    title: t("dock.quitDone"),
+    subtitle: t("dock.quitSubtitle"),
     icon: target.icon || "assets/logo.png",
     duration: 2800
   });
@@ -130,7 +131,7 @@ function handleExternalOpen() {
         </div>
         <span v-if="target.type === 'tool'" class="dock-status-tag" :class="{ 'is-running': isRunning }">
           <span class="dock-status-dot"></span>
-          {{ isRunning ? "运行中" : "未启动" }}
+          {{ isRunning ? t("dock.menu.running") : t("dock.menu.notStarted") }}
         </span>
       </div>
 
@@ -145,7 +146,7 @@ function handleExternalOpen() {
           @click="handleOpen"
         >
           <span class="dock-menu-symbol">↗</span>
-          <span>打开窗口</span>
+          <span>{{ t("dock.menu.openWindow") }}</span>
         </button>
 
         <button
@@ -155,7 +156,7 @@ function handleExternalOpen() {
           @click="handleHide"
         >
           <span class="dock-menu-symbol">−</span>
-          <span>隐藏窗口</span>
+          <span>{{ t("dock.menu.hideWindow") }}</span>
         </button>
 
         <button
@@ -165,8 +166,8 @@ function handleExternalOpen() {
         >
           <span class="dock-menu-symbol">⟲</span>
           <div class="dock-menu-text">
-            <span>重新加载</span>
-            <small>单应用热重启</small>
+            <span>{{ t("dock.menu.reloadApp") }}</span>
+            <small>{{ t("dock.menu.reloadSub") }}</small>
           </div>
         </button>
 
@@ -179,8 +180,8 @@ function handleExternalOpen() {
         >
           <span class="dock-menu-symbol">📌</span>
           <div class="dock-menu-text">
-            <span>从 Dock 栏移出</span>
-            <small>可在模块管理中重新添加</small>
+            <span>{{ t("dock.menu.removeFromDock") }}</span>
+            <small>{{ t("dock.menu.removeSub") }}</small>
           </div>
         </button>
 
@@ -191,8 +192,8 @@ function handleExternalOpen() {
         >
           <span class="dock-menu-symbol">✕</span>
           <div class="dock-menu-text">
-            <span>真正的关闭</span>
-            <small>退出并释放内存</small>
+            <span>{{ t("dock.menu.quitApp") }}</span>
+            <small>{{ t("dock.menu.quitSub") }}</small>
           </div>
         </button>
       </template>
@@ -205,7 +206,7 @@ function handleExternalOpen() {
           @click="handleExternalOpen"
         >
           <span class="dock-menu-symbol">↗</span>
-          <span>在新标签页打开官网</span>
+          <span>{{ t("dock.menu.openOfficial") }}</span>
         </button>
       </template>
 

@@ -18,6 +18,7 @@ import type { ChatShareTarget } from "../chat/private-chat-client";
 import { windowManagerController } from "../core/window-manager.store";
 import { useContextMenu } from "../sdk/interactions";
 import { notifications } from "../sdk/notifications";
+import { t, currentLanguage } from "../i18n";
 
 const aihotContextMenu = ref<{
   visible: boolean;
@@ -86,14 +87,21 @@ onBeforeUnmount(() => {
 const viewTitle = computed(() => {
   switch (state.currentView) {
     case "leaderboard":
-      return "AI HOT 模型榜";
+      return t("aihot.view.leaderboard");
     case "feed":
-      return "AI HOT 精选资讯";
+      return t("aihot.view.feed");
     case "daily":
-      return "AI HOT 官方日报";
+      return t("aihot.view.daily");
     default:
-      return "AI HOT 资讯流";
+      return t("aihot.view.default");
   }
+});
+
+const displayStatusMessage = computed(() => {
+  if (state.statusMessage === "已获取来源数据。") return t("aihot.status.dataFetched");
+  if (state.statusMessage === "正在显示缓存，检查更新中…") return t("aihot.status.showingCache");
+  if (state.statusMessage === "保留当前已读取的数据；没有数据时显示空列表。") return t("aihot.status.retainedData");
+  return state.statusMessage;
 });
 
 // 筛选后的排行榜
@@ -138,9 +146,37 @@ const filteredFeedArticles = computed(() => {
   return filtered.length ? filtered : state.feedArticles;
 });
 
+// 筛选与排序：英文模式下若有 originalTitle 则优先展示，并把具备英文原生标题的内容排在前面
+const displayedFeedArticles = computed(() => {
+  const base = filteredFeedArticles.value;
+  if (currentLanguage.value !== "en") return base;
+  return [...base].sort((a, b) => {
+    const aEn = Boolean(a.originalTitle && /[a-zA-Z]{3,}/.test(a.originalTitle));
+    const bEn = Boolean(b.originalTitle && /[a-zA-Z]{3,}/.test(b.originalTitle));
+    if (aEn && !bEn) return -1;
+    if (!aEn && bEn) return 1;
+    return 0;
+  });
+});
+
+function getArticleTitle(article: AiHotFeedArticle): string {
+  if (currentLanguage.value === "en" && article.originalTitle) {
+    return article.originalTitle;
+  }
+  return article.title;
+}
+
+function getArticleSourceName(article: AiHotFeedArticle): string {
+  const name = article.sourceName || "AI HOT";
+  if (currentLanguage.value === "en" && name.includes("：")) {
+    return name.split("：")[0].trim();
+  }
+  return name;
+}
+
 const hasContent = computed(() => {
   if (state.currentView === "leaderboard") return filteredLeaderboard.value.length > 0;
-  if (state.currentView === "feed") return filteredFeedArticles.value.length > 0;
+  if (state.currentView === "feed") return displayedFeedArticles.value.length > 0;
   if (state.currentView === "daily") return !!state.dailyReport;
   return false;
 });
@@ -209,7 +245,7 @@ function handleSelectDailyDate(date: string) {
             :class="{ active: state.currentView === 'leaderboard' }"
             @click="handleSwitchView('leaderboard')"
           >
-            🏆 模型榜
+            {{ t('aihot.tab.leaderboard') }}
           </button>
           <button
             type="button"
@@ -217,7 +253,7 @@ function handleSelectDailyDate(date: string) {
             :class="{ active: state.currentView === 'feed' }"
             @click="handleSwitchView('feed')"
           >
-            ✦ 精选资讯
+            {{ t('aihot.tab.feed') }}
           </button>
           <button
             type="button"
@@ -225,13 +261,13 @@ function handleSelectDailyDate(date: string) {
             :class="{ active: state.currentView === 'daily' }"
             @click="handleSwitchView('daily')"
           >
-            📰 官方日报
+            {{ t('aihot.tab.daily') }}
           </button>
         </div>
         <button
           id="aihot-refresh"
           class="icon-btn"
-          title="刷新当前来源"
+          :title="t('aihot.refreshTip')"
           :disabled="!active || state.isLoading"
           type="button"
           @click="handleRefresh"
@@ -255,7 +291,7 @@ function handleSelectDailyDate(date: string) {
               :class="{ active: !state.leaderboardProvider }"
               @click="handleSelectProvider('')"
             >
-              全部厂商
+              {{ t('aihot.allProviders') }}
             </button>
             <button
               type="button"
@@ -303,7 +339,7 @@ function handleSelectDailyDate(date: string) {
               type="text"
               class="aihot-search-input"
               id="aihot-lb-search"
-              placeholder="🔍 检索模型或厂商…"
+              :placeholder="t('aihot.searchPlaceholder')"
               v-model="state.leaderboardSearch"
             />
           </div>
@@ -318,7 +354,7 @@ function handleSelectDailyDate(date: string) {
               :class="{ active: !state.feedCategory }"
               @click="handleSelectCategory('')"
             >
-              全部
+              {{ t('aihot.category.all') }}
             </button>
             <button
               type="button"
@@ -326,7 +362,7 @@ function handleSelectDailyDate(date: string) {
               :class="{ active: state.feedCategory === 'ai-models' }"
               @click="handleSelectCategory('ai-models')"
             >
-              🤖 模型发布
+              {{ t('aihot.category.models') }}
             </button>
             <button
               type="button"
@@ -334,7 +370,7 @@ function handleSelectDailyDate(date: string) {
               :class="{ active: state.feedCategory === 'ai-products' }"
               @click="handleSelectCategory('ai-products')"
             >
-              🚀 产品动态
+              {{ t('aihot.category.products') }}
             </button>
             <button
               type="button"
@@ -342,7 +378,7 @@ function handleSelectDailyDate(date: string) {
               :class="{ active: state.feedCategory === 'industry' }"
               @click="handleSelectCategory('industry')"
             >
-              🏢 行业动态
+              {{ t('aihot.category.industry') }}
             </button>
             <button
               type="button"
@@ -350,7 +386,7 @@ function handleSelectDailyDate(date: string) {
               :class="{ active: state.feedCategory === 'paper' }"
               @click="handleSelectCategory('paper')"
             >
-              📄 学术论文
+              {{ t('aihot.category.paper') }}
             </button>
             <button
               type="button"
@@ -358,7 +394,7 @@ function handleSelectDailyDate(date: string) {
               :class="{ active: state.feedCategory === 'tip' }"
               @click="handleSelectCategory('tip')"
             >
-              💡 观点教程
+              {{ t('aihot.category.tip') }}
             </button>
           </div>
           <div class="aihot-subbar-right">
@@ -369,7 +405,7 @@ function handleSelectDailyDate(date: string) {
                 :class="{ active: state.feedWindow === '24h' }"
                 @click="handleSelectWindow('24h')"
               >
-                24 小时
+                {{ t('aihot.window.24h') }}
               </button>
               <button
                 type="button"
@@ -377,7 +413,7 @@ function handleSelectDailyDate(date: string) {
                 :class="{ active: state.feedWindow === '7d' }"
                 @click="handleSelectWindow('7d')"
               >
-                近 7 天
+                {{ t('aihot.window.7d') }}
               </button>
             </div>
           </div>
@@ -385,7 +421,7 @@ function handleSelectDailyDate(date: string) {
       </div>
 
       <!-- 核心内容展示区 -->
-      <p v-if="state.statusMessage" class="muted small" role="status">{{ state.statusMessage }}</p>
+      <p v-if="state.statusMessage" class="muted small" role="status">{{ displayStatusMessage }}</p>
       <p v-if="state.errorMessage && hasContent" class="notice" role="status">{{ state.errorMessage }}</p>
       <div id="aihot-body">
         <!-- 错误提示（无可用内容时呈现） -->
@@ -395,7 +431,7 @@ function handleSelectDailyDate(date: string) {
 
         <!-- 加载中状态（无可用内容时呈现） -->
         <p class="muted small" v-else-if="state.isLoading && !hasContent">
-          正在载入 AI HOT 数据…
+          {{ t('aihot.loading') }}
         </p>
 
         <!-- 1. 视图：🏆 模型榜 (leaderboard) -->
@@ -444,7 +480,7 @@ function handleSelectDailyDate(date: string) {
         <!-- 3. 视图：✦ 精选资讯 (feed) -->
         <div class="aihot-grid" v-else-if="state.currentView === 'feed'">
           <a
-            v-for="(item, itemIdx) in filteredFeedArticles"
+            v-for="(item, itemIdx) in displayedFeedArticles"
             :key="item.id || item.title + itemIdx"
             :href="item.url"
             target="_blank"
@@ -457,7 +493,7 @@ function handleSelectDailyDate(date: string) {
               {{ itemIdx + 1 }}
             </span>
             <div style="min-width:0;flex:1">
-              <div class="aihot-t">{{ item.title }}</div>
+              <div class="aihot-t">{{ getArticleTitle(item) }}</div>
               <p class="aihot-s" v-if="item.summary">{{ item.summary }}</p>
               <div class="aihot-m">
                 <span>
@@ -468,14 +504,14 @@ function handleSelectDailyDate(date: string) {
                   >
                     {{ item.category }}
                   </span>
-                  {{ item.sourceName }}
+                  {{ getArticleSourceName(item) }}
                 </span>
                 <time>{{ item.published }}</time>
               </div>
             </div>
           </a>
-          <p class="muted small" v-if="!filteredFeedArticles.length">
-            当前分类暂无资讯。
+          <p class="muted small" v-if="!displayedFeedArticles.length">
+            {{ t('aihot.emptyFeed') }}
           </p>
         </div>
 

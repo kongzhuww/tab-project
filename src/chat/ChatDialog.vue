@@ -33,6 +33,7 @@ import { profileAvatarUrl } from "./chat-avatar";
 import { privateChatState, dmTargetUid, openDirectMessage, sendServerInvitationCard, joinPrivateInvite } from "./private-chat-client";
 import { privateChatConfigured, savePrivatePublicConfig } from "./private-chat-config";
 import { restartPrivateChat } from "./private-chat-client";
+import { t } from "../i18n";
 import { chatService } from "./chat.service";
 import { roomPeers, rosterError } from "./chat-peer-roster";
 import { historyScope } from "./chat-history";
@@ -196,7 +197,7 @@ async function prepareSelectedImage(file: Blob, send = false) {
       if (!accepted) pendingImage.value = data; // Keep a usable draft on unsupported server/storage failure.
       else scrollToBottom();
     } else pendingImage.value = data;
-  } catch (error: any) { if (current()) imageError.value = error?.message || "图片处理失败，请换一张图片"; }
+  } catch (error: any) { if (current()) imageError.value = error?.message || t("chat.imageError"); }
   finally { if (imageAlive) imagePreparing.value = false; }
 }
 async function handleImageSelected(event: Event) {
@@ -237,7 +238,7 @@ async function convertImageToLocalDataUrl(url: string): Promise<string> {
 }
 
 async function syncFromBiliProfile() {
-  if (topProfileState.userName && topProfileState.userName !== "哔哩哔哩用户") {
+  if (topProfileState.userName && topProfileState.userName !== "哔哩哔哩用户" && topProfileState.userName !== t("chat.biliDefaultUser")) {
     editName.value = topProfileState.userName;
   }
   if (topProfileState.avatarUrl && !topProfileState.avatarUrl.endsWith(".svg")) {
@@ -319,8 +320,8 @@ const inputText = ref("");
 const composerCapabilityReason = computed(() => {
   const caps = privateChatState.capabilities;
   if (caps.status === "unknown" || caps.status === "incompatible") return caps.reason;
-  if (pendingImage.value && !caps.messageTypes.includes("image")) return caps.reason || "服务端未启用图片消息";
-  if (inputText.value.trim() && !caps.messageTypes.includes("text")) return "此服务端未启用文字消息，草稿已保留。";
+  if (pendingImage.value && !caps.messageTypes.includes("image")) return caps.reason || t("chat.imageNotEnabled");
+  if (inputText.value.trim() && !caps.messageTypes.includes("text")) return t("chat.textNotEnabled");
   return "";
 });
 const messagesContainer = ref<HTMLElement | null>(null);

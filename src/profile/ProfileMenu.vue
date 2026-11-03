@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { profileMenuController, type ProfileAction } from "./store";
+import { t } from "../i18n";
 
 function onActionClick(action: ProfileAction) {
   profileMenuController.trigger(action);
@@ -8,16 +9,16 @@ function onActionClick(action: ProfileAction) {
 
 <template>
   <button type="button" data-action="messages" @click.stop="onActionClick('messages')">
-    通知中心
+    {{ t('profile.menu.notifications') }}
   </button>
-  <button type="button" data-action="tabs" @click.stop="onActionClick('tabs')">标签页管理</button>
+  <button type="button" data-action="tabs" @click.stop="onActionClick('tabs')">{{ t('profile.menu.tabs') }}</button>
   <button type="button" data-action="refresh" @click.stop="onActionClick('refresh')">
-    刷新 B站账号信息
+    {{ t('profile.menu.refreshBili') }}
   </button>
   <button type="button" data-action="switch" @click.stop="onActionClick('switch')">
-    切换用户（打开 B站）
+    {{ t('profile.menu.switchUser') }}
   </button>
   <button type="button" data-action="web" @click.stop="onActionClick('web')">
-    打开 B站个人中心
+    {{ t('profile.menu.biliCenter') }}
   </button>
 </template>

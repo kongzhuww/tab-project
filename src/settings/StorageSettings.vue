@@ -3,6 +3,7 @@ import { nextTick, onBeforeUnmount, ref, watch } from "vue";
 import StickerLibrarySettings from "../stickers/StickerLibrarySettings.vue";
 import BiliSettingsPanel from "../bilibili/BiliSettingsPanel.vue";
 import type { StorageSettingsTarget } from "./store";
+import { t } from "../i18n";
 
 const props = defineProps<{ active: boolean; target: StorageSettingsTarget | null; request: number }>();
 const root = ref<HTMLElement | null>(null);
@@ -23,13 +24,13 @@ onBeforeUnmount(() => { alive = false; ++focusVersion; });
 
 <template>
   <div ref="root" class="storage-settings">
-    <p class="hint storage-note">目录选择立即生效，不用再点底部保存。浏览器只提供文件夹名称，不提供完整磁盘路径。</p>
+    <p class="hint storage-note">{{ t('storage.note') }}</p>
     <section class="storage-group" aria-labelledby="storage-stickers-title">
-      <h3 id="storage-stickers-title" data-storage-target="stickers" tabindex="-1">表情包图片文件夹</h3>
+      <h3 id="storage-stickers-title" data-storage-target="stickers" tabindex="-1">{{ t('storage.stickersTitle') }}</h3>
       <StickerLibrarySettings :active="props.active" />
     </section>
     <section class="storage-group" aria-labelledby="storage-bili-title">
-      <h3 id="storage-bili-title" data-storage-target="bili-cache" tabindex="-1">B站视频缓存目录</h3>
+      <h3 id="storage-bili-title" data-storage-target="bili-cache" tabindex="-1">{{ t('storage.biliCacheTitle') }}</h3>
       <BiliSettingsPanel :active="props.active" />
     </section>
   </div>

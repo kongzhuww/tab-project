@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import { cubeRegistryStore, type CustomFaceType } from './cube-registry.store';
+import { t } from '../i18n';
 const state = cubeRegistryStore.state;
 const activeFaces = computed(() => cubeRegistryStore.getActiveFaces());
 const inactive = computed(() => state.registeredFaces.filter(f => !state.activeFaceIds.includes(f.id)));
@@ -28,38 +29,38 @@ function add() {
 
 <template>
   <Teleport to="body">
-    <section v-if="state.isConfigDialogOpen" class="cube-manager" role="dialog" aria-label="管理立方体面" @keydown.esc.stop="cubeRegistryStore.closeConfigDialog()">
-      <header><strong>管理立方体面</strong><button type="button" aria-label="关闭" @click="cubeRegistryStore.closeConfigDialog()">×</button></header>
+    <section v-if="state.isConfigDialogOpen" class="cube-manager" role="dialog" :aria-label="t('cube.manager.title')" @keydown.esc.stop="cubeRegistryStore.closeConfigDialog()">
+      <header><strong>{{ t('cube.manager.title') }}</strong><button type="button" aria-label="关闭" @click="cubeRegistryStore.closeConfigDialog()">×</button></header>
       <div class="cube-manager-body">
-        <p>默认只有音乐。可以删除所有面，空位仍可添加。</p>
+        <p>{{ t('cube.manager.desc') }}</p>
         <div v-for="(face, index) in activeFaces" :key="face.id" class="cube-row">
           <span>{{ face.icon }} {{ face.title }}</span>
-          <button type="button" :disabled="index === 0" @click="perform(() => cubeRegistryStore.moveUp(face.id))" title="上移">↑</button>
-          <button type="button" :disabled="index === activeFaces.length - 1" @click="perform(() => cubeRegistryStore.moveDown(face.id))" title="下移">↓</button>
-          <button type="button" @click="perform(() => cubeRegistryStore.removeCustomFace(face.id))">删除面</button>
+          <button type="button" :disabled="index === 0" @click="perform(() => cubeRegistryStore.moveUp(face.id))" :title="t('cube.manager.moveUp')">↑</button>
+          <button type="button" :disabled="index === activeFaces.length - 1" @click="perform(() => cubeRegistryStore.moveDown(face.id))" :title="t('cube.manager.moveDown')">↓</button>
+          <button type="button" @click="perform(() => cubeRegistryStore.removeCustomFace(face.id))">{{ t('cube.manager.removeFace') }}</button>
         </div>
         <div v-for="face in inactive" :key="face.id" class="cube-row">
-          <span>{{ face.title }}（未启用）</span>
-          <button type="button" @click="perform(() => cubeRegistryStore.toggleActive(face.id, true))">添加</button>
-          <button v-if="!face.builtIn" type="button" @click="perform(() => cubeRegistryStore.removeCustomFace(face.id))">删除</button>
+          <span>{{ face.title }}{{ t('cube.manager.inactiveSuffix') }}</span>
+          <button type="button" @click="perform(() => cubeRegistryStore.toggleActive(face.id, true))">{{ t('cube.manager.add') }}</button>
+          <button v-if="!face.builtIn" type="button" @click="perform(() => cubeRegistryStore.removeCustomFace(face.id))">{{ t('cube.manager.delete') }}</button>
         </div>
-        <h3>添加面</h3>
-        <label><input v-model="codeMode" type="checkbox" /> 粘贴 JSON 配置</label>
+        <h3>{{ t('cube.manager.addFace') }}</h3>
+        <label><input v-model="codeMode" type="checkbox" /> {{ t('cube.manager.pasteJson') }}</label>
         <form @submit.prevent="add">
           <template v-if="!codeMode">
-            <label>标题<input v-model="title" maxlength="60" required /></label>
-            <label>类型<select v-model="kind"><option value="memo">文本</option><option value="countdown">倒数日</option><option value="link">链接</option></select></label>
-            <label>内容<input v-model="content" :type="kind === 'countdown' ? 'date' : 'text'" :placeholder="kind === 'link' ? 'https://…' : '输入内容'" maxlength="500" required /></label>
+            <label>{{ t('cube.manager.fieldTitle') }}<input v-model="title" maxlength="60" required /></label>
+            <label>{{ t('cube.manager.fieldType') }}<select v-model="kind"><option value="memo">{{ t('cube.manager.typeMemo') }}</option><option value="countdown">{{ t('cube.manager.typeCountdown') }}</option><option value="link">{{ t('cube.manager.typeLink') }}</option></select></label>
+            <label>{{ t('cube.manager.fieldContent') }}<input v-model="content" :type="kind === 'countdown' ? 'date' : 'text'" :placeholder="kind === 'link' ? 'https://…' : t('cube.manager.contentPlaceholderText')" maxlength="500" required /></label>
           </template>
           <template v-else>
-            <p>仅支持文本、倒数日和链接配置，不执行 JavaScript / HTML。开发者动态注册说明见 SDK 文档。</p>
+            <p>{{ t('cube.manager.securityNotice') }}</p>
             <textarea v-model="code" rows="9" maxlength="10000" aria-label="面的 JSON 配置" spellcheck="false"></textarea>
           </template>
-          <button type="submit">添加面</button>
+          <button type="submit">{{ t('cube.manager.submitAdd') }}</button>
         </form>
         <p v-if="error" role="alert">{{ error }}</p>
       </div>
-      <footer><button type="button" @click="perform(() => cubeRegistryStore.resetDefaults())">恢复默认（仅音乐）</button><small>自定义配置保留，但退出轮播</small></footer>
+      <footer><button type="button" @click="perform(() => cubeRegistryStore.resetDefaults())">{{ t('cube.manager.resetDefault') }}</button><small>{{ t('cube.manager.resetNotice') }}</small></footer>
     </section>
   </Teleport>
 </template>

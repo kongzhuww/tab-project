@@ -9,11 +9,11 @@
       <form id="launcher-form" @submit.prevent="handleSubmitEdit">
         <input id="launcher-id" type="hidden" :value="state.editDialog.id" />
         <h2 id="launcher-dialog-title">
-          {{ state.editDialog.isNew ? '添加网站' : '编辑网站' }}
+          {{ state.editDialog.isNew ? t('sites.addSite') : t('sites.editSite') }}
         </h2>
 
         <label>
-          名称
+          {{ t('sites.name') }}
           <input
             id="launcher-title"
             v-model="state.editDialog.title"
@@ -24,7 +24,7 @@
         </label>
 
         <label>
-          网址
+          {{ t('sites.url') }}
           <input
             id="launcher-url"
             v-model="state.editDialog.url"
@@ -36,24 +36,24 @@
         </label>
 
         <label>
-          备注
+          {{ t('sites.note') }}
           <input
             id="launcher-note"
             v-model="state.editDialog.note"
             type="text"
             maxlength="100"
-            placeholder="鼠标悬停提示备注（可替代网址展示）"
+            :placeholder="t('sites.notePlaceholder')"
             autocomplete="off"
           />
         </label>
 
         <label>
-          分组
+          {{ t('sites.group') }}
           <input
             id="launcher-group"
             v-model="state.editDialog.group"
             maxlength="20"
-            placeholder="常用网站"
+            :placeholder="t('sites.groupDefault')"
             autocomplete="off"
           />
         </label>
@@ -66,11 +66,11 @@
             type="button"
             @click="handleDeleteEdit"
           >
-            删除
+            {{ t('sites.deleteSite') }}
           </button>
           <span class="grow"></span>
-          <button id="launcher-cancel" type="button" @click="handleCancelEdit">取消</button>
-          <button class="dialog-primary" type="submit">保存</button>
+          <button id="launcher-cancel" type="button" @click="handleCancelEdit">{{ t('common.cancel') }}</button>
+          <button class="dialog-primary" type="submit">{{ t('sites.saveSite') }}</button>
         </div>
       </form>
     </dialog>
@@ -412,6 +412,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import { launcherDialogsController } from "./dialogs-store";
+import { t } from "../i18n";
 
 const state = launcherDialogsController.state;
 

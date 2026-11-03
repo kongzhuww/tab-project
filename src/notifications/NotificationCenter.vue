@@ -1,16 +1,16 @@
 <template>
-  <section v-if="state.isOpen" ref="panel" id="notification-center" popover="manual" class="notification-center" aria-label="通知中心">
-    <header><div><h2>通知中心 <span v-if="unread">{{ unread }} 条未读</span></h2><small>重要通知保留30天，最多200条 · 仅本机</small></div><button type="button" aria-label="关闭通知中心" @click="controller.close">×</button></header>
-    <nav aria-label="通知操作"><button type="button" :disabled="state.saving || !unread" @click="controller.markAllRead">全部已读</button><button type="button" :disabled="state.saving || !state.items.length" @click="confirmClear = !confirmClear">清空</button><button type="button" :disabled="state.loading" @click="controller.refresh">重新读取</button></nav>
-    <div v-if="confirmClear" class="clear-confirm">清空这里的全部通知？<button type="button" :disabled="state.saving" @click="clearHistory">确认清空</button><button type="button" @click="confirmClear = false">取消</button></div>
+  <section v-if="state.isOpen" ref="panel" id="notification-center" popover="manual" class="notification-center" :aria-label="t('notifications.centerTitle')">
+    <header><div><h2>{{ t('notifications.centerTitle') }} <span v-if="unread">{{ t('notifications.unreadCountOnly', { count: unread }) }}</span></h2><small>{{ t('notifications.retention') }}</small></div><button type="button" :aria-label="t('window.close')" @click="controller.close">×</button></header>
+    <nav :aria-label="t('notifications.centerTitle')"><button type="button" :disabled="state.saving || !unread" @click="controller.markAllRead">{{ t('notifications.markAllRead') }}</button><button type="button" :disabled="state.saving || !state.items.length" @click="confirmClear = !confirmClear">{{ t('notifications.clear') }}</button><button type="button" :disabled="state.loading" @click="controller.refresh">{{ t('notifications.reload') }}</button></nav>
+    <div v-if="confirmClear" class="clear-confirm">{{ t('notifications.clearConfirm') }}<button type="button" :disabled="state.saving" @click="clearHistory">{{ t('notifications.confirmClearBtn') }}</button><button type="button" @click="confirmClear = false">{{ t('common.cancel') }}</button></div>
     <p v-if="state.error" class="center-error" role="alert">{{ state.error }}</p>
     <div class="center-list">
-      <p v-if="state.loading && !state.items.length" class="center-empty">正在读取通知…</p>
-      <div v-else-if="!state.items.length" class="center-empty"><strong>暂无通知</strong><p>错过的重要 Toast 和任务提醒会保存在这里。普通保存、复制成功提示不会堆积。</p></div>
+      <p v-if="state.loading && !state.items.length" class="center-empty">{{ t('notifications.reading') }}</p>
+      <div v-else-if="!state.items.length" class="center-empty"><strong>{{ t('notifications.emptyTitle') }}</strong><p>{{ t('notifications.emptyDesc') }}</p></div>
       <article v-for="item in state.items" :key="item.id" class="history-card" :class="{ unread: !item.read }">
         <div class="history-meta"><img :src="item.appType === 'bili' ? 'assets/bilibili.svg' : 'assets/icon-48.png'" alt="" /><strong>{{ item.appName }}</strong><span v-if="!item.read" class="unread-dot" aria-label="未读"></span><time :datetime="new Date(item.createdAt).toISOString()" :title="formatTime(item.createdAt)">{{ formatTime(item.createdAt) }}</time><button type="button" :disabled="state.saving" aria-label="删除此通知" @click="controller.remove(item.id)">×</button></div>
         <button type="button" class="history-content" :disabled="state.saving" @click="controller.activate(item)">
-          <strong>{{ item.title }}</strong><small v-if="item.subtitle">{{ item.subtitle }}</small><p v-if="item.message">{{ item.message }}</p><span class="history-action">{{ item.target ? '打开相关页面 →' : item.read ? '已读' : '标记已读' }}</span>
+          <strong>{{ item.title }}</strong><small v-if="item.subtitle">{{ item.subtitle }}</small><p v-if="item.message">{{ item.message }}</p><span class="history-action">{{ item.target ? t('notifications.openTarget') : item.read ? t('notifications.isRead') : t('notifications.markRead') }}</span>
         </button>
       </article>
     </div>
@@ -19,6 +19,7 @@
 <script setup lang="ts">
 import { ref, watch, nextTick, onUnmounted } from 'vue';
 import { notificationHistoryController as controller, notificationHistoryState as state, notificationUnreadCount as unread } from './history-store';
+import { t, currentLanguage } from '../i18n';
 const panel = ref<HTMLElement | null>(null), confirmClear = ref(false);
 function place() {
   const el = panel.value; if (!el) return;
@@ -45,7 +46,10 @@ watch(() => state.isOpen, async (open, _old, cleanup) => {
   window.addEventListener('pointerdown', outside); window.addEventListener('keydown', key); window.addEventListener('resize', place); document.addEventListener('visibilitychange', visibility);
 }, { immediate: true, flush: 'post' });
 onUnmounted(detach);
-function formatTime(time: number) { return new Date(time).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }); }
+function formatTime(time: number) {
+  const locale = currentLanguage.value === 'en' ? 'en-US' : 'zh-CN';
+  return new Date(time).toLocaleString(locale, { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
 async function clearHistory() { await controller.clear(); confirmClear.value = false; }
 </script>
 <style scoped>

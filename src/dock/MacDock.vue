@@ -6,6 +6,7 @@ import DockContextMenu, { type ContextTarget } from "./DockContextMenu.vue";
 import { getDockModule } from "../modules/registry";
 import { pluginMarketController } from "../modules/market-store";
 import { privateChatConfigured } from "../chat/private-chat-config";
+import { t } from "../i18n";
 
 const snapshot = computed(() => macDockState);
 const contextTarget = ref<ContextTarget | null>(null);
@@ -300,10 +301,10 @@ onBeforeUnmount(() => {
       class="mac-dock-item"
       type="button"
       data-dock-target="home-launcher"
-      title="常用主页"
+      :title="t('dock.home')"
       @click.stop="onHomeClick($event)"
     >
-      <img class="mac-dock-icon" :src="'assets/nav-home.svg'" alt="主页" />
+      <img class="mac-dock-icon" :src="'assets/nav-home.svg'" :alt="t('dock.home')" />
     </button>
 
     <div class="mac-dock-divider mac-dock-divider-dark" aria-hidden="true"></div>
@@ -336,7 +337,7 @@ onBeforeUnmount(() => {
       class="mac-dock-item mac-dock-market-btn"
       :class="{ 'is-active': pluginMarketController.state.isOpen }"
       type="button"
-      title="模块与全屏插件管理"
+      :title="t('dock.market')"
       @click.stop="onMarketClick($event)"
     >
       <span class="mac-dock-market-icon" aria-hidden="true">🧩</span>

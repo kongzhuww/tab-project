@@ -3,13 +3,35 @@ import { ref, computed, nextTick, onMounted, onUnmounted } from "vue";
 import { clockState } from "./store";
 import { mottoState, mottoController } from "./motto-store";
 import { notificationController } from "../notifications/store";
+import { t } from "../i18n";
 
 const isEditingMotto = ref(false);
 const editingInput = ref("");
 const mottoInputRef = ref<HTMLInputElement | null>(null);
 
+const GREETING_TRANSLATION_MAP: Record<string, string> = {
+  "夜深了": "clock.greeting.lateNight",
+  "早上好": "clock.greeting.morning",
+  "上午好": "clock.greeting.forenoon",
+  "中午好": "clock.greeting.noon",
+  "下午好": "clock.greeting.afternoon",
+  "晚上好": "clock.greeting.evening",
+  "你好": "clock.greeting.hello"
+};
+
+function formatMottoDisplay(text: string): string {
+  const key = GREETING_TRANSLATION_MAP[text];
+  if (key) {
+    return t(key as any);
+  }
+  return text;
+}
+
 const currentGreetingText = computed(() => {
-  return mottoState.customText || clockState.greetingText;
+  if (mottoState.customText) {
+    return formatMottoDisplay(mottoState.customText);
+  }
+  return clockState.greetingText;
 });
 
 function startEditMotto() {
@@ -28,7 +50,7 @@ function saveMotto() {
   const val = editingInput.value.trim();
   mottoController.setCustomMotto(val);
   if (val) {
-    notificationController.fetch("标语", `已更新标语: ${val}`);
+    notificationController.fetch(t("motto.appName"), t("motto.updated", { text: val }));
   }
 }
 
@@ -82,7 +104,7 @@ onUnmounted(() => {
   <!-- 可编辑标语区域 -->
   <div
     class="hero-motto-wrapper"
-    title="点击直接编辑标语 · 滚轮切换历史标语 · 右键查看标语菜单"
+    :title="t('motto.hint')"
     @wheel="onMottoWheel"
     @contextmenu="onMottoContextMenu"
   >
@@ -92,7 +114,7 @@ onUnmounted(() => {
       v-model="editingInput"
       class="hero-motto-input"
       type="text"
-      placeholder="写下你此刻的个性标语…"
+      :placeholder="t('motto.placeholder')"
       maxlength="60"
       @blur="saveMotto"
       @keydown="onMottoKeydown"
@@ -105,7 +127,7 @@ onUnmounted(() => {
       @click="startEditMotto"
     >
       <span class="motto-content">{{ currentGreetingText }}</span>
-      <span v-if="mottoState.history.length > 1" class="motto-scroll-hint" title="滚动鼠标滚轮快速切换历史标语">⇕</span>
+      <span v-if="mottoState.history.length > 1" class="motto-scroll-hint" :title="t('motto.scrollHint')">⇕</span>
     </p>
   </div>
 
@@ -119,21 +141,21 @@ onUnmounted(() => {
       @contextmenu.prevent
     >
       <div class="motto-menu-header">
-        <span>🏷️ 自定义标语</span>
-        <small class="dim">{{ mottoState.history.length }} 条记录</small>
+        <span>{{ t('motto.customTitle') }}</span>
+        <small class="dim">{{ t('motto.recordsCount', { count: mottoState.history.length }) }}</small>
       </div>
 
       <button type="button" class="motto-menu-action" @click="startEditMotto">
         <i>✎</i>
-        <span>编辑当前标语</span>
+        <span>{{ t('motto.editCurrent') }}</span>
       </button>
 
       <div class="motto-menu-divider"></div>
 
-      <div class="motto-history-label">历史标语记录（点击切换）：</div>
+      <div class="motto-history-label">{{ t('motto.historyLabel') }}</div>
       <div class="motto-history-list">
         <div v-if="!mottoState.history.length" class="motto-history-empty dim">
-          暂无历史标语，自定义的每一条标语都会沉淀在此
+          {{ t('motto.historyEmpty') }}
         </div>
         <template v-else>
           <div
@@ -144,11 +166,11 @@ onUnmounted(() => {
             @click="mottoController.selectHistory(item)"
           >
             <span class="motto-item-date">{{ item.date }}</span>
-            <span class="motto-item-text" :title="item.text">{{ item.text }}</span>
+            <span class="motto-item-text" :title="formatMottoDisplay(item.text)">{{ formatMottoDisplay(item.text) }}</span>
             <button
               type="button"
               class="motto-item-del"
-              title="删除此条标语"
+              :title="t('motto.deleteEntry')"
               @click.stop="mottoController.deleteEntry(item.id)"
             >×</button>
           </div>
@@ -163,7 +185,7 @@ onUnmounted(() => {
         @click="mottoController.resetToSystem"
       >
         <i>↻</i>
-        <span>恢复系统自动问候（早安/午安/晚安）</span>
+        <span>{{ t('motto.resetGreeting') }}</span>
       </button>
 
       <button
@@ -173,7 +195,7 @@ onUnmounted(() => {
         @click="mottoController.clearHistory"
       >
         <i>🗑</i>
-        <span>清空全部历史标语</span>
+        <span>{{ t('motto.clearAll') }}</span>
       </button>
     </div>
   </Teleport>

@@ -3,17 +3,26 @@ import { onMounted, onUnmounted, watch } from "vue";
 import { clockState, clockController } from "./store";
 import { clockSettingsController } from "./settings-store";
 import { fullscreenCardState } from "../core/fullscreen-cards.store";
+import { t, currentLanguage } from "../i18n";
 
-const WK = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
+const WK_KEYS = [
+  "clock.weekday.sun",
+  "clock.weekday.mon",
+  "clock.weekday.tue",
+  "clock.weekday.wed",
+  "clock.weekday.thu",
+  "clock.weekday.fri",
+  "clock.weekday.sat"
+] as const;
 
 function greeting(h: number): string {
-  if (h < 5) return "夜深了";
-  if (h < 9) return "早上好";
-  if (h < 12) return "上午好";
-  if (h < 14) return "中午好";
-  if (h < 18) return "下午好";
-  if (h < 23) return "晚上好";
-  return "夜深了";
+  if (h < 5) return t("clock.greeting.lateNight");
+  if (h < 9) return t("clock.greeting.morning");
+  if (h < 12) return t("clock.greeting.forenoon");
+  if (h < 14) return t("clock.greeting.noon");
+  if (h < 18) return t("clock.greeting.afternoon");
+  if (h < 23) return t("clock.greeting.evening");
+  return t("clock.greeting.lateNight");
 }
 
 function getZonedDate(): Date {
@@ -36,7 +45,13 @@ function tick(): void {
   const timeText = `${p(h)}:${p(m)}`;
   const secsText = `:${p(s)}`;
   const greetingText = greeting(h);
-  const dateText = `${year}年${month}月${dayDate}日 · ${WK[weekIdx]}`;
+  const weekText = t(WK_KEYS[weekIdx]);
+  const dateText = t("clock.datePattern", {
+    year,
+    month,
+    day: dayDate,
+    week: weekText
+  });
 
   clockController.updateTime(timeText, secsText, greetingText, dateText);
 }
@@ -68,6 +83,9 @@ tick();
 
 onMounted(() => {
   clockSettingsController.initPreferences();
+  watch(currentLanguage, () => {
+    tick();
+  });
   if (!fullscreenCardState.activeId) {
     tick();
     timer = setInterval(tick, 1000);

@@ -4,6 +4,7 @@ import { todoistModuleState, withTodoistWrite } from "./module-state";
 import { todoistService, isTodoistTaskCompleted } from "../services/todoist.service";
 import { todoistTaskListState, todoistTaskListController } from "./task-list-store";
 import { createTaskStartDateReader, parseDateAndTime } from "./task-date-helper";
+import { t } from "../i18n";
 
 export interface CalendarCellItem {
   date: string; dayNumber: number; isOutside: boolean; isToday: boolean;
@@ -67,7 +68,7 @@ const history = new Map<string, { items: CalendarTodoItem[]; savedAt: number }>(
 const reopenedIds = new Set<string>();
 export const todoistCalendarSidebarState = reactive<TodoistCalendarSidebarState>({
   collapsed: false, selectedDate: getLocalTodayDateStr(), badgeText: "Todoist",
-  monthLabel: "", yearLabel: "", cells: [], agendaTitle: "今日任务",
+  monthLabel: "", yearLabel: "", cells: [], agendaTitle: "",
   todoItems: [], todoLoading: false, emptyText: "", writeError: ""
 });
 export type CalendarSidebarAction = "init" | "toggle-collapsed" | "today" | "prev-month" | "next-month" |
@@ -92,7 +93,7 @@ function projectTasks() {
   }
   for (const item of active) if (item.scheduledDate === selected) merged.set(item.id, item);
   state.todoItems = [...merged.values()].sort((a, b) => Number(a.completed) - Number(b.completed) || (a.time || "").localeCompare(b.time || ""));
-  state.agendaTitle = selected === getLocalTodayDateStr() ? "今日任务" : `${selected.slice(5).replace("-", "月")}日任务`;
+  state.agendaTitle = selected === getLocalTodayDateStr() ? t("todoist.calendar.todayTasks") : t("todoist.calendar.dateTasks", { date: selected });
   const counts = new Map<string, Set<string>>();
   for (const item of [...Array.from(history.values()).flatMap(entry => entry.items), ...local, ...active]) {
     const date = item.scheduledDate || completedDay(item);
@@ -103,7 +104,7 @@ function projectTasks() {
   for (const cell of state.cells) {
     cell.itemCount = counts.get(cell.date)?.size || 0;
     cell.hasDot = cell.itemCount > 0;
-    cell.title = `${cell.date}${cell.itemCount ? ` · ${cell.itemCount} 个任务` : ""}`;
+    cell.title = cell.itemCount ? t("todoist.calendar.cellTaskCount", { date: cell.date, count: cell.itemCount }) : cell.date;
   }
 }
 export const todoistCalendarSidebarController = {

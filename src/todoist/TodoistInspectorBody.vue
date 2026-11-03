@@ -11,7 +11,7 @@
           :key="repo.fullName"
           type="button"
           class="inspector-repo-btn"
-          :title="'关联 GitHub 仓库：' + repo.fullName + ' · 点击在插件内查看详情'"
+          :title="t('todoist.linkRepoTitle', { name: repo.fullName })"
           @click="openGitHubRepo(repo.fullName)"
         >
           <span class="repo-badge-icon">🐙</span>
@@ -27,7 +27,7 @@
             type="button"
             class="task-complete-circle-btn"
             :class="{ completed: isTaskCompleted }"
-            title="标记完成/撤销"
+            :title="t('todoist.toggleComplete')"
             @click="emit('toggleComplete')"
           >
             <span v-if="isTaskCompleted" class="check-mark">✓</span>
@@ -35,14 +35,14 @@
           <textarea
             :value="editTitle"
             rows="1"
-            aria-label="任务标题"
+            :aria-label="t('todoist.taskTitle')"
             @vue:mounted="resizeTitle"
             @vue:updated="resizeTitle"
             :disabled="isUploadingImg"
             ref="titleTextareaRef"
             class="inspector-input-title"
             :class="{ 'title-done': isTaskCompleted }"
-            placeholder="任务标题"
+            :placeholder="t('todoist.taskTitle')"
             @input="resizeText($event.target as HTMLTextAreaElement); emit('update:editTitle', ($event.target as HTMLTextAreaElement).value); emit('scheduleDraftSave', $event)"
             @compositionend="emit('scheduleDraftSave', $event)"
             @blur="emit('saveTitleAndDesc', $event)"
@@ -53,7 +53,7 @@
 
       <section class="inspector-section inspector-desc-section" @dragover.prevent="emit('dragover')" @dragleave.prevent="emit('dragleave')" @drop.prevent="emit('dropImage', $event)">
         <textarea v-if="isDescEditing" ref="descTextareaRef" :value="editDescription"
-          class="desc-inline-editor" rows="1" placeholder="描述" :disabled="isUploadingImg"
+          class="desc-inline-editor" rows="1" :placeholder="t('todoist.taskDesc')" :disabled="isUploadingImg"
           @input="onDescInput" @compositionend="emit('scheduleDraftSave', $event)"
           @blur="finishDescEdit" @paste="emit('descPaste', $event)" />
         <div v-else class="desc-display-mode" role="button" tabindex="0" aria-label="编辑描述"
@@ -93,7 +93,7 @@
             <button
               type="button"
               class="subtask-del-btn"
-              title="删除子任务"
+              :title="t('todoist.subtask.delete')"
               @click="emit('removeSubtask', st.id)"
             >×</button>
           </div>
@@ -104,14 +104,14 @@
             :value="newSubtaskText"
             type="text"
             class="subtask-input-field"
-            placeholder="输入子任务并回车…"
+            :placeholder="t('todoist.subtask.inputPlaceholder')"
             @input="emit('update:newSubtaskText', ($event.target as HTMLInputElement).value)"
             @keydown.enter.prevent="emit('confirmAddSubtask')"
             @keydown.esc="emit('update:isAddingSubtask', false)"
           />
           <div class="subtask-actions">
-            <button type="button" class="btn-subtask-ok" @click="emit('confirmAddSubtask')">添加</button>
-            <button type="button" class="btn-subtask-cancel" @click="emit('update:isAddingSubtask', false)">取消</button>
+            <button type="button" class="btn-subtask-ok" @click="emit('confirmAddSubtask')">{{ t('common.add') }}</button>
+            <button type="button" class="btn-subtask-cancel" @click="emit('update:isAddingSubtask', false)">{{ t('common.cancel') }}</button>
           </div>
         </div>
         <button
@@ -120,7 +120,7 @@
           class="inspector-add-subtask-btn"
           @click="emit('update:isAddingSubtask', true)"
         >
-          <span class="subtask-plus-icon">＋</span> 添加子任务
+          <span class="subtask-plus-icon">＋</span> {{ t('todoist.subtask.add') }}
         </button>
       </section>
 
@@ -135,7 +135,7 @@
               :value="newCommentText"
               type="text"
               class="comment-input-field"
-              placeholder="评论…"
+              :placeholder="t('todoist.comment.placeholder')"
               :disabled="isSubmittingComment"
               @input="emit('update:newCommentText', ($event.target as HTMLInputElement).value)"
               @keydown.enter.prevent="emit('submitComment')"
@@ -143,7 +143,7 @@
             <button
               type="button"
               class="comment-clip-btn"
-              title="上传照片附件"
+              :title="t('todoist.comment.attachPhoto')"
               @click.stop="emit('triggerFileInput')"
             >📎</button>
           </div>
@@ -153,7 +153,7 @@
             class="comment-submit-btn"
             :disabled="isSubmittingComment"
             @click="emit('submitComment')"
-          >发送</button>
+          >{{ t('todoist.comment.send') }}</button>
         </div>
 
         <div v-if="state.comments.length > 0" class="comments-list">
@@ -228,11 +228,11 @@
           @click="isDueDatePickerOpen = !isDueDatePickerOpen"
         >
           <span class="row-icon">▣</span>
-          <span class="row-text">{{ formatDisplayDate(editDueDate, editDueTime) || '设定截止' }}</span>
+          <span class="row-text">{{ formatDisplayDate(editDueDate, editDueTime) || t('todoist.prop.setDueDate') }}</span>
           <span
             v-if="editDueDate"
             class="row-clear-btn"
-            title="清除截止时间"
+            :title="t('todoist.prop.clearDueDate')"
             @click.stop="emit('clearDueDate')"
           >×</span>
         </button>
@@ -250,28 +250,28 @@
       </div>
 
       <div class="side-prop-group">
-        <span class="side-prop-label">优先级</span>
+        <span class="side-prop-label">{{ t('todoist.prop.priority') }}</span>
         <button ref="priorityBtnRef" type="button" class="side-item-row" @click="isPriorityMenuOpen = true"><span :style="{ color: priorityColor(state.priority) }">⚑</span><span class="row-text">P{{ 5 - state.priority }}</span><span>⌄</span></button>
         <InspectorPopover v-if="isPriorityMenuOpen" :anchor="priorityBtnRef" @close="isPriorityMenuOpen = false">
           <div class="inspector-menu"><button v-for="p in priorityOptions" :key="p.level" type="button" :disabled="!!todoistModuleState.pendingWrites" @click="selectPriority(p.level)"><span :style="{ color: p.color }">⚑</span> {{ p.name }} <span v-if="state.priority === p.level">✓</span></button></div>
         </InspectorPopover>
       </div>
       <div class="side-prop-group">
-        <span class="side-prop-label">标签</span>
-        <button ref="labelsBtnRef" type="button" class="side-item-row" @click="isLabelsMenuOpen = true"><span class="row-text">{{ state.labels.join('、') || '添加标签' }}</span><span>＋</span></button>
+        <span class="side-prop-label">{{ t('todoist.prop.labels') }}</span>
+        <button ref="labelsBtnRef" type="button" class="side-item-row" @click="isLabelsMenuOpen = true"><span class="row-text">{{ state.labels.join('、') || t('todoist.prop.addLabels') }}</span><span>＋</span></button>
         <InspectorPopover v-if="isLabelsMenuOpen" :anchor="labelsBtnRef" @close="isLabelsMenuOpen = false">
           <div class="inspector-menu">
-            <input v-model="labelSearchText" placeholder="搜索或新建标签" aria-label="搜索标签" @keydown.enter.prevent="createOrSelectLabel" />
-            <small v-if="labelsLoading">读取标签中…</small><p v-if="labelsError" role="alert">{{ labelsError }}</p>
+            <input v-model="labelSearchText" :placeholder="t('todoist.prop.searchOrCreateLabel')" :aria-label="t('todoist.prop.searchLabelAria')" @keydown.enter.prevent="createOrSelectLabel" />
+            <small v-if="labelsLoading">{{ t('todoist.prop.readingLabels') }}</small><p v-if="labelsError" role="alert">{{ labelsError }}</p>
             <div class="label-options-list"><label v-for="opt in filteredLabels" :key="opt" class="label-option-row"><span>◇ {{ opt }}</span><input type="checkbox" :checked="state.labels.includes(opt)" :disabled="!!todoistModuleState.pendingWrites" @change="emit('toggleLabelSelect', opt)" /></label></div>
-            <button v-if="labelSearchText.trim() && !allKnownLabels.includes(labelSearchText.trim())" type="button" :disabled="!!todoistModuleState.pendingWrites" @click="createOrSelectLabel">＋ 创建“{{ labelSearchText.trim() }}”</button>
-            <small v-if="!labelsLoading && !filteredLabels.length && !labelSearchText">暂无标签</small>
+            <button v-if="labelSearchText.trim() && !allKnownLabels.includes(labelSearchText.trim())" type="button" :disabled="!!todoistModuleState.pendingWrites" @click="createOrSelectLabel">{{ t('todoist.prop.createLabelBtn', { name: labelSearchText.trim() }) }}</button>
+            <small v-if="!labelsLoading && !filteredLabels.length && !labelSearchText">{{ t('todoist.prop.noLabels') }}</small>
           </div>
         </InspectorPopover>
       </div>
       <div class="side-prop-group">
-        <span class="side-prop-label">提醒 <small>本机</small></span>
-        <button ref="reminderBtnRef" type="button" class="side-item-row" @click="openReminder"><span class="row-text">{{ formatReminderDisplay(state.reminderTime) || '添加提醒' }}</span><span>＋</span></button>
+        <span class="side-prop-label">{{ t('todoist.prop.reminder') }} <small>{{ t('todoist.prop.localOnly') }}</small></span>
+        <button ref="reminderBtnRef" type="button" class="side-item-row" @click="openReminder"><span class="row-text">{{ formatReminderDisplay(state.reminderTime) || t('todoist.prop.addReminder') }}</span><span>＋</span></button>
         <ReminderPicker v-if="isReminderPickerOpen" :anchor="reminderBtnRef" :task-id="state.taskId"
           :value="state.reminderTime" :task-date="editStartDate || editDueDate" :task-time="editStartTime || editDueTime"
           @close="isReminderPickerOpen = false" />
@@ -282,6 +282,7 @@
 
 <script setup lang="ts">
 import { ref, computed, nextTick, watch, onMounted, onUnmounted } from "vue";
+import { t } from "../i18n";
 import InspectorPopover from "./InspectorPopover.vue";
 import TaskRepositoryLinks from "./TaskRepositoryLinks.vue";
 import ReminderPicker from "./ReminderPicker.vue";

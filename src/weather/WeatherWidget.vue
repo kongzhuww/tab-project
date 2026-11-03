@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, nextTick } from "vue";
+import { ref, computed, watch, onMounted, onUnmounted, nextTick } from "vue";
 import { weatherState, weatherController as controller } from "./store";
 import { weatherService, type WeatherCityItem } from "../services/weather.service";
+import { t, currentLanguage } from "../i18n";
 
 const contextMenuVisible = ref(false);
 const contextMenuPos = ref({ x: 0, y: 0 });
@@ -78,6 +79,10 @@ onMounted(() => {
   });
   void weatherService.loadWeather();
 
+  watch(currentLanguage, () => {
+    weatherService.reformatCurrentWeather();
+  });
+
   window.addEventListener("pointerdown", onGlobalPointerDown, true);
   window.addEventListener("keydown", onGlobalKeyDown, true);
 });
@@ -113,20 +118,20 @@ function handleDialogClick(e: MouseEvent): void {
   <div class="weather-widget-container" @contextmenu="onContextMenu">
     <template v-if="weatherState.state === 'unconfigured'">
       <p class="notice">
-        未设置城市。右键此处快速设置，或到 <a href="options.html">设置</a> 填写城市名（如 武汉 / Tokyo）。
+        {{ t('weather.noCitySet') }}
       </p>
     </template>
 
     <template v-else-if="weatherState.state === 'loading'">
-      <p class="muted small">加载中…</p>
+      <p class="muted small">{{ t('common.loading') }}</p>
     </template>
 
     <template v-else-if="weatherState.state === 'not_found'">
-      <p class="notice">找不到城市「{{ weatherState.city }}」，右键可重新选择地点。</p>
+      <p class="notice">{{ t('weather.cityNotFound', { city: weatherState.city }) }}</p>
     </template>
 
     <template v-else-if="weatherState.state === 'error'">
-      <p class="notice">{{ weatherState.errorMessage || "天气加载失败，右键此处可重新选择地点。" }}</p>
+      <p class="notice">{{ weatherState.errorMessage || t('weather.loadFailed') }}</p>
     </template>
 
     <template v-else-if="weatherState.state === 'ready' && weatherState.data">
@@ -162,8 +167,8 @@ function handleDialogClick(e: MouseEvent): void {
           <div class="weather-forecast-city-info">
             <span class="weather-forecast-icon">{{ weatherState.data?.currentEmoji || "🌤️" }}</span>
             <div>
-              <h3 id="weather-forecast-city-title">{{ weatherState.city || weatherState.data?.cityName || "天气预报" }}</h3>
-              <p class="small muted">{{ weatherState.data?.subText || "未来多日天气趋势与生活气象指数" }}</p>
+              <h3 id="weather-forecast-city-title">{{ weatherState.city || weatherState.data?.cityName || t('weather.forecastTitle') }}</h3>
+              <p class="small muted">{{ weatherState.data?.subText || t('weather.forecastSub') }}</p>
             </div>
           </div>
           <div class="weather-forecast-actions">
@@ -171,16 +176,16 @@ function handleDialogClick(e: MouseEvent): void {
               id="weather-forecast-refresh-btn"
               type="button"
               class="weather-forecast-btn"
-              title="刷新天气数据"
+              :title="t('weather.refreshTitle')"
               @click="controller.refresh()"
             >
-              ↻ 刷新
+              {{ t('weather.refresh') }}
             </button>
             <button
               id="weather-forecast-close-btn"
               type="button"
               class="weather-forecast-close"
-              title="关闭"
+              :title="t('common.close')"
               @click="handleCloseModal"
             >
               ✕
@@ -191,20 +196,20 @@ function handleDialogClick(e: MouseEvent): void {
         <!-- 生活指标网格 -->
         <div class="weather-metrics-grid" v-if="weatherState.detailInfo">
           <div class="weather-metric-item">
-            <span class="metric-label">💧 相对湿度</span>
+            <span class="metric-label">{{ t('weather.metric.humidity') }}</span>
             <span class="metric-val" id="weather-forecast-humidity">{{ weatherState.detailInfo.humidity || "50%" }}</span>
           </div>
           <div class="weather-metric-item">
-            <span class="metric-label">💨 风力风向</span>
-            <span class="metric-val" id="weather-forecast-wind">{{ weatherState.detailInfo.wind || "微风" }}</span>
+            <span class="metric-label">{{ t('weather.metric.wind') }}</span>
+            <span class="metric-val" id="weather-forecast-wind">{{ weatherState.detailInfo.wind || (currentLanguage === 'en' ? 'Breeze' : '微风') }}</span>
           </div>
           <div class="weather-metric-item">
-            <span class="metric-label">☀️ 紫外线指数</span>
-            <span class="metric-val" id="weather-forecast-uv">{{ weatherState.detailInfo.uvIndex || "中等" }}</span>
+            <span class="metric-label">{{ t('weather.metric.uv') }}</span>
+            <span class="metric-val" id="weather-forecast-uv">{{ weatherState.detailInfo.uvIndex || (currentLanguage === 'en' ? 'Moderate' : '中等') }}</span>
           </div>
           <div class="weather-metric-item">
-            <span class="metric-label">🍃 空气质量</span>
-            <span class="metric-val" id="weather-forecast-aqi">{{ weatherState.detailInfo.airQuality || "良" }}</span>
+            <span class="metric-label">{{ t('weather.metric.aqi') }}</span>
+            <span class="metric-val" id="weather-forecast-aqi">{{ weatherState.detailInfo.airQuality || (currentLanguage === 'en' ? 'Good' : '良') }}</span>
           </div>
         </div>
 
@@ -225,7 +230,7 @@ function handleDialogClick(e: MouseEvent): void {
             </div>
             <div class="day-rain-col">
               <span class="rain-tag" v-if="day.rainProb > 0">☂️ {{ day.rainProb }}%</span>
-              <span class="rain-tag empty" v-else>无降水</span>
+              <span class="rain-tag empty" v-else>{{ t('weather.metric.noRain') }}</span>
             </div>
             <div class="day-temp-bar-col">
               <span class="low-temp">{{ day.lowTemp }}°</span>
@@ -257,10 +262,10 @@ function handleDialogClick(e: MouseEvent): void {
       >
         <div class="weather-location-head">
           <div class="weather-location-title-row">
-            <span class="weather-location-title">切换天气地点</span>
+            <span class="weather-location-title">{{ t('weather.menu.changeLocation') }}</span>
             <span class="weather-location-curr-badge" :title="weatherState.city">
               <span class="weather-curr-dot"></span>
-              {{ weatherState.city || "未设置" }}
+              {{ weatherState.city || t('weather.menu.unset') }}
             </span>
           </div>
         </div>
@@ -271,7 +276,7 @@ function handleDialogClick(e: MouseEvent): void {
             <input
               ref="inputRef"
               class="weather-location-input"
-              placeholder="输入城市名或拼音…"
+              :placeholder="t('weather.menu.inputPlaceholder')"
               v-model="cityInput"
               @keydown.enter.prevent="submitCity"
               autocomplete="off"
@@ -281,14 +286,14 @@ function handleDialogClick(e: MouseEvent): void {
               type="button"
               class="weather-input-clear"
               @click="cityInput = ''"
-              title="清除输入"
+              :title="t('weather.menu.clearInput')"
             >✕</button>
           </div>
-          <button type="submit" class="weather-location-submit">确定</button>
+          <button type="submit" class="weather-location-submit">{{ t('weather.menu.submit') }}</button>
         </form>
 
         <div v-if="cityInput.trim()">
-          <div class="weather-section-subtitle">匹配建议</div>
+          <div class="weather-section-subtitle">{{ t('weather.menu.suggestions') }}</div>
           <div class="weather-location-suggestions" v-if="citySuggestions.length">
             <button
               v-for="item in citySuggestions"
@@ -302,12 +307,12 @@ function handleDialogClick(e: MouseEvent): void {
             </button>
           </div>
           <div v-else class="weather-suggestion-empty">
-            未找到完全匹配城市，回车或点击「确定」直接尝试检索
+            {{ t('weather.menu.emptySuggestion') }}
           </div>
         </div>
 
         <div v-else>
-          <div class="weather-section-subtitle">常用城市</div>
+          <div class="weather-section-subtitle">{{ t('weather.menu.commonCities') }}</div>
           <div class="weather-quick-chips-grid">
             <button
               v-for="c in quickCities"

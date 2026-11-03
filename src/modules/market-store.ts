@@ -42,7 +42,7 @@ export const PLUGIN_CATALOG: readonly PluginMarketItem[] = [
     icon: "assets/nav-todoist.svg",
     emoji: "✅",
     desc: "独立可拖动待办看板与项目协作工作台，支持日历联动、时间规划与云端标签管理。",
-    author: "Doist / LogicWeaver",
+    author: "Doist / tab-project",
     tags: ["待办看板", "日程规划", "独立浮窗"],
     builtIn: true
   },
@@ -55,7 +55,7 @@ export const PLUGIN_CATALOG: readonly PluginMarketItem[] = [
     categoryLabel: "独立模块 · 实时交流",
     emoji: "💬",
     desc: "实验性自托管私有聊天室，默认关闭。需先手动启用，再配置自己的服务器和专属邀请；支持文字、受限图片与分享卡片。",
-    author: "LogicWeaver Lab",
+    author: "tab-project Lab",
     tags: ["实验性", "默认关闭", "自托管"],
     builtIn: true,
     isDev: true,
@@ -87,7 +87,7 @@ export const PLUGIN_CATALOG: readonly PluginMarketItem[] = [
     icon: "assets/bilibili.svg",
     emoji: "📺",
     desc: "B站全屏双栏收藏夹知识库、小窗画中画影院、AI 字幕提取与原声电台一体化工作台。",
-    author: "LogicWeaver Lab",
+    author: "tab-project Lab",
     tags: ["核心常驻", "Bilibili", "视频整理"],
     builtIn: true
   },
@@ -115,7 +115,7 @@ export const PLUGIN_CATALOG: readonly PluginMarketItem[] = [
     icon: "assets/nav-aihot.svg",
     emoji: "🔥",
     desc: "全网前沿 AI 科技头条、技术论文与开源爆点聚合情报站，内置沉浸式长文阅读器。",
-    author: "LogicWeaver Lab",
+    author: "tab-project Lab",
     tags: ["核心常驻", "AI资讯", "前沿技术"],
     builtIn: true
   },
@@ -129,7 +129,7 @@ export const PLUGIN_CATALOG: readonly PluginMarketItem[] = [
     icon: "assets/nav-pricing.svg",
     emoji: "📐",
     desc: "全球主流 LLM 大语言模型价格性价比全景雷达、性能天梯排行榜与推理成本测算器；当前处于实验开发阶段。",
-    author: "LogicWeaver Lab",
+    author: "tab-project Lab",
     tags: ["实验性", "LLM定价", "性能跑分"],
     builtIn: true,
     isDev: true,
@@ -145,7 +145,7 @@ export const PLUGIN_CATALOG: readonly PluginMarketItem[] = [
     icon: "assets/nav-youtube.svg",
     emoji: "▶️",
     desc: "YouTube 官方流媒体插件。原生打通当前 Edge 登录账号，双栏 B 站收藏夹架构，18 个精准专属推荐换一批与点赞/收藏同步。",
-    author: "LogicWeaver Lab",
+    author: "tab-project Lab",
     tags: ["核心常驻", "全屏插件", "算法推荐", "视频收藏"],
     builtIn: true
   }
