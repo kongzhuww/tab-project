@@ -531,14 +531,8 @@ export const biliMiniPlayerController = {
 
       const list = await bilibiliService.getVideoDanmaku(cid);
       biliMiniPlayerState.danmakuList = list;
-      if (list.length > 0) {
-        notifyToast(`✓ 已成功获取 ${list.length} 条弹幕`);
-      } else {
-        notifyToast("当前视频暂无弹幕或弹幕列表为空");
-      }
     } catch (err: any) {
       console.warn("[MiniPlayer] 获取弹幕失败:", err);
-      notifyToast(`获取弹幕失败: ${err?.message || "网络异常"}`, true);
     } finally {
       biliMiniPlayerState.danmakuLoading = false;
     }

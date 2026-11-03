@@ -762,10 +762,19 @@ export class BilibiliService {
   }
 
   /**
-   * 获取系统虚拟收藏夹 (稍后再看、我的追番)
+   * 获取系统虚拟收藏夹 (稍后再看、我的追番、播放历史)
    */
   public getOtherFolders(): BiliFolderData[] {
     return [
+      {
+        id: "__history__",
+        fid: "__history__",
+        title: "播放历史",
+        media_count: 0,
+        icon: "📜",
+        isOther: true,
+        otherType: "history"
+      },
       {
         id: "__toview__",
         fid: "__toview__",
@@ -785,6 +794,30 @@ export class BilibiliService {
         otherType: "bangumi"
       }
     ];
+  }
+
+  /**
+   * 读取用户最近观看的历史记录
+   */
+  public async getWatchHistory(pn = 1, ps = 24): Promise<{ medias: BiliVideoData[]; total: number }> {
+    const data = await this.api<any>(`https://api.bilibili.com/x/v2/history?pn=${pn}&ps=${ps}`);
+    const rawList = Array.isArray(data) ? data : (data?.list || []);
+    const medias: BiliVideoData[] = rawList.map((item: any) => ({
+      id: item.aid || item.history?.oid || item.id,
+      type: 2,
+      title: item.title || item.tag_name || "视频记录",
+      cover: (item.pic || "").replace(/^http:/, "https:"),
+      duration: item.duration || 0,
+      upper: item.owner ? { mid: item.owner.mid, name: item.owner.name, face: item.owner.face } : (item.author ? { mid: item.mid || 0, name: item.author, face: "" } : undefined),
+      cnt_info: {
+        play: item.stat?.view || 0,
+        danmaku: item.stat?.danmaku || 0,
+        collect: item.stat?.favorite || 0
+      },
+      bvid: item.bvid || item.history?.bvid || "",
+      fav_time: item.view_at || item.progress
+    }));
+    return { medias, total: Number(data?.total || medias.length) };
   }
 
   /**
@@ -868,6 +901,21 @@ export class BilibiliService {
     keyword = ""
   ): Promise<{ info: any; medias: BiliVideoData[]; hasMore: boolean; total: number }> {
     const idStr = String(mediaId);
+
+    if (idStr === "__history__") {
+      const res = await this.getWatchHistory(pn, ps);
+      let list = res.medias;
+      if (keyword.trim()) {
+        const q = keyword.toLowerCase();
+        list = list.filter((v) => v.title.toLowerCase().includes(q) || (v.upper?.name && v.upper.name.toLowerCase().includes(q)));
+      }
+      return {
+        info: { title: "播放历史", media_count: res.total },
+        medias: list,
+        hasMore: pn * ps < res.total,
+        total: res.total
+      };
+    }
 
     if (idStr === "__toview__") {
       const res = await this.getToViewVideos();
