@@ -2372,29 +2372,13 @@ html[data-theme="light"] .site-shelf-folder-panel,html[data-theme="lonetrail"] .
   color: #94a3b8;
 }
 
-/* Todoist 自定义模态对话框与确认弹窗（替代原生 prompt / confirm） */
-.todoist-dialog-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 2147483647 !important;
-  background: rgba(15, 23, 42, 0.65);
-
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 16px;
-  animation: todoistFadeIn 0.18s cubic-bezier(0.16, 1, 0.3, 1);
-}
-@keyframes todoistFadeIn {
-  from { opacity: 0; transform: scale(0.96); }
-  to { opacity: 1; transform: scale(1); }
-}
+/* Todoist 自定义无模态对话框与确认弹窗（Modeless） */
 .todoist-dialog-card {
   width: 100%;
   max-width: 440px;
   background: #ffffff;
   border-radius: 16px;
-  box-shadow: 0 24px 60px -12px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 20px 48px -8px rgba(0, 0, 0, 0.28), 0 0 0 1px rgba(0, 0, 0, 0.08);
   overflow: hidden;
   display: flex;
   flex-direction: column;

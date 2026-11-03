@@ -606,91 +606,82 @@
       </button>
     </div>
 
-    <!-- 声明式输入对话框（Prompt Dialog Modal） -->
+    <!-- 声明式输入对话框（无模态 Modeless Prompt Dialog） -->
     <div
       v-if="promptModal.isOpen && todoistModuleState.active"
-      class="todoist-dialog-overlay"
-      @click="closePromptModal"
-      @keydown.esc.stop.prevent="closePromptModal"
+      ref="promptDialogCardRef"
+      class="todoist-dialog-card is-modeless is-draggable"
+      :style="{
+        position: 'fixed',
+        left: `${promptModal.x}px`,
+        top: `${promptModal.y}px`,
+        width: 'min(380px, calc(100vw - 32px))',
+        margin: 0
+      }"
+      @click.stop
     >
-      <div
-        class="todoist-dialog-card is-draggable"
-        :style="{
-          position: 'fixed',
-          left: `${promptModal.x}px`,
-          top: `${promptModal.y}px`,
-          width: 'min(380px, calc(100vw - 32px))',
-          margin: 0
-        }"
-        @click.stop
-      >
-        <div class="todoist-dialog-head" @pointerdown="startDragDialog('prompt', $event)">
-          <span class="todoist-dialog-icon">✏️</span>
-          <h3 class="todoist-dialog-title">{{ promptModal.title }}</h3>
-          <span class="todoist-dialog-drag-hint" title="按住可拖动位置">⋮⋮</span>
-        </div>
-        <div class="todoist-dialog-body">
-          <p v-if="promptModal.message" class="todoist-dialog-desc">{{ promptModal.message }}</p>
-          <input
-            ref="promptInputRef"
-            v-model="promptModal.value"
-            type="text"
-            class="todoist-dialog-input"
-            :placeholder="promptModal.placeholder"
-            @keydown.enter.prevent="submitPromptModal"
-          />
-        </div>
-        <div class="todoist-dialog-foot">
-          <button type="button" class="todoist-dialog-btn" @click="closePromptModal">取消</button>
-          <button type="button" class="todoist-dialog-btn primary" @click="submitPromptModal">
-            {{ promptModal.confirmText || '确定' }}
-          </button>
-        </div>
+      <div class="todoist-dialog-head" @pointerdown="startDragDialog('prompt', $event)">
+        <span class="todoist-dialog-icon">✏️</span>
+        <h3 class="todoist-dialog-title">{{ promptModal.title }}</h3>
+        <span class="todoist-dialog-drag-hint" title="按住可拖动位置">⋮⋮</span>
+      </div>
+      <div class="todoist-dialog-body">
+        <p v-if="promptModal.message" class="todoist-dialog-desc">{{ promptModal.message }}</p>
+        <input
+          ref="promptInputRef"
+          v-model="promptModal.value"
+          type="text"
+          class="todoist-dialog-input"
+          :placeholder="promptModal.placeholder"
+          @keydown.enter.prevent="submitPromptModal"
+          @keydown.esc.stop.prevent="closePromptModal"
+        />
+      </div>
+      <div class="todoist-dialog-foot">
+        <button type="button" class="todoist-dialog-btn" @click="closePromptModal">取消</button>
+        <button type="button" class="todoist-dialog-btn primary" @click="submitPromptModal">
+          {{ promptModal.confirmText || '确定' }}
+        </button>
       </div>
     </div>
 
 
-    <!-- 声明式确认对话框（Confirm Dialog Modal） -->
+    <!-- 声明式确认对话框（无模态 Modeless Confirm Dialog） -->
     <div
       v-if="confirmModal.isOpen && todoistModuleState.active"
-      class="todoist-dialog-overlay"
-      @click="closeConfirmModal"
-      @keydown.esc.stop.prevent="closeConfirmModal"
+      ref="confirmDialogCardRef"
+      class="todoist-dialog-card is-modeless is-draggable"
+      :style="{
+        position: 'fixed',
+        left: `${confirmModal.x}px`,
+        top: `${confirmModal.y}px`,
+        width: 'min(380px, calc(100vw - 32px))',
+        margin: 0
+      }"
+      @click.stop
     >
-      <div
-        class="todoist-dialog-card is-draggable"
-        :style="{
-          position: 'fixed',
-          left: `${confirmModal.x}px`,
-          top: `${confirmModal.y}px`,
-          width: 'min(380px, calc(100vw - 32px))',
-          margin: 0
-        }"
-        @click.stop
-      >
-        <div class="todoist-dialog-head" @pointerdown="startDragDialog('confirm', $event)">
-          <span class="todoist-dialog-icon">{{ confirmModal.icon || '⚠️' }}</span>
-          <h3 class="todoist-dialog-title">{{ confirmModal.title }}</h3>
-          <span class="todoist-dialog-drag-hint" title="按住可拖动位置">⋮⋮</span>
+      <div class="todoist-dialog-head" @pointerdown="startDragDialog('confirm', $event)">
+        <span class="todoist-dialog-icon">{{ confirmModal.icon || '⚠️' }}</span>
+        <h3 class="todoist-dialog-title">{{ confirmModal.title }}</h3>
+        <span class="todoist-dialog-drag-hint" title="按住可拖动位置">⋮⋮</span>
+      </div>
+      <div class="todoist-dialog-body">
+        <div
+          v-if="confirmModal.danger"
+          class="todoist-dialog-danger-banner"
+        >
+          <div class="todoist-dialog-danger-text">{{ confirmModal.alertText }}</div>
         </div>
-        <div class="todoist-dialog-body">
-          <div
-            v-if="confirmModal.danger"
-            class="todoist-dialog-danger-banner"
-          >
-            <div class="todoist-dialog-danger-text">{{ confirmModal.alertText }}</div>
-          </div>
-          <p class="todoist-dialog-msg">{{ confirmModal.message }}</p>
-        </div>
-        <div class="todoist-dialog-foot">
-          <button type="button" class="todoist-dialog-btn" @click="closeConfirmModal">取消</button>
-          <button
-            type="button"
-            class="todoist-dialog-btn"
-            :class="confirmModal.danger ? 'danger' : 'primary'"
-            @click="submitConfirmModal"
-          >{{ confirmModal.confirmText || '确定' }}</button>
-        </div>
+        <p class="todoist-dialog-msg">{{ confirmModal.message }}</p>
+      </div>
+      <div class="todoist-dialog-foot">
+        <button type="button" class="todoist-dialog-btn" @click="closeConfirmModal">取消</button>
+        <button
+          type="button"
+          class="todoist-dialog-btn"
+          :class="confirmModal.danger ? 'danger' : 'primary'"
+          @click="submitConfirmModal"
+        >{{ confirmModal.confirmText || '确定' }}</button>
       </div>
     </div>
 
@@ -832,6 +823,7 @@ const promptModal = reactive({
   payload: null as RenameTarget | null
 });
 const promptInputRef = ref<HTMLInputElement | null>(null);
+const promptDialogCardRef = ref<HTMLElement | null>(null);
 
 // 响应式 Confirm 对话框
 const confirmModal = reactive({
@@ -847,6 +839,7 @@ const confirmModal = reactive({
   actionType: "" as "delete-project" | "delete-section" | "delete-task" | "",
   payload: null as DeleteTarget | null
 });
+const confirmDialogCardRef = ref<HTMLElement | null>(null);
 
 // 响应式任务右键上下文菜单
 const taskContextMenu = reactive({
@@ -1665,6 +1658,12 @@ function onSwitchProject(projectId: string) {
 
 function handleGlobalKeydown(e: KeyboardEvent) {
   if (e.key === "Escape") {
+    if (promptModal.isOpen) {
+      closePromptModal();
+    }
+    if (confirmModal.isOpen) {
+      closeConfirmModal();
+    }
     if (taskContextMenu.isOpen) {
       taskContextMenu.isOpen = false;
       taskContextMenu.activeSubpanel = null;
@@ -1675,13 +1674,33 @@ function handleGlobalKeydown(e: KeyboardEvent) {
   }
 }
 
+function handleGlobalPointerDown(e: PointerEvent) {
+  const target = e.target as HTMLElement;
+  if (!target) return;
+  if (promptModal.isOpen && promptDialogCardRef.value) {
+    if (!promptDialogCardRef.value.contains(target) && !target.closest(".todoist-project-action-btn, .todoist-project-new-btn, .todoist-section-menu-item")) {
+      closePromptModal();
+    }
+  }
+  if (confirmModal.isOpen && confirmDialogCardRef.value) {
+    if (!confirmDialogCardRef.value.contains(target) && !target.closest(".todoist-project-action-btn, .todoist-section-menu-item, .todoist-task-menu-item")) {
+      closeConfirmModal();
+    }
+  }
+}
+
 watch(() => todoistModuleState.active, active => {
   document.removeEventListener("keydown", handleGlobalKeydown);
-  if (active) document.addEventListener("keydown", handleGlobalKeydown);
+  window.removeEventListener("pointerdown", handleGlobalPointerDown);
+  if (active) {
+    document.addEventListener("keydown", handleGlobalKeydown);
+    window.addEventListener("pointerdown", handleGlobalPointerDown);
+  }
 }, { immediate: true, flush: "sync" });
 
 onUnmounted(() => {
   document.removeEventListener("keydown", handleGlobalKeydown);
+  window.removeEventListener("pointerdown", handleGlobalPointerDown);
   clearComposerDraft();
 });
 </script>
@@ -1925,60 +1944,207 @@ onUnmounted(() => {
   backdrop-filter: blur(4px);
 }
 
-.todoist-dialog-overlay {
+/* 无模态纯净实体弹窗样式（100% 实体纸面，严禁遮罩，严禁半透明发灰） */
+.todoist-dialog-card {
   position: fixed;
-  inset: 0;
   z-index: 2147483647 !important;
-  background: rgba(15, 23, 42, 0.22);
-  backdrop-filter: blur(2px);
-  pointer-events: auto;
-  animation: todoistFadeIn 0.15s ease-out;
+  background: #ffffff !important;
+  color: #0f172a !important;
+  border-radius: 16px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  box-shadow: 0 20px 48px -8px rgba(0, 0, 0, 0.28), 0 0 0 1px rgba(0, 0, 0, 0.05);
+  max-height: calc(100vh - 80px);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  animation: todoistDialogPop 0.16s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.todoist-dialog-card {
-  max-height: calc(100vh - 80px);
-  overflow: auto;
-  transition: box-shadow 0.2s ease;
-  background: var(--surface, #ffffff);
-  border: 1px solid var(--border, rgba(0, 0, 0, 0.1));
-  box-shadow: 0 20px 48px -8px rgba(0, 0, 0, 0.28), 0 0 0 1px var(--border, rgba(0, 0, 0, 0.06));
-  border-radius: 14px;
+:root[data-theme="dark"] .todoist-dialog-card {
+  background: #1e293b !important;
+  color: #f8fafc !important;
+  border-color: rgba(255, 255, 255, 0.14);
+  box-shadow: 0 24px 60px -8px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+@keyframes todoistDialogPop {
+  from { opacity: 0; transform: translateY(-4px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
 .todoist-dialog-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 20px 12px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
   cursor: grab;
   user-select: none;
   touch-action: none;
 }
+
+:root[data-theme="dark"] .todoist-dialog-head {
+  border-bottom-color: rgba(255, 255, 255, 0.08);
+}
+
 .todoist-dialog-head:active {
   cursor: grabbing;
 }
+
+.todoist-dialog-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: #0f172a;
+  flex: 1;
+}
+
+:root[data-theme="dark"] .todoist-dialog-title {
+  color: #f8fafc;
+}
+
 .todoist-dialog-drag-hint {
-  color: var(--muted, #94a3b8);
+  color: #94a3b8;
   font-size: 13px;
   letter-spacing: -1px;
   opacity: 0.6;
   margin-left: auto;
   cursor: grab;
 }
-.todoist-dialog-danger-banner {
-  background: rgba(239, 68, 68, 0.1);
-  padding: 10px 12px;
-  border-radius: 8px;
-  border: 1px solid rgba(239, 68, 68, 0.25);
-  margin-bottom: 10px;
+
+.todoist-dialog-body {
+  padding: 16px 20px;
 }
+
+.todoist-dialog-desc {
+  margin: 0 0 12px;
+  color: #64748b;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+:root[data-theme="dark"] .todoist-dialog-desc {
+  color: #94a3b8;
+}
+
+.todoist-dialog-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 9px 13px;
+  border: 1.5px solid #cbd5e1;
+  border-radius: 10px;
+  font-size: 13.5px;
+  color: #0f172a;
+  background: #ffffff;
+  outline: none;
+  transition: all 0.15s ease;
+}
+
+:root[data-theme="dark"] .todoist-dialog-input {
+  background: #0f172a;
+  border-color: #334155;
+  color: #f8fafc;
+}
+
+.todoist-dialog-input:focus {
+  border-color: #0ea5e9;
+  box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.15);
+}
+
+.todoist-dialog-foot {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 12px 20px 16px;
+  border-top: 1px solid rgba(0, 0, 0, 0.04);
+}
+
+:root[data-theme="dark"] .todoist-dialog-foot {
+  border-top-color: rgba(255, 255, 255, 0.06);
+}
+
+.todoist-dialog-btn {
+  padding: 7px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  border-radius: 8px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+:root[data-theme="dark"] .todoist-dialog-btn {
+  background: #334155;
+  border-color: #475569;
+  color: #e2e8f0;
+}
+
+.todoist-dialog-btn:hover {
+  background: #f8fafc;
+}
+
+:root[data-theme="dark"] .todoist-dialog-btn:hover {
+  background: #475569;
+}
+
+.todoist-dialog-btn.primary {
+  background: #0ea5e9;
+  border-color: #0ea5e9;
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.todoist-dialog-btn.primary:hover {
+  background: #0284c7;
+}
+
+.todoist-dialog-btn.danger {
+  background: #ef4444;
+  border-color: #ef4444;
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.todoist-dialog-btn.danger:hover {
+  background: #dc2626;
+}
+
+.todoist-dialog-danger-banner {
+  background: #fef2f2;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid #fee2e2;
+  margin-bottom: 12px;
+}
+
+:root[data-theme="dark"] .todoist-dialog-danger-banner {
+  background: rgba(239, 68, 68, 0.16);
+  border-color: rgba(239, 68, 68, 0.32);
+}
+
 .todoist-dialog-danger-text {
   font-weight: 700;
   color: #dc2626;
   font-size: 13.5px;
   line-height: 1.4;
 }
+
+:root[data-theme="dark"] .todoist-dialog-danger-text {
+  color: #f87171;
+}
+
 .todoist-dialog-msg {
   margin: 0;
-  color: var(--muted, #64748b);
+  color: #64748b;
   font-size: 12.5px;
   line-height: 1.5;
+}
+
+:root[data-theme="dark"] .todoist-dialog-msg {
+  color: #94a3b8;
 }
 
 /* 智能日期识别提示条样式 (适配主题规范，严禁暗色死色) */
