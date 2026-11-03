@@ -13,6 +13,7 @@ import ChatShareMenu from "../chat/ChatShareMenu.vue";
 import { chatService } from "../chat/chat.service";
 import type { ChatShareTarget } from "../chat/private-chat-client";
 import { pluginSlots, type MenuSlotAction } from "../sdk/slots";
+import { webSiteTaskController } from "./web-task-store";
 
 const state = menusState;
 
@@ -243,6 +244,25 @@ function handleMoveOut() {
   launcherMenusController.dispatch("link:move-out", { link });
 }
 
+function handleCreateTask() {
+  const link = state.linkMenu.link;
+  if (!link) return;
+  const chromeApi = (globalThis as any).chrome;
+  const icon = link.url && chromeApi?.runtime?.id
+    ? `chrome-extension://${chromeApi.runtime.id}/_favicon/?pageUrl=${encodeURIComponent(link.url)}&size=32`
+    : undefined;
+  webSiteTaskController.open({
+    id: link.id,
+    title: link.title || link.url || "",
+    url: link.url || "",
+    icon,
+    note: link.note || undefined,
+    category: link.page || link.group || "常用网站",
+    source: "launcher"
+  });
+  launcherMenusController.closeLinkMenu();
+}
+
 function handleLinkMove(page: string) {
   state.linkMenu.flyoutOpen = false;
   const link = state.linkMenu.link;
@@ -397,6 +417,9 @@ watch(() => [state.pageMenu, state.pageMenu.isOpen], () => {
       <button v-if="state.linkMenu.link?.group && state.linkMenu.link.group !== '常用网站'" type="button" @click="handleMoveOut">移出文件夹，放到外面</button>
       <button id="link-menu-rename" type="button" @click="handleLinkRename">
         重命名
+      </button>
+      <button id="link-menu-create-task" type="button" @click="handleCreateTask">
+        📋 创建任务
       </button>
       <ChatShareMenu id="link-menu-send" :visible="state.linkMenu.isOpen" :disabled="linkMenuBusy" @open="state.linkMenu.flyoutOpen = false" @select="shareLink" />
       <button v-for="action in pluginLinkActions" :key="action.id" type="button"

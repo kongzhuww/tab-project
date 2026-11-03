@@ -8,6 +8,7 @@ import { pluginSlots, type MenuSlotAction } from '../sdk/slots';
 import { InlineTitleInput, InlineEditStatus, useInlineTitleEdit, useContextMenu } from '../sdk/interactions';
 import { notifications } from '../sdk/notifications';
 import type { BookmarkBoardItem } from './board-data';
+import { webSiteTaskController } from '../launcher/web-task-store';
 const props = defineProps<{
   target: { item?: BookmarkBoardItem; parentId: string; x: number; y: number; section?: boolean };
   busy: boolean; blocked: boolean; size: 'small' | 'large'; outerParentId?: string;
@@ -71,6 +72,22 @@ async function collectToLauncher(pageId: string) {
     actionError.value = err?.message || '收藏失败，请重试';
   }
 }
+function handleCreateTask() {
+  if (!liveItem.value || liveItem.value.kind !== 'link' || actionsBlocked.value) return;
+  const chromeApi = (globalThis as any).chrome;
+  const icon = liveItem.value.url && chromeApi?.runtime?.id
+    ? `chrome-extension://${chromeApi.runtime.id}/_favicon/?pageUrl=${encodeURIComponent(liveItem.value.url)}&size=32`
+    : undefined;
+  webSiteTaskController.open({
+    id: liveItem.value.id,
+    title: liveItem.value.title || liveItem.value.url,
+    url: liveItem.value.url,
+    icon,
+    source: 'bookmark'
+  });
+  emit('close');
+}
+
 function startTitle() {
   if (actionsBlocked.value || !liveItem.value) return;
   urlEdit.reset(); confirming.value = false;
@@ -177,6 +194,7 @@ async function runPluginAction(action: MenuSlotAction, target: { id: string; tit
           :items="moveItems" :x="Number.parseFloat(String(style.left || 0))" :y="Number.parseFloat(String(style.top || 0))"
           :vertical-budget="280" empty-text="暂无其他可移动分区" @select="moveTo" />
         <button id="link-menu-rename" type="button" :disabled="actionsBlocked" @click="startTitle">重命名</button>
+        <button id="link-menu-create-task" type="button" :disabled="actionsBlocked" @click="handleCreateTask">📋 创建任务</button>
         <button id="link-menu-edit" type="button" :disabled="actionsBlocked" @click="startUrl">编辑</button>
         <button v-for="action in pluginLinkActions" :key="action.id" type="button" :disabled="actionsBlocked || action.disabled?.({ id: target.item.id, title: target.item.title, url: target.item.url, kind: 'link' })"
           @click="runPluginAction(action, { id: target.item.id, title: target.item.title, url: target.item.url, kind: 'link' })">

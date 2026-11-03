@@ -69,6 +69,7 @@ const InPageSideDrawer = defineAsyncComponent(() => import("../sidepanel/InPageS
 const BiliSubtitleModal = defineAsyncComponent(() => import("../bilibili/BiliSubtitleModal.vue"));
 const BiliVideoTaskModal = defineAsyncComponent(() => import("../bilibili/BiliVideoTaskModal.vue"));
 const GitHubTaskModal = defineAsyncComponent(() => import("../github/GitHubTaskModal.vue"));
+const WebSiteTaskModal = defineAsyncComponent(() => import("../launcher/WebSiteTaskModal.vue"));
 const FirecrawlModal = defineAsyncComponent(() => import("../firecrawl/FirecrawlModal.vue"));
 const FloatingImageViewer = defineAsyncComponent(() => import("../viewers/FloatingImageViewer.vue"));
 const CommandPalette = defineAsyncComponent(() => import("../commands/CommandPalette.vue"));
@@ -193,6 +194,11 @@ const PluginMarketDialog = defineAsyncComponent(async () => {
     <!-- 🐙 GitHub 仓库创建任务独立无模态浮动视窗 -->
     <div id="vue-github-task-modal-root">
       <GitHubTaskModal />
+    </div>
+
+    <!-- 🌐 网站与书签创建任务独立无模态浮动视窗 -->
+    <div id="vue-web-task-modal-root">
+      <WebSiteTaskModal />
     </div>
 
     <!-- ⚡ Firecrawl 网页纯净提炼便签视窗 -->

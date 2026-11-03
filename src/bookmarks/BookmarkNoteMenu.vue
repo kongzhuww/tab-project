@@ -57,6 +57,16 @@
       </button>
 
       <button
+        v-if="!state.isFolder"
+        id="bookmark-context-create-task"
+        type="button"
+        role="menuitem"
+        @click="handleCreateTask"
+      >
+        <b>📋 创建任务</b>
+      </button>
+
+      <button
         id="bookmark-context-rename"
         type="button"
         role="menuitem"
@@ -182,6 +192,7 @@
 import { onMounted, onUnmounted } from "vue";
 import { bookmarkMenuController, type BookmarkMenuMode } from "./menu-store";
 import CustomSelect from "../core/CustomSelect.vue";
+import { webSiteTaskController } from "../launcher/web-task-store";
 
 const state = bookmarkMenuController.state;
 
@@ -212,6 +223,20 @@ onMounted(() => {
 
 function handleOpen() {
   bookmarkMenuController.openBookmark();
+}
+
+function handleCreateTask() {
+  const item = state.item;
+  if (!item || item.isFolder) return;
+  webSiteTaskController.open({
+    id: item.id,
+    title: state.title || item.url || "",
+    url: item.url || "",
+    icon: state.iconUrl || undefined,
+    note: state.noteValue || undefined,
+    source: "bookmark"
+  });
+  bookmarkMenuController.closeMenu();
 }
 
 function handleNewSubFolder() {
