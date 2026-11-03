@@ -259,6 +259,21 @@
                   </button>
                 </div>
 
+                <!-- 🌐 关联 网页/书签 标签 (网站名称/链接标注) -->
+                <div v-if="getTaskWebSites(task.id, task.description, task.content).length" class="todoist-card-repo-strip web-strip">
+                  <button
+                    v-for="s in getTaskWebSites(task.id, task.description, task.content)"
+                    :key="s.url"
+                    type="button"
+                    class="todoist-card-repo-btn web-btn"
+                    :title="'关联网页：' + (s.title || s.url) + ' · 点击直接打开'"
+                    @click.stop="openTaskWebSite(s.url)"
+                  >
+                    <span class="repo-badge-icon">🌐</span>
+                    <span class="repo-badge-name">{{ s.title || s.url }}</span>
+                  </button>
+                </div>
+
                 <!-- 原地就地编辑框 -->
                 <textarea
                   v-if="editingTaskId === task.id"
@@ -723,6 +738,7 @@ import { formatMonthDayTime, parseDateKeyword } from "./task-date-helper";
 import { githubTaskCreation } from "./github-task-target";
 import { getTaskRepositoryLinks, type RepositoryLink } from "./repository-links";
 import { getTaskBiliVideoLinks, type BiliVideoLink } from "./bili-video-links";
+import { getTaskWebSiteLinks, type WebSiteLink } from "./web-site-links";
 import { githubRepoDetailController } from "../github/repo-detail-store";
 import { biliMiniPlayerController } from "../bilibili/mini-player-store";
 import { t } from "../i18n";
@@ -735,11 +751,13 @@ onMounted(() => {
   window.addEventListener('storage', onRepoLinksChanged);
   window.addEventListener('todoist-repository-links-changed', onRepoLinksChanged);
   window.addEventListener('todoist-bili-links-changed', onRepoLinksChanged);
+  window.addEventListener('todoist-web-links-changed', onRepoLinksChanged);
 });
 onUnmounted(() => {
   window.removeEventListener('storage', onRepoLinksChanged);
   window.removeEventListener('todoist-repository-links-changed', onRepoLinksChanged);
   window.removeEventListener('todoist-bili-links-changed', onRepoLinksChanged);
+  window.removeEventListener('todoist-web-links-changed', onRepoLinksChanged);
 });
 
 function getTaskRepos(taskId: string, description?: string): RepositoryLink[] {
@@ -750,6 +768,16 @@ function getTaskRepos(taskId: string, description?: string): RepositoryLink[] {
 function getTaskVideos(taskId: string, description?: string, title?: string): BiliVideoLink[] {
   void repoLinksVersion.value;
   return getTaskBiliVideoLinks(taskId, description, title);
+}
+
+function getTaskWebSites(taskId: string, description?: string, title?: string): WebSiteLink[] {
+  void repoLinksVersion.value;
+  return getTaskWebSiteLinks(taskId, description, title);
+}
+
+function openTaskWebSite(url: string) {
+  if (!url) return;
+  window.open(url, '_blank', 'noopener,noreferrer');
 }
 
 function openBiliVideo(v: BiliVideoLink) {
@@ -2261,5 +2289,16 @@ onUnmounted(() => {
 .date-hint-toggle-btn:hover {
   background: var(--panel-hover, rgba(0, 0, 0, 0.05));
   color: var(--heading, #0f172a);
+}
+
+.todoist-card-repo-btn.web-btn {
+  background: rgba(14, 165, 233, 0.08);
+  border-color: rgba(14, 165, 233, 0.2);
+  color: #0284c7;
+}
+
+.todoist-card-repo-btn.web-btn:hover {
+  background: rgba(14, 165, 233, 0.16);
+  border-color: #0284c7;
 }
 </style>

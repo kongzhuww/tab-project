@@ -146,6 +146,7 @@ import { withTodoistWrite, todoistModuleState } from "../todoist/module-state";
 import { todoistTaskListController } from "../todoist/task-list-store";
 import CustomSelect, { type CustomSelectOption } from "../core/CustomSelect.vue";
 import TodoistDatePickerPopover from "../todoist/TodoistDatePickerPopover.vue";
+import { attachWebSite } from "../todoist/web-site-links";
 
 const target = computed(() => state.target);
 
@@ -333,6 +334,7 @@ function handleGlobalPointerDown(e: PointerEvent) {
 async function submit() {
   if (isSubmitting.value || !content.value.trim() || !selectedProjectId.value || !timeValid.value || !target.value) return;
 
+  const currentTarget = { ...target.value };
   const projId = selectedProjectId.value;
   const secId = selectedSectionId.value || undefined;
   const taskContent = content.value.trim();
@@ -360,6 +362,17 @@ async function submit() {
       if (!created || typeof created.id !== "string") {
         throw new Error("创建任务返回数据异常");
       }
+
+      // 双向持久化绑定本地网站卡片关联
+      try {
+        attachWebSite(created.id, {
+          title: currentTarget.title || currentTarget.url,
+          url: currentTarget.url,
+          icon: currentTarget.icon,
+          note: currentTarget.note,
+          source: currentTarget.source
+        });
+      } catch {}
 
       todoistService.invalidateWorkspaceSnapshots();
       notifications.show({

@@ -96,6 +96,39 @@
         </footer>
       </article>
     </div>
+
+    <!-- 4. 🌐 常用网站与书签卡片展示 (类似桌面的微型小卡片，点击直接跳转打开) -->
+    <div v-if="webSites.length" class="web-cards-grid">
+      <article
+        v-for="site in webSites"
+        :key="site.url"
+        class="web-assoc-card"
+        :title="'在新标签页打开: ' + (site.title || site.url)"
+        @click="openWebSite(site.url)"
+      >
+        <div class="web-assoc-tile">
+          <img
+            v-if="getSiteFavicon(site)"
+            :src="getSiteFavicon(site)"
+            alt=""
+            class="web-assoc-icon"
+            @error="handleWebIconError($event)"
+          />
+          <span v-else class="web-assoc-fallback">🌐</span>
+        </div>
+        <span class="web-assoc-label" :title="site.title || site.url">
+          {{ site.title || getHost(site.url) }}
+        </span>
+        <button
+          type="button"
+          class="web-assoc-unlink-btn"
+          title="移除关联"
+          @click.stop="handleUnlinkWeb(site.url)"
+        >
+          ×
+        </button>
+      </article>
+    </div>
   </section>
 </template>
 
@@ -106,25 +139,60 @@ import { readRepositoryLinks, writeRepositoryLinks, validRepositoryName as valid
 import { readBiliVideoLinks, unlinkBiliVideo, getTaskBiliVideoLinks, type BiliVideoLink } from './bili-video-links';
 import { biliMiniPlayerController } from '../bilibili/mini-player-store';
 import { githubRepoDetailController } from '../github/repo-detail-store';
+import { getTaskWebSiteLinks, unlinkWebSite, type WebSiteLink } from './web-site-links';
 
 const props = defineProps<{ taskId: string; description?: string; title?: string }>();
 const links = ref<RepoLink[]>([]);
 const biliVideos = ref<BiliVideoLink[]>([]);
+const webSites = ref<WebSiteLink[]>([]);
 const query = ref('');
 const error = ref('');
 const selecting = ref(false);
 const readable = ref(false);
 
-const hasAnyLinks = computed(() => links.value.length > 0 || biliVideos.value.length > 0);
+const hasAnyLinks = computed(() => links.value.length > 0 || biliVideos.value.length > 0 || webSites.value.length > 0);
 
 function reloadLinks() {
   try {
     links.value = getTaskRepositoryLinks(props.taskId, props.description);
     biliVideos.value = getTaskBiliVideoLinks(props.taskId, props.description, props.title);
+    webSites.value = getTaskWebSiteLinks(props.taskId, props.description, props.title);
     readable.value = true;
   } catch {
     error.value = '关联记录读取失败，未覆盖已有数据。';
     readable.value = false;
+  }
+}
+
+function openWebSite(url: string) {
+  if (!url) return;
+  window.open(url, '_blank', 'noopener,noreferrer');
+}
+
+function handleUnlinkWeb(url: string) {
+  unlinkWebSite(props.taskId, url);
+  reloadLinks();
+}
+
+function getSiteFavicon(site: WebSiteLink): string {
+  if (site.icon) return site.icon;
+  const chromeApi = (globalThis as any).chrome;
+  if (chromeApi?.runtime?.id && site.url) {
+    return `chrome-extension://${chromeApi.runtime.id}/_favicon/?pageUrl=${encodeURIComponent(site.url)}&size=32`;
+  }
+  return '';
+}
+
+function handleWebIconError(event: Event) {
+  const target = event.target as HTMLElement;
+  if (target) target.style.display = 'none';
+}
+
+function getHost(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, '');
+  } catch {
+    return url;
   }
 }
 
@@ -141,12 +209,14 @@ onMounted(() => {
   window.addEventListener('storage', onLinkChange);
   window.addEventListener('todoist-repository-links-changed', onLinkChange);
   window.addEventListener('todoist-bili-links-changed', onLinkChange);
+  window.addEventListener('todoist-web-links-changed', onLinkChange);
 });
 
 onUnmounted(() => {
   window.removeEventListener('storage', onLinkChange);
   window.removeEventListener('todoist-repository-links-changed', onLinkChange);
   window.removeEventListener('todoist-bili-links-changed', onLinkChange);
+  window.removeEventListener('todoist-web-links-changed', onLinkChange);
 });
 
 watch(
@@ -553,5 +623,98 @@ function openGitHubDetail(fullName: string, e: MouseEvent) {
   font-size: 10.5px;
   color: var(--muted);
   margin-top: 2px;
+}
+
+/* 🌐 常用网站与书签微型桌面卡片样式 (图片同款白底圆角图标 + 截断文字) */
+.web-cards-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.web-assoc-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 68px;
+  cursor: pointer;
+  user-select: none;
+  transition: transform 0.15s ease;
+}
+
+.web-assoc-card:hover {
+  transform: translateY(-2px);
+}
+
+.web-assoc-tile {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: var(--panel, #ffffff);
+  border: 1px solid var(--border, rgba(0, 0, 0, 0.12));
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.web-assoc-card:hover .web-assoc-tile {
+  border-color: #0284c7;
+  box-shadow: 0 4px 12px rgba(2, 132, 199, 0.18);
+}
+
+.web-assoc-icon {
+  width: 26px;
+  height: 26px;
+  object-fit: contain;
+}
+
+.web-assoc-fallback {
+  font-size: 20px;
+}
+
+.web-assoc-label {
+  margin-top: 5px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text, #334155);
+  text-align: center;
+  width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 1.3;
+}
+
+.web-assoc-unlink-btn {
+  position: absolute;
+  top: -5px;
+  right: 5px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: rgba(100, 116, 139, 0.85);
+  color: #ffffff;
+  border: none;
+  font-size: 11px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s, background-color 0.15s;
+}
+
+.web-assoc-card:hover .web-assoc-unlink-btn {
+  opacity: 1;
+}
+
+.web-assoc-unlink-btn:hover {
+  background: #ef4444;
 }
 </style>
