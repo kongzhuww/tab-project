@@ -92,33 +92,39 @@
 
             <div class="field full-width">
               <label>{{ t('settings.dockPos.label') }} <em>DOCK POSITION</em></label>
-              <select v-model="form.dockPosition" @change="onDockPositionChange">
-                <option value="bottom">{{ t('settings.dockPos.bottom') }}</option>
-                <option value="left">{{ t('settings.dockPos.left') }}</option>
-                <option value="right">{{ t('settings.dockPos.right') }}</option>
-                <option value="top">{{ t('settings.dockPos.top') }}</option>
-              </select>
+              <CustomSelect
+                :model-value="form.dockPosition || 'bottom'"
+                :options="dockPositionOptions"
+                size="md"
+                @update:model-value="form.dockPosition = $event as any"
+                @change="onDockPositionChange"
+              />
               <p class="hint">{{ t('settings.dockPos.hint') }}</p>
             </div>
 
             <div class="field full-width" style="margin-top: 8px;">
               <label>{{ t('settings.searchEngine.label') }} <em>SEARCH ENGINE</em></label>
-              <select v-model="form.searchEngine" @change="saveImmediate('searchEngine')">
-                <option value="bing">{{ t('settings.searchEngine.bing') }}</option>
-                <option value="google">{{ t('settings.searchEngine.google') }}</option>
-                <option value="baidu">{{ t('settings.searchEngine.baidu') }}</option>
-                <option value="duckduckgo">{{ t('settings.searchEngine.duckduckgo') }}</option>
-              </select>
+              <CustomSelect
+                :model-value="form.searchEngine || 'bing'"
+                :options="searchEngineOptions"
+                size="md"
+                @update:model-value="form.searchEngine = $event as any"
+                @change="saveImmediate('searchEngine')"
+              />
               <p class="hint">{{ t('settings.searchEngine.hint') }}</p>
             </div>
 
             <div class="field full-width" style="margin-top: 8px;">
               <label>{{ t('settings.startupStyle.label') }} <em>STARTUP STYLE</em></label>
               <div style="display:flex;gap:10px;align-items:center;">
-                <select v-model="form.startupAnimationStyle" style="flex:1;" @change="handleStartupStyleChange">
-                  <option value="endfield">{{ t('settings.startupStyle.endfield') }}</option>
-                  <option value="rhinelab">{{ t('settings.startupStyle.rhinelab') }}</option>
-                </select>
+                <CustomSelect
+                  :model-value="form.startupAnimationStyle || 'endfield'"
+                  :options="startupStyleOptions"
+                  size="md"
+                  style="flex:1;"
+                  @update:model-value="form.startupAnimationStyle = $event as any"
+                  @change="handleStartupStyleChange"
+                />
                 <button type="button" class="btn-secondary" style="min-width:110px;" @click="previewStartup">{{ t('settings.startupStyle.preview') }}</button>
               </div>
               <p class="hint">{{ t('settings.startupStyle.hint') }}</p>
@@ -397,10 +403,13 @@
             <div class="field full-width">
               <label>{{ t('settings.privacy.filterLabel') }} <em>SEARCH FILTER</em></label>
               <div style="display:flex;gap:10px;align-items:center;">
-                <select v-model="selectedFolderToAdd" style="flex:1;">
-                  <option value="">{{ availableFolders.length ? t('settings.privacy.selectPlaceholder') : t('settings.privacy.reading') }}</option>
-                  <option v-for="f in availableFolders" :key="f.id" :value="f.id">{{ f.path }}</option>
-                </select>
+                <CustomSelect
+                  v-model="selectedFolderToAdd"
+                  :options="availableFolderOptions"
+                  :placeholder="availableFolders.length ? t('settings.privacy.selectPlaceholder') : t('settings.privacy.reading')"
+                  size="md"
+                  style="flex:1;"
+                />
                 <button type="button" class="btn-secondary" :disabled="!selectedFolderToAdd" @click="addIgnoredFolder">{{ t('settings.privacy.addFolder') }}</button>
               </div>
 
@@ -876,6 +885,7 @@ import {
 } from "../search/search-slots.store";
 import { isGuestPreviewActive, guestPreviewController } from "../core/guest-preview-store";
 import { t, currentLanguage, setLanguage, SUPPORTED_LANGUAGES } from "../i18n";
+import CustomSelect, { type CustomSelectOption } from "../core/CustomSelect.vue";
 
 declare const chrome: any;
 const props = withDefaults(defineProps<{ active?: boolean }>(), { active: true });
@@ -891,6 +901,33 @@ const tabs = computed(() => [
 ]);
 
 const currentTab = ref("modules");
+
+const dockPositionOptions = computed<CustomSelectOption[]>(() => [
+  { value: "bottom", label: t("settings.dockPos.bottom"), icon: "⬇️" },
+  { value: "left", label: t("settings.dockPos.left"), icon: "⬅️" },
+  { value: "right", label: t("settings.dockPos.right"), icon: "➡️" },
+  { value: "top", label: t("settings.dockPos.top"), icon: "⬆️" }
+]);
+
+const searchEngineOptions = computed<CustomSelectOption[]>(() => [
+  { value: "bing", label: t("settings.searchEngine.bing"), icon: "🔍" },
+  { value: "google", label: t("settings.searchEngine.google"), icon: "🌐" },
+  { value: "baidu", label: t("settings.searchEngine.baidu"), icon: "🐾" },
+  { value: "duckduckgo", label: t("settings.searchEngine.duckduckgo"), icon: "🦆" }
+]);
+
+const startupStyleOptions = computed<CustomSelectOption[]>(() => [
+  { value: "endfield", label: t("settings.startupStyle.endfield"), icon: "✨" },
+  { value: "rhinelab", label: t("settings.startupStyle.rhinelab"), icon: "🔬" }
+]);
+
+const availableFolderOptions = computed<CustomSelectOption[]>(() => {
+  return availableFolders.value.map(f => ({
+    value: f.id,
+    label: f.path,
+    icon: "📁"
+  }));
+});
 const settingsMain = ref<HTMLElement | null>(null);
 watch(() => settingsController.state.sectionRequest, () => {
   const section = settingsController.state.requestedSection;

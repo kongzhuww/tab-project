@@ -1,7 +1,7 @@
-import { d as w, b as d, D as b, H as _, z as k, o as y, g as S, h as t, t as a, p as E, k as D, E as $, I as x, F as C, y as c, c as L } from "./chunks/vendor-vue-dDCd4-uG.js";
-import { S as B, i as H } from "./chunks/SearchBox-BgMcHHOF.js";
-import { s as I } from "./chunks/search.service-Ch5HygjH.js";
-const T = { class: "sub-newtab-topbar" }, M = { class: "sub-newtab-center" }, N = { class: "hero-clock" }, V = { id: "greeting" }, F = {
+import { d as w, b as d, D as b, G as _, z as k, o as y, g as S, h as t, t as a, p as D, k as E, s as $, H as x, F as C, y as c, c as L } from "./chunks/vendor-vue-FFI3kJnP.js";
+import { S as B, i as H } from "./chunks/SearchBox-B9hhBclJ.js";
+import { s as T } from "./chunks/search.service-Ct9e-A4u.js";
+const I = { class: "sub-newtab-topbar" }, M = { class: "sub-newtab-center" }, N = { class: "hero-clock" }, V = { id: "greeting" }, F = {
   id: "clock",
   class: "clock"
 }, A = { id: "secs" }, K = {
@@ -30,12 +30,12 @@ const T = { class: "sub-newtab-topbar" }, M = { class: "sub-newtab-center" }, N 
     }
     return b(() => {
       l = window.setInterval(i, 1e3), document.addEventListener("visibilitychange", i), window.addEventListener("keydown", r), _(() => {
-        I.focus();
+        T.focus();
       });
     }), k(() => {
       clearInterval(l), document.removeEventListener("visibilitychange", i), window.removeEventListener("keydown", r);
     }), (e, s) => (y(), S(C, null, [
-      t("div", T, [
+      t("div", I, [
         t("button", {
           id: "theme-toggle",
           class: "sub-theme-toggle",
@@ -48,7 +48,7 @@ const T = { class: "sub-newtab-topbar" }, M = { class: "sub-newtab-center" }, N 
         t("div", N, [
           t("p", V, a(m.value), 1),
           t("p", F, [
-            E(a(h.value), 1),
+            D(a(h.value), 1),
             t("span", A, a(v.value), 1)
           ]),
           t("p", K, a(g.value), 1)
@@ -56,7 +56,7 @@ const T = { class: "sub-newtab-topbar" }, M = { class: "sub-newtab-center" }, N 
         t("form", {
           id: "search",
           class: "search",
-          onSubmit: s[0] || (s[0] = D(() => {
+          onSubmit: s[0] || (s[0] = E(() => {
           }, ["prevent"]))
         }, [
           $(B)

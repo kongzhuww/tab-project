@@ -9,6 +9,7 @@ import { cleanBookmarkTitle, cleanBookmarkUrl, saveBookmarkText, saveBookmarkIco
 import { removeBookmarkIcon } from './icon-storage';
 import { launcherDialogsController } from '../launcher/dialogs-store';
 import { notifications } from '../sdk/notifications';
+import CustomSelect, { type CustomSelectOption } from '../core/CustomSelect.vue';
 const BookmarkFolderDialog = defineAsyncComponent(() => import('./BookmarkFolderDialog.vue'));
 const BookmarkBoardMenu = defineAsyncComponent(() => import('./BookmarkBoardMenu.vue'));
 const props = defineProps<{ headerTarget: string }>();
@@ -24,6 +25,13 @@ const menuRef = ref<{ canDismiss: boolean } | null>(null);
 let generation = 0, mounted = true;
 let refreshTimer: ReturnType<typeof setTimeout> | undefined;
 let unsubscribe = () => {};
+const sourceOptions = computed<CustomSelectOption[]>(() => {
+  return board.value.sources.map(s => ({
+    value: s.id,
+    label: s.title,
+    icon: '🔖'
+  }));
+});
 const source = computed(() => board.value.sources.find(item => item.id === sourceId.value));
 const sections = computed(() => source.value?.sections || []);
 const section = computed(() => sections.value.find(item => item.id === sectionId.value));
@@ -241,9 +249,15 @@ onUnmounted(() => { mounted = false; ++generation; unsubscribe(); clearTimeout(r
             @click="selectSection(item.id)" @contextmenu.prevent="openMenu(item, item.parentId || '', $event, true)">{{ item.title }}</button>
         </nav>
         <div class="bookmark-board-tools">
-          <select v-if="board.sources.length > 1" v-model="sourceId" :disabled="saving || !!menu" aria-label="书签来源" @change="selectSource">
-            <option v-for="item in board.sources" :key="item.id" :value="item.id">{{ item.title }}</option>
-          </select>
+          <CustomSelect
+            v-if="board.sources.length > 1"
+            v-model="sourceId"
+            :options="sourceOptions"
+            :disabled="saving || !!menu"
+            size="xs"
+            style="width: 110px;"
+            @change="selectSource"
+          />
           <button type="button" :disabled="loading || saving" title="刷新书签" aria-label="刷新书签" @click="refresh">↻</button>
         </div>
       </div>

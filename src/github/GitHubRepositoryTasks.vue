@@ -31,52 +31,28 @@
         </div>
       </div>
 
-      <!-- 项目与分组选择器 (自由选择目标 Project 与 Section) -->
+      <!-- 项目与分组选择器 (采用现代化自定义下拉菜单) -->
       <div class="task-destination-selector">
         <div class="selector-field">
-          <label class="selector-label" for="task-dest-project">
-            <span class="selector-title">📁 目标项目</span>
-          </label>
-          <select
-            id="task-dest-project"
+          <span class="selector-title">📁 目标项目</span>
+          <CustomSelect
             v-model="selectedProjectId"
-            class="task-project-select"
+            :options="projectOptions"
             :disabled="githubTaskCreation.saving || loadingProjects"
+            :placeholder="loadingProjects ? '正在加载项目…' : '选择项目'"
             @change="onProjectChange"
-          >
-            <option v-if="loadingProjects" value="" disabled>正在加载 Todoist 项目…</option>
-            <option v-else-if="!projects.length" value="" disabled>未找到可用项目，请检查登录</option>
-            <option
-              v-for="p in projects"
-              :key="p.id"
-              :value="String(p.id)"
-            >
-              {{ p.name }}
-            </option>
-          </select>
+          />
         </div>
 
         <div class="selector-field">
-          <label class="selector-label" for="task-dest-section">
-            <span class="selector-title">📑 目标分组 (板块)</span>
-          </label>
-          <select
-            id="task-dest-section"
+          <span class="selector-title">📑 目标分组 (板块)</span>
+          <CustomSelect
             v-model="selectedSectionId"
-            class="task-section-select"
+            :options="sectionOptions"
             :disabled="githubTaskCreation.saving || loadingSections"
+            :placeholder="loadingSections ? '正在加载板块…' : '(无分组 / 默认项目根)'"
             @change="onSectionChange"
-          >
-            <option value="">(无分组 / 默认项目根)</option>
-            <option v-if="loadingSections" value="" disabled>正在加载板块分组…</option>
-            <option
-              v-for="s in sections"
-              :key="s.id"
-              :value="String(s.id)"
-            >
-              {{ s.name }}
-            </option>
-          </select>
+          />
         </div>
       </div>
 
@@ -174,6 +150,7 @@ import { githubTaskCreation, type GitHubTaskTarget } from '../todoist/github-tas
 import TaskRepositoryLinks from '../todoist/TaskRepositoryLinks.vue';
 import TodoistDatePickerPopover from '../todoist/TodoistDatePickerPopover.vue';
 import GitHubRepositoryLinkedTasks from './GitHubRepositoryLinkedTasks.vue';
+import CustomSelect, { type CustomSelectOption } from '../core/CustomSelect.vue';
 
 const props = defineProps<{ repository: RepositoryLink }>();
 const emit = defineEmits<{ close: []; openTask: [taskId: string] }>();
@@ -260,15 +237,38 @@ async function loadSectionsForProject(projId: string) {
   }
 }
 
-async function onProjectChange() {
-  if (!selectedProjectId.value) return;
+const projectOptions = computed<CustomSelectOption[]>(() => {
+  return projects.value.map(p => ({
+    value: String(p.id),
+    label: p.name,
+    icon: '📁'
+  }));
+});
+
+const sectionOptions = computed<CustomSelectOption[]>(() => {
+  const list: CustomSelectOption[] = [
+    { value: '', label: '(无分组 / 默认项目根)', icon: '📑' }
+  ];
+  sections.value.forEach(s => {
+    list.push({
+      value: String(s.id),
+      label: s.name,
+      icon: '📑'
+    });
+  });
+  return list;
+});
+
+async function onProjectChange(id: string | number) {
+  selectedProjectId.value = String(id);
   localStorage.setItem('github_task_last_project_id', selectedProjectId.value);
   selectedSectionId.value = '';
   localStorage.removeItem('github_task_last_section_id');
   await loadSectionsForProject(selectedProjectId.value);
 }
 
-function onSectionChange() {
+function onSectionChange(id: string | number) {
+  selectedSectionId.value = String(id);
   if (selectedSectionId.value) {
     localStorage.setItem('github_task_last_section_id', selectedSectionId.value);
   } else {

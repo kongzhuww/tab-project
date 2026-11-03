@@ -4,85 +4,34 @@
     <div class="benchmark-subbar">
       <!-- 1. 主模型选择 -->
       <div class="model-select-group">
-        <label for="benchmark-model-picker" class="picker-label primary">
+        <label class="picker-label primary">
           <span class="color-dot primary"></span> 主测模型：
         </label>
-        <select
+        <CustomSelect
           id="benchmark-model-picker"
           class="benchmark-select primary"
-          :value="activeModel.id"
-          @change="onModelSelect(($event.target as HTMLSelectElement).value)"
-        >
-          <optgroup label="🌟 开源前沿矩阵">
-            <option
-              v-for="m in models.filter(it => it.group === 'open-source')"
-              :key="m.id"
-              :value="m.id"
-            >
-              {{ m.name }} ({{ m.creator }})
-            </option>
-          </optgroup>
-          <optgroup label="💎 商业标杆矩阵">
-            <option
-              v-for="m in models.filter(it => it.group === 'commercial')"
-              :key="m.id"
-              :value="m.id"
-            >
-              {{ m.name }} ({{ m.creator }})
-            </option>
-          </optgroup>
-          <optgroup label="⚡ 极速轻量矩阵">
-            <option
-              v-for="m in models.filter(it => it.group === 'lightweight')"
-              :key="m.id"
-              :value="m.id"
-            >
-              {{ m.name }} ({{ m.creator }})
-            </option>
-          </optgroup>
-        </select>
+          :model-value="activeModel.id"
+          :options="mainModelOptions"
+          size="sm"
+          style="min-width: 220px;"
+          @change="onModelSelect(String($event))"
+        />
       </div>
 
       <!-- 2. 对比模型选择（彻底解决右边无意义的问题） -->
       <div class="model-select-group">
-        <label for="benchmark-compare-picker" class="picker-label compare">
+        <label class="picker-label compare">
           <span class="color-dot compare"></span> 对比基准：
         </label>
-        <select
+        <CustomSelect
           id="benchmark-compare-picker"
           class="benchmark-select compare"
-          :value="compareModelId"
-          @change="compareModelId = ($event.target as HTMLSelectElement).value"
-        >
-          <option value="__benchmark__">📐 行业基准均值线 (Top19)</option>
-          <optgroup label="🌟 开源模型对比">
-            <option
-              v-for="m in models.filter(it => it.group === 'open-source' && it.id !== activeModel.id)"
-              :key="m.id"
-              :value="m.id"
-            >
-              {{ m.name }} ({{ m.creator }})
-            </option>
-          </optgroup>
-          <optgroup label="💎 商业标杆对比">
-            <option
-              v-for="m in models.filter(it => it.group === 'commercial' && it.id !== activeModel.id)"
-              :key="m.id"
-              :value="m.id"
-            >
-              {{ m.name }} ({{ m.creator }})
-            </option>
-          </optgroup>
-          <optgroup label="⚡ 极速轻量对比">
-            <option
-              v-for="m in models.filter(it => it.group === 'lightweight' && it.id !== activeModel.id)"
-              :key="m.id"
-              :value="m.id"
-            >
-              {{ m.name }} ({{ m.creator }})
-            </option>
-          </optgroup>
-        </select>
+          :model-value="compareModelId"
+          :options="compareModelOptions"
+          size="sm"
+          style="min-width: 220px;"
+          @change="compareModelId = String($event)"
+        />
       </div>
 
       <div class="model-quick-tags">
@@ -425,6 +374,7 @@ import {
   PARETO_CURVE_POINTS,
   type ImageGenBenchmarkModel
 } from "./image-benchmark-data";
+import CustomSelect, { type CustomSelectOption } from "../core/CustomSelect.vue";
 
 const props = defineProps<{
   selectedModelId: string;
@@ -435,6 +385,28 @@ const emit = defineEmits<{
 }>();
 
 const models = IMAGE_GEN_BENCHMARK_MODELS;
+
+const mainModelOptions = computed<CustomSelectOption[]>(() => {
+  return models.map(m => ({
+    value: m.id,
+    label: `${m.name} (${m.creator})`,
+    icon: m.group === 'open-source' ? '🌟' : m.group === 'commercial' ? '💎' : '⚡'
+  }));
+});
+
+const compareModelOptions = computed<CustomSelectOption[]>(() => {
+  const list: CustomSelectOption[] = [
+    { value: "__benchmark__", label: "📐 行业基准均值线 (Top19)" }
+  ];
+  models.filter(m => m.id !== activeModel.value.id).forEach(m => {
+    list.push({
+      value: m.id,
+      label: `${m.name} (${m.creator})`,
+      icon: m.group === 'open-source' ? '🌟' : m.group === 'commercial' ? '💎' : '⚡'
+    });
+  });
+  return list;
+});
 
 // 对比模型 ID，默认为 Midjourney v6.1（商业标杆），形成开箱即有的双模型精彩 PK
 const compareModelId = ref<string>("midjourney-v6-1");

@@ -7,6 +7,7 @@ import { todoistTaskListController } from "../todoist/task-list-store";
 import { openTodoistTask } from "../todoist/task-navigation";
 import { notifications } from "../sdk/notifications";
 import TodoistDatePickerPopover from "../todoist/TodoistDatePickerPopover.vue";
+import CustomSelect, { type CustomSelectOption } from "../core/CustomSelect.vue";
 
 const windowRef = ref<HTMLElement | null>(null);
 const pos = ref<{ x: number; y: number } | null>(null);
@@ -244,47 +245,43 @@ async function loadSectionsForProject(projId: string) {
   }
 }
 
-const selectedProjectName = computed(() => {
-  return projects.value.find(p => String(p.id) === selectedProjectId.value)?.name || "选择项目…";
+const projectOptions = computed<CustomSelectOption[]>(() => {
+  return projects.value.map(p => ({
+    value: String(p.id),
+    label: p.name,
+    icon: "📁"
+  }));
 });
 
-const selectedSectionName = computed(() => {
-  if (!selectedSectionId.value) return "无分组 / 默认项目根";
-  return sections.value.find(s => String(s.id) === selectedSectionId.value)?.name || "无分组 / 默认项目根";
+const sectionOptions = computed<CustomSelectOption[]>(() => {
+  const list: CustomSelectOption[] = [
+    { value: "", label: "(无分组 / 默认项目根)", icon: "📑" }
+  ];
+  sections.value.forEach(s => {
+    list.push({
+      value: String(s.id),
+      label: s.name,
+      icon: "📑"
+    });
+  });
+  return list;
 });
 
-const isProjectMenuOpen = ref(false);
-
-function toggleProjectMenu() {
-  if (isSubmitting.value || loadingProjects.value) return;
-  isProjectMenuOpen.value = !isProjectMenuOpen.value;
-}
-
-async function onProjectChange() {
-  if (!selectedProjectId.value) return;
+async function onProjectChange(id: string | number) {
+  selectedProjectId.value = String(id);
   localStorage.setItem("bili_task_last_project_id", selectedProjectId.value);
   selectedSectionId.value = "";
   localStorage.removeItem("bili_task_last_section_id");
   await loadSectionsForProject(selectedProjectId.value);
 }
 
-function onSectionChange() {
+function onSectionChange(id: string | number) {
+  selectedSectionId.value = String(id);
   if (selectedSectionId.value) {
     localStorage.setItem("bili_task_last_section_id", selectedSectionId.value);
   } else {
     localStorage.removeItem("bili_task_last_section_id");
   }
-}
-
-function selectProject(id: string) {
-  selectedProjectId.value = id;
-  isProjectMenuOpen.value = false;
-  void onProjectChange();
-}
-
-function selectSection(id: string) {
-  selectedSectionId.value = id;
-  onSectionChange();
 }
 
 // 监听弹窗打开与视频变化
@@ -463,65 +460,28 @@ onUnmounted(() => {
             </div>
           </div>
 
-          <!-- 目标项目与分组选择器：双方案对比 -->
+          <!-- 目标项目与分组选择器 (统一采用现代弹出菜单) -->
           <div class="bili-destination-selector">
-            <!-- 方案 B：现代精致卡片按钮 + 自适应浮动下拉菜单 (目标项目) -->
             <div class="bili-selector-field">
-              <span class="bili-selector-title">📁 目标项目 (方案 B: 现代弹出菜单)</span>
-              <div class="bili-custom-select-wrapper">
-                <button
-                  type="button"
-                  class="bili-custom-select-btn"
-                  :class="{ 'is-open': isProjectMenuOpen }"
-                  :disabled="isSubmitting || loadingProjects"
-                  @click="toggleProjectMenu"
-                >
-                  <span class="bili-select-text">{{ loadingProjects ? '正在读取项目…' : selectedProjectName }}</span>
-                  <span class="bili-select-arrow">▾</span>
-                </button>
-                <div v-if="isProjectMenuOpen" class="bili-custom-popover-menu">
-                  <div v-if="!projects.length" class="bili-popover-empty">未找到可用项目</div>
-                  <button
-                    v-for="p in projects"
-                    :key="p.id"
-                    type="button"
-                    class="bili-popover-item"
-                    :class="{ 'is-active': String(p.id) === selectedProjectId }"
-                    @click="selectProject(String(p.id))"
-                  >
-                    <span>{{ p.name }}</span>
-                    <span v-if="String(p.id) === selectedProjectId" class="bili-popover-check">✓</span>
-                  </button>
-                </div>
-              </div>
+              <span class="bili-selector-title">📁 目标项目</span>
+              <CustomSelect
+                v-model="selectedProjectId"
+                :options="projectOptions"
+                :disabled="isSubmitting || loadingProjects"
+                :placeholder="loadingProjects ? '正在加载项目…' : '选择项目'"
+                @change="onProjectChange"
+              />
             </div>
 
-            <!-- 方案 A：横向自适应流式药丸胶囊排布 (目标分组板块) -->
             <div class="bili-selector-field">
-              <span class="bili-selector-title">📑 目标分组 (方案 A: 药丸胶囊平铺)</span>
-              <div v-if="loadingSections" class="bili-pills-loading">正在读取板块…</div>
-              <div v-else class="bili-pills-container">
-                <button
-                  type="button"
-                  class="bili-pill-chip"
-                  :class="{ 'is-active': !selectedSectionId }"
-                  :disabled="isSubmitting"
-                  @click="selectSection('')"
-                >
-                  (默认项目根)
-                </button>
-                <button
-                  v-for="s in sections"
-                  :key="s.id"
-                  type="button"
-                  class="bili-pill-chip"
-                  :class="{ 'is-active': selectedSectionId === String(s.id) }"
-                  :disabled="isSubmitting"
-                  @click="selectSection(String(s.id))"
-                >
-                  {{ s.name }}
-                </button>
-              </div>
+              <span class="bili-selector-title">📑 目标分组 (板块)</span>
+              <CustomSelect
+                v-model="selectedSectionId"
+                :options="sectionOptions"
+                :disabled="isSubmitting || loadingSections"
+                :placeholder="loadingSections ? '正在加载板块…' : '(无分组 / 默认项目根)'"
+                @change="onSectionChange"
+              />
             </div>
           </div>
 

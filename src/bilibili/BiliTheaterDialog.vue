@@ -20,17 +20,15 @@
         <span id="bili-theater-author" class="bili-theater-author">{{ state.author }}</span>
       </div>
       <div class="bili-theater-controls">
-        <select
+        <CustomSelect
           v-if="!state.useIframe && state.acceptQualities.length"
           class="bili-theater-quality-select"
-          :value="state.currentQuality"
-          title="切换视频画质清晰度"
+          :model-value="state.currentQuality"
+          :options="qualityOptions"
+          size="sm"
+          style="width: 105px;"
           @change="handleQualityChange"
-        >
-          <option v-for="q in state.acceptQualities" :key="q.qn" :value="q.qn">
-            {{ q.label }}
-          </option>
-        </select>
+        />
         <button
           v-if="state.canDirectPlay"
           class="bili-theater-btn"
@@ -251,15 +249,23 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from "vue";
+import { ref, computed } from "vue";
 import { useVideoFailover } from "./use-video-failover";
 import { biliTheaterController } from "./theater-store";
 import BiliRichText from "./BiliRichText.vue";
+import CustomSelect, { type CustomSelectOption } from "../core/CustomSelect.vue";
 
 // B站剧场响应式状态
 const state = biliTheaterController.state;
 const videoRef = ref<HTMLVideoElement | null>(null);
 useVideoFailover(state, videoRef, () => biliTheaterController.playbackFailed());
+
+const qualityOptions = computed<CustomSelectOption[]>(() => {
+  return state.acceptQualities.map(q => ({
+    value: q.qn,
+    label: q.label
+  }));
+});
 
 // 关闭剧场视窗
 function handleClose() {
@@ -277,11 +283,8 @@ function handleTogglePlayerMode() {
 }
 
 // 切换画质清晰度
-function handleQualityChange(event: Event) {
-  const target = event.target as HTMLSelectElement;
-  if (target) {
-    biliTheaterController.switchQuality(Number(target.value));
-  }
+function handleQualityChange(qn: string | number) {
+  biliTheaterController.switchQuality(Number(qn));
 }
 
 // 切换评论排序

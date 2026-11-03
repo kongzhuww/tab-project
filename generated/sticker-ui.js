@@ -1,15 +1,15 @@
-import { d as z, D, z as F, o as n, g as a, h as o, i as d, E as v, t as h, F as g, j as M, u as w, C as P, G as y, b as p, c as V } from "./chunks/vendor-vue-dDCd4-uG.js";
-import { S as L } from "./chunks/StickerBoard-B9xmDs6x.js";
-import { b as f, w as $ } from "./chunks/stickers.service-Qf4pDC-d.js";
+import { d as z, D, z as F, o as n, g as a, h as o, i as d, s as v, t as h, F as g, j as M, u as w, C as P, E as y, b as p, c as V } from "./chunks/vendor-vue-FFI3kJnP.js";
+import { S as L } from "./chunks/StickerBoard-DCj4jQzB.js";
+import { b as f, w as $ } from "./chunks/stickers.service-s7Amh1xE.js";
 import { g as b, i as S, s as j } from "./chunks/quick-links-export.service-bmE4-0fH.js";
-import { _ as G } from "./chunks/_plugin-vue_export-helper-CRVO6deU.js";
-const H = { class: "sticker-app" }, Q = {
+import { _ as H } from "./chunks/_plugin-vue_export-helper-CVWGtx1v.js";
+const Q = { class: "sticker-app" }, U = {
   key: 0,
   class: "sticker-side-nav"
-}, U = {
+}, q = {
   key: 1,
   class: "sticker-side-tools"
-}, q = {
+}, G = {
   key: 2,
   class: "sticker-page-section"
 }, J = { class: "sticker-page-grid" }, K = {
@@ -18,7 +18,7 @@ const H = { class: "sticker-app" }, Q = {
 }, O = ["title", "onClick"], R = ["src"], X = ["hidden"], Y = /* @__PURE__ */ z({
   __name: "StickerStandalone",
   setup(tt) {
-    const T = y(() => import("./chunks/SettingsDialog-mPzbz17W.js")), B = y(() => import("./chunks/AppPromptModal-BMf1x_4w.js")), k = document.body.dataset.mode === "sidepanel", l = p([]), i = p("等待扫描"), u = p(""), _ = p(!1);
+    const T = y(() => import("./chunks/SettingsDialog-CdId9B1t.js")), B = y(() => import("./chunks/AppPromptModal-jdiL1bnB.js")), k = document.body.dataset.mode === "sidepanel", l = p([]), i = p("等待扫描"), u = p(""), _ = p(!1);
     let m = 0;
     function r(s, e = !1) {
       u.value = s, _.value = e, clearTimeout(m), m = window.setTimeout(() => {
@@ -72,13 +72,13 @@ const H = { class: "sticker-app" }, Q = {
       }
     }
     return (s, e) => (n(), a(g, null, [
-      o("main", H, [
-        k ? (n(), a("nav", Q, [...e[0] || (e[0] = [
+      o("main", Q, [
+        k ? (n(), a("nav", U, [...e[0] || (e[0] = [
           o("a", { href: "sidepanel.html" }, "← 工具首页", -1),
           o("span", null, "表情包", -1)
         ])])) : d("", !0),
         v(L),
-        k ? (n(), a("div", U, [
+        k ? (n(), a("div", q, [
           o("button", {
             type: "button",
             onClick: E
@@ -88,7 +88,7 @@ const H = { class: "sticker-app" }, Q = {
             onClick: I
           }, "☆ 保存网页到常用网站")
         ])) : d("", !0),
-        k ? (n(), a("section", q, [
+        k ? (n(), a("section", G, [
           o("header", null, [
             o("div", null, [
               e[1] || (e[1] = o("strong", null, "当前网页图片", -1)),
@@ -127,5 +127,5 @@ const H = { class: "sticker-app" }, Q = {
       }, h(u.value), 11, X)
     ], 64));
   }
-}), Z = /* @__PURE__ */ G(Y, [["__scopeId", "data-v-afcc7f36"]]), C = document.getElementById("vue-sticker-standalone-root");
+}), Z = /* @__PURE__ */ H(Y, [["__scopeId", "data-v-afcc7f36"]]), C = document.getElementById("vue-sticker-standalone-root");
 C && V(Z).mount(C);

@@ -95,18 +95,12 @@
       :hidden="state.mode !== 'launcher'"
     >
       <label for="bookmark-launcher-group-select">选择常用网站分区</label>
-      <select
+      <CustomSelect
         id="bookmark-launcher-group-select"
         v-model="state.selectedLauncherGroup"
-      >
-        <option
-          v-for="group in state.launcherGroups"
-          :key="group"
-          :value="group"
-        >
-          {{ group }}
-        </option>
-      </select>
+        :options="state.launcherGroups"
+        size="sm"
+      />
       <div>
         <button id="bookmark-launcher-cancel" type="button" @click="handleSwitchMode('actions')">返回</button>
         <button id="bookmark-launcher-save" class="primary" type="button" @click="handleSaveLauncher">确认收藏</button>
@@ -187,6 +181,7 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted } from "vue";
 import { bookmarkMenuController, type BookmarkMenuMode } from "./menu-store";
+import CustomSelect from "../core/CustomSelect.vue";
 
 const state = bookmarkMenuController.state;
 

@@ -2,11 +2,17 @@
 import { computed, ref } from 'vue';
 import { cubeRegistryStore, type CustomFaceType } from './cube-registry.store';
 import { t } from '../i18n';
+import CustomSelect, { type CustomSelectOption } from '../core/CustomSelect.vue';
 const state = cubeRegistryStore.state;
 const activeFaces = computed(() => cubeRegistryStore.getActiveFaces());
 const inactive = computed(() => state.registeredFaces.filter(f => !state.activeFaceIds.includes(f.id)));
 const title = ref('');
 const kind = ref<CustomFaceType>('memo');
+const kindOptions = computed<CustomSelectOption[]>(() => [
+  { value: 'memo', label: t('cube.manager.typeMemo'), icon: '📝' },
+  { value: 'countdown', label: t('cube.manager.typeCountdown'), icon: '⏳' },
+  { value: 'link', label: t('cube.manager.typeLink'), icon: '🔗' }
+]);
 const content = ref('');
 const codeMode = ref(false);
 const code = ref(JSON.stringify({ title: '每日一句', icon: '📝', customType: 'memo', customData: { text: '今天也要记得休息' } }, null, 2));
@@ -49,7 +55,15 @@ function add() {
         <form @submit.prevent="add">
           <template v-if="!codeMode">
             <label>{{ t('cube.manager.fieldTitle') }}<input v-model="title" maxlength="60" required /></label>
-            <label>{{ t('cube.manager.fieldType') }}<select v-model="kind"><option value="memo">{{ t('cube.manager.typeMemo') }}</option><option value="countdown">{{ t('cube.manager.typeCountdown') }}</option><option value="link">{{ t('cube.manager.typeLink') }}</option></select></label>
+            <label>
+              {{ t('cube.manager.fieldType') }}
+              <CustomSelect
+                v-model="kind"
+                :options="kindOptions"
+                size="sm"
+                @change="kind = $event as CustomFaceType"
+              />
+            </label>
             <label>{{ t('cube.manager.fieldContent') }}<input v-model="content" :type="kind === 'countdown' ? 'date' : 'text'" :placeholder="kind === 'link' ? 'https://…' : t('cube.manager.contentPlaceholderText')" maxlength="500" required /></label>
           </template>
           <template v-else>

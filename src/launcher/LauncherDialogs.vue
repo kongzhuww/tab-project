@@ -88,15 +88,12 @@
         </p>
         <label>
           合并到
-          <select id="group-merge-target" v-model="state.groupMerge.targetGroup" required>
-            <option
-              v-for="group in state.groupMerge.groups"
-              :key="group"
-              :value="group"
-            >
-              {{ group }}
-            </option>
-          </select>
+          <CustomSelect
+            id="group-merge-target"
+            v-model="state.groupMerge.targetGroup"
+            :options="groupMergeOptions"
+            size="sm"
+          />
         </label>
         <div class="dialog-actions">
           <span class="grow"></span>
@@ -119,15 +116,12 @@
         </p>
         <label>
           目标分区
-          <select id="folder-move-page-target" v-model="state.folderMove.targetPageId" required>
-            <option
-              v-for="page in state.folderMove.pages"
-              :key="page.id"
-              :value="page.id"
-            >
-              {{ page.name }}
-            </option>
-          </select>
+          <CustomSelect
+            id="folder-move-page-target"
+            v-model="state.folderMove.targetPageId"
+            :options="folderMovePageOptions"
+            size="sm"
+          />
         </label>
         <div class="dialog-actions">
           <span class="grow"></span>
@@ -150,31 +144,24 @@
         </p>
         <label id="link-move-page-label">
           目标位置 / 分区
-          <select id="link-move-page-target" v-model="state.linkMove.targetPageId">
-            <option
-              v-for="page in state.linkMove.pages"
-              :key="page.id"
-              :value="page.id"
-            >
-              {{ page.name }}
-            </option>
-          </select>
+          <CustomSelect
+            id="link-move-page-target"
+            v-model="state.linkMove.targetPageId"
+            :options="linkMovePageOptions"
+            size="sm"
+          />
         </label>
         <label
           v-if="state.linkMove.showFolderSelect"
           id="link-move-folder-label"
         >
           目标文件夹 / 收藏夹
-          <select id="link-move-folder-target" v-model="state.linkMove.targetFolderId">
-            <option value="">（不放入文件夹，保留在分区根目录）</option>
-            <option
-              v-for="folder in state.linkMove.folders"
-              :key="folder.id"
-              :value="folder.id"
-            >
-              {{ folder.name }}
-            </option>
-          </select>
+          <CustomSelect
+            id="link-move-folder-target"
+            v-model="state.linkMove.targetFolderId"
+            :options="linkMoveFolderOptions"
+            size="sm"
+          />
         </label>
         <div class="dialog-actions">
           <span class="grow"></span>
@@ -255,8 +242,31 @@
 import { computed, ref, watch } from "vue";
 import { launcherDialogsController } from "./dialogs-store";
 import { t } from "../i18n";
+import CustomSelect, { type CustomSelectOption } from "../core/CustomSelect.vue";
 
 const state = launcherDialogsController.state;
+
+const groupMergeOptions = computed<CustomSelectOption[]>(() => {
+  return (state.groupMerge.groups || []).map(g => ({ value: g, label: g, icon: '📁' }));
+});
+
+const folderMovePageOptions = computed<CustomSelectOption[]>(() => {
+  return (state.folderMove.pages || []).map(p => ({ value: p.id, label: p.name, icon: '📑' }));
+});
+
+const linkMovePageOptions = computed<CustomSelectOption[]>(() => {
+  return (state.linkMove.pages || []).map(p => ({ value: p.id, label: p.name, icon: '📑' }));
+});
+
+const linkMoveFolderOptions = computed<CustomSelectOption[]>(() => {
+  const list: CustomSelectOption[] = [
+    { value: '', label: '（不放入文件夹，保留在分区根目录）', icon: '🌐' }
+  ];
+  (state.linkMove.folders || []).forEach(f => {
+    list.push({ value: f.id, label: f.name, icon: '📁' });
+  });
+  return list;
+});
 
 // 编辑弹窗操作
 function handleSubmitEdit() {

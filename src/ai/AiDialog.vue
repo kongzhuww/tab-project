@@ -19,9 +19,13 @@
       </button>
     </header>
     <div class="lw-ai-account">
-      <select id="lw-ai-model" aria-label="AI 模型" v-model="state.model">
-        <option value="gemini-3.6-flash" selected>✦ Gemini 3.6 Flash (Google · 百万上下文 · 免费极速)</option>
-      </select>
+      <CustomSelect
+        id="lw-ai-model"
+        v-model="state.model"
+        :options="modelOptions"
+        size="sm"
+        style="max-width: 380px;"
+      />
       <button id="lw-ai-connect" type="button" @click="handleConnect">连接 ChatGPT / Codex</button>
     </div>
     <p id="lw-ai-status" class="lw-ai-status" role="status">{{ state.statusText }}</p>
@@ -131,9 +135,14 @@
 
 <script setup lang="ts">
 import { aiDialogController } from "./store";
+import CustomSelect, { type CustomSelectOption } from "../core/CustomSelect.vue";
 
 // AI 助手弹窗响应式状态
 const state = aiDialogController.state;
+
+const modelOptions: CustomSelectOption[] = [
+  { value: "gemini-3.6-flash", label: "Gemini 3.6 Flash (Google · 百万上下文 · 免费极速)", icon: "✦" }
+];
 
 function handleClose() {
   aiDialogController.close();

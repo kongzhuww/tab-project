@@ -52,18 +52,16 @@
 
       <!-- 搜索栏与过滤工具条（生图评测下由专属组件承载，价格与排行下展示统一工具栏） -->
       <div class="pricing-toolbar" v-show="state.view !== 'image-eval'">
-        <select
+        <CustomSelect
           id="pricing-mode"
           class="pricing-sort"
           v-show="state.view === 'price'"
           v-model="state.sortMode"
+          :options="sortOptions"
+          size="sm"
+          style="width: 140px;"
           @change="handleSortChange"
-        >
-          <option value="cheap-in">{{ t("pricing.sort.cheapIn") }}</option>
-          <option value="cheap-out">{{ t("pricing.sort.cheapOut") }}</option>
-          <option value="free">{{ t("pricing.sort.free") }}</option>
-          <option value="context">{{ t("pricing.sort.context") }}</option>
-        </select>
+        />
         <input
           id="pricing-search"
           class="pricing-search"
@@ -351,7 +349,15 @@ const PricingSettingsPanel = defineAsyncComponent(() => import("./PricingSetting
 import { pricingState, pricingController, type PricingState } from "./pricing-store";
 import { fullscreenCardState } from "../core/fullscreen-card-state";
 import { t } from "../i18n";
+import CustomSelect, { type CustomSelectOption } from "../core/CustomSelect.vue";
 const ImageBenchmarkView = defineAsyncComponent(() => import("./ImageBenchmarkView.vue"));
+
+const sortOptions = computed<CustomSelectOption[]>(() => [
+  { value: "cheap-in", label: t("pricing.sort.cheapIn"), icon: "💰" },
+  { value: "cheap-out", label: t("pricing.sort.cheapOut"), icon: "💸" },
+  { value: "free", label: t("pricing.sort.free"), icon: "🎁" },
+  { value: "context", label: t("pricing.sort.context"), icon: "📚" }
+]);
 
 
 declare const chrome: any;
