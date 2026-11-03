@@ -574,15 +574,16 @@ onUnmounted(() => {
   pointer-events: auto;
   width: min(380px, 92vw);
   max-height: min(680px, 88vh);
-  background: var(--surface, #ffffff);
+  background: var(--panel, #ffffff);
   border: 1px solid var(--border, rgba(0, 0, 0, 0.12));
   border-radius: 12px;
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.18), 0 0 0 1px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.22), 0 0 0 1px var(--border, rgba(0, 0, 0, 0.05));
   display: flex;
   flex-direction: column;
   overflow: hidden;
   color: var(--text, #1e293b);
   box-sizing: border-box;
+  contain: paint;
 }
 
 .bili-task-header {
@@ -634,7 +635,7 @@ onUnmounted(() => {
 }
 
 .bili-task-close-btn:hover {
-  background: rgba(0, 0, 0, 0.06);
+  background: var(--surface-hover, rgba(0, 0, 0, 0.06));
   color: var(--heading, #0f172a);
 }
 
@@ -644,6 +645,7 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  background: var(--panel, #ffffff);
 }
 
 /* 已关联任务 */
@@ -683,7 +685,7 @@ onUnmounted(() => {
   align-items: flex-start;
   gap: 8px;
   padding: 6px 8px;
-  background: var(--panel, #f8fafc);
+  background: var(--surface, rgba(0, 0, 0, 0.03));
   border: 1px solid var(--border, rgba(0, 0, 0, 0.06));
   border-radius: 6px;
 }
@@ -748,7 +750,7 @@ onUnmounted(() => {
   align-items: center;
   gap: 10px;
   padding: 8px 10px;
-  background: var(--panel, #f8fafc);
+  background: var(--surface, rgba(0, 0, 0, 0.03));
   border: 1px solid var(--border, rgba(0, 0, 0, 0.08));
   border-radius: 8px;
 }
@@ -792,7 +794,7 @@ onUnmounted(() => {
   flex-direction: column;
   gap: 8px;
   padding: 8px 10px;
-  background: var(--panel, #f8fafc);
+  background: var(--surface, rgba(0, 0, 0, 0.03));
   border: 1px solid var(--border, rgba(0, 0, 0, 0.08));
   border-radius: 8px;
 }
@@ -816,7 +818,7 @@ onUnmounted(() => {
   padding: 5px 8px;
   border-radius: 6px;
   border: 1px solid var(--border, rgba(0, 0, 0, 0.12));
-  background: var(--surface, #ffffff);
+  background: var(--panel, #ffffff);
   color: var(--heading, #0f172a);
   font-size: 12px;
   outline: none;
@@ -834,9 +836,9 @@ onUnmounted(() => {
   line-height: 1.4;
   padding: 8px 10px;
   border-radius: 6px;
-  background: #fef2f2;
-  border: 1px solid #fecaca;
-  color: #dc2626;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  color: #ef4444;
   margin: 0;
 }
 
@@ -866,8 +868,8 @@ onUnmounted(() => {
   box-sizing: border-box;
   padding: 8px 10px;
   border: 1px solid var(--border, rgba(0, 0, 0, 0.12));
-  background: var(--surface, #ffffff);
-  color: var(--text, #1e293b);
+  background: var(--panel, #ffffff);
+  color: var(--heading, #0f172a);
   border-radius: 6px;
   font-family: inherit;
   font-size: 12.5px;
@@ -885,8 +887,8 @@ onUnmounted(() => {
   box-sizing: border-box;
   padding: 7px 10px;
   border: 1px solid var(--border, rgba(0, 0, 0, 0.12));
-  background: var(--surface, #ffffff);
-  color: var(--text, #1e293b);
+  background: var(--panel, #ffffff);
+  color: var(--heading, #0f172a);
   border-radius: 6px;
   font-size: 12px;
   text-align: left;
@@ -895,7 +897,7 @@ onUnmounted(() => {
 }
 
 .bili-task-date-button:hover {
-  background: var(--panel, #f8fafc);
+  background: var(--surface-hover, rgba(0, 0, 0, 0.04));
   border-color: var(--border, rgba(0, 0, 0, 0.2));
 }
 
