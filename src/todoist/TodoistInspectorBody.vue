@@ -124,7 +124,12 @@
         </button>
       </section>
 
-      <TaskRepositoryLinks :key="state.taskId" :task-id="state.taskId" />
+      <TaskRepositoryLinks
+        :key="state.taskId"
+        :task-id="state.taskId"
+        :description="editDescription"
+        :title="editTitle"
+      />
 
       <!-- 4. 评论区 (Avatar + 快速输入 + 历史评论) -->
       <section class="inspector-section inspector-comments-section">

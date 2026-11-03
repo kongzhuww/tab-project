@@ -244,6 +244,21 @@
                   </button>
                 </div>
 
+                <!-- 📺 关联 B站 视频卡片标签 (视频标题标注) -->
+                <div v-if="getTaskVideos(task.id, task.description, task.content).length" class="todoist-card-repo-strip bili-strip">
+                  <button
+                    v-for="v in getTaskVideos(task.id, task.description, task.content)"
+                    :key="v.bvid"
+                    type="button"
+                    class="todoist-card-repo-btn bili-btn"
+                    :title="'关联 B站 视频：' + v.title + ' · 点击立即播放'"
+                    @click.stop="openBiliVideo(v)"
+                  >
+                    <span class="repo-badge-icon">📺</span>
+                    <span class="repo-badge-name">{{ v.title }}</span>
+                  </button>
+                </div>
+
                 <!-- 原地就地编辑框 -->
                 <textarea
                   v-if="editingTaskId === task.id"
@@ -707,7 +722,9 @@ import { notifications } from "../sdk/notifications";
 import { formatMonthDayTime, parseDateKeyword } from "./task-date-helper";
 import { githubTaskCreation } from "./github-task-target";
 import { getTaskRepositoryLinks, type RepositoryLink } from "./repository-links";
+import { getTaskBiliVideoLinks, type BiliVideoLink } from "./bili-video-links";
 import { githubRepoDetailController } from "../github/repo-detail-store";
+import { biliMiniPlayerController } from "../bilibili/mini-player-store";
 import { t } from "../i18n";
 
 const repoLinksVersion = ref(0);
@@ -717,15 +734,33 @@ function onRepoLinksChanged() {
 onMounted(() => {
   window.addEventListener('storage', onRepoLinksChanged);
   window.addEventListener('todoist-repository-links-changed', onRepoLinksChanged);
+  window.addEventListener('todoist-bili-links-changed', onRepoLinksChanged);
 });
 onUnmounted(() => {
   window.removeEventListener('storage', onRepoLinksChanged);
   window.removeEventListener('todoist-repository-links-changed', onRepoLinksChanged);
+  window.removeEventListener('todoist-bili-links-changed', onRepoLinksChanged);
 });
 
 function getTaskRepos(taskId: string, description?: string): RepositoryLink[] {
   void repoLinksVersion.value;
   return getTaskRepositoryLinks(taskId, description);
+}
+
+function getTaskVideos(taskId: string, description?: string, title?: string): BiliVideoLink[] {
+  void repoLinksVersion.value;
+  return getTaskBiliVideoLinks(taskId, description, title);
+}
+
+function openBiliVideo(v: BiliVideoLink) {
+  biliMiniPlayerController.openVideo({
+    bvid: v.bvid,
+    aid: v.aid ? String(v.aid) : undefined,
+    title: v.title,
+    author: v.author,
+    cover: v.cover,
+    url: v.url
+  });
 }
 
 function openGitHubRepo(fullName: string) {
@@ -1745,10 +1780,10 @@ onUnmounted(() => {
   box-sizing: border-box;
 }
 
-.todoist-card-repo-btn:hover {
-  background: var(--surface-hover, var(--border));
-  color: var(--accent);
-  border-color: var(--accent);
+.todoist-card-repo-btn.bili-btn:hover {
+  background: rgba(2, 132, 199, 0.08);
+  color: #0284c7;
+  border-color: #0284c7;
 }
 
 .todoist-card-repo-btn .repo-badge-icon {

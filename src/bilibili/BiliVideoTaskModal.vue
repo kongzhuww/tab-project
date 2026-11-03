@@ -8,6 +8,7 @@ import { openTodoistTask } from "../todoist/task-navigation";
 import { notifications } from "../sdk/notifications";
 import TodoistDatePickerPopover from "../todoist/TodoistDatePickerPopover.vue";
 import CustomSelect, { type CustomSelectOption } from "../core/CustomSelect.vue";
+import { attachBiliVideo } from "../todoist/bili-video-links";
 
 const windowRef = ref<HTMLElement | null>(null);
 const pos = ref<{ x: number; y: number } | null>(null);
@@ -306,6 +307,7 @@ async function submit() {
   const projId = selectedProjectId.value;
   const secId = selectedSectionId.value || undefined;
   const vk = videoKey.value;
+  const targetVideo = video.value;
 
   const payload = {
     content: content.value.trim(),
@@ -332,6 +334,18 @@ async function submit() {
 
       if (vk) {
         saveStoredTaskId(vk, created.id);
+      }
+
+      // 双向绑定任务与该 B站 视频
+      if (targetVideo) {
+        attachBiliVideo(created.id, {
+          bvid: targetVideo.bvid || (vk.startsWith('BV') ? vk : ''),
+          aid: targetVideo.aid,
+          title: targetVideo.title,
+          cover: targetVideo.cover,
+          author: targetVideo.author,
+          url: targetVideo.url || (targetVideo.bvid ? `https://www.bilibili.com/video/${targetVideo.bvid}` : '')
+        });
       }
 
       todoistService.invalidateWorkspaceSnapshots();
