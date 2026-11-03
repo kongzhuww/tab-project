@@ -52,20 +52,20 @@
             <button
               type="button"
               class="todoist-project-action-btn"
-              title="重命名项目"
+              :title="t('todoist.renameProject')"
               @click="openRenameProjectPrompt(activeProject, $event)"
             >
               <span class="action-icon">✏️</span>
-              <span class="action-text">重命名</span>
+              <span class="action-text">{{ t('common.rename') }}</span>
             </button>
             <button
               type="button"
               class="todoist-project-action-btn danger"
-              title="删除项目"
+              :title="t('todoist.deleteProject')"
               @click="openDeleteProjectConfirm(activeProject, $event)"
             >
               <span class="action-icon">🗑️</span>
-              <span class="action-text">删除项目</span>
+              <span class="action-text">{{ t('todoist.deleteProject') }}</span>
             </button>
           </div>
         </div>
@@ -708,6 +708,7 @@ import { formatMonthDayTime, parseDateKeyword } from "./task-date-helper";
 import { githubTaskCreation } from "./github-task-target";
 import { getTaskRepositoryLinks, type RepositoryLink } from "./repository-links";
 import { githubRepoDetailController } from "../github/repo-detail-store";
+import { t } from "../i18n";
 
 const repoLinksVersion = ref(0);
 function onRepoLinksChanged() {
@@ -1535,11 +1536,11 @@ function openCreateProjectPrompt(event?: MouseEvent) {
   const pos = computeModalPosition(event, 380, 220);
   promptModal.x = pos.x;
   promptModal.y = pos.y;
-  promptModal.title = "新建项目";
-  promptModal.message = "请输入新项目名称：";
+  promptModal.title = t("todoist.newProject");
+  promptModal.message = t("todoist.inputProjectPlaceholder");
   promptModal.value = "";
-  promptModal.placeholder = "项目名称…";
-  promptModal.confirmText = "创建";
+  promptModal.placeholder = t("todoist.inputProjectPlaceholder");
+  promptModal.confirmText = t("common.confirm");
   promptModal.actionType = "create-project";
   promptModal.payload = null;
   promptModal.isOpen = true;
@@ -1550,11 +1551,11 @@ function openRenameProjectPrompt(project: TodoistProjectOption, event?: MouseEve
   const pos = computeModalPosition(event, 380, 220);
   promptModal.x = pos.x;
   promptModal.y = pos.y;
-  promptModal.title = "重命名项目";
-  promptModal.message = `正在重命名项目「${project.name}」：`;
+  promptModal.title = t("todoist.renameProject");
+  promptModal.message = project.name;
   promptModal.value = project.name;
-  promptModal.placeholder = "新项目名称…";
-  promptModal.confirmText = "保存";
+  promptModal.placeholder = t("todoist.inputProjectPlaceholder");
+  promptModal.confirmText = t("common.save");
   promptModal.actionType = "rename-project";
   promptModal.payload = { projectId: project.id };
   promptModal.isOpen = true;
@@ -1570,11 +1571,11 @@ function openRenameSectionPrompt(col: TodoistColumnItem, event?: MouseEvent) {
   const pos = computeModalPosition(trigger, 380, 220);
   promptModal.x = pos.x;
   promptModal.y = pos.y;
-  promptModal.title = "重命名板块";
-  promptModal.message = `正在重命名板块「${col.title}」：`;
+  promptModal.title = t("todoist.renameSection");
+  promptModal.message = col.title;
   promptModal.value = col.title;
-  promptModal.placeholder = "新板块名称…";
-  promptModal.confirmText = "保存";
+  promptModal.placeholder = t("todoist.inputSectionPlaceholder");
+  promptModal.confirmText = t("common.save");
   promptModal.actionType = "rename-section";
   promptModal.payload = { sectionId: col.sectionId };
   promptModal.isOpen = true;
@@ -1607,12 +1608,12 @@ function openDeleteProjectConfirm(project: TodoistProjectOption, event?: MouseEv
   const pos = computeModalPosition(event, 380, 240);
   confirmModal.x = pos.x;
   confirmModal.y = pos.y;
-  confirmModal.title = "删除项目确认";
+  confirmModal.title = t("todoist.deleteProjectConfirm");
   confirmModal.icon = "🗑️";
   confirmModal.danger = true;
-  confirmModal.alertText = `确定要彻底删除项目「${project.name}」吗？`;
-  confirmModal.message = "此操作不可撤销，项目下的所有板块与任务也将一并删除！";
-  confirmModal.confirmText = "彻底删除";
+  confirmModal.alertText = t("todoist.deleteProjectAlert", { name: project.name });
+  confirmModal.message = t("todoist.deleteProjectWarning");
+  confirmModal.confirmText = t("common.deletePermanently");
   confirmModal.actionType = "delete-project";
   confirmModal.payload = { projectId: project.id };
   confirmModal.isOpen = true;
@@ -1624,12 +1625,12 @@ function openDeleteSectionConfirm(col: TodoistColumnItem, event?: MouseEvent) {
   const pos = computeModalPosition(trigger, 380, 240);
   confirmModal.x = pos.x;
   confirmModal.y = pos.y;
-  confirmModal.title = "删除板块确认";
+  confirmModal.title = t("todoist.deleteSectionConfirm");
   confirmModal.icon = "🗑️";
   confirmModal.danger = true;
-  confirmModal.alertText = `确定要删除板块「${col.title}」吗？`;
-  confirmModal.message = "板块内的任务将自动保留并移至默认收件箱。";
-  confirmModal.confirmText = "删除板块";
+  confirmModal.alertText = t("todoist.deleteSectionAlert", { name: col.title });
+  confirmModal.message = t("todoist.deleteSectionWarning");
+  confirmModal.confirmText = t("todoist.deleteSection");
   confirmModal.actionType = "delete-section";
   confirmModal.payload = { sectionId: col.sectionId };
   confirmModal.isOpen = true;

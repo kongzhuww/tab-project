@@ -420,15 +420,37 @@
           <header class="panel-head">
             <span class="panel-index">04</span>
             <div>
-              <h2>主题与外观定制</h2>
-              <p>系统主题风格与新标签页视觉定制：提供明亮、深色及专属风格切换，支持预设纯净山景与自定义动静态壁纸。</p>
+              <h2>{{ t("theme.sectionTitle") }}</h2>
+              <p>{{ t("theme.sectionDesc") }}</p>
             </div>
           </header>
 
           <div class="fields-grid">
+            <!-- 界面语言选择 (INTERFACE LANGUAGE) -->
+            <div class="field full-width">
+              <label>{{ t("language.title") }} <em>INTERFACE LANGUAGE</em></label>
+              <div class="lang-selector-row">
+                <button
+                  v-for="opt in SUPPORTED_LANGUAGES"
+                  :key="opt.code"
+                  type="button"
+                  class="lang-pill-btn"
+                  :class="{ 'is-active': currentLanguage === opt.code }"
+                  @click="setLanguage(opt.code)"
+                >
+                  <span class="lang-pill-flag">{{ opt.code === 'zh' ? '🇨🇳' : '🇺🇸' }}</span>
+                  <span class="lang-pill-name">{{ opt.label }}</span>
+                  <span v-if="currentLanguage === opt.code" class="lang-pill-badge">✓ {{ t("common.inUse") }}</span>
+                </button>
+              </div>
+              <p class="field-hint" style="margin-top: 6px; font-size: 11px; color: var(--muted);">
+                {{ t("language.hint") }}
+              </p>
+            </div>
+
             <!-- 系统主题风格 (SYSTEM THEMES) -->
             <div class="field full-width">
-              <label>系统主题风格 <em>SYSTEM THEMES</em></label>
+              <label>{{ t("theme.systemThemes") }} <em>SYSTEM THEMES</em></label>
               <div class="theme-presets-grid">
                 <div
                   v-for="item in SYSTEM_THEMES"
@@ -440,7 +462,7 @@
                   <div class="theme-preset-header">
                     <span class="theme-preset-icon">{{ item.icon }}</span>
                     <span class="theme-preset-title">{{ item.name }}</span>
-                    <span v-if="activeThemeId === item.id" class="theme-preset-active-pill">✓ 使用中</span>
+                    <span v-if="activeThemeId === item.id" class="theme-preset-active-pill">✓ {{ t("common.inUse") }}</span>
                   </div>
                   <div class="theme-preset-preview" :class="`preview-${item.id}`">
                     <div class="preview-mini-topbar"></div>
@@ -453,7 +475,7 @@
                 </div>
               </div>
               <div class="theme-preset-hint">
-                💡 贴心提示：新标签页所有组件均深度优化适配明亮模式（白天），视觉纯净高雅；深色模式适合夜间低光照环境使用。
+                {{ t("theme.hint") }}
               </div>
             </div>
 
@@ -853,29 +875,30 @@ import {
   persistSlots
 } from "../search/search-slots.store";
 import { isGuestPreviewActive, guestPreviewController } from "../core/guest-preview-store";
+import { t, currentLanguage, setLanguage, SUPPORTED_LANGUAGES } from "../i18n";
 
 declare const chrome: any;
 const props = withDefaults(defineProps<{ active?: boolean }>(), { active: true });
 
 // Tabs 导航定义
-const tabs = [
-  { id: "modules", index: "01", name: "模块与功能" },
-  { id: "shortcuts", index: "02", name: "快捷键配置" },
-  { id: "privacy", index: "03", name: "搜索书签过滤" },
-  { id: "wallpaper", index: "04", name: "主题与外观" },
-  { id: "sync", index: "05", name: "数据备份与同步" },
-  { id: "storage", index: "06", name: "文件夹与存储" }
-];
+const tabs = computed(() => [
+  { id: "modules", index: "01", name: t("settings.tab.modules") },
+  { id: "shortcuts", index: "02", name: t("settings.tab.shortcuts") },
+  { id: "privacy", index: "03", name: t("settings.tab.privacy") },
+  { id: "wallpaper", index: "04", name: t("settings.tab.appearance") },
+  { id: "sync", index: "05", name: t("settings.tab.sync") },
+  { id: "storage", index: "06", name: t("settings.tab.storage") }
+]);
 
 const currentTab = ref("modules");
 const settingsMain = ref<HTMLElement | null>(null);
 watch(() => settingsController.state.sectionRequest, () => {
   const section = settingsController.state.requestedSection;
-  if (section && tabs.some(tab => tab.id === section)) currentTab.value = section;
+  if (section && tabs.value.some(tab => tab.id === section)) currentTab.value = section;
 }, { immediate: true });
 const currentTabTitle = computed(() => {
-  const t = tabs.find((x) => x.id === currentTab.value);
-  return t ? `${t.index} ${t.name}` : "设置";
+  const item = tabs.value.find((x) => x.id === currentTab.value);
+  return item ? `${item.index} ${item.name}` : t("common.settings");
 });
 
 const isStandalonePage = computed(() => {
@@ -1298,12 +1321,12 @@ function draftSnapshot(): Record<string, any> {
 // ========================================================
 // 04 主题与外观 (System Themes & Wallpaper Settings)
 // ========================================================
-const SYSTEM_THEMES = [
-  { id: "light", icon: "☀️", name: "白天明亮", desc: "经典纯净浅色，全模块适配最佳，高对比度清爽视觉" },
-  { id: "dark", icon: "🌙", name: "夜间深色", desc: "护眼深邃暗色，适合弱光夜间环境浏览" },
-  { id: "endfield", icon: "⚡", name: "终末地风格", desc: "工业战术硬核，金黄微光与深灰质感点缀" },
-  { id: "lonetrail", icon: "🌌", name: "孤星风格", desc: "深空沉稳蓝灰，极简科研与静谧纸面质感" }
-];
+const SYSTEM_THEMES = computed(() => [
+  { id: "light", icon: "☀️", name: t("theme.light"), desc: t("theme.lightDesc") },
+  { id: "dark", icon: "🌙", name: t("theme.dark"), desc: t("theme.darkDesc") },
+  { id: "endfield", icon: "⚡", name: t("theme.endfield"), desc: t("theme.endfieldDesc") },
+  { id: "lonetrail", icon: "🌌", name: t("theme.lonetrail"), desc: t("theme.lonetrailDesc") }
+]);
 
 const activeThemeId = ref(
   (typeof document !== "undefined" && document.documentElement.dataset.theme) ||

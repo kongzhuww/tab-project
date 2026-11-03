@@ -1,0 +1,10 @@
+{
+  "extName": {
+    "message": "tab-project 新标签页",
+    "description": "扩展在 Chrome/Edge 商店和浏览器扩展管理中显示的名称"
+  },
+  "extDescription": {
+    "message": "聚合搜索、常用网站与书签管理，整合 GitHub、Todoist、B站、音乐和 AI 资讯，支持多主题与覆盖式侧栏。",
+    "description": "扩展在商店和扩展管理中的简要描述"
+  }
+}

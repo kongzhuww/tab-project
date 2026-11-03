@@ -1,0 +1,10 @@
+{
+  "extName": {
+    "message": "tab-project New Tab",
+    "description": "Extension name shown in Chrome/Edge Web Store and extension management"
+  },
+  "extDescription": {
+    "message": "All-in-one productivity new tab: unified search, favorite sites & bookmarks, integrated GitHub, Todoist, Bilibili, music and clean themes with modeless sidebar.",
+    "description": "Short extension description shown in Web Store and extension manager"
+  }
+}

@@ -21,7 +21,7 @@ const deleted = new Set(execFileSync("git", ["ls-files", "--deleted", "-z"],
   { cwd: root, encoding: "utf8" }).split("\0"));
 const safe = [...new Set(candidates)].filter(file => !deleted.has(file) &&
   !/(^|\/)(?:\.env(?:\..*)?|[^/]*\.local\.[^/]*|node_modules)(\/|$)/i.test(file));
-const runtimeFiles = safe.filter(file => /^(?:assets|third_party)\//.test(file) ||
+const runtimeFiles = safe.filter(file => /^(?:assets|third_party|_locales)\//.test(file) ||
   /^[^/]+\.html$/.test(file) || ["manifest.json", "favicon.ico", "popup.css", "LICENSE", "ATTRIBUTION.md"].includes(file));
 const sourceFiles = safe.filter(file => file.startsWith("src/") ||
   // Public compile-time contract only: never copy the whole server/config tree.
