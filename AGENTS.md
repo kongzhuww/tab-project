@@ -68,7 +68,7 @@
 | **桌宠快捷栏（已移除）** | 无入口 | 新仓库按用户要求整套删除，严禁恢复 |
 | **监控快捷栏（已移除）** | 无入口 | 原 `AgentLaunchers.vue` 与专属服务探针已彻底移除，严禁恢复 |
 | **设置** | `src/settings/SettingsDialog.vue` / `SettingsView.vue` | 顶栏右上角设置齿轮按钮及非模态设置面板 |
-| **主题** | `src/layout/AppTopBar.vue` (`#theme-toggle`) | 顶栏最右上角主题切换按钮（白天 light / 夜晚 dark / 终末地 endfield / 孤星 lonetrail） |
+| **主题** | `src/settings/SettingsView.vue` (主题与外观) | 顶栏独立轮转按钮已移除（保持顶栏整洁），系统主题已统一移入设置面板「04 主题与外观」，集中管理系统风格切换（白天 light / 夜晚 dark / 终末地 endfield / 孤星 lonetrail）与桌面壁纸定制 |
 
 ### 3.2 首屏展台区（Hero Launcher）
 | 用户口令 | 对应源码文件 | 作用位置与说明 |

@@ -415,17 +415,48 @@
           </div>
         </section>
 
-        <!-- 04 壁纸与桌面背景 -->
+        <!-- 04 主题与外观定制 -->
         <section v-show="currentTab === 'wallpaper'" class="settings-panel">
           <header class="panel-head">
             <span class="panel-index">04</span>
             <div>
-              <h2>壁纸与桌面背景</h2>
-              <p>个性化定制新标签页背景：支持预设山景、纯黑无干扰、赛博霓虹渐变、自定义本地图片与动态视频壁纸。</p>
+              <h2>主题与外观定制</h2>
+              <p>系统主题风格与新标签页视觉定制：提供明亮、深色及专属风格切换，支持预设纯净山景与自定义动静态壁纸。</p>
             </div>
           </header>
 
           <div class="fields-grid">
+            <!-- 系统主题风格 (SYSTEM THEMES) -->
+            <div class="field full-width">
+              <label>系统主题风格 <em>SYSTEM THEMES</em></label>
+              <div class="theme-presets-grid">
+                <div
+                  v-for="item in SYSTEM_THEMES"
+                  :key="item.id"
+                  class="theme-preset-card"
+                  :class="{ 'is-active': activeThemeId === item.id }"
+                  @click="handleSelectTheme(item.id)"
+                >
+                  <div class="theme-preset-header">
+                    <span class="theme-preset-icon">{{ item.icon }}</span>
+                    <span class="theme-preset-title">{{ item.name }}</span>
+                    <span v-if="activeThemeId === item.id" class="theme-preset-active-pill">✓ 使用中</span>
+                  </div>
+                  <div class="theme-preset-preview" :class="`preview-${item.id}`">
+                    <div class="preview-mini-topbar"></div>
+                    <div class="preview-mini-body">
+                      <div class="preview-mini-card"></div>
+                      <div class="preview-mini-card"></div>
+                    </div>
+                  </div>
+                  <p class="theme-preset-desc">{{ item.desc }}</p>
+                </div>
+              </div>
+              <div class="theme-preset-hint">
+                💡 贴心提示：新标签页所有组件均深度优化适配明亮模式（白天），视觉纯净高雅；深色模式适合夜间低光照环境使用。
+              </div>
+            </div>
+
             <!-- 快捷导入与工具栏 -->
             <div class="field full-width">
               <label>导入与管理 <em>IMPORT & ACTIONS</em></label>
@@ -831,7 +862,7 @@ const tabs = [
   { id: "modules", index: "01", name: "模块与功能" },
   { id: "shortcuts", index: "02", name: "快捷键配置" },
   { id: "privacy", index: "03", name: "搜索书签过滤" },
-  { id: "wallpaper", index: "04", name: "壁纸与背景" },
+  { id: "wallpaper", index: "04", name: "主题与外观" },
   { id: "sync", index: "05", name: "数据备份与同步" },
   { id: "storage", index: "06", name: "文件夹与存储" }
 ];
@@ -1265,8 +1296,40 @@ function draftSnapshot(): Record<string, any> {
 }
 
 // ========================================================
-// 05 壁纸与桌面背景 (Wallpaper Settings)
+// 04 主题与外观 (System Themes & Wallpaper Settings)
 // ========================================================
+const SYSTEM_THEMES = [
+  { id: "light", icon: "☀️", name: "白天明亮", desc: "经典纯净浅色，全模块适配最佳，高对比度清爽视觉" },
+  { id: "dark", icon: "🌙", name: "夜间深色", desc: "护眼深邃暗色，适合弱光夜间环境浏览" },
+  { id: "endfield", icon: "⚡", name: "终末地风格", desc: "工业战术硬核，金黄微光与深灰质感点缀" },
+  { id: "lonetrail", icon: "🌌", name: "孤星风格", desc: "深空沉稳蓝灰，极简科研与静谧纸面质感" }
+];
+
+const activeThemeId = ref(
+  (typeof document !== "undefined" && document.documentElement.dataset.theme) ||
+  (typeof localStorage !== "undefined" && localStorage.getItem("theme")) ||
+  "light"
+);
+
+function handleSelectTheme(themeId: string) {
+  activeThemeId.value = themeId;
+  if (typeof document !== "undefined") {
+    document.documentElement.dataset.theme = themeId;
+    document.documentElement.setAttribute("data-theme", themeId);
+  }
+  try {
+    localStorage.setItem("theme", themeId);
+  } catch {}
+  if (typeof chrome !== "undefined" && chrome?.storage?.local) {
+    void chrome.storage.local.set({ theme: themeId });
+  }
+  document.querySelectorAll("iframe").forEach((f) => {
+    try {
+      f.contentWindow?.postMessage({ type: "theme-change", theme: themeId }, "*");
+    } catch {}
+  });
+}
+
 const BUILTIN_WALLPAPERS: Array<{
   id: string;
   title: string;
@@ -1812,6 +1875,9 @@ async function loadAll() {
 }
 
 onMounted(() => {
+  if (typeof document !== "undefined") {
+    activeThemeId.value = document.documentElement.dataset.theme || localStorage.getItem("theme") || "light";
+  }
   loadAll();
   initWebDav();
   window.addEventListener("keydown", handleGlobalKeyDown, true);

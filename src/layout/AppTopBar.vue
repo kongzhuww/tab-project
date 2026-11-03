@@ -48,68 +48,11 @@ function handleContextMenuProfile(event: MouseEvent) {
   profileMenuController.open(event.clientX, event.clientY);
 }
 
-const THEMES = [
-  { id: "light", icon: "☀️", label: "白天模式" },
-  { id: "dark", icon: "🌙", label: "夜晚模式" },
-  { id: "endfield", icon: "⚡", label: "终末地风格" },
-  { id: "lonetrail", icon: "🌌", label: "孤星风格" }
-];
-
-const currentThemeIcon = ref("☀️");
-const currentThemeLabel = ref("切换主题");
-
-function updateThemeDisplay() {
-  if (typeof document === "undefined") return;
-  const cur = document.documentElement.dataset.theme || "light";
-  const meta = THEMES.find((x) => x.id === cur) || THEMES.find((x) => x.id === "light") || THEMES[0];
-  currentThemeIcon.value = meta.icon;
-  currentThemeLabel.value = `主题：${meta.label}（点击更换）`;
-}
-
-function handleToggleTheme(event: MouseEvent) {
-  event.preventDefault();
-  if (typeof document === "undefined") return;
-  const cur = document.documentElement.dataset.theme || "light";
-  const curIdx = THEMES.findIndex((x) => x.id === cur);
-  const nextTheme = THEMES[(curIdx + 1) % THEMES.length];
-  document.documentElement.dataset.theme = nextTheme.id;
-  try {
-    localStorage.setItem("theme", nextTheme.id);
-  } catch {}
-  if (typeof chrome !== "undefined" && chrome?.storage?.local) {
-    void chrome.storage.local.set({ theme: nextTheme.id });
-  }
-  updateThemeDisplay();
-  document.querySelectorAll("iframe").forEach((f) => {
-    try {
-      f.contentWindow?.postMessage({ type: "theme-change", theme: nextTheme.id }, "*");
-    } catch {}
-  });
-}
-
-function handleTopBarCopy(e: ClipboardEvent) {
-  const target = e.target as HTMLElement | null;
-  if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) {
-    return;
-  }
-  e.preventDefault();
-  e.stopPropagation();
-}
-
-function handleTopBarSelectStart(e: Event) {
-  const target = e.target as HTMLElement | null;
-  if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) {
-    return;
-  }
-  e.preventDefault();
-}
-
 onMounted(() => {
   notificationHistoryController.start();
   const saved = localStorage.getItem("theme") || "light";
   document.documentElement.dataset.theme = saved;
   document.documentElement.setAttribute("data-theme", saved);
-  updateThemeDisplay();
 });
 
 </script>
@@ -178,15 +121,6 @@ onMounted(() => {
         📑
       </button>
       <button id="settings-open" class="tb-btn" title="设置" @click="handleOpenSettings">⚙</button>
-      <button
-        id="theme-toggle"
-        class="tb-btn"
-        type="button"
-        title="主题 · 切换风格"
-        @click="handleToggleTheme"
-      >
-        {{ currentThemeIcon }}
-      </button>
     </div>
   </header>
 </template>

@@ -1370,8 +1370,176 @@ html[data-theme="endfield"] .settings-view-root .switch {
 }
 
 /* ========================================================
-   壁纸与背景控制台 (Wallpaper Settings Panel)
+   主题与外观定制控制台 (System Themes & Wallpaper)
    ======================================================== */
+.settings-view-root .theme-presets-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.settings-view-root .theme-preset-card {
+  position: relative;
+  border-radius: 12px;
+  border: 1.5px solid var(--border);
+  background: var(--surface);
+  overflow: hidden;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  display: flex;
+  flex-direction: column;
+  padding: 12px 14px;
+  gap: 8px;
+}
+
+.settings-view-root .theme-preset-card:hover {
+  border-color: #38bdf8;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+}
+
+.settings-view-root .theme-preset-card.is-active {
+  border-color: #0ea5e9;
+  background: var(--panel);
+  box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.3);
+}
+
+.settings-view-root .theme-preset-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.settings-view-root .theme-preset-icon {
+  font-size: 16px;
+  line-height: 1;
+}
+
+.settings-view-root .theme-preset-title {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--heading);
+  flex: 1;
+}
+
+.settings-view-root .theme-preset-active-pill {
+  font-size: 10.5px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: #0ea5e9;
+  color: #ffffff;
+}
+
+.settings-view-root .theme-preset-preview {
+  position: relative;
+  width: 100%;
+  height: 52px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  padding: 5px 8px;
+  gap: 4px;
+}
+
+.settings-view-root .preview-light {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+}
+.settings-view-root .preview-light .preview-mini-topbar {
+  height: 6px;
+  background: #e2e8f0;
+  border-radius: 3px;
+  width: 50%;
+}
+.settings-view-root .preview-light .preview-mini-card {
+  height: 14px;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+}
+
+.settings-view-root .preview-dark {
+  background: #0f172a;
+  border-color: #334155;
+}
+.settings-view-root .preview-dark .preview-mini-topbar {
+  height: 6px;
+  background: #334155;
+  border-radius: 3px;
+  width: 50%;
+}
+.settings-view-root .preview-dark .preview-mini-card {
+  height: 14px;
+  background: #1e293b;
+  border: 1px solid #475569;
+  border-radius: 4px;
+}
+
+.settings-view-root .preview-endfield {
+  background: #18181b;
+  border-color: #facc15;
+}
+.settings-view-root .preview-endfield .preview-mini-topbar {
+  height: 6px;
+  background: #facc15;
+  border-radius: 3px;
+  width: 40%;
+}
+.settings-view-root .preview-endfield .preview-mini-card {
+  height: 14px;
+  background: #27272a;
+  border: 1px solid #52525b;
+  border-radius: 4px;
+}
+
+.settings-view-root .preview-lonetrail {
+  background: #0b192c;
+  border-color: #38bdf8;
+}
+.settings-view-root .preview-lonetrail .preview-mini-topbar {
+  height: 6px;
+  background: #38bdf8;
+  border-radius: 3px;
+  width: 45%;
+}
+.settings-view-root .preview-lonetrail .preview-mini-card {
+  height: 14px;
+  background: #1e3e62;
+  border: 1px solid #476b94;
+  border-radius: 4px;
+}
+
+.settings-view-root .preview-mini-body {
+  display: flex;
+  gap: 5px;
+  width: 100%;
+}
+.settings-view-root .preview-mini-body .preview-mini-card {
+  flex: 1;
+}
+
+.settings-view-root .theme-preset-desc {
+  margin: 0;
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.settings-view-root .theme-preset-hint {
+  margin-top: 8px;
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.5;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+}
+
 .settings-view-root .wallpaper-presets-grid,
 .settings-view-root .wallpaper-library-grid {
   display: grid;
