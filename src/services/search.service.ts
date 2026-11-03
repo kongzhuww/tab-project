@@ -141,6 +141,29 @@ export class SearchService {
     this.bindController();
   }
 
+  private isSearchQueryUrl(url: string, title?: string): boolean {
+    if (!url) return false;
+    try {
+      const u = new URL(url);
+      const host = u.hostname.toLowerCase();
+      const path = u.pathname.toLowerCase();
+      if (
+        (host.includes("qcc.com") && path.includes("/search")) ||
+        (host.includes("bing.com") && path.includes("/search")) ||
+        (host.includes("google.com") && path.includes("/search")) ||
+        (host.includes("baidu.com") && (path.includes("/s") || path.includes("/search"))) ||
+        (host.includes("tianyancha.com") && path.includes("/search")) ||
+        (host.includes("aiqicha.baidu.com") && path.includes("/s"))
+      ) {
+        return true;
+      }
+    } catch {}
+    if (title && (/^在\s*(企查查|天眼查|爱企查|Bing|百度|Google)\s*搜索/i.test(title) || /^Bing\s*搜索/i.test(title))) {
+      return true;
+    }
+    return false;
+  }
+
   private initHistory(): void {
     if (typeof localStorage !== "undefined") {
       try {
@@ -149,8 +172,13 @@ export class SearchService {
           const parsed = JSON.parse(raw);
           if (Array.isArray(parsed)) {
             this.clickHistory = parsed.filter((item: any) => item && typeof item.url === "string" &&
-              typeof item.title === "string" && searchUrlKey(item.url) && Number.isFinite(item.visitedAt))
+              typeof item.title === "string" && searchUrlKey(item.url) && Number.isFinite(item.visitedAt) &&
+              !this.isSearchQueryUrl(item.url, item.title))
               .sort((a, b) => b.visitedAt - a.visitedAt).slice(0, 30);
+            // 自动回写清洗后的历史记录，将之前遗留在本地的引擎搜索项永久清除
+            if (this.clickHistory.length !== parsed.length) {
+              localStorage.setItem(SEARCH_HISTORY_STORAGE_KEY, JSON.stringify(this.clickHistory));
+            }
           }
         }
       } catch {}
@@ -162,19 +190,9 @@ export class SearchService {
     const cleanUrl = item.url.trim();
 
     // 过滤掉搜索引擎生成的结果页（如 bing.com/search、qcc.com/web/search 等查询链接），只记录具体内容网站
-    try {
-      const u = new URL(cleanUrl);
-      if (
-        (u.hostname.includes("qcc.com") && u.pathname.includes("/search")) ||
-        (u.hostname.includes("bing.com") && u.pathname.includes("/search")) ||
-        (u.hostname.includes("google.com") && u.pathname.includes("/search")) ||
-        (u.hostname.includes("baidu.com") && (u.pathname.includes("/s") || u.pathname.includes("/search"))) ||
-        (u.hostname.includes("tianyancha.com") && u.pathname.includes("/search")) ||
-        (u.hostname.includes("aiqicha.baidu.com") && u.pathname.includes("/s"))
-      ) {
-        return;
-      }
-    } catch {}
+    if (this.isSearchQueryUrl(cleanUrl, item.title)) {
+      return;
+    }
 
     // 过滤掉已有记录，置于数组最前方
     this.clickHistory = this.clickHistory.filter(h => h.url !== cleanUrl);
