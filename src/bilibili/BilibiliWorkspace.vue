@@ -808,7 +808,7 @@ function onRadioVideoDragStart(event: DragEvent, video: { bvid: string; title: s
               <div class="fo-sidebar-toggle-title">
                 <span class="fo-sidebar-toggle-icon">⚡</span>
                 <span>{{ t('bili.channel.title') }}</span>
-                <span v-if="isFeaturesCollapsed" class="fo-sidebar-toggle-pill">5</span>
+                <span v-if="isFeaturesCollapsed" class="fo-sidebar-toggle-pill">6</span>
               </div>
               <button
                 type="button"
@@ -850,6 +850,12 @@ function onRadioVideoDragStart(event: DragEvent, video: { bvid: string; title: s
                 <button id="fo-sidebar-radio-btn" type="button" class="fo-sidebar-sub-btn" :class="{ on: organizer.mode === 'radio' }" :title="t('bili.channel.radioTip')" @click="dispatch('open-radio')">
                   <div class="fo-sidebar-sub-main"><span class="fo-sidebar-sub-icon">📻</span><div class="fo-sidebar-sub-text"><strong>{{ t('bili.channel.radio') }}</strong><small>{{ t('bili.channel.radioSub') }}</small></div></div>
                   <span class="fo-sidebar-sub-badge">RADIO</span>
+                </button>
+              </div>
+              <div class="fo-sidebar-sub-wrap fo-sidebar-history-wrap">
+                <button id="fo-sidebar-history-btn" type="button" class="fo-sidebar-sub-btn" :class="{ on: organizer.mode === 'organizer' && biliFavoritesState.activeFolderId === '__history__' }" :title="t('bili.channel.historyTip')" @click="dispatch('select-folder', { id: '__history__', kind: 'other' })">
+                  <div class="fo-sidebar-sub-main"><span class="fo-sidebar-sub-icon">📜</span><div class="fo-sidebar-sub-text"><strong>{{ t('bili.channel.history') }}</strong><small>{{ t('bili.channel.historySub') }}</small></div></div>
+                  <span class="fo-sidebar-sub-badge">HISTORY</span>
                 </button>
               </div>
             </div>
