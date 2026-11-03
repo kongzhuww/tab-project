@@ -18,7 +18,7 @@ const H = { class: "sticker-app" }, Q = {
 }, O = ["title", "onClick"], R = ["src"], X = ["hidden"], Y = /* @__PURE__ */ z({
   __name: "StickerStandalone",
   setup(tt) {
-    const T = y(() => import("./chunks/SettingsDialog-BtMNMHUy.js")), B = y(() => import("./chunks/AppPromptModal-C3oN6boj.js")), k = document.body.dataset.mode === "sidepanel", l = p([]), i = p("等待扫描"), u = p(""), _ = p(!1);
+    const T = y(() => import("./chunks/SettingsDialog-B0vBUy07.js")), B = y(() => import("./chunks/AppPromptModal-C3oN6boj.js")), k = document.body.dataset.mode === "sidepanel", l = p([]), i = p("等待扫描"), u = p(""), _ = p(!1);
     let m = 0;
     function r(s, e = !1) {
       u.value = s, _.value = e, clearTimeout(m), m = window.setTimeout(() => {

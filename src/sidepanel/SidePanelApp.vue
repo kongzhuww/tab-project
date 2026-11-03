@@ -1036,10 +1036,10 @@ onUnmounted(() => {
 
 .sp-page-picker-dropdown {
   padding: 10px;
-  background: var(--surface);
+  background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 12px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18), 0 2px 8px rgba(0, 0, 0, 0.08);
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -1073,7 +1073,7 @@ onUnmounted(() => {
   padding: 6px 8px;
   border-radius: 8px;
   border: 1px solid var(--border);
-  background: var(--panel);
+  background: var(--surface);
   color: var(--text);
   font-size: 11px;
   font-weight: 600;
@@ -1110,8 +1110,9 @@ onUnmounted(() => {
   gap: 6px;
   padding: 10px;
   border-radius: 8px;
-  background: var(--surface);
+  background: var(--panel);
   border: 1px solid var(--border);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.16);
 }
 .manual-head {
   display: flex;
@@ -1402,6 +1403,8 @@ onUnmounted(() => {
   left: 10px;
   right: 10px;
   z-index: 50;
+  background: var(--panel);
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.22), 0 2px 10px rgba(0, 0, 0, 0.1);
 }
 .todoist-card-body {
   gap: 10px;
