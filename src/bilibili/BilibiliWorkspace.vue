@@ -1376,6 +1376,9 @@ function onRadioVideoDragStart(event: DragEvent, video: { bvid: string; title: s
         <span class="fo-context-icon">💾</span> 缓存视频
       </button>
       <div class="fo-context-divider"></div>
+      <button type="button" class="fo-context-item" @click="runContextMenuAction('create-task')">
+        <span class="fo-context-icon">📋</span> 创建任务
+      </button>
       <button type="button" class="fo-context-item" @click="runContextMenuAction('subtitle')">
         <span class="fo-context-icon">▤</span> 字幕转文本
       </button>

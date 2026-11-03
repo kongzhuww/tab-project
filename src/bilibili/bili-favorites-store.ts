@@ -820,6 +820,19 @@ export const biliFavoritesController = {
       } else {
         notifyToast("该视频暂无字幕信息", { isError: true });
       }
+    } else if (action === "create-task") {
+      const { biliVideoTaskController } = await import("./video-task-store");
+      biliVideoTaskController.open({
+        bvid: video.bvid || (String(video.id || "").startsWith("BV") ? video.id : ""),
+        aid: video.aid || video.id,
+        title: video.title || "",
+        cover: video.cover,
+        author: video.author,
+        authorMid: video.authorMid,
+        playCount: video.playCount,
+        duration: video.duration,
+        url: targetUrl
+      });
     } else if (action === "cache") {
       const { cacheBiliVideo } = await import("./cache.service");
       await cacheBiliVideo({ bvid: video.bvid, aid: video.aid, title: video.title, cover: video.cover });
