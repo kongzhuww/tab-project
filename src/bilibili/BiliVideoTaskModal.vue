@@ -244,6 +244,22 @@ async function loadSectionsForProject(projId: string) {
   }
 }
 
+const selectedProjectName = computed(() => {
+  return projects.value.find(p => String(p.id) === selectedProjectId.value)?.name || "选择项目…";
+});
+
+const selectedSectionName = computed(() => {
+  if (!selectedSectionId.value) return "无分组 / 默认项目根";
+  return sections.value.find(s => String(s.id) === selectedSectionId.value)?.name || "无分组 / 默认项目根";
+});
+
+const isProjectMenuOpen = ref(false);
+
+function toggleProjectMenu() {
+  if (isSubmitting.value || loadingProjects.value) return;
+  isProjectMenuOpen.value = !isProjectMenuOpen.value;
+}
+
 async function onProjectChange() {
   if (!selectedProjectId.value) return;
   localStorage.setItem("bili_task_last_project_id", selectedProjectId.value);
@@ -258,6 +274,17 @@ function onSectionChange() {
   } else {
     localStorage.removeItem("bili_task_last_section_id");
   }
+}
+
+function selectProject(id: string) {
+  selectedProjectId.value = id;
+  isProjectMenuOpen.value = false;
+  void onProjectChange();
+}
+
+function selectSection(id: string) {
+  selectedSectionId.value = id;
+  onSectionChange();
 }
 
 // 监听弹窗打开与视频变化
@@ -436,52 +463,65 @@ onUnmounted(() => {
             </div>
           </div>
 
-          <!-- 目标项目与分组选择器 -->
+          <!-- 目标项目与分组选择器：双方案对比 -->
           <div class="bili-destination-selector">
+            <!-- 方案 B：现代精致卡片按钮 + 自适应浮动下拉菜单 (目标项目) -->
             <div class="bili-selector-field">
-              <label class="bili-selector-label" for="bili-dest-project">
-                <span class="bili-selector-title">📁 目标项目</span>
-              </label>
-              <select
-                id="bili-dest-project"
-                v-model="selectedProjectId"
-                class="bili-project-select"
-                :disabled="isSubmitting || loadingProjects"
-                @change="onProjectChange"
-              >
-                <option v-if="loadingProjects" value="" disabled>正在加载 Todoist 项目…</option>
-                <option v-else-if="!projects.length" value="" disabled>未找到可用项目，请检查登录</option>
-                <option
-                  v-for="p in projects"
-                  :key="p.id"
-                  :value="String(p.id)"
+              <span class="bili-selector-title">📁 目标项目 (方案 B: 现代弹出菜单)</span>
+              <div class="bili-custom-select-wrapper">
+                <button
+                  type="button"
+                  class="bili-custom-select-btn"
+                  :class="{ 'is-open': isProjectMenuOpen }"
+                  :disabled="isSubmitting || loadingProjects"
+                  @click="toggleProjectMenu"
                 >
-                  {{ p.name }}
-                </option>
-              </select>
+                  <span class="bili-select-text">{{ loadingProjects ? '正在读取项目…' : selectedProjectName }}</span>
+                  <span class="bili-select-arrow">▾</span>
+                </button>
+                <div v-if="isProjectMenuOpen" class="bili-custom-popover-menu">
+                  <div v-if="!projects.length" class="bili-popover-empty">未找到可用项目</div>
+                  <button
+                    v-for="p in projects"
+                    :key="p.id"
+                    type="button"
+                    class="bili-popover-item"
+                    :class="{ 'is-active': String(p.id) === selectedProjectId }"
+                    @click="selectProject(String(p.id))"
+                  >
+                    <span>{{ p.name }}</span>
+                    <span v-if="String(p.id) === selectedProjectId" class="bili-popover-check">✓</span>
+                  </button>
+                </div>
+              </div>
             </div>
 
+            <!-- 方案 A：横向自适应流式药丸胶囊排布 (目标分组板块) -->
             <div class="bili-selector-field">
-              <label class="bili-selector-label" for="bili-dest-section">
-                <span class="bili-selector-title">📑 目标分组 (板块)</span>
-              </label>
-              <select
-                id="bili-dest-section"
-                v-model="selectedSectionId"
-                class="bili-section-select"
-                :disabled="isSubmitting || loadingSections"
-                @change="onSectionChange"
-              >
-                <option value="">(无分组 / 默认项目根)</option>
-                <option v-if="loadingSections" value="" disabled>正在加载板块分组…</option>
-                <option
+              <span class="bili-selector-title">📑 目标分组 (方案 A: 药丸胶囊平铺)</span>
+              <div v-if="loadingSections" class="bili-pills-loading">正在读取板块…</div>
+              <div v-else class="bili-pills-container">
+                <button
+                  type="button"
+                  class="bili-pill-chip"
+                  :class="{ 'is-active': !selectedSectionId }"
+                  :disabled="isSubmitting"
+                  @click="selectSection('')"
+                >
+                  (默认项目根)
+                </button>
+                <button
                   v-for="s in sections"
                   :key="s.id"
-                  :value="String(s.id)"
+                  type="button"
+                  class="bili-pill-chip"
+                  :class="{ 'is-active': selectedSectionId === String(s.id) }"
+                  :disabled="isSubmitting"
+                  @click="selectSection(String(s.id))"
                 >
                   {{ s.name }}
-                </option>
-              </select>
+                </button>
+              </div>
             </div>
           </div>
 
@@ -811,24 +851,148 @@ onUnmounted(() => {
   color: var(--muted, #64748b);
 }
 
-.bili-project-select,
-.bili-section-select {
+/* 方案 B：现代自定义弹出菜单 */
+.bili-custom-select-wrapper {
+  position: relative;
   width: 100%;
+}
+
+.bili-custom-select-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   box-sizing: border-box;
-  padding: 5px 8px;
+  padding: 6px 10px;
   border-radius: 6px;
   border: 1px solid var(--border, rgba(0, 0, 0, 0.12));
   background: var(--panel, #ffffff);
   color: var(--heading, #0f172a);
   font-size: 12px;
-  outline: none;
   cursor: pointer;
-  transition: border-color 0.15s;
+  outline: none;
+  transition: all 0.15s;
 }
 
-.bili-project-select:focus,
-.bili-section-select:focus {
+.bili-custom-select-btn:hover:not(:disabled) {
   border-color: #0284c7;
+}
+
+.bili-custom-select-btn.is-open {
+  border-color: #0284c7;
+  box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.15);
+}
+
+.bili-select-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bili-select-arrow {
+  font-size: 10px;
+  color: var(--muted, #64748b);
+  transition: transform 0.15s;
+}
+
+.bili-custom-select-btn.is-open .bili-select-arrow {
+  transform: rotate(180deg);
+}
+
+.bili-custom-popover-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 10;
+  max-height: 180px;
+  overflow-y: auto;
+  background: var(--panel, #ffffff);
+  border: 1px solid var(--border, rgba(0, 0, 0, 0.12));
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  display: flex;
+  flex-direction: column;
+  padding: 4px;
+  gap: 2px;
+}
+
+.bili-popover-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 8px;
+  border: none;
+  background: transparent;
+  color: var(--text, #1e293b);
+  font-size: 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.12s;
+}
+
+.bili-popover-item:hover {
+  background: var(--surface-hover, rgba(0, 0, 0, 0.05));
+  color: var(--heading, #0f172a);
+}
+
+.bili-popover-item.is-active {
+  background: rgba(2, 132, 199, 0.08);
+  color: #0284c7;
+  font-weight: 600;
+}
+
+.bili-popover-check {
+  font-size: 11px;
+}
+
+.bili-popover-empty {
+  padding: 8px;
+  font-size: 11px;
+  color: var(--muted, #64748b);
+  text-align: center;
+}
+
+/* 方案 A：药丸胶囊平铺 */
+.bili-pills-loading {
+  font-size: 11px;
+  color: var(--muted, #64748b);
+  padding: 4px 0;
+}
+
+.bili-pills-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-height: 110px;
+  overflow-y: auto;
+  padding: 2px 0;
+}
+
+.bili-pill-chip {
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border, rgba(0, 0, 0, 0.12));
+  background: var(--panel, #ffffff);
+  color: var(--muted, #64748b);
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.bili-pill-chip:hover:not(:disabled) {
+  border-color: #0284c7;
+  color: var(--heading, #0f172a);
+}
+
+.bili-pill-chip.is-active {
+  background: #0284c7;
+  border-color: #0284c7;
+  color: #ffffff;
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(2, 132, 199, 0.3);
 }
 
 .bili-task-feedback {
