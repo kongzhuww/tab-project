@@ -1,4 +1,4 @@
-export const RELEASE_API = "https://api.github.com/repos/kongzhuww/tab-project-next/releases";
+export const RELEASE_API = "https://api.github.com/repos/kongzhuww/tab-project/releases";
 export interface ReleaseAsset { id: number; name: string; size: number; browser_download_url: string }
 export interface ReleaseInfo { tag_name: string; name: string; body: string; assets: ReleaseAsset[] }
 export function record(value: unknown): Record<string, unknown> {
@@ -18,7 +18,7 @@ export function parseRelease(value: unknown): ReleaseInfo {
     let url: URL;
     try { url = new URL(String(asset.browser_download_url)); } catch { continue; }
     if (url.origin !== "https://github.com" || url.username || url.password ||
-        !url.pathname.startsWith("/kongzhuww/tab-project-next/releases/download/")) continue;
+        !url.pathname.startsWith("/kongzhuww/tab-project/releases/download/")) continue;
     assets.push({ id: asset.id, name: asset.name, size: asset.size, browser_download_url: url.href });
   }
   return { tag_name: data.tag_name, name: typeof data.name === "string" ? data.name : "",
