@@ -66,6 +66,44 @@ export const launcherRuntime = {
     launcherMenusController.openPageMenu(page, launcherService.getPageLabel(page),
       launcherService.getPageNames().length > 1, event?.clientX || 0, event?.clientY || 0);
   },
+  async locateLink(linkId: string): Promise<boolean> {
+    if (!linkId) return false;
+    await launcherService.ready;
+    const link = launcherService.getState().links.find(l => String(l.id) === String(linkId));
+    if (!link) return false;
+
+    // 1. 如果带有所属分区，先切换到对应分区
+    const targetPage = link.page || "常用网站";
+    if (launcherService.getState().activePage !== targetPage) {
+      await launcherService.setPage(targetPage);
+    }
+
+    // 2. 判断是否在文件夹内
+    const group = link.group || "常用网站";
+    if (group !== "常用网站") {
+      this.openFolder(group);
+    } else if (folderState.isOpen) {
+      launcherFolderController.closeFolder();
+    }
+
+    // 3. 延时等待 DOM 渲染后执行平滑居中滚动与橙色发光动画
+    setTimeout(() => {
+      const selector = `[data-launcher-id="${link.id}"]`;
+      const el = document.querySelector(selector) as HTMLElement | null;
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "center", inline: "center" });
+        el.classList.remove("launcher-locate-highlight");
+        // 强制重绘以触发重启动画
+        void el.offsetWidth;
+        el.classList.add("launcher-locate-highlight");
+        setTimeout(() => {
+          el.classList.remove("launcher-locate-highlight");
+        }, 3200);
+      }
+    }, 120);
+
+    return true;
+  },
   render(): void {
     const data = launcherService.getState();
     const pages = launcherService.getPageNames();

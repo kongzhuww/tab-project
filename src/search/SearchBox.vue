@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from "vue";
-import { searchState, searchController } from "./store";
+import { searchState, searchController, type SearchSuggestionItem } from "./store";
 import { searchService } from "../services/search.service";
 import { gitHubService, type GitHubSearchRule } from "../services/github.service";
+import { launcherRuntime } from "../launcher/runtime";
+import { launcherService } from "../services/launcher.service";
+import { useContextMenu } from "../sdk/interactions";
 import { t } from "../i18n";
 
 const searchPlaceholder = computed(() => {
@@ -133,7 +136,50 @@ function onToggleBiliRec(e: MouseEvent) {
 
 const inputRef = ref<HTMLInputElement | null>(null);
 
+const contextItem = ref<SearchSuggestionItem | null>(null);
+const contextMenuVisible = ref(false);
+const contextMenuPos = ref({ x: 0, y: 0 });
+
+const { menuRef: contextMenuRef, style: contextMenuStyle } = useContextMenu({
+  visible: () => contextMenuVisible.value,
+  anchor: () => contextMenuPos.value,
+  dismiss: () => { contextMenuVisible.value = false; }
+});
+
+function onSuggestionContextMenu(item: SearchSuggestionItem, e: MouseEvent) {
+  e.preventDefault();
+  e.stopPropagation();
+  contextItem.value = item;
+  contextMenuPos.value = { x: e.clientX, y: e.clientY };
+  contextMenuVisible.value = true;
+}
+
+const canLocateLauncher = computed(() => {
+  if (!contextItem.value) return false;
+  if (contextItem.value.launcherLinkId) return true;
+  if (!contextItem.value.url) return false;
+  const links = launcherService.getState().links || [];
+  return links.some(l => l.url === contextItem.value?.url);
+});
+
+async function onLocateLauncher() {
+  const item = contextItem.value;
+  contextMenuVisible.value = false;
+  if (!item) return;
+
+  let targetId = item.launcherLinkId;
+  if (!targetId && item.url) {
+    const found = launcherService.getState().links.find(l => l.url === item.url);
+    if (found) targetId = String(found.id);
+  }
+  if (!targetId) return;
+
+  searchController.setSuggestionsVisible(false);
+  await launcherRuntime.locateLink(targetId);
+}
+
 function onSuggestionClick(item: any) {
+  contextMenuVisible.value = false;
   searchController.onSuggestionClick(item);
 }
 
@@ -294,6 +340,7 @@ onUnmounted(() => {
       type="button"
       role="option"
       @click="onSuggestionClick(item)"
+      @contextmenu="onSuggestionContextMenu(item, $event)"
     >
       <img
         v-if="item.iconSrc"
@@ -316,6 +363,39 @@ onUnmounted(() => {
       </span>
     </button>
   </div>
+
+  <!-- 搜索建议右键菜单（支持定位到常用网站位置） -->
+  <Teleport to="body">
+    <div
+      v-if="contextMenuVisible"
+      ref="contextMenuRef"
+      class="folder-menu search-suggestion-context-menu"
+      role="menu"
+      :style="contextMenuStyle"
+      @pointerdown.stop
+      @contextmenu.prevent.stop
+    >
+      <div class="search-suggestion-menu-header">
+        <strong>{{ contextItem?.title }}</strong>
+        <small v-if="contextItem?.url">{{ contextItem?.url }}</small>
+      </div>
+      <button
+        v-if="canLocateLauncher"
+        type="button"
+        class="search-suggestion-menu-btn highlight-locate-btn"
+        @click="onLocateLauncher"
+      >
+        <span>🎯 定位到常用网站</span>
+      </button>
+      <button
+        type="button"
+        class="search-suggestion-menu-btn"
+        @click="onSuggestionClick(contextItem)"
+      >
+        <span>🔗 打开此网页</span>
+      </button>
+    </div>
+  </Teleport>
 </template>
 
 <style scoped>
@@ -334,5 +414,69 @@ onUnmounted(() => {
   white-space: nowrap;
   cursor: default;
   user-select: none;
+}
+
+.search-suggestion-context-menu {
+  min-width: 190px;
+  max-width: 280px;
+  padding: 6px;
+  border-radius: 12px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.22), 0 2px 10px rgba(0, 0, 0, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  z-index: 10000;
+}
+.search-suggestion-menu-header {
+  padding: 6px 8px 8px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 3px;
+}
+.search-suggestion-menu-header strong {
+  display: block;
+  font-size: 12px;
+  color: var(--heading);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.search-suggestion-menu-header small {
+  display: block;
+  font-size: 10px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-top: 2px;
+}
+.search-suggestion-menu-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: 7px;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.search-suggestion-menu-btn:hover {
+  background: var(--surface-hover);
+  color: var(--heading);
+}
+.highlight-locate-btn {
+  color: #ea580c;
+  font-weight: 600;
+}
+.highlight-locate-btn:hover {
+  background: rgba(234, 88, 12, 0.12);
+  color: #c2410c;
 }
 </style>

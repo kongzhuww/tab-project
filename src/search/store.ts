@@ -20,6 +20,8 @@ export interface SearchSuggestionItem {
   rawQuery?: string;
   rawCommand?: string;
   rawSong?: any;
+  sources?: string[];
+  launcherLinkId?: string;
 }
 
 export interface SearchStateSnapshot {

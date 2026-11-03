@@ -45,11 +45,19 @@ export function rankWebCandidates(query: string, candidates: WebCandidate[], lim
       previous.score = Math.max(previous.score, score);
       // A live saved title takes precedence over an outdated history snapshot.
       if (previous.candidate.source === 'history' && candidate.source !== 'history') previous.candidate = candidate;
+      if (candidate.item.launcherLinkId && !previous.candidate.item.launcherLinkId) {
+        previous.candidate.item.launcherLinkId = candidate.item.launcherLinkId;
+      }
     }
   }
   return [...merged.values()].sort((a, b) => b.score - a.score || b.visitedAt - a.visitedAt || a.order - b.order)
     .slice(0, limit).map(({ candidate, sources }) => {
       const labels = [sources.has('launcher') ? '常用网站' : '', sources.has('bookmark') ? '书签' : '', sources.has('history') ? '历史' : ''].filter(Boolean);
-      return { ...candidate.item, badge: labels.length ? { ...candidate.item.badge, text: labels.join(' · ') } : candidate.item.badge };
+      return {
+        ...candidate.item,
+        badge: labels.length ? { ...candidate.item.badge, text: labels.join(' · ') } : candidate.item.badge,
+        sources: Array.from(sources),
+        launcherLinkId: candidate.item.launcherLinkId
+      };
     });
 }

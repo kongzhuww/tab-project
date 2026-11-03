@@ -680,6 +680,7 @@ export class SearchService {
         if (!link.url) continue;
         candidates.push({ source: "launcher", item: {
           id: `launcher_${link.id}`, title: link.title || link.url, meta: link.url, url: link.url,
+          launcherLinkId: String(link.id),
           iconSrc: launcherService.getCachedIcon(link.url) || link.customIcon || link.icon || iconFor(link.url),
           badge: { className: "badge-launcher", text: "常用网站", icon: "⭐" }
         } });
