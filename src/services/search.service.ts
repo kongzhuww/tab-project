@@ -160,6 +160,22 @@ export class SearchService {
   public recordSearchClick(item: { url: string; title: string; iconSrc?: string; badge?: any }): void {
     if (!item.url || !searchUrlKey(item.url)) return;
     const cleanUrl = item.url.trim();
+
+    // 过滤掉搜索引擎生成的结果页（如 bing.com/search、qcc.com/web/search 等查询链接），只记录具体内容网站
+    try {
+      const u = new URL(cleanUrl);
+      if (
+        (u.hostname.includes("qcc.com") && u.pathname.includes("/search")) ||
+        (u.hostname.includes("bing.com") && u.pathname.includes("/search")) ||
+        (u.hostname.includes("google.com") && u.pathname.includes("/search")) ||
+        (u.hostname.includes("baidu.com") && (u.pathname.includes("/s") || u.pathname.includes("/search"))) ||
+        (u.hostname.includes("tianyancha.com") && u.pathname.includes("/search")) ||
+        (u.hostname.includes("aiqicha.baidu.com") && u.pathname.includes("/s"))
+      ) {
+        return;
+      }
+    } catch {}
+
     // 过滤掉已有记录，置于数组最前方
     this.clickHistory = this.clickHistory.filter(h => h.url !== cleanUrl);
 
@@ -701,6 +717,7 @@ export class SearchService {
           if (!bookmark.url || bookmarksService.isBookmarkIgnored(bookmark, ignored, folderMap)) continue;
           candidates.push({ source: "bookmark", fuzzyMatch: true, item: {
             id: `bm_${bookmark.id}`, title: bookmark.title || bookmark.url, meta: bookmark.url, url: bookmark.url,
+            bookmarkId: String(bookmark.id),
             iconSrc: iconFor(bookmark.url), badge: { className: "badge-bookmark", text: "书签", icon: "🔖" }
           } });
         }

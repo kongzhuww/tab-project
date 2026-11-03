@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from "vue";
+import { ref, computed, watch, onMounted, onUnmounted } from "vue";
 import { searchState, searchController, type SearchSuggestionItem } from "./store";
 import { searchService } from "../services/search.service";
 import { gitHubService, type GitHubSearchRule } from "../services/github.service";
@@ -135,6 +135,58 @@ function onToggleBiliRec(e: MouseEvent) {
 }
 
 const inputRef = ref<HTMLInputElement | null>(null);
+const selectedSuggestionIndex = ref(-1);
+
+watch(() => searchState.suggestions, () => {
+  selectedSuggestionIndex.value = -1;
+});
+watch(() => searchState.isSuggestionsVisible, (visible) => {
+  if (!visible) selectedSuggestionIndex.value = -1;
+});
+
+function onKeydown(e: KeyboardEvent) {
+  if (!searchState.isSuggestionsVisible || !searchState.suggestions.length) {
+    if (e.key === "Enter") onSubmit();
+    return;
+  }
+
+  if (e.key === "ArrowDown") {
+    e.preventDefault();
+    if (selectedSuggestionIndex.value < searchState.suggestions.length - 1) {
+      selectedSuggestionIndex.value++;
+    } else {
+      selectedSuggestionIndex.value = 0;
+    }
+    scrollSelectedSuggestionIntoView();
+  } else if (e.key === "ArrowUp") {
+    e.preventDefault();
+    if (selectedSuggestionIndex.value > 0) {
+      selectedSuggestionIndex.value--;
+    } else {
+      selectedSuggestionIndex.value = searchState.suggestions.length - 1;
+    }
+    scrollSelectedSuggestionIntoView();
+  } else if (e.key === "Enter") {
+    if (selectedSuggestionIndex.value >= 0 && selectedSuggestionIndex.value < searchState.suggestions.length) {
+      e.preventDefault();
+      onSuggestionClick(searchState.suggestions[selectedSuggestionIndex.value]);
+    } else {
+      onSubmit();
+    }
+  } else if (e.key === "Escape") {
+    searchController.setSuggestionsVisible(false);
+  }
+}
+
+function scrollSelectedSuggestionIntoView() {
+  const container = document.getElementById("search-suggestions");
+  if (!container) return;
+  const items = container.querySelectorAll(".search-suggestion");
+  const activeItem = items[selectedSuggestionIndex.value] as HTMLElement | undefined;
+  if (activeItem) {
+    activeItem.scrollIntoView({ block: "nearest" });
+  }
+}
 
 const contextItem = ref<SearchSuggestionItem | null>(null);
 const contextMenuVisible = ref(false);
@@ -161,6 +213,50 @@ const canLocateLauncher = computed(() => {
   const links = launcherService.getState().links || [];
   return links.some(l => l.url === contextItem.value?.url);
 });
+
+const canLocateBookmark = computed(() => {
+  if (!contextItem.value) return false;
+  return Boolean(contextItem.value.bookmarkId || contextItem.value.badge?.text?.includes("书签"));
+});
+
+async function onLocateBookmark() {
+  const item = contextItem.value;
+  contextMenuVisible.value = false;
+  if (!item) return;
+
+  searchController.setSuggestionsVisible(false);
+
+  // 1. 查找目标书签节点与所属板块
+  let targetNodeId = item.bookmarkId;
+  let targetUrl = item.url || "";
+
+  // 2. 切换主视图到书签看板 (BookmarkBoard)
+  const sitesViewBtn = document.querySelector(".sites-view-switch button:nth-child(2)") as HTMLButtonElement | null;
+  if (sitesViewBtn) {
+    sitesViewBtn.click();
+  }
+
+  // 3. 延时寻找目标 DOM 并高亮
+  setTimeout(() => {
+    let el: HTMLElement | null = null;
+    if (targetNodeId) {
+      el = document.querySelector(`[data-bookmark-node="${targetNodeId}"]`) as HTMLElement | null;
+    }
+    if (!el && targetUrl) {
+      el = document.querySelector(`.bookmark-board [href="${targetUrl}"]`) as HTMLElement | null;
+    }
+
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "center", inline: "center" });
+      el.classList.remove("launcher-locate-highlight");
+      void el.offsetWidth;
+      el.classList.add("launcher-locate-highlight");
+      setTimeout(() => {
+        el?.classList.remove("launcher-locate-highlight");
+      }, 3200);
+    }
+  }, 160);
+}
 
 async function onLocateLauncher() {
   const item = contextItem.value;
@@ -232,7 +328,7 @@ onUnmounted(() => {
     @input="onInput"
     @focus="onInputFocus"
     @click="onInputClick"
-    @keydown.enter="onSubmit"
+    @keydown="onKeydown"
   />
   <span
     v-if="searchState.mode === 'web'"
@@ -334,13 +430,15 @@ onUnmounted(() => {
     :hidden="!searchState.isSuggestionsVisible || !searchState.suggestions.length"
   >
     <button
-      v-for="item in searchState.suggestions"
+      v-for="(item, idx) in searchState.suggestions"
       :key="item.id"
       class="search-suggestion"
+      :class="{ 'is-selected': idx === selectedSuggestionIndex }"
       type="button"
       role="option"
       @click="onSuggestionClick(item)"
       @contextmenu="onSuggestionContextMenu(item, $event)"
+      @mouseenter="selectedSuggestionIndex = idx"
     >
       <img
         v-if="item.iconSrc"
@@ -386,6 +484,14 @@ onUnmounted(() => {
         @click="onLocateLauncher"
       >
         <span>🎯 定位到常用网站</span>
+      </button>
+      <button
+        v-if="canLocateBookmark"
+        type="button"
+        class="search-suggestion-menu-btn highlight-locate-bookmark-btn"
+        @click="onLocateBookmark"
+      >
+        <span>🔖 定位到书签</span>
       </button>
       <button
         type="button"
@@ -478,5 +584,19 @@ onUnmounted(() => {
 .highlight-locate-btn:hover {
   background: rgba(234, 88, 12, 0.12);
   color: #c2410c;
+}
+
+.highlight-locate-bookmark-btn {
+  color: #0284c7;
+  font-weight: 600;
+}
+.highlight-locate-bookmark-btn:hover {
+  background: rgba(2, 132, 199, 0.12);
+  color: #0369a1;
+}
+
+.search-suggestion.is-selected {
+  background: var(--surface-hover) !important;
+  border-color: rgba(249, 115, 22, 0.4) !important;
 }
 </style>

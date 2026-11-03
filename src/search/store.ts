@@ -22,6 +22,7 @@ export interface SearchSuggestionItem {
   rawSong?: any;
   sources?: string[];
   launcherLinkId?: string;
+  bookmarkId?: string;
 }
 
 export interface SearchStateSnapshot {

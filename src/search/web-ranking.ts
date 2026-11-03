@@ -48,6 +48,9 @@ export function rankWebCandidates(query: string, candidates: WebCandidate[], lim
       if (candidate.item.launcherLinkId && !previous.candidate.item.launcherLinkId) {
         previous.candidate.item.launcherLinkId = candidate.item.launcherLinkId;
       }
+      if (candidate.item.bookmarkId && !previous.candidate.item.bookmarkId) {
+        previous.candidate.item.bookmarkId = candidate.item.bookmarkId;
+      }
     }
   }
   return [...merged.values()].sort((a, b) => b.score - a.score || b.visitedAt - a.visitedAt || a.order - b.order)
@@ -57,7 +60,8 @@ export function rankWebCandidates(query: string, candidates: WebCandidate[], lim
         ...candidate.item,
         badge: labels.length ? { ...candidate.item.badge, text: labels.join(' · ') } : candidate.item.badge,
         sources: Array.from(sources),
-        launcherLinkId: candidate.item.launcherLinkId
+        launcherLinkId: candidate.item.launcherLinkId,
+        bookmarkId: candidate.item.bookmarkId
       };
     });
 }
