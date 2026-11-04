@@ -9,11 +9,11 @@ const props = defineProps<{
   active?: boolean;
 }>();
 
-const newTopicInput = ref("");
-const isCreatingTopic = ref(false);
+const newGroupInput = ref("");
+const isCreatingGroup = ref(false);
 const activeMenuColumn = ref<string | null>(null);
-const renameTopicInput = ref("");
-const renamingColumnTopic = ref<string | null>(null);
+const renameGroupInput = ref("");
+const renamingColumnGroup = ref<string | null>(null);
 
 // 看板横向滚动容器引用
 const boardViewportRef = ref<HTMLElement | null>(null);
@@ -38,7 +38,7 @@ function onShelfWheel(event: WheelEvent) {
 
 // 内存直接绑定的拖拽状态
 const activeDragRepo = ref<MyRepoItem | null>(null);
-const activeDragFromTopic = ref<string | null>(null);
+const activeDragFromGroup = ref<string | null>(null);
 const hoverTargetColumn = ref<string | null>(null);
 
 // 边缘自动滚动状态
@@ -53,13 +53,13 @@ const contextMenuState = reactive<{
   x: number;
   y: number;
   repo: MyRepoItem | null;
-  fromTopic: string | null;
+  fromGroup: string | null;
 }>({
   visible: false,
   x: 0,
   y: 0,
   repo: null,
-  fromTopic: null
+  fromGroup: null
 });
 
 const activeSubMenu = ref<string | null>(null);
@@ -70,7 +70,7 @@ function closeContextMenu(): void {
   activeSubMenu.value = null;
 }
 
-function handleOpenContextMenu(e: MouseEvent, repo: MyRepoItem, fromTopic: string) {
+function handleOpenContextMenu(e: MouseEvent, repo: MyRepoItem, fromGroup: string) {
   e.preventDefault();
   e.stopPropagation();
 
@@ -82,38 +82,24 @@ function handleOpenContextMenu(e: MouseEvent, repo: MyRepoItem, fromTopic: strin
   contextMenuState.x = x;
   contextMenuState.y = y;
   contextMenuState.repo = repo;
-  contextMenuState.fromTopic = fromTopic;
+  contextMenuState.fromGroup = fromGroup;
   contextMenuState.visible = true;
-  activeSubMenu.value = "folder"; // 默认即展开或可悬停展开
+  activeSubMenu.value = "folder";
   isFlyoutLeft.value = x > window.innerWidth - 380;
 }
 
 async function handleMoveToDefault() {
   const repo = contextMenuState.repo;
-  const fromTopic = contextMenuState.fromTopic;
   closeContextMenu();
   if (!repo) return;
-
-  if (fromTopic && fromTopic !== "default") {
-    await myReposController.removeRepoFromTopic(repo, fromTopic);
-  } else if (repo.topics.length) {
-    await myReposController.syncRepoTopics(repo, []);
-  }
+  await myReposController.moveRepoToGroup(repo, null);
 }
 
-async function handleMoveToTopic(targetTopic: string) {
+async function handleMoveToGroup(targetGroup: string) {
   const repo = contextMenuState.repo;
-  const fromTopic = contextMenuState.fromTopic;
   closeContextMenu();
   if (!repo) return;
-
-  if (fromTopic && fromTopic !== "default" && fromTopic !== targetTopic) {
-    const next = repo.topics.filter(t => t !== fromTopic);
-    if (!next.includes(targetTopic)) next.push(targetTopic);
-    await myReposController.syncRepoTopics(repo, next);
-  } else {
-    await myReposController.addRepoToTopic(repo, targetTopic);
-  }
+  await myReposController.moveRepoToGroup(repo, targetGroup);
 }
 
 async function handleCopyRepoUrl() {
@@ -182,15 +168,9 @@ function onGlobalKeyDown(event: KeyboardEvent): void {
 // 数据过滤与计算
 // -------------------------------------------------------------
 
-// 提取所有活跃的 Topic 列：包含用户自定义的 topic 和仓库中现有的 topics
-const activeTopicColumns = computed(() => {
-  const set = new Set<string>(myReposState.customTopicNames);
-  for (const r of myReposState.repos) {
-    for (const t of r.topics) {
-      if (t) set.add(t);
-    }
-  }
-  return Array.from(set).sort();
+// 活跃的分组列：用户自定义的中文/英文分组列表
+const activeGroupColumns = computed(() => {
+  return myReposState.customGroups;
 });
 
 // 过滤后的仓库列表
@@ -200,65 +180,62 @@ const filteredRepos = computed(() => {
   return myReposState.repos.filter(r =>
     r.name.toLowerCase().includes(q) ||
     r.description.toLowerCase().includes(q) ||
-    r.topics.some(t => t.includes(q)) ||
+    r.localGroups.some(g => g.toLowerCase().includes(q)) ||
+    r.topics.some(t => t.toLowerCase().includes(q)) ||
     (r.language && r.language.toLowerCase().includes(q))
   );
 });
 
-// 左侧“默认板块”中的仓库：没有打任何已知活跃 Topic 的仓库，或未分类
+// 左侧“未分类”中的仓库：没有被赋予任何本地分组的仓库
 const defaultColumnRepos = computed(() => {
-  const topicsSet = new Set(activeTopicColumns.value);
-  return filteredRepos.value.filter(r => {
-    if (!r.topics.length) return true;
-    return !r.topics.some(t => topicsSet.has(t));
-  });
+  return filteredRepos.value.filter(r => !r.localGroups.length);
 });
 
-// 获取属于特定 Topic 列的仓库
-function getReposForTopic(topic: string): MyRepoItem[] {
-  return filteredRepos.value.filter(r => r.topics.includes(topic));
+// 获取属于特定分组列的仓库
+function getReposForGroup(group: string): MyRepoItem[] {
+  return filteredRepos.value.filter(r => r.localGroups.includes(group));
 }
 
-// 新建 Topic 板块
-async function handleCreateTopic() {
-  const name = newTopicInput.value.trim();
+// 新建分组板块
+async function handleCreateGroup() {
+  const name = newGroupInput.value.trim();
   if (!name) return;
-  const created = await myReposController.createTopicColumn(name);
+  const created = await myReposController.createGroup(name);
   if (created) {
-    newTopicInput.value = "";
-    isCreatingTopic.value = false;
+    newGroupInput.value = "";
+    isCreatingGroup.value = false;
   }
 }
 
-// 开始重命名 Topic
-function startRenameTopic(topic: string) {
-  renamingColumnTopic.value = topic;
-  renameTopicInput.value = topic;
+// 开始重命名分组
+function startRenameGroup(group: string) {
+  renamingColumnGroup.value = group;
+  renameGroupInput.value = group;
   activeMenuColumn.value = null;
 }
 
-// 确认重命名
-async function handleConfirmRename(oldTopic: string) {
-  const newName = renameTopicInput.value.trim();
-  if (!newName || newName === oldTopic) {
-    renamingColumnTopic.value = null;
+// 确认重命名分组
+async function handleConfirmRename(oldGroup: string) {
+  const newName = renameGroupInput.value.trim();
+  if (!newName || newName === oldGroup) {
+    renamingColumnGroup.value = null;
     return;
   }
-  const ok = await myReposController.renameTopicColumn(oldTopic, newName);
+  const ok = await myReposController.renameGroup(oldGroup, newName);
   if (ok) {
-    renamingColumnTopic.value = null;
+    renamingColumnGroup.value = null;
   }
 }
 
-// 删除 Topic 板块
-async function handleDeleteTopic(topic: string) {
+// 删除分组板块
+async function handleDeleteGroup(group: string) {
   activeMenuColumn.value = null;
-  await myReposController.deleteTopicColumn(topic);
+  await myReposController.deleteGroup(group);
 }
 
-// 从指定 Topic 移除仓库
-async function handleRemoveRepoFromTopic(repo: MyRepoItem, topic: string) {
-  await myReposController.removeRepoFromTopic(repo, topic);
+// 从指定分组移除仓库
+async function handleRemoveRepoFromGroup(repo: MyRepoItem, group: string) {
+  await myReposController.removeRepoFromGroup(repo, group);
 }
 
 // -------------------------------------------------------------
@@ -269,7 +246,6 @@ function onViewportWheel(event: WheelEvent) {
   const vp = boardViewportRef.value;
   if (!vp) return;
 
-  // 1. 若光标在某列内部纵向卡片滚动区，且该列可以纵向滚动，不拦截，保证该列卡片自然纵向滚动
   const target = event.target as HTMLElement | null;
   const colScroll = target?.closest(".column-cards-scroll");
   if (colScroll && colScroll.scrollHeight > colScroll.clientHeight && !event.shiftKey && event.deltaX === 0) {
@@ -280,19 +256,16 @@ function onViewportWheel(event: WheelEvent) {
     }
   }
 
-  // 2. 触摸板双指天然横向滑动（deltaX），完全不 preventDefault，走浏览器 120Hz 硬件加速自然惯性滚动
   if (Math.abs(event.deltaX) > Math.abs(event.deltaY) && event.deltaX !== 0) {
     return;
   }
 
-  // 3. 鼠标滚轮垂直滑动（deltaY），直接平滑映射至看板横向滚动
   if (event.deltaY !== 0) {
     event.preventDefault();
     vp.scrollLeft += event.deltaY;
   }
 }
 
-// 拖拽过程中，全局监听鼠标滚轮，让用户随时可以通过滚轮平滑横向滚动看板
 function onWindowWheelWhileDragging(event: WheelEvent) {
   if (!activeDragRepo.value || !boardViewportRef.value) return;
   event.preventDefault();
@@ -327,12 +300,10 @@ function checkEdgeAutoScroll(clientX: number) {
   const threshold = 100;
 
   if (clientX > rect.right - threshold) {
-    // 接近右边缘，向右滚动
     const ratio = Math.min(1, Math.max(0.1, (clientX - (rect.right - threshold)) / threshold));
     autoScrollVelocity = Math.round(ratio * 20);
     startAutoScroll();
   } else if (clientX < rect.left + threshold) {
-    // 接近左边缘，向左滚动
     const ratio = Math.min(1, Math.max(0.1, ((rect.left + threshold) - clientX) / threshold));
     autoScrollVelocity = -Math.round(ratio * 20);
     startAutoScroll();
@@ -347,20 +318,20 @@ function onViewportDragOver(event: DragEvent) {
   checkEdgeAutoScroll(event.clientX);
 }
 
-function onDragStart(event: DragEvent, repo: MyRepoItem, fromTopic: string) {
+function onDragStart(event: DragEvent, repo: MyRepoItem, fromGroup: string) {
   closeContextMenu();
   activeDragRepo.value = repo;
-  activeDragFromTopic.value = fromTopic;
+  activeDragFromGroup.value = fromGroup;
   if (event.dataTransfer) {
     event.dataTransfer.effectAllowed = "move";
-    event.dataTransfer.setData("text/plain", `${repo.id}:${fromTopic}`);
+    event.dataTransfer.setData("text/plain", `${repo.id}:${fromGroup}`);
   }
   window.addEventListener("wheel", onWindowWheelWhileDragging, { passive: false });
 }
 
 function onDragEnd() {
   activeDragRepo.value = null;
-  activeDragFromTopic.value = null;
+  activeDragFromGroup.value = null;
   hoverTargetColumn.value = null;
   stopAutoScroll();
   window.removeEventListener("wheel", onWindowWheelWhileDragging);
@@ -383,27 +354,26 @@ function onDragLeave(event: DragEvent, columnId: string) {
   }
 }
 
-async function onDropToTopic(event: DragEvent, targetTopic: string) {
+async function onDropToGroup(event: DragEvent, targetGroup: string) {
   event.preventDefault();
   const repo = activeDragRepo.value;
-  const fromTopic = activeDragFromTopic.value;
+  const fromGroup = activeDragFromGroup.value;
   onDragEnd();
 
   if (!repo) return;
 
-  if (targetTopic === "default") {
-    // 拖回默认板块：从原 topic 移除
-    if (fromTopic && fromTopic !== "default") {
-      await myReposController.removeRepoFromTopic(repo, fromTopic);
+  if (targetGroup === "default") {
+    // 拖回默认板块（未分类）：从所有/当前分组移除
+    if (fromGroup && fromGroup !== "default") {
+      await myReposController.removeRepoFromGroup(repo, fromGroup);
+    } else {
+      await myReposController.moveRepoToGroup(repo, null);
     }
   } else {
-    // 拖到新 topic 板块
-    if (fromTopic && fromTopic !== "default" && fromTopic !== targetTopic) {
-      const next = repo.topics.filter(t => t !== fromTopic);
-      if (!next.includes(targetTopic)) next.push(targetTopic);
-      await myReposController.syncRepoTopics(repo, next);
-    } else {
-      await myReposController.addRepoToTopic(repo, targetTopic);
+    // 拖到指定自定义分组
+    await myReposController.addRepoToGroup(repo, targetGroup);
+    if (fromGroup && fromGroup !== "default" && fromGroup !== targetGroup) {
+      await myReposController.removeRepoFromGroup(repo, fromGroup);
     }
   }
 }
@@ -428,12 +398,11 @@ watch(
     window.removeEventListener("pointerdown", onGlobalPointerDown);
     window.removeEventListener("keydown", onGlobalKeyDown);
     closeContextMenu();
+
     if (visible) {
       window.addEventListener("pointerdown", onGlobalPointerDown);
       window.addEventListener("keydown", onGlobalKeyDown);
-      if (!myReposState.repos.length) {
-        void myReposController.load();
-      }
+      void myReposController.load();
     }
   },
   { immediate: true }
@@ -443,60 +412,57 @@ onMounted(() => {
   if (props.active) {
     window.addEventListener("pointerdown", onGlobalPointerDown);
     window.addEventListener("keydown", onGlobalKeyDown);
-    if (!myReposState.repos.length) {
-      void myReposController.load();
-    }
+    void myReposController.load();
   }
 });
 
 onUnmounted(() => {
+  stopAutoScroll();
   window.removeEventListener("wheel", onWindowWheelWhileDragging);
   window.removeEventListener("pointerdown", onGlobalPointerDown);
   window.removeEventListener("keydown", onGlobalKeyDown);
-  stopAutoScroll();
-  closeContextMenu();
 });
 </script>
 
 <template>
   <div class="my-repos-workspace">
-    <!-- 错误状态提示条 -->
+
+    <!-- 错误横幅提示 -->
     <div v-if="myReposState.errorMessage" class="error-banner">
       <span>⚠️ {{ myReposState.errorMessage }}</span>
-      <button type="button" @click="myReposController.load(true)">重试</button>
+      <button type="button" class="btn-retry" @click="myReposController.load(true)">重试</button>
     </div>
 
-    <!-- 1. 顶部全宽长方形：默认板块 (未分配 Topic 仓库池 / 快速分发托盘) -->
+    <!-- 1. 上方：未分类与全部仓库抽屉托盘 (Default Shelf) -->
     <section
-      class="default-shelf"
-      :class="{ 'drop-active': hoverTargetColumn === 'default', 'is-collapsed': isDefaultShelfCollapsed }"
+      class="default-shelf-area"
+      :class="{ 'is-collapsed': isDefaultShelfCollapsed, 'drop-active': hoverTargetColumn === 'default' }"
       @dragover="onDragOver($event, 'default')"
       @dragleave="onDragLeave($event, 'default')"
-      @drop="onDropToTopic($event, 'default')"
+      @drop="onDropToGroup($event, 'default')"
     >
       <header class="shelf-header">
-        <div class="shelf-title-group">
-          <span class="col-dot default-dot"></span>
-          <h3 class="shelf-title">{{ t('github.myRepos.defaultShelf') }}</h3>
-          <span class="badge-count">{{ defaultColumnRepos.length }}</span>
-          <span class="shelf-hint">{{ t('github.myRepos.defaultShelfHint') }}</span>
-          <span v-if="myReposState.syncingTopic" class="sync-status">
-            <i class="spin-icon">⏳</i> {{ t('github.myRepos.syncingTopics') }}
-          </span>
+        <div class="shelf-left">
+          <span class="shelf-icon">📁</span>
+          <span class="shelf-title">未分类仓库</span>
+          <span class="shelf-badge">{{ defaultColumnRepos.length }}</span>
+          <span class="shelf-sub-tip">（拖入此处即可取消分组归属，不会修改 GitHub 远端 Topics）</span>
         </div>
-        <div class="shelf-actions">
-          <!-- 紧凑搜索框 -->
-          <div class="shelf-search-box">
+
+        <div class="shelf-right">
+          <!-- 搜索框 -->
+          <div class="shelf-search-wrap">
+            <span class="search-icon">🔍</span>
             <input
               v-model="myReposState.searchQuery"
               type="text"
-              :placeholder="t('github.myRepos.filterPlaceholder')"
               class="shelf-search-input"
+              placeholder="搜索我的仓库名称、简介或语言…"
             />
             <button
               v-if="myReposState.searchQuery"
               type="button"
-              class="shelf-clear-btn"
+              class="clear-search-btn"
               @click="myReposState.searchQuery = ''"
             >✕</button>
           </div>
@@ -505,7 +471,7 @@ onUnmounted(() => {
           <button
             type="button"
             class="shelf-btn-refresh"
-            :disabled="myReposState.loading || myReposState.syncingTopic"
+            :disabled="myReposState.loading"
             :title="t('github.myRepos.refreshBtnTitle')"
             @click="myReposController.load(true)"
           >
@@ -554,7 +520,7 @@ onUnmounted(() => {
           </p>
 
           <div v-if="repo.topics.length" class="repo-topics-row">
-            <span v-for="t in repo.topics" :key="t" class="topic-chip">
+            <span v-for="t in repo.topics" :key="t" class="topic-chip-tag" title="GitHub 远端引流标签">
               #{{ t }}
             </span>
           </div>
@@ -574,12 +540,12 @@ onUnmounted(() => {
         </div>
 
         <div v-if="!defaultColumnRepos.length" class="empty-shelf-placeholder">
-          <span>{{ t('github.myRepos.emptyShelf') }}</span>
+          <span>暂无未分类仓库，所有仓库都已归入下方自定义板块</span>
         </div>
       </div>
     </section>
 
-    <!-- 2. 下方：各个 Topic 看板横向多列滚动区 -->
+    <!-- 2. 下方：各个自定义分组看板横向多列滚动区 -->
     <div
       ref="boardViewportRef"
       class="board-viewport"
@@ -587,55 +553,55 @@ onUnmounted(() => {
       @dragover="onViewportDragOver"
     >
       <div class="board-columns-track">
-        <!-- 右侧各个 Topic 看板列 -->
+        <!-- 右侧各个本地自定义分组看板列 -->
         <section
-          v-for="topic in activeTopicColumns"
-          :key="topic"
+          v-for="group in activeGroupColumns"
+          :key="group"
           class="board-column topic-column"
-          :class="{ 'drop-active': hoverTargetColumn === topic }"
-          @dragover="onDragOver($event, topic)"
-          @dragleave="onDragLeave($event, topic)"
-          @drop="onDropToTopic($event, topic)"
+          :class="{ 'drop-active': hoverTargetColumn === group }"
+          @dragover="onDragOver($event, group)"
+          @dragleave="onDragLeave($event, group)"
+          @drop="onDropToGroup($event, group)"
         >
           <header class="column-header">
             <!-- 正常标题显示 -->
-            <div v-if="renamingColumnTopic !== topic" class="column-title-group">
+            <div v-if="renamingColumnGroup !== group" class="column-title-group">
               <span class="col-dot topic-dot"></span>
-              <h3 class="column-title" :title="'GitHub Topic: ' + topic">
-                #{{ topic }}
+              <h3 class="column-title" :title="'自定义分组: ' + group">
+                📁 {{ group }}
               </h3>
-              <span class="badge-count">{{ getReposForTopic(topic).length }}</span>
+              <span class="badge-count">{{ getReposForGroup(group).length }}</span>
             </div>
 
             <!-- 内联重命名输入框 -->
             <div v-else class="column-rename-group">
               <input
-                v-model="renameTopicInput"
+                v-model="renameGroupInput"
                 type="text"
                 class="rename-input"
-                @keydown.enter="handleConfirmRename(topic)"
-                @keydown.esc="renamingColumnTopic = null"
+                @keydown.enter="handleConfirmRename(group)"
+                @keydown.esc="renamingColumnGroup = null"
                 autofocus
               />
-              <button type="button" class="btn-confirm-rename" @click="handleConfirmRename(topic)">✓</button>
-              <button type="button" class="btn-cancel-rename" @click="renamingColumnTopic = null">✕</button>
+              <button type="button" class="btn-confirm-rename" @click="handleConfirmRename(group)">✓</button>
+              <button type="button" class="btn-cancel-rename" @click="renamingColumnGroup = null">✕</button>
             </div>
 
             <div class="column-actions">
               <button
                 type="button"
                 class="col-more-btn"
-                :title="t('github.myRepos.topicActions')"
-                @click="activeMenuColumn = activeMenuColumn === topic ? null : topic"
+                title="分组操作"
+                @click="activeMenuColumn = activeMenuColumn === group ? null : group"
               >•••</button>
 
               <!-- 气泡弹出菜单 -->
-              <div v-if="activeMenuColumn === topic" class="col-popover-menu">
-                <button type="button" class="menu-item" @click="startRenameTopic(topic)">
-                  {{ t('github.myRepos.renameTopicMenu') }}
+              <div v-if="activeMenuColumn === group" class="col-popover-menu">
+                <button type="button" class="menu-item" @click="startRenameGroup(group)">
+                  重命名分组
                 </button>
-                <button type="button" class="menu-item danger" @click="handleDeleteTopic(topic)">
-                  {{ t('github.myRepos.deleteTopicMenu') }}
+                <button type="button" class="menu-item danger" @click="handleDeleteGroup(group)">
+                  删除分组
                 </button>
               </div>
             </div>
@@ -643,14 +609,14 @@ onUnmounted(() => {
 
           <div class="column-cards-scroll">
             <div
-              v-for="repo in getReposForTopic(topic)"
+              v-for="repo in getReposForGroup(group)"
               :key="repo.id"
               class="repo-card"
               :class="{ 'card-dragging': activeDragRepo?.id === repo.id }"
               draggable="true"
-              @dragstart="onDragStart($event, repo, topic)"
+              @dragstart="onDragStart($event, repo, group)"
               @dragend="onDragEnd"
-              @contextmenu="handleOpenContextMenu($event, repo, topic)"
+              @contextmenu="handleOpenContextMenu($event, repo, group)"
             >
               <div class="repo-card-head">
                 <span class="repo-name" :title="repo.fullName" @click="openRepoUrl(repo.htmlUrl)">
@@ -664,23 +630,24 @@ onUnmounted(() => {
                 {{ repo.description }}
               </p>
 
-              <!-- 卡片上的 Topic 标签，带快速移除按钮 -->
+              <!-- 仓库所属分组与移除按钮 -->
               <div class="repo-topics-row">
                 <span class="topic-chip active-chip">
-                  #{{ topic }}
+                  📁 {{ group }}
                   <i
                     class="remove-topic-btn"
-                    :title="t('github.myRepos.removeTopicTip')"
-                    @click.stop="handleRemoveRepoFromTopic(repo, topic)"
+                    title="从该分组移出"
+                    @click.stop="handleRemoveRepoFromGroup(repo, group)"
                   >✕</i>
                 </span>
-                <!-- 其他附带的 topics -->
+                <!-- 显示远端 GitHub Topics 仅作标识参考 -->
                 <span
-                  v-for="other in repo.topics.filter(t => t !== topic)"
-                  :key="other"
-                  class="topic-chip other-chip"
+                  v-for="t in repo.topics"
+                  :key="t"
+                  class="topic-chip-tag"
+                  title="GitHub 远端引流标签"
                 >
-                  #{{ other }}
+                  #{{ t }}
                 </span>
               </div>
 
@@ -698,36 +665,36 @@ onUnmounted(() => {
               </div>
             </div>
 
-            <div v-if="!getReposForTopic(topic).length" class="empty-column-placeholder">
-              <span>{{ t('github.myRepos.emptyColumn') }}</span>
+            <div v-if="!getReposForGroup(group).length" class="empty-column-placeholder">
+              <span>暂无仓库，可从上方或其它列拖入</span>
             </div>
           </div>
         </section>
 
-        <!-- 3. 最右侧：＋ 新建 Topic 板块 -->
+        <!-- 3. 最右侧：＋ 新建分组板块 -->
         <section class="board-column new-column-slot">
-          <div v-if="!isCreatingTopic" class="new-column-placeholder" @click="isCreatingTopic = true">
+          <div v-if="!isCreatingGroup" class="new-column-placeholder" @click="isCreatingGroup = true">
             <span class="plus-icon">＋</span>
-            <span class="new-col-text">新建 Topic 板块</span>
+            <span class="new-col-text">新建分组板块</span>
           </div>
 
           <div v-else class="new-column-composer">
             <header class="composer-header">
-              <strong>{{ t('github.myRepos.newTopicTitle') }}</strong>
-              <small>{{ t('github.myRepos.newTopicSub') }}</small>
+              <strong>新建分组板块</strong>
+              <small>支持中文命名，仅在插件内归类，不影响 GitHub 远端 Topics</small>
             </header>
             <input
-              v-model="newTopicInput"
+              v-model="newGroupInput"
               type="text"
-              :placeholder="t('github.myRepos.newTopicPlaceholder')"
+              placeholder="输入分组名称（如：前端工具、深度学习）"
               class="composer-input"
-              @keydown.enter="handleCreateTopic"
-              @keydown.esc="isCreatingTopic = false"
+              @keydown.enter="handleCreateGroup"
+              @keydown.esc="isCreatingGroup = false"
               autofocus
             />
             <div class="composer-actions">
-              <button type="button" class="btn-primary" @click="handleCreateTopic">{{ t('github.myRepos.createTopicBtn') }}</button>
-              <button type="button" class="btn-cancel" @click="isCreatingTopic = false">{{ t('common.cancel') }}</button>
+              <button type="button" class="btn-primary" @click="handleCreateGroup">创建</button>
+              <button type="button" class="btn-cancel" @click="isCreatingGroup = false">{{ t('common.cancel') }}</button>
             </div>
           </div>
         </section>
@@ -755,7 +722,7 @@ onUnmounted(() => {
             type="button"
             @click.stop="activeSubMenu = activeSubMenu === 'folder' ? null : 'folder'"
           >
-            <span>{{ t('github.myRepos.moveToGroup') }}</span>
+            <span>移动到分组</span>
             <span class="sub-arrow">›</span>
           </button>
 
@@ -768,23 +735,23 @@ onUnmounted(() => {
             <!-- 设为未分类 -->
             <button
               class="fo-cover-menu-item"
-              :class="{ primary: !contextMenuState.repo.topics.length }"
+              :class="{ primary: !contextMenuState.repo.localGroups.length }"
               type="button"
               @click="handleMoveToDefault"
             >
-              {{ !contextMenuState.repo.topics.length ? "✓ " : "  " }}{{ t('github.myRepos.setUncategorized') }}
+              {{ !contextMenuState.repo.localGroups.length ? "✓ " : "  " }}设为未分类
             </button>
 
-            <!-- 各个 Topic 分组 -->
+            <!-- 各个自定义分组 -->
             <button
-              v-for="topic in activeTopicColumns"
-              :key="topic"
+              v-for="grp in activeGroupColumns"
+              :key="grp"
               class="fo-cover-menu-item"
-              :class="{ primary: contextMenuState.repo.topics.includes(topic) }"
+              :class="{ primary: contextMenuState.repo.localGroups.includes(grp) }"
               type="button"
-              @click="handleMoveToTopic(topic)"
+              @click="handleMoveToGroup(grp)"
             >
-              {{ contextMenuState.repo.topics.includes(topic) ? "✓ " : "  " }}📁 {{ topic }}
+              {{ contextMenuState.repo.localGroups.includes(grp) ? "✓ " : "  " }}📁 {{ grp }}
             </button>
           </div>
         </div>
@@ -809,7 +776,7 @@ onUnmounted(() => {
           {{ t('github.myRepos.copyCloneCmd') }}
         </button>
 
-        <!-- 4. 在 GitHub 打开 -->
+        <!-- 4. 创建任务 -->
         <button
           class="fo-cover-menu-item"
           type="button"
@@ -819,6 +786,7 @@ onUnmounted(() => {
           创建任务
         </button>
 
+        <!-- 5. 在 GitHub 打开 -->
         <button
           class="fo-cover-menu-item"
           type="button"
@@ -844,24 +812,6 @@ onUnmounted(() => {
   overflow: hidden;
 }
 
-.sync-status {
-  font-size: 11px;
-  color: var(--muted, #64748b);
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.spin-icon {
-  display: inline-block;
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-
 .error-banner {
   padding: 8px 16px;
   background: #fef2f2;
@@ -873,241 +823,225 @@ onUnmounted(() => {
   justify-content: space-between;
 }
 
-.error-banner button {
-  background: none;
+.btn-retry {
+  background: #ffffff;
   border: 1px solid #f87171;
   color: #b91c1c;
+  padding: 3px 10px;
   border-radius: 4px;
-  padding: 2px 8px;
   cursor: pointer;
+  font-size: 11px;
 }
 
-/* 顶部默认板块横幅架容器：长方形全宽，位于看板最顶端 */
-.default-shelf {
-  margin: 16px 20px 0 20px;
-  background: var(--surface, #f8fafc);
-  border: 1px solid var(--border, rgba(0, 0, 0, 0.08));
-  border-radius: 10px;
-  flex-shrink: 0;
+/* 1. 顶部默认货架区 (Shelf) */
+.default-shelf-area {
   display: flex;
   flex-direction: column;
-  transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+  background: var(--panel, #f8fafc);
+  border-bottom: 1px solid var(--border, rgba(0, 0, 0, 0.08));
+  flex-shrink: 0;
+  transition: all 0.2s ease;
 }
 
-.default-shelf.drop-active {
-  border-color: #0284c7 !important;
-  background: rgba(2, 132, 199, 0.05) !important;
-  box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.2);
+.default-shelf-area.drop-active {
+  background: rgba(2, 132, 199, 0.06);
+  outline: 2px dashed #0284c7;
+  outline-offset: -2px;
 }
 
 .shelf-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 14px;
-  border-bottom: 1px solid var(--border, rgba(0, 0, 0, 0.06));
+  padding: 8px 16px;
   gap: 12px;
 }
 
-.default-shelf.is-collapsed .shelf-header {
-  border-bottom: none;
-}
-
-.shelf-title-group {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-  flex-wrap: wrap;
-}
-
-.shelf-title {
-  margin: 0;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--heading, #0f172a);
-}
-
-.shelf-hint {
-  font-size: 11px;
-  color: var(--muted, #94a3b8);
-  margin-left: 2px;
-}
-
-.shelf-actions {
+.shelf-left {
   display: flex;
   align-items: center;
   gap: 8px;
   flex-shrink: 0;
 }
 
-.shelf-search-box {
+.shelf-icon {
+  font-size: 15px;
+}
+
+.shelf-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--heading, #0f172a);
+}
+
+.shelf-badge {
+  background: var(--surface, #e2e8f0);
+  color: var(--muted, #64748b);
+  font-size: 11px;
+  padding: 1px 7px;
+  border-radius: 10px;
+  font-weight: 600;
+}
+
+.shelf-sub-tip {
+  font-size: 11px;
+  color: var(--muted, #94a3b8);
+}
+
+.shelf-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.shelf-search-wrap {
   position: relative;
   display: flex;
   align-items: center;
 }
 
-.shelf-search-input {
-  width: 170px;
-  padding: 4px 22px 4px 8px;
+.search-icon {
+  position: absolute;
+  left: 8px;
   font-size: 11px;
-  border: 1px solid var(--border, rgba(0, 0, 0, 0.12));
+  color: var(--muted, #94a3b8);
+  pointer-events: none;
+}
+
+.shelf-search-input {
+  padding: 4px 26px 4px 26px;
+  font-size: 12px;
   border-radius: 6px;
-  background: var(--panel, #ffffff);
+  border: 1px solid var(--border, rgba(0, 0, 0, 0.12));
+  background: var(--surface, #ffffff);
   color: var(--text, #1e293b);
+  width: 200px;
   outline: none;
-  transition: border-color 0.15s ease;
+  transition: all 0.15s;
 }
 
 .shelf-search-input:focus {
   border-color: #0284c7;
+  width: 250px;
 }
 
-.shelf-clear-btn {
+.clear-search-btn {
   position: absolute;
-  right: 4px;
-  background: none;
+  right: 6px;
+  background: transparent;
   border: none;
   color: var(--muted, #94a3b8);
-  cursor: pointer;
   font-size: 10px;
-  padding: 1px 3px;
+  cursor: pointer;
+  padding: 2px;
 }
 
 .shelf-btn-refresh {
   display: flex;
   align-items: center;
   gap: 4px;
-  padding: 3px 8px;
-  border: 1px solid var(--border, rgba(0, 0, 0, 0.12));
+  padding: 4px 10px;
   border-radius: 6px;
-  background: var(--panel, #ffffff);
+  border: 1px solid var(--border, rgba(0, 0, 0, 0.1));
+  background: var(--surface, #ffffff);
   color: var(--text, #334155);
-  font-size: 11px;
+  font-size: 12px;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all 0.15s;
 }
 
 .shelf-btn-refresh:hover:not(:disabled) {
-  background: var(--surface-hover, rgba(0, 0, 0, 0.04));
-  border-color: var(--border-strong, rgba(0, 0, 0, 0.2));
+  background: var(--panel, #f1f5f9);
 }
 
-.shelf-btn-refresh:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
+.spinning {
+  display: inline-block;
+  animation: spin 1s linear infinite;
 }
 
 .shelf-toggle-btn {
-  background: transparent;
-  border: 1px solid var(--border, rgba(0, 0, 0, 0.08));
+  padding: 4px 8px;
   border-radius: 6px;
-  padding: 3px 8px;
-  font-size: 11px;
+  border: 1px solid var(--border, rgba(0, 0, 0, 0.1));
+  background: var(--surface, #ffffff);
   color: var(--muted, #64748b);
+  font-size: 11.5px;
   cursor: pointer;
-  transition: all 0.15s ease;
 }
 
-.shelf-toggle-btn:hover {
-  background: var(--surface-hover, rgba(0, 0, 0, 0.04));
-  color: var(--text, #1e293b);
-  border-color: var(--border-strong, rgba(0, 0, 0, 0.15));
-}
-
-/* 顶部默认板块横向滚动卡片轨道 */
 .shelf-cards-scroll {
   display: flex;
-  align-items: stretch;
   gap: 12px;
+  padding: 4px 16px 12px;
   overflow-x: auto;
   overflow-y: hidden;
-  padding: 10px 14px 12px;
-  overscroll-behavior-x: contain;
-  -webkit-overflow-scrolling: touch;
-  max-height: 160px;
+  max-height: 180px;
 }
 
 .shelf-card {
-  width: 260px;
-  min-width: 260px;
-  max-width: 260px;
-  flex-shrink: 0;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
+  flex: 0 0 240px;
 }
 
 .empty-shelf-placeholder {
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: 16px;
   width: 100%;
-  padding: 14px 0;
   color: var(--muted, #94a3b8);
   font-size: 12px;
 }
 
-/* 看板视口：与顶部长方形协同 */
+/* 2. 看板横向多列滚动视窗 */
 .board-viewport {
   flex: 1;
   overflow-x: auto;
   overflow-y: hidden;
-  padding: 12px 20px 16px;
-  overscroll-behavior-x: contain;
-  -webkit-overflow-scrolling: touch;
+  display: flex;
+  padding: 14px 16px;
+  box-sizing: border-box;
 }
 
 .board-columns-track {
   display: flex;
-  align-items: flex-start;
   gap: 16px;
   height: 100%;
+  align-items: stretch;
 }
 
-/* 列基础容器 */
 .board-column {
-  width: 290px;
-  min-width: 290px;
-  max-width: 290px;
-  height: 100%;
+  width: 280px;
+  flex-shrink: 0;
   display: flex;
   flex-direction: column;
   background: var(--panel, #f8fafc);
   border: 1px solid var(--border, rgba(0, 0, 0, 0.08));
-  border-radius: 10px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
-  flex-shrink: 0;
-  position: relative;
-  transition: border-color 0.15s ease, background-color 0.15s ease;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
+  overflow: hidden;
+  transition: background-color 0.15s, outline 0.15s;
 }
 
-/* 拖拽悬停反馈 */
 .board-column.drop-active {
-  border-color: #0284c7 !important;
-  background: rgba(2, 132, 199, 0.04) !important;
-}
-
-.default-column {
-  background: var(--surface, #f8fafc);
-  border-color: var(--border, rgba(0, 0, 0, 0.1));
+  background: rgba(2, 132, 199, 0.06);
+  outline: 2px dashed #0284c7;
+  outline-offset: -2px;
 }
 
 .column-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 14px 10px;
-  border-bottom: 1px solid var(--border, rgba(0, 0, 0, 0.05));
+  padding: 12px 14px;
+  background: var(--panel, #f1f5f9);
+  border-bottom: 1px solid var(--border, rgba(0, 0, 0, 0.06));
   flex-shrink: 0;
-  position: relative;
 }
 
 .column-title-group {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   min-width: 0;
 }
 
@@ -1115,15 +1049,8 @@ onUnmounted(() => {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  flex-shrink: 0;
-}
-
-.default-dot {
-  background: #94a3b8;
-}
-
-.topic-dot {
   background: #0284c7;
+  flex-shrink: 0;
 }
 
 .column-title {
@@ -1131,81 +1058,25 @@ onUnmounted(() => {
   font-size: 13px;
   font-weight: 600;
   color: var(--heading, #0f172a);
-  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .badge-count {
   font-size: 11px;
+  font-weight: 600;
   color: var(--muted, #64748b);
-  margin-left: 2px;
-}
-
-.column-hint {
-  font-size: 11px;
-  color: var(--muted, #94a3b8);
-}
-
-.col-more-btn {
-  background: none;
-  border: none;
-  color: var(--muted, #94a3b8);
-  font-size: 13px;
-  cursor: pointer;
-  padding: 2px 4px;
-  border-radius: 4px;
-}
-
-.col-more-btn:hover {
-  background: var(--surface-hover, rgba(0, 0, 0, 0.06));
-  color: var(--text, #1e293b);
-}
-
-/* 列菜单气泡 */
-.col-popover-menu {
-  position: absolute;
-  top: 36px;
-  right: 10px;
-  background: var(--panel, #ffffff);
-  border: 1px solid var(--border, rgba(0, 0, 0, 0.12));
+  background: var(--surface, #e2e8f0);
+  padding: 1px 6px;
   border-radius: 8px;
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
-  padding: 4px;
-  z-index: 50;
-  min-width: 170px;
 }
 
-.menu-item {
-  width: 100%;
-  text-align: left;
-  background: none;
-  border: none;
-  padding: 6px 10px;
-  font-size: 12px;
-  color: var(--text, #334155);
-  border-radius: 4px;
-  cursor: pointer;
-}
-
-.menu-item:hover {
-  background: var(--surface-hover, rgba(0, 0, 0, 0.05));
-}
-
-.menu-item.danger {
-  color: #dc2626;
-}
-
-.menu-item.danger:hover {
-  background: #fef2f2;
-}
-
-/* 重命名列控件 */
 .column-rename-group {
   display: flex;
   align-items: center;
   gap: 4px;
-  width: 100%;
+  flex: 1;
 }
 
 .rename-input {
@@ -1214,73 +1085,126 @@ onUnmounted(() => {
   padding: 3px 6px;
   border: 1px solid #0284c7;
   border-radius: 4px;
-  background: var(--panel, #ffffff);
-  color: var(--text, #1e293b);
+  background: var(--surface, #ffffff);
+  color: var(--heading, #0f172a);
+  outline: none;
 }
 
-.btn-confirm-rename, .btn-cancel-rename {
+.btn-confirm-rename,
+.btn-cancel-rename {
   border: none;
-  border-radius: 4px;
-  padding: 3px 6px;
-  font-size: 11px;
+  background: transparent;
   cursor: pointer;
+  font-size: 12px;
+  padding: 3px 5px;
+  border-radius: 4px;
 }
 
 .btn-confirm-rename {
-  background: #0284c7;
-  color: #ffffff;
+  color: #16a34a;
 }
 
 .btn-cancel-rename {
-  background: var(--surface-hover, #e2e8f0);
-  color: var(--muted, #64748b);
+  color: #ef4444;
 }
 
-/* 卡片滚动列表 */
+.column-actions {
+  position: relative;
+}
+
+.col-more-btn {
+  border: none;
+  background: transparent;
+  color: var(--muted, #94a3b8);
+  font-size: 13px;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  letter-spacing: 1px;
+}
+
+.col-more-btn:hover {
+  background: var(--surface-hover, rgba(0, 0, 0, 0.06));
+  color: var(--heading, #0f172a);
+}
+
+.col-popover-menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 4px;
+  width: 110px;
+  background: var(--panel, #ffffff);
+  border: 1px solid var(--border, rgba(0, 0, 0, 0.12));
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  display: flex;
+  flex-direction: column;
+  padding: 4px 0;
+  z-index: 100;
+}
+
+.menu-item {
+  border: none;
+  background: transparent;
+  color: var(--text, #334155);
+  font-size: 12px;
+  padding: 7px 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.menu-item:hover {
+  background: var(--surface-hover, rgba(0, 0, 0, 0.05));
+}
+
+.menu-item.danger {
+  color: #ef4444;
+}
+
+.menu-item.danger:hover {
+  background: rgba(239, 68, 68, 0.08);
+}
+
 .column-cards-scroll {
   flex: 1;
   overflow-y: auto;
-  padding: 10px 12px 14px;
+  padding: 10px;
   display: flex;
   flex-direction: column;
   gap: 10px;
 }
 
-/* 仓库卡片基础样式：设置 flex-shrink: 0 彻底防止卡片被纵向挤压压缩 */
+/* 卡片样式 */
 .repo-card {
-  flex-shrink: 0;
-  background: var(--surface, #ffffff);
+  background: var(--panel, #ffffff);
   border: 1px solid var(--border, rgba(0, 0, 0, 0.08));
   border-radius: 8px;
   padding: 10px 12px;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
-  cursor: grab;
-  transition: transform 0.12s ease, box-shadow 0.12s ease, opacity 0.12s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
   display: flex;
   flex-direction: column;
   gap: 6px;
-  box-sizing: border-box;
+  cursor: grab;
+  user-select: none;
+  transition: transform 0.15s, box-shadow 0.15s, opacity 0.15s;
 }
 
 .repo-card:hover {
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
-  border-color: var(--border-strong, rgba(0, 0, 0, 0.18));
   transform: translateY(-1px);
-}
-
-.repo-card:active {
-  cursor: grabbing;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
+  border-color: var(--border, rgba(0, 0, 0, 0.16));
 }
 
 .repo-card.card-dragging {
-  opacity: 0.35;
-  border-style: dashed;
-  border-color: #0284c7;
+  opacity: 0.4;
+  transform: scale(0.96);
 }
 
 .repo-card-head {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 6px;
 }
 
@@ -1289,10 +1213,9 @@ onUnmounted(() => {
   font-weight: 600;
   color: var(--heading, #0f172a);
   cursor: pointer;
-  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  flex: 1;
+  white-space: nowrap;
 }
 
 .repo-name:hover {
@@ -1301,22 +1224,21 @@ onUnmounted(() => {
 }
 
 .badge-repo-visibility {
-  font-size: 9px;
-  font-weight: 500;
+  font-size: 10px;
   padding: 1px 5px;
   border-radius: 4px;
+  font-weight: 500;
+  flex-shrink: 0;
 }
 
 .badge-repo-visibility.private {
-  background: #fef3c7;
-  color: #92400e;
-  border: 1px solid #fde68a;
+  background: rgba(234, 179, 8, 0.15);
+  color: #b45309;
 }
 
 .badge-repo-visibility.fork {
-  background: #f1f5f9;
-  color: #475569;
-  border: 1px solid #e2e8f0;
+  background: var(--surface, #f1f5f9);
+  color: var(--muted, #64748b);
 }
 
 .repo-desc {
@@ -1333,43 +1255,49 @@ onUnmounted(() => {
 .repo-topics-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
+  gap: 5px;
 }
 
 .topic-chip {
-  font-size: 10px;
-  padding: 1px 6px;
-  border-radius: 4px;
-  background: var(--surface-hover, rgba(0, 0, 0, 0.04));
-  color: var(--muted, #64748b);
   display: inline-flex;
   align-items: center;
-  gap: 3px;
-}
-
-.active-chip {
-  background: #e0f2fe;
-  color: #0369a1;
+  gap: 4px;
+  font-size: 11px;
+  padding: 2px 7px;
+  border-radius: 5px;
   font-weight: 500;
 }
 
+.topic-chip.active-chip {
+  background: rgba(2, 132, 199, 0.12);
+  color: #0284c7;
+}
+
 .remove-topic-btn {
-  cursor: pointer;
   font-style: normal;
   font-size: 9px;
-  opacity: 0.6;
+  cursor: pointer;
+  opacity: 0.7;
 }
 
 .remove-topic-btn:hover {
   opacity: 1;
-  color: #b91c1c;
+  color: #ef4444;
+}
+
+.topic-chip-tag {
+  background: var(--surface, rgba(0, 0, 0, 0.04));
+  color: var(--muted, #64748b);
+  font-size: 10.5px;
+  padding: 1px 6px;
+  border-radius: 4px;
 }
 
 .repo-card-footer {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-size: 10.5px;
+  font-size: 11px;
   color: var(--muted, #94a3b8);
   margin-top: 2px;
 }
@@ -1380,57 +1308,62 @@ onUnmounted(() => {
   gap: 8px;
 }
 
+.meta-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
 .lang-color {
-  display: inline-block;
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: #0284c7;
-  margin-right: 3px;
+  background: #0ea5e9;
+  display: inline-block;
 }
 
 .empty-column-placeholder {
-  padding: 30px 10px;
-  text-align: center;
-  font-size: 11.5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100px;
   color: var(--muted, #94a3b8);
-  border: 1px dashed var(--border, rgba(0, 0, 0, 0.08));
-  border-radius: 6px;
-  margin-top: 4px;
+  font-size: 12px;
+  border: 1px dashed var(--border, rgba(0, 0, 0, 0.1));
+  border-radius: 8px;
+  margin-top: 10px;
 }
 
-/* 新建板块插槽 */
+/* 3. 新建分组列 */
 .new-column-slot {
   background: transparent;
-  border: 1px dashed var(--border, rgba(0, 0, 0, 0.15));
+  border: 1px dashed var(--border, rgba(0, 0, 0, 0.18));
 }
 
 .new-column-placeholder {
-  height: 100%;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  height: 100%;
   gap: 8px;
-  color: var(--muted, #64748b);
   cursor: pointer;
-  border-radius: 10px;
-  transition: all 0.15s ease;
+  color: var(--muted, #64748b);
+  transition: all 0.15s;
 }
 
 .new-column-placeholder:hover {
   background: var(--surface-hover, rgba(0, 0, 0, 0.03));
   color: #0284c7;
-  border-color: #0284c7;
 }
 
 .plus-icon {
-  font-size: 24px;
+  font-size: 20px;
   font-weight: 300;
 }
 
 .new-col-text {
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 500;
 }
 
@@ -1449,20 +1382,20 @@ onUnmounted(() => {
 
 .composer-header small {
   display: block;
-  font-size: 10.5px;
-  color: var(--muted, #94a3b8);
+  font-size: 11px;
+  color: var(--muted, #64748b);
   margin-top: 2px;
 }
 
 .composer-input {
   width: 100%;
   box-sizing: border-box;
-  padding: 7px 10px;
-  font-size: 12px;
+  padding: 8px 10px;
+  font-size: 12.5px;
   border: 1px solid var(--border, rgba(0, 0, 0, 0.15));
   border-radius: 6px;
   background: var(--panel, #ffffff);
-  color: var(--text, #1e293b);
+  color: var(--heading, #0f172a);
   outline: none;
 }
 
@@ -1475,29 +1408,34 @@ onUnmounted(() => {
   gap: 8px;
 }
 
-.composer-actions .btn-primary {
+.btn-primary {
   flex: 1;
-  padding: 6px 10px;
+  padding: 7px;
+  border-radius: 6px;
+  border: none;
   background: #0284c7;
   color: #ffffff;
-  border: none;
-  border-radius: 6px;
-  font-size: 11.5px;
+  font-size: 12px;
   font-weight: 500;
   cursor: pointer;
 }
 
-.composer-actions .btn-primary:hover {
+.btn-primary:hover {
   background: #0369a1;
 }
 
-.composer-actions .btn-cancel {
-  padding: 6px 10px;
-  background: var(--surface-hover, #f1f5f9);
-  color: var(--muted, #64748b);
-  border: none;
+.btn-cancel {
+  padding: 7px 12px;
   border-radius: 6px;
-  font-size: 11.5px;
+  border: 1px solid var(--border, rgba(0, 0, 0, 0.12));
+  background: var(--surface, #ffffff);
+  color: var(--muted, #64748b);
+  font-size: 12px;
   cursor: pointer;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 </style>
