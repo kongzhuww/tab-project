@@ -73,6 +73,7 @@ export function sanitizeGroupName(input: string): string {
 export class MyReposController {
   private static instance: MyReposController;
   private abortController: AbortController | null = null;
+  private inFlightPromise: Promise<void> | null = null;
 
   public static getInstance(): MyReposController {
     if (!MyReposController.instance) {
@@ -82,41 +83,59 @@ export class MyReposController {
   }
 
   /**
-   * 初始化并加载数据（SWR 策略）
+   * 初始化并加载数据（SWR 策略，支持并发防抖与请求去重）
    */
   public async load(forceRemote = false): Promise<void> {
-    this.abortController?.abort();
+    if (!forceRemote && this.inFlightPromise) {
+      return this.inFlightPromise;
+    }
+
+    if (forceRemote) {
+      this.abortController?.abort();
+      this.inFlightPromise = null;
+    }
+
     this.abortController = new AbortController();
     const signal = this.abortController.signal;
 
-    // 1. 读取本地分组与本地仓库映射
-    await this.loadPersistedGroups();
+    const task = (async () => {
+      // 1. 读取本地分组与本地仓库映射
+      await this.loadPersistedGroups();
 
-    // 2. 尝试读取离线缓存
-    const cached = await storageCache.get<MyRepoItem[]>(CACHE_KEY);
-    if (cached && cached.length) {
-      this.hydrateRepos(cached);
-    } else if (myReposState.repos.length) {
-      this.hydrateRepos(myReposState.repos);
-    }
-
-    // 如果还没有仓库数据，或者用户明确点击刷新，则立刻请求远端
-    const shouldFetch = forceRemote || !myReposState.repos.length;
-    if (shouldFetch) {
-      myReposState.loading = true;
-      myReposState.errorMessage = "";
-      try {
-        await this.fetchRemote(signal);
-      } catch (err: any) {
-        if (err.name === "AbortError") return;
-        myReposState.errorMessage = err.message || "获取个人仓库失败";
-      } finally {
-        myReposState.loading = false;
+      // 2. 尝试读取离线缓存
+      const cached = await storageCache.get<MyRepoItem[]>(CACHE_KEY);
+      if (cached && cached.length) {
+        this.hydrateRepos(cached);
+      } else if (myReposState.repos.length) {
+        this.hydrateRepos(myReposState.repos);
       }
-    } else {
-      // SWR 后台静默刷新，不打扰当前界面
-      void this.fetchRemote(signal).catch(() => {});
-    }
+
+      // 如果还没有仓库数据，或者用户明确点击刷新，则立刻请求远端
+      const shouldFetch = forceRemote || !myReposState.repos.length;
+      if (shouldFetch) {
+        myReposState.loading = true;
+        myReposState.errorMessage = "";
+        try {
+          await this.fetchRemote(signal);
+        } catch (err: any) {
+          if (err.name === "AbortError") return;
+          myReposState.errorMessage = err.message || "获取个人仓库失败";
+        } finally {
+          myReposState.loading = false;
+        }
+      } else {
+        // SWR 后台静默刷新，不打扰当前界面
+        void this.fetchRemote(signal).catch(() => {});
+      }
+    })();
+
+    this.inFlightPromise = task.finally(() => {
+      if (this.inFlightPromise === task) {
+        this.inFlightPromise = null;
+      }
+    });
+
+    return this.inFlightPromise;
   }
 
   private async fetchRemote(signal: AbortSignal): Promise<void> {
@@ -126,30 +145,61 @@ export class MyReposController {
       return;
     }
 
-    let url = "https://api.github.com/user/repos?type=owner&sort=updated&per_page=100";
-    if (!ghToken) {
-      url = `https://api.github.com/users/${encodeURIComponent(ghUser)}/repos?type=owner&sort=updated&per_page=100`;
-    }
-
     const headers = createGitHubReadHeaders(ghToken);
-    const response = await fetch(url, {
-      method: "GET",
-      headers,
-      signal
-    });
+    const combinedRawList: any[] = [];
+    const seenIds = new Set<number>();
 
-    if (!response.ok) {
-      if (response.status === 401) throw new Error("GitHub Token 无效或已过期，请在设置中更新。");
-      if (response.status === 403) throw new Error("GitHub API 频率受限或无权访问，请检查 Token 权限。");
-      throw new Error(`GitHub 请求失败 (HTTP ${response.status})`);
+    // 1. 核心基准源：若配置了用户名，以 users/:ghUser/repos 为最高确定性基准（无论是公开还是私有，绝不丢弃）
+    if (ghUser) {
+      try {
+        const userReposUrl = `https://api.github.com/users/${encodeURIComponent(ghUser)}/repos?type=owner&sort=updated&per_page=100`;
+        const resp = await fetch(userReposUrl, { method: "GET", headers, signal });
+        if (resp.ok) {
+          const list = await resp.json();
+          if (Array.isArray(list)) {
+            for (const item of list) {
+              if (item && item.id && !seenIds.has(item.id)) {
+                seenIds.add(item.id);
+                combinedRawList.push(item);
+              }
+            }
+          }
+        }
+      } catch (err: any) {
+        if (err.name === "AbortError") throw err;
+      }
     }
 
-    const rawList = await response.json();
-    if (!Array.isArray(rawList)) {
-      throw new Error("GitHub 返回数据格式异常");
+    // 2. 互补源：若配置了 Token，尝试请求 /user/repos 以拉取包括私有仓库在内的全量归属仓库
+    if (ghToken) {
+      try {
+        const authReposUrl = "https://api.github.com/user/repos?affiliation=owner&sort=updated&per_page=100";
+        const resp = await fetch(authReposUrl, { method: "GET", headers, signal });
+        if (resp.ok) {
+          const list = await resp.json();
+          if (Array.isArray(list)) {
+            for (const item of list) {
+              if (item && item.id && !seenIds.has(item.id)) {
+                seenIds.add(item.id);
+                combinedRawList.push(item);
+              }
+            }
+          }
+        }
+      } catch (err: any) {
+        if (err.name === "AbortError") throw err;
+      }
     }
 
-    const parsed: MyRepoItem[] = rawList.map((item: any) => {
+    // 3. 安全防腐：若远端接口未能获取到任何仓库（例如瞬时断网），但本地已有数据，则不抹白已有仓库
+    if (!combinedRawList.length) {
+      if (!myReposState.repos.length) {
+        myReposState.errorMessage = "未能读取到个人仓库，请检查网络或 GitHub 设置。";
+      }
+      return;
+    }
+
+    const parsed: MyRepoItem[] = combinedRawList.map((item: any) => {
       const fullName = item.full_name || `${item.owner?.login || ghUser}/${item.name}`;
       const repoName = item.name;
       // 容错匹配：支持完整 "owner/repo" 或仅仓库名 "repo"
@@ -182,6 +232,7 @@ export class MyReposController {
   }
 
   private hydrateRepos(rawRepos: MyRepoItem[]): void {
+    let mappingChanged = false;
     myReposState.repos = rawRepos.map(repo => {
       // 优先级 1: 历史已存在的分组映射 (fullName, repoName, 小写全名, 小写仓库名)
       const mapped = myReposState.repoGroupsMap[repo.fullName] ||
@@ -189,17 +240,20 @@ export class MyReposController {
                      myReposState.repoGroupsMap[repo.fullName.toLowerCase()] ||
                      myReposState.repoGroupsMap[repo.name.toLowerCase()];
 
-      // 优先级 2: 之前如果打过 GitHub Topics（如 browser-extension, command-alias 等），平滑自动继承到对应的分组列
-      const fallbackFromTopics = repo.topics && repo.topics.length
-        ? repo.topics.filter(t => myReposState.customGroups.some(cg => cg.toLowerCase() === t.toLowerCase() || cg.toLowerCase().includes(t.toLowerCase())))
-        : [];
+      // 优先级 2: 仓库自带显式 localGroups（若非空）
+      const existingLocal = repo.localGroups && repo.localGroups.length ? repo.localGroups : null;
 
-      const assigned = mapped || repo.localGroups || fallbackFromTopics;
+      // 优先级 3: 智能规则对齐（若尚未分类，根据 topics/name/isFork 自动对齐到已有分组中）
+      const inferred = this.inferGroupsForRepo(repo, myReposState.customGroups);
 
-      const validGroups = [...new Set(assigned.filter(Boolean))];
+      const assigned = (mapped && mapped.length ? mapped : null) || existingLocal || inferred;
+
+      const validGroups = assigned ? [...new Set(assigned.filter(Boolean))] : [];
+
       // 同步回写映射
-      if (validGroups.length && !myReposState.repoGroupsMap[repo.fullName]) {
+      if (validGroups.length && (!myReposState.repoGroupsMap[repo.fullName] || !myReposState.repoGroupsMap[repo.fullName].length)) {
         myReposState.repoGroupsMap[repo.fullName] = validGroups;
+        mappingChanged = true;
       }
 
       return {
@@ -207,6 +261,68 @@ export class MyReposController {
         localGroups: validGroups
       };
     });
+
+    if (mappingChanged) {
+      void this.persistGroupsMap();
+    }
+  }
+
+  /**
+   * 智能推断仓库最匹配的分组归属（仅在无手动归类时作为平滑桥接）
+   */
+  private inferGroupsForRepo(repo: MyRepoItem, groups: string[]): string[] {
+    if (!groups || !groups.length) return [];
+    const matched: string[] = [];
+
+    const repoNameLower = repo.name.toLowerCase();
+    const topicsLower = (repo.topics || []).map(t => t.toLowerCase());
+
+    for (const g of groups) {
+      const gLower = g.toLowerCase();
+
+      // 1. fork 相关列
+      if ((gLower.includes("fork") || g.includes("分支")) && (repo.isFork || topicsLower.includes("fork"))) {
+        matched.push(g);
+        continue;
+      }
+
+      // 2. 浏览器插件相关列
+      if ((gLower.includes("浏览器") || gLower.includes("browser") || gLower.includes("chrome") || gLower.includes("edge")) &&
+          (topicsLower.some(t => t.includes("extension") || t.includes("browser") || t.includes("newtab")) || repoNameLower.includes("tab-project"))) {
+        matched.push(g);
+        continue;
+      }
+
+      // 3. PI插件相关列
+      if ((gLower.includes("pi") || g.includes("PI")) &&
+          (topicsLower.some(t => t.includes("pi") || t.includes("grounding-pi")) || repoNameLower.includes("pi-") || repoNameLower.includes("-pi"))) {
+        matched.push(g);
+        continue;
+      }
+
+      // 4. Herdr插件相关列
+      if (gLower.includes("herdr") && (topicsLower.some(t => t.includes("herdr")) || repoNameLower.includes("herdr"))) {
+        matched.push(g);
+        continue;
+      }
+
+      // 5. 嵌入式相关列
+      if ((gLower.includes("嵌入式") || gLower.includes("embedded") || gLower.includes("单片机")) &&
+          (topicsLower.some(t => t.includes("embedded") || t.includes("zephyr") || t.includes("stm32") || t.includes("k230")) ||
+           repoNameLower.includes("k230") || repoNameLower.includes("mspm0") || repoNameLower.includes("pid-") || repoNameLower.includes("zephyr"))) {
+        matched.push(g);
+        continue;
+      }
+
+      // 6. 美化相关列
+      if ((gLower.includes("美化") || gLower.includes("theme") || gLower.includes("style")) &&
+          (topicsLower.some(t => t.includes("theme") || t.includes("beauty") || t.includes("ui")) || repoNameLower.includes("theme") || repoNameLower.includes("style"))) {
+        matched.push(g);
+        continue;
+      }
+    }
+
+    return matched;
   }
 
   /**

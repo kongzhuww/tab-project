@@ -395,25 +395,18 @@ function formatDate(iso: string): string {
 watch(
   () => props.active,
   (visible) => {
-    window.removeEventListener("pointerdown", onGlobalPointerDown);
-    window.removeEventListener("keydown", onGlobalKeyDown);
     closeContextMenu();
-
     if (visible) {
-      window.addEventListener("pointerdown", onGlobalPointerDown);
-      window.addEventListener("keydown", onGlobalKeyDown);
       void myReposController.load();
     }
-  },
-  { immediate: true }
+  }
 );
 
 onMounted(() => {
-  if (props.active) {
-    window.addEventListener("pointerdown", onGlobalPointerDown);
-    window.addEventListener("keydown", onGlobalKeyDown);
-    void myReposController.load();
-  }
+  window.addEventListener("pointerdown", onGlobalPointerDown);
+  window.addEventListener("keydown", onGlobalKeyDown);
+  // 组件挂载即刻水合与加载个人仓库数据
+  void myReposController.load();
 });
 
 onUnmounted(() => {
