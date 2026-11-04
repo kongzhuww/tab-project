@@ -665,6 +665,22 @@ export class GitHubService {
     for (const [key, id] of snapshot.repoNodeIds) {
       this.repoNodeIds.set(key, id);
     }
+
+    // 🌟 将 GraphQL 附带的 Lists 仓库完整卡片数据直接合并到仓库池，0 毫秒极速就绪，免除漫长串行分页
+    if (snapshot.repositories && snapshot.repositories.size > 0) {
+      const existingMap = new Map<string, GitHubRawRepo>();
+      this.categoryRepos.forEach(r => existingMap.set(r.full_name.toLowerCase(), r));
+      this.repos.forEach(r => existingMap.set(r.full_name.toLowerCase(), r));
+
+      for (const [key, repo] of snapshot.repositories) {
+        if (!existingMap.has(key)) {
+          existingMap.set(key, repo as GitHubRawRepo);
+        }
+      }
+      this.categoryRepos = [...existingMap.values()];
+      this.rebuildLoadedRepos();
+    }
+
     if (this.active !== "全部" && this.active !== this.UNCAT && !this.cats.includes(this.active)) {
       this.active = "全部";
     }
@@ -673,12 +689,14 @@ export class GitHubService {
   private async saveListsCache(): Promise<void> {
     if (typeof chrome !== "undefined" && chrome.storage?.local && this.cacheKey) {
       try {
+        const repoDetails = this.categoryRepos.length ? this.categoryRepos : this.repos;
         await chrome.storage.local.set({
           [`ghListsCache_${this.cacheKey}`]: {
             lists: this.lists,
             repoListNames: Object.fromEntries(this.repoListNames),
             repoListIds: Object.fromEntries(this.repoListIds),
             repoNodeIds: Object.fromEntries(this.repoNodeIds),
+            cachedRepos: repoDetails.slice(0, 500),
             savedAt: Date.now()
           }
         });
@@ -696,6 +714,10 @@ export class GitHubService {
           this.repoListNames = new Map(Object.entries(cached.repoListNames || {}));
           this.repoListIds = new Map(Object.entries(cached.repoListIds || {}));
           this.repoNodeIds = new Map(Object.entries(cached.repoNodeIds || {}));
+          if (Array.isArray(cached.cachedRepos) && cached.cachedRepos.length) {
+            this.categoryRepos = cached.cachedRepos;
+            this.rebuildLoadedRepos();
+          }
           this.publishFolders();
         }
       } catch {}

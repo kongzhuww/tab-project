@@ -25,6 +25,8 @@ export interface GitHubListsSnapshot {
   repoListNames: Map<string, string[]>;
   // repo full_name (lowercase) -> repo GraphQL Node ID
   repoNodeIds: Map<string, string>;
+  // repo full_name (lowercase) -> 完整仓库详情卡片数据
+  repositories: Map<string, any>;
   fetchedAt: number;
 }
 
@@ -98,7 +100,30 @@ query GetUserLists($cursor: String) {
           nodes {
             ... on Repository {
               id
+              databaseId
+              name
               nameWithOwner
+              description
+              url
+              isPrivate
+              isFork
+              stargazerCount
+              forkCount
+              updatedAt
+              primaryLanguage {
+                name
+              }
+              owner {
+                login
+                avatarUrl
+              }
+              repositoryTopics(first: 10) {
+                nodes {
+                  topic {
+                    name
+                  }
+                }
+              }
             }
           }
         }
@@ -121,7 +146,30 @@ query GetListItems($id: ID!, $cursor: String!) {
         nodes {
           ... on Repository {
             id
+            databaseId
+            name
             nameWithOwner
+            description
+            url
+            isPrivate
+            isFork
+            stargazerCount
+            forkCount
+            updatedAt
+            primaryLanguage {
+              name
+            }
+            owner {
+              login
+              avatarUrl
+            }
+            repositoryTopics(first: 10) {
+              nodes {
+                topic {
+                  name
+                }
+              }
+            }
           }
         }
       }
@@ -135,6 +183,7 @@ export async function fetchGitHubUserLists(token: string, signal?: AbortSignal):
   const repoListIds = new Map<string, string[]>();
   const repoListNames = new Map<string, string[]>();
   const repoNodeIds = new Map<string, string>();
+  const repositories = new Map<string, any>();
 
   let hasNextList = true;
   let listCursor: string | null = null;
@@ -154,7 +203,7 @@ export async function fetchGitHubUserLists(token: string, signal?: AbortSignal):
             items: {
               totalCount: number;
               pageInfo: { hasNextPage: boolean; endCursor: string | null };
-              nodes: Array<{ id: string; nameWithOwner: string }>;
+              nodes: Array<any>;
             };
           }>;
         };
@@ -181,7 +230,7 @@ export async function fetchGitHubUserLists(token: string, signal?: AbortSignal):
       };
       lists.push(listInfo);
 
-      const collectItems = (items: Array<{ id: string; nameWithOwner: string }>) => {
+      const collectItems = (items: Array<any>) => {
         for (const repo of items) {
           if (!repo?.nameWithOwner) continue;
           const key = repo.nameWithOwner.toLowerCase();
@@ -194,6 +243,29 @@ export async function fetchGitHubUserLists(token: string, signal?: AbortSignal):
           const names = repoListNames.get(key) || [];
           if (!names.includes(listInfo.name)) names.push(listInfo.name);
           repoListNames.set(key, names);
+
+          // 收集完整卡片所需属性
+          if (!repositories.has(key)) {
+            repositories.set(key, {
+              id: repo.databaseId || repo.id,
+              node_id: repo.id,
+              name: repo.name || repo.nameWithOwner.split("/")[1] || repo.nameWithOwner,
+              full_name: repo.nameWithOwner,
+              html_url: repo.url || `https://github.com/${repo.nameWithOwner}`,
+              description: repo.description || null,
+              language: repo.primaryLanguage?.name || null,
+              stargazers_count: Number(repo.stargazerCount) || 0,
+              forks_count: Number(repo.forkCount) || 0,
+              updated_at: repo.updatedAt || "",
+              topics: Array.isArray(repo.repositoryTopics?.nodes)
+                ? repo.repositoryTopics.nodes.map((n: any) => n.topic?.name).filter(Boolean)
+                : [],
+              owner: {
+                login: repo.owner?.login || repo.nameWithOwner.split("/")[0] || "",
+                avatar_url: repo.owner?.avatarUrl || ""
+              }
+            });
+          }
         }
       };
 
@@ -237,6 +309,7 @@ export async function fetchGitHubUserLists(token: string, signal?: AbortSignal):
     repoListIds,
     repoListNames,
     repoNodeIds,
+    repositories,
     fetchedAt: Date.now()
   };
 }
