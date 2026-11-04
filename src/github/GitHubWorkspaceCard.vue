@@ -12,6 +12,7 @@ import GitHubBatchBar from "./GitHubBatchBar.vue";
 import GitHubTrending from "./GitHubTrending.vue";
 import GitHubAwesome from "./GitHubAwesome.vue";
 import GitHubMyRepos from "./GitHubMyRepos.vue";
+import GitHubStarsBoard from "./GitHubStarsBoard.vue";
 import GitHubNotificationPanel from "./GitHubNotificationPanel.vue";
 import GitHubNotificationDetailDrawer from "./GitHubNotificationDetailDrawer.vue";
 import {
@@ -358,24 +359,7 @@ onBeforeUnmount(() => { gitHubService.setAiViewActive(false); ++initialVersion; 
             @configure="isSettingsOpen = true"
           />
           <template v-else-if="activeChannel === 'stars'">
-            <header class="gh-bili-hero" id="gh-hero">
-              <GitHubHero @open-ai-settings="openAiSettings" />
-            </header>
-
-            <div class="gh-main-subbar">
-              <span id="gh-rate" class="gh-rate"></span>
-              <button type="button" class="gh-batch-toggle-btn" id="gh-batch-toggle-btn" hidden style="display:none;">批量操作</button>
-            </div>
-            <div id="gh-batch-bar" class="gh-batch-bar" hidden>
-              <GitHubBatchBar :active="active && activeChannel === 'stars'" />
-            </div>
-            <div id="gh-search-body" hidden></div>
-            <div id="vue-github-status-root">
-              <GitHubStatus />
-            </div>
-            <div id="vue-github-repositories-root">
-              <GitHubRepositories :active="active && activeChannel === 'stars'" />
-            </div>
+            <GitHubStarsBoard :active="active && activeChannel === 'stars'" />
           </template>
 
           <!-- 视图 B: 趋势榜单 -->
