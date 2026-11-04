@@ -94,9 +94,11 @@ export class MyReposController {
     const cached = await storageCache.get<MyRepoItem[]>(CACHE_KEY);
     if (cached && cached.length) {
       this.hydrateRepos(cached);
+    } else if (myReposState.repos.length) {
+      this.hydrateRepos(myReposState.repos);
     }
 
-    if (!forceRemote && cached && cached.length) {
+    if (!forceRemote && myReposState.repos.length) {
       void this.fetchRemote(signal).catch(() => {});
       return;
     }
@@ -145,7 +147,12 @@ export class MyReposController {
 
     const parsed: MyRepoItem[] = rawList.map((item: any) => {
       const fullName = item.full_name || `${item.owner?.login || ghUser}/${item.name}`;
-      const localGroups = myReposState.repoGroupsMap[fullName] || [];
+      const repoName = item.name;
+      // 容错匹配：支持完整 "owner/repo" 或仅仓库名 "repo"
+      const localGroups = myReposState.repoGroupsMap[fullName] ||
+                          myReposState.repoGroupsMap[repoName] ||
+                          myReposState.repoGroupsMap[fullName.toLowerCase()] ||
+                          myReposState.repoGroupsMap[repoName.toLowerCase()] || [];
       return {
         id: item.id,
         name: item.name,
@@ -172,7 +179,11 @@ export class MyReposController {
 
   private hydrateRepos(rawRepos: MyRepoItem[]): void {
     myReposState.repos = rawRepos.map(repo => {
-      const assigned = myReposState.repoGroupsMap[repo.fullName] || repo.localGroups || [];
+      const assigned = myReposState.repoGroupsMap[repo.fullName] ||
+                       myReposState.repoGroupsMap[repo.name] ||
+                       myReposState.repoGroupsMap[repo.fullName.toLowerCase()] ||
+                       myReposState.repoGroupsMap[repo.name.toLowerCase()] ||
+                       repo.localGroups || [];
       return {
         ...repo,
         localGroups: [...new Set(assigned.filter(Boolean))]
@@ -191,6 +202,7 @@ export class MyReposController {
     }
     myReposState.repoGroupsMap[repo.fullName] = [...repo.localGroups];
     await this.persistGroupsMap();
+    await storageCache.set(CACHE_KEY, myReposState.repos, { ttlMs: 30 * 86400 * 1000 });
   }
 
   /**
@@ -200,6 +212,7 @@ export class MyReposController {
     repo.localGroups = repo.localGroups.filter(g => g !== group);
     myReposState.repoGroupsMap[repo.fullName] = [...repo.localGroups];
     await this.persistGroupsMap();
+    await storageCache.set(CACHE_KEY, myReposState.repos, { ttlMs: 30 * 86400 * 1000 });
   }
 
   /**
@@ -216,6 +229,7 @@ export class MyReposController {
     }
     myReposState.repoGroupsMap[repo.fullName] = [...repo.localGroups];
     await this.persistGroupsMap();
+    await storageCache.set(CACHE_KEY, myReposState.repos, { ttlMs: 30 * 86400 * 1000 });
   }
 
   /**
@@ -294,26 +308,41 @@ export class MyReposController {
 
   private async loadPersistedGroups(): Promise<void> {
     try {
+      let groups: any = null;
+      let mapping: any = null;
+
       if (typeof chrome !== "undefined" && chrome.storage?.local) {
         const stored = await chrome.storage.local.get([GROUPS_KEY, REPO_GROUPS_MAPPING_KEY]);
-        const groups = stored?.[GROUPS_KEY];
-        if (Array.isArray(groups)) {
-          myReposState.customGroups = groups.map(sanitizeGroupName).filter(Boolean);
-        }
-        const mapping = stored?.[REPO_GROUPS_MAPPING_KEY];
-        if (mapping && typeof mapping === "object") {
-          myReposState.repoGroupsMap = mapping;
-        }
-      } else {
-        const rawGroups = localStorage.getItem(GROUPS_KEY);
-        if (rawGroups) {
-          myReposState.customGroups = JSON.parse(rawGroups);
-        }
-        const rawMap = localStorage.getItem(REPO_GROUPS_MAPPING_KEY);
-        if (rawMap) {
-          myReposState.repoGroupsMap = JSON.parse(rawMap);
-        }
+        groups = stored?.[GROUPS_KEY];
+        mapping = stored?.[REPO_GROUPS_MAPPING_KEY];
       }
+
+      if (!groups || !Array.isArray(groups)) {
+        const rawGroups = localStorage.getItem(GROUPS_KEY);
+        if (rawGroups) groups = JSON.parse(rawGroups);
+      }
+
+      if (!mapping || typeof mapping !== "object") {
+        const rawMap = localStorage.getItem(REPO_GROUPS_MAPPING_KEY);
+        if (rawMap) mapping = JSON.parse(rawMap);
+      }
+
+      if (Array.isArray(groups)) {
+        myReposState.customGroups = groups.map(sanitizeGroupName).filter(Boolean);
+      }
+      if (mapping && typeof mapping === "object") {
+        myReposState.repoGroupsMap = mapping;
+      }
+    } catch {}
+  }
+
+  private async persistGroupsMap(): Promise<void> {
+    try {
+      const data = { ...myReposState.repoGroupsMap };
+      if (typeof chrome !== "undefined" && chrome.storage?.local) {
+        await chrome.storage.local.set({ [REPO_GROUPS_MAPPING_KEY]: data });
+      }
+      localStorage.setItem(REPO_GROUPS_MAPPING_KEY, JSON.stringify(data));
     } catch {}
   }
 
@@ -322,19 +351,8 @@ export class MyReposController {
     try {
       if (typeof chrome !== "undefined" && chrome.storage?.local) {
         await chrome.storage.local.set({ [GROUPS_KEY]: list });
-      } else {
-        localStorage.setItem(GROUPS_KEY, JSON.stringify(list));
       }
-    } catch {}
-  }
-
-  private async persistGroupsMap(): Promise<void> {
-    try {
-      if (typeof chrome !== "undefined" && chrome.storage?.local) {
-        await chrome.storage.local.set({ [REPO_GROUPS_MAPPING_KEY]: myReposState.repoGroupsMap });
-      } else {
-        localStorage.setItem(REPO_GROUPS_MAPPING_KEY, JSON.stringify(myReposState.repoGroupsMap));
-      }
+      localStorage.setItem(GROUPS_KEY, JSON.stringify(list));
     } catch {}
   }
 }
