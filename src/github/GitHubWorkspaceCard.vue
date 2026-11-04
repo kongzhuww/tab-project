@@ -359,7 +359,12 @@ onBeforeUnmount(() => { gitHubService.setAiViewActive(false); ++initialVersion; 
             @configure="isSettingsOpen = true"
           />
           <template v-else-if="activeChannel === 'stars'">
-            <GitHubStarsBoard :active="active && activeChannel === 'stars'" />
+            <header class="gh-bili-hero" id="gh-hero">
+              <GitHubHero @open-ai-settings="openAiSettings" />
+            </header>
+            <div id="vue-github-repositories-root" style="flex: 1; min-height: 0; display: flex; flex-direction: column;">
+              <GitHubStarsBoard :active="active && activeChannel === 'stars'" />
+            </div>
           </template>
 
           <!-- 视图 B: 趋势榜单 -->

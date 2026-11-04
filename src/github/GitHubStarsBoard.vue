@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, reactive, nextTick } from "vue";
+import { ref, computed, onMounted, onUnmounted, reactive } from "vue";
 import { gitHubService, type GitHubRawRepo } from "../services/github.service";
 import { starBoardController as controller, starBoardState as state } from "./stars-board-store";
 import { githubRepoDetailController } from "./repo-detail-store";
@@ -29,6 +29,11 @@ function onShelfWheel(event: WheelEvent) {
     el.scrollLeft += event.deltaY;
   }
 }
+
+// 是否正在加载
+const isLoading = computed(() => {
+  return gitHubService.loadingAllStars || (!gitHubService.repos.length && !controller.filteredUncatRepos.length && !controller.lists.length);
+});
 
 // 拖拽状态
 const activeDragRepo = ref<GitHubRawRepo | null>(null);
@@ -338,7 +343,8 @@ onUnmounted(() => {
             title="刷新 Star 列表"
             @click="gitHubService.refreshRepositories()"
           >
-            <span>🔄 刷新</span>
+            <span :class="{ spinning: isLoading }">🔄</span>
+            <span>{{ isLoading ? '读取中…' : '刷新' }}</span>
           </button>
 
           <!-- 折叠切换 -->
@@ -354,67 +360,109 @@ onUnmounted(() => {
         </div>
       </header>
 
-      <!-- 单排横向切片容器 -->
+      <!-- 骨架屏占位（当加载中且暂无卡片时展示） -->
       <div
-        v-if="controller.filteredUncatRepos.length"
+        v-if="isLoading && !controller.filteredUncatRepos.length"
+        class="shelf-cards-scroll"
+      >
+        <div v-for="i in 6" :key="'skel-shelf-' + i" class="repo gh-card skel-card">
+          <div class="skel-line skel-title"></div>
+          <div class="skel-line skel-desc"></div>
+          <div class="skel-line skel-meta"></div>
+        </div>
+      </div>
+
+      <!-- 单排横向切片容器：严格标准 126px 高度卡片 -->
+      <div
+        v-else-if="controller.filteredUncatRepos.length"
         v-show="!isDefaultShelfCollapsed"
         ref="shelfScrollRef"
         class="shelf-cards-scroll"
         @wheel="onShelfWheel"
       >
-        <div
+        <article
           v-for="repo in controller.pagedUncatRepos"
           :key="repo.full_name"
-          class="repo-card shelf-card"
+          class="repo gh-card shelf-card"
           :class="{ 'card-dragging': activeDragRepo?.full_name === repo.full_name }"
           draggable="true"
+          @click="openRepoDetail(repo)"
           @dragstart="onDragStart($event, repo, null)"
           @dragend="onDragEnd"
           @contextmenu="handleOpenContextMenu($event, repo, null)"
         >
-          <div class="repo-card-head">
-            <span class="repo-name" :title="repo.full_name" @click="openRepoDetail(repo)">
-              {{ repo.name }}
-            </span>
-            <button
-              type="button"
-              class="btn-open-link"
-              title="在 GitHub 打开新标签页"
-              @click.stop="openRepoUrl(repo.html_url)"
-            >↗</button>
+          <button class="fo-card-more" type="button" aria-label="更多操作" title="更多操作" @click.stop="handleOpenContextMenu($event, repo, null)">⋮</button>
+
+          <!-- 头部：头像 + 仓库名 (owner/name) -->
+          <div class="gh-card-head">
+            <img
+              class="gh-owner-avatar"
+              :src="repo.owner?.avatar_url || 'assets/github-star.svg'"
+              alt=""
+              loading="lazy"
+              referrerpolicy="no-referrer"
+              @error="($event.target as HTMLImageElement).src='assets/github-star.svg'"
+            >
+            <a
+              :href="repo.html_url"
+              target="_blank"
+              rel="noreferrer"
+              class="name"
+              :title="repo.full_name"
+              @click.stop
+            >
+              <span class="owner">{{ repo.owner?.login || repo.full_name.split('/')[0] }}/</span>{{ repo.name }}
+            </a>
           </div>
 
-          <p class="repo-desc" :title="repo.description || ''" @click="openRepoDetail(repo)">
-            {{ repo.description || "暂无描述" }}
-          </p>
+          <!-- 卡片内容 -->
+          <div class="gh-card-body">
+            <div class="gh-card-badges">
+              <span class="gh-badge-folder uncat">＋ 未分类</span>
+              <!-- 折叠的 Topics 标签：最多展示前 2 个，超出显示 +N，绝对不撑大卡片 -->
+              <template v-if="repo.topics && repo.topics.length">
+                <span
+                  v-for="t in repo.topics.slice(0, 2)"
+                  :key="t"
+                  class="gh-badge-topic-chip"
+                  :title="'Topic: ' + t"
+                >
+                  #{{ t }}
+                </span>
+                <span
+                  v-if="repo.topics.length > 2"
+                  class="gh-badge-topic-chip more"
+                  :title="repo.topics.slice(2).map(t => '#' + t).join(' ')"
+                >
+                  +{{ repo.topics.length - 2 }}
+                </span>
+              </template>
+            </div>
 
-          <div v-if="repo.topics && repo.topics.length" class="repo-topics-wrap">
-            <span v-for="t in repo.topics" :key="t" class="topic-chip-tag" :title="'Topic: ' + t">
-              #{{ t }}
-            </span>
+            <p class="desc" :title="repo.description || ''">
+              {{ repo.description || "暂无描述" }}
+            </p>
           </div>
 
-          <div class="repo-card-meta">
-            <span v-if="repo.language" class="meta-lang">
-              <span class="lang-color-dot"></span>
-              {{ repo.language }}
-            </span>
-            <span class="meta-stars" title="Stars">⭐ {{ repo.stargazers_count }}</span>
-            <span class="meta-date" :title="'更新于: ' + repo.updated_at">{{ formatDate(repo.updated_at) }}</span>
+          <!-- 底栏元数据 -->
+          <div class="meta">
+            <span class="gh-stars">★ {{ repo.stargazers_count }}</span>
+            <span v-if="repo.language" class="gh-lang">{{ repo.language }}</span>
+            <span class="gh-updated">更新 {{ formatDate(repo.updated_at) }}</span>
           </div>
-        </div>
+        </article>
 
-        <!-- 末尾快捷翻页卡片：直接点击翻到下一页 -->
+        <!-- 末尾快捷翻页卡片：直接点击翻到下一页，高度严格与标准卡片对齐 -->
         <div
           v-if="controller.uncatPage < controller.uncatTotalPages"
-          class="repo-card shelf-card shelf-next-card"
+          class="repo gh-card shelf-card shelf-next-card"
           title="点击翻到下一页"
           @click="controller.nextUncatPage"
         >
           <div class="shelf-next-content">
             <span class="shelf-next-icon">➔</span>
             <span class="shelf-next-title">下一页</span>
-            <span class="shelf-next-sub">（第 {{ controller.uncatPage + 1 }} 页，共 {{ controller.uncatTotalPages }} 页）</span>
+            <span class="shelf-next-sub">{{ controller.uncatPage + 1 }} / {{ controller.uncatTotalPages }} 页</span>
           </div>
         </div>
       </div>
@@ -427,8 +475,24 @@ onUnmounted(() => {
       @wheel="onViewportWheel"
       @dragover="onViewportDragOver"
     >
-      <div class="board-columns-track">
-        <!-- 各个 GitHub 原生 List 看板列 -->
+      <!-- 骨架屏占位（当加载中且暂无 Lists 时展示） -->
+      <div v-if="isLoading && !controller.lists.length" class="board-columns-track">
+        <div v-for="c in 4" :key="'skel-col-' + c" class="board-column skel-column">
+          <div class="column-header">
+            <div class="skel-line" style="width: 120px; height: 16px;"></div>
+          </div>
+          <div class="column-cards-scroll">
+            <div v-for="r in 3" :key="'skel-col-card-' + r" class="repo gh-card skel-card">
+              <div class="skel-line skel-title"></div>
+              <div class="skel-line skel-desc"></div>
+              <div class="skel-line skel-meta"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 真实各 Lists 看板列 -->
+      <div v-else class="board-columns-track">
         <section
           v-for="list in controller.lists"
           :key="list.id"
@@ -458,54 +522,86 @@ onUnmounted(() => {
           </header>
 
           <div class="column-cards-scroll">
-            <div
+            <article
               v-for="repo in controller.getReposForList(list.name)"
               :key="repo.full_name"
-              class="repo-card"
+              class="repo gh-card"
               :class="{ 'card-dragging': activeDragRepo?.full_name === repo.full_name }"
               draggable="true"
+              @click="openRepoDetail(repo)"
               @dragstart="onDragStart($event, repo, list.name)"
               @dragend="onDragEnd"
               @contextmenu="handleOpenContextMenu($event, repo, list.name)"
             >
-              <div class="repo-card-head">
-                <span class="repo-name" :title="repo.full_name" @click="openRepoDetail(repo)">
-                  {{ repo.name }}
-                </span>
-                <button
-                  type="button"
-                  class="btn-open-link"
-                  title="在 GitHub 打开新标签页"
-                  @click.stop="openRepoUrl(repo.html_url)"
-                >↗</button>
+              <button class="fo-card-more" type="button" aria-label="更多操作" title="更多操作" @click.stop="handleOpenContextMenu($event, repo, list.name)">⋮</button>
+
+              <!-- 头部：头像 + 仓库名 -->
+              <div class="gh-card-head">
+                <img
+                  class="gh-owner-avatar"
+                  :src="repo.owner?.avatar_url || 'assets/github-star.svg'"
+                  alt=""
+                  loading="lazy"
+                  referrerpolicy="no-referrer"
+                  @error="($event.target as HTMLImageElement).src='assets/github-star.svg'"
+                >
+                <a
+                  :href="repo.html_url"
+                  target="_blank"
+                  rel="noreferrer"
+                  class="name"
+                  :title="repo.full_name"
+                  @click.stop
+                >
+                  <span class="owner">{{ repo.owner?.login || repo.full_name.split('/')[0] }}/</span>{{ repo.name }}
+                </a>
               </div>
 
-              <p class="repo-desc" :title="repo.description || ''" @click="openRepoDetail(repo)">
-                {{ repo.description || "暂无描述" }}
-              </p>
+              <!-- 卡片内容 -->
+              <div class="gh-card-body">
+                <div class="gh-card-badges">
+                  <span class="gh-badge-folder" :title="'属于列表: ' + list.name">
+                    📁 {{ list.name }}
+                    <span
+                      class="btn-inline-remove"
+                      title="从该列表中移出"
+                      role="button"
+                      tabindex="0"
+                      @click.stop="controller.removeRepoFromList(repo.full_name, list.name)"
+                    >×</span>
+                  </span>
+                  <!-- 折叠的 Topics 标签：最多展示前 2 个，超出显示 +N，绝对不撑大卡片 -->
+                  <template v-if="repo.topics && repo.topics.length">
+                    <span
+                      v-for="t in repo.topics.slice(0, 2)"
+                      :key="t"
+                      class="gh-badge-topic-chip"
+                      :title="'Topic: ' + t"
+                    >
+                      #{{ t }}
+                    </span>
+                    <span
+                      v-if="repo.topics.length > 2"
+                      class="gh-badge-topic-chip more"
+                      :title="repo.topics.slice(2).map(t => '#' + t).join(' ')"
+                    >
+                      +{{ repo.topics.length - 2 }}
+                    </span>
+                  </template>
+                </div>
 
-              <!-- 归属列表标签，带快速移除按钮 -->
-              <div class="repo-local-groups-wrap">
-                <span class="local-group-chip" :title="'属于列表: ' + list.name">
-                  📁 {{ list.name }}
-                  <button
-                    type="button"
-                    class="btn-remove-group"
-                    title="从该列表中移出"
-                    @click.stop="controller.removeRepoFromList(repo.full_name, list.name)"
-                  >×</button>
-                </span>
+                <p class="desc" :title="repo.description || ''">
+                  {{ repo.description || "暂无描述" }}
+                </p>
               </div>
 
-              <div class="repo-card-meta">
-                <span v-if="repo.language" class="meta-lang">
-                  <span class="lang-color-dot"></span>
-                  {{ repo.language }}
-                </span>
-                <span class="meta-stars">⭐ {{ repo.stargazers_count }}</span>
-                <span class="meta-date">{{ formatDate(repo.updated_at) }}</span>
+              <!-- 底栏元数据 -->
+              <div class="meta">
+                <span class="gh-stars">★ {{ repo.stargazers_count }}</span>
+                <span v-if="repo.language" class="gh-lang">{{ repo.language }}</span>
+                <span class="gh-updated">更新 {{ formatDate(repo.updated_at) }}</span>
               </div>
-            </div>
+            </article>
 
             <div v-if="!controller.getReposForList(list.name).length" class="empty-column-dropzone">
               <span>暂无仓库，可从上方或其它列拖入</span>
@@ -782,31 +878,42 @@ onUnmounted(() => {
   color: #0284c7;
 }
 
+.spinning {
+  display: inline-block;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
 /* 单排横向卡片托盘 */
 .shelf-cards-scroll {
   display: flex;
   flex-direction: row;
-  align-items: stretch;
-  gap: 12px;
-  padding: 10px 16px 14px 16px;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 16px 12px 16px;
   overflow-x: auto;
   overflow-y: hidden;
   white-space: nowrap;
 }
 
+/* 顶部托盘中的标准卡片（严格 126px 高度） */
 .shelf-card {
-  width: 250px;
-  min-width: 250px;
-  max-width: 250px;
+  width: 270px;
+  min-width: 270px;
+  max-width: 270px;
   flex-shrink: 0;
   margin-bottom: 0 !important;
 }
 
-/* 末尾下一页快捷卡片 */
+/* 末尾下一页快捷卡片：尺寸与标准 126px 卡片完全对齐 */
 .shelf-next-card {
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
   border: 2px dashed #0284c7 !important;
   background: rgba(2, 132, 199, 0.04) !important;
   cursor: pointer !important;
@@ -823,13 +930,13 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
   color: #0284c7;
   text-align: center;
 }
 
 .shelf-next-icon {
-  font-size: 20px;
+  font-size: 18px;
   font-weight: bold;
 }
 
@@ -843,12 +950,43 @@ onUnmounted(() => {
   opacity: 0.8;
 }
 
+/* 优雅 Topics 标签折叠 */
+.gh-badge-topic-chip {
+  font-size: 10px;
+  background: var(--panel, rgba(0, 0, 0, 0.04));
+  color: var(--muted, #64748b);
+  padding: 1px 5px;
+  border-radius: 4px;
+  border: 1px solid var(--border, rgba(0, 0, 0, 0.06));
+  line-height: 1.3;
+}
+
+.gh-badge-topic-chip.more {
+  background: rgba(2, 132, 199, 0.08);
+  color: #0284c7;
+  font-weight: 600;
+  cursor: help;
+}
+
+.btn-inline-remove {
+  font-size: 13px;
+  font-weight: bold;
+  margin-left: 4px;
+  cursor: pointer;
+  opacity: 0.7;
+}
+
+.btn-inline-remove:hover {
+  opacity: 1;
+  color: #ef4444;
+}
+
 /* 下方横向看板 */
 .board-viewport {
   flex: 1;
   overflow-x: auto;
   overflow-y: hidden;
-  padding: 14px 16px;
+  padding: 10px 16px 14px 16px;
   min-height: 0;
 }
 
@@ -863,13 +1001,13 @@ onUnmounted(() => {
 .board-column {
   display: flex;
   flex-direction: column;
-  width: 270px;
-  min-width: 270px;
-  max-width: 270px;
+  width: 290px;
+  min-width: 290px;
+  max-width: 290px;
   height: 100%;
   background: var(--panel, #ffffff);
   border: 1px solid var(--border, rgba(0, 0, 0, 0.08));
-  border-radius: 10px;
+  border-radius: 12px;
   overflow: hidden;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
   transition: all 0.15s ease;
@@ -950,144 +1088,15 @@ onUnmounted(() => {
   padding: 10px 12px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
   min-height: 0;
 }
 
-/* 卡片样式 */
-.repo-card {
-  background: var(--surface, #ffffff);
-  border: 1px solid var(--border, rgba(0, 0, 0, 0.08));
-  border-radius: 8px;
-  padding: 10px 12px;
-  cursor: grab;
-  user-select: none;
-  transition: all 0.15s ease;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
-}
-
-.repo-card:hover {
-  border-color: #0284c7;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.06);
-  transform: translateY(-1px);
-}
-
-.repo-card.card-dragging {
-  opacity: 0.4;
-  outline: 2px dashed #0284c7;
-}
-
-.repo-card-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 6px;
-  margin-bottom: 5px;
-}
-
-.repo-name {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--heading, #0f172a);
-  cursor: pointer;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.repo-name:hover {
-  color: #0284c7;
-}
-
-.btn-open-link {
-  background: none;
-  border: none;
-  color: var(--muted, #94a3b8);
-  font-size: 12px;
-  cursor: pointer;
-  padding: 0 2px;
-}
-
-.btn-open-link:hover {
-  color: #0284c7;
-}
-
-.repo-desc {
-  font-size: 11.5px;
-  color: var(--muted, #64748b);
-  line-height: 1.45;
-  margin: 0 0 8px 0;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  white-space: normal;
-  cursor: pointer;
-}
-
-.repo-topics-wrap,
-.repo-local-groups-wrap {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  margin-bottom: 8px;
-}
-
-.topic-chip-tag {
-  font-size: 10px;
-  background: var(--panel, #f1f5f9);
-  color: var(--muted, #64748b);
-  padding: 1px 5px;
-  border-radius: 4px;
-  border: 1px solid var(--border, rgba(0, 0, 0, 0.05));
-}
-
-.local-group-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  font-size: 10.5px;
-  background: rgba(2, 132, 199, 0.08);
-  color: #0284c7;
-  padding: 1px 6px;
-  border-radius: 4px;
-  font-weight: 500;
-}
-
-.btn-remove-group {
-  background: none;
-  border: none;
-  color: #0284c7;
-  font-size: 12px;
-  line-height: 1;
-  padding: 0 2px;
-  cursor: pointer;
-  border-radius: 2px;
-}
-
-.btn-remove-group:hover {
-  background: rgba(2, 132, 199, 0.2);
-}
-
-.repo-card-meta {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 11px;
-  color: var(--muted, #94a3b8);
-}
-
-.meta-lang {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.lang-color-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: #3b82f6;
+/* 看板内的卡片 */
+.column-cards-scroll .repo.gh-card {
+  width: 100% !important;
+  box-sizing: border-box !important;
+  margin-bottom: 0 !important;
 }
 
 .empty-column-dropzone {
@@ -1096,7 +1105,7 @@ onUnmounted(() => {
   justify-content: center;
   padding: 30px 10px;
   border: 1px dashed var(--border, rgba(0, 0, 0, 0.15));
-  border-radius: 6px;
+  border-radius: 8px;
   color: var(--muted, #94a3b8);
   font-size: 11.5px;
   text-align: center;
@@ -1134,6 +1143,47 @@ onUnmounted(() => {
 .btn-trigger-add-col .plus-icon {
   font-size: 24px;
   font-weight: 300;
+}
+
+/* 骨架屏 (Skeleton Screen) 样式 */
+.skel-card {
+  pointer-events: none !important;
+  opacity: 0.65;
+  background: var(--surface, #ffffff) !important;
+  border: 1px solid var(--border, rgba(0, 0, 0, 0.06)) !important;
+}
+
+.skel-column {
+  opacity: 0.7;
+}
+
+.skel-line {
+  background: linear-gradient(90deg, rgba(150, 150, 150, 0.1) 25%, rgba(150, 150, 150, 0.22) 50%, rgba(150, 150, 150, 0.1) 75%);
+  background-size: 200% 100%;
+  animation: skel-shimmer 1.4s ease-in-out infinite;
+  border-radius: 4px;
+}
+
+.skel-title {
+  width: 60%;
+  height: 15px;
+  margin-bottom: 10px;
+}
+
+.skel-desc {
+  width: 90%;
+  height: 28px;
+  margin-bottom: 12px;
+}
+
+.skel-meta {
+  width: 40%;
+  height: 12px;
+}
+
+@keyframes skel-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
 }
 
 /* 右键菜单 */
