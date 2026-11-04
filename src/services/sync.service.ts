@@ -27,7 +27,7 @@ export const SYNC_WHITELIST_KEYS: readonly string[] = [
   ...BASE_KEYS, SHORTCUT_KEY, SEARCH_IGNORED_BOOKMARK_FOLDERS_KEY,
   "wereadSortIds", "foGroups",
   "foTree", "foCollapsedGroupsV1", "biliFollowingGroupsV1", "biliSubCustomChannelsV1", "biliRadioSeriesV1",
-  "ghRepoRemarksV1",
+  "ghRepoRemarksV1", "gh_my_repo_groups_v2", "gh_my_repo_groups_map_v2",
   "ghUser", "ghToken", "todoistToken", "todoistActiveProjectIdV1", "lw_private_chat_v1", "googleCalendarSessionTokenV1", "lw_webdav_config",
   "launcherGroups", "launcherFolders", "quickLinks", "quickLinkGroupSizes",
   "launcherPages", "launcherPageLabels", "launcherActivePage", "launcherFolderPositionV1",
@@ -66,7 +66,7 @@ export async function readSyncSettings(): Promise<Record<string, unknown>> {
     });
     // Include localStorage items (e.g. private chat config) if not present in chrome.storage.local
     if (typeof localStorage !== "undefined") {
-      const extraKeys = ["lw_private_chat_v1", "ghUser", "ghToken", "todoistToken", "googleCalendarSessionTokenV1", "lw_webdav_config", "biliRadioSeriesV1"];
+      const extraKeys = ["lw_private_chat_v1", "ghUser", "ghToken", "todoistToken", "googleCalendarSessionTokenV1", "lw_webdav_config", "biliRadioSeriesV1", "gh_my_repo_groups_v2", "gh_my_repo_groups_map_v2"];
       for (const k of extraKeys) {
         if (data[k] === undefined) {
           const val = localStorage.getItem(k) ?? (k === "biliRadioSeriesV1" ? localStorage.getItem("lw_backup_bili_radio_series") : null);
