@@ -91,6 +91,8 @@ export class MyReposController {
 
     // 1. 读取本地分组与本地仓库映射
     await this.loadPersistedGroups();
+
+    // 2. 尝试读取离线缓存
     const cached = await storageCache.get<MyRepoItem[]>(CACHE_KEY);
     if (cached && cached.length) {
       this.hydrateRepos(cached);
@@ -98,20 +100,22 @@ export class MyReposController {
       this.hydrateRepos(myReposState.repos);
     }
 
-    if (!forceRemote && myReposState.repos.length) {
+    // 如果还没有仓库数据，或者用户明确点击刷新，则立刻请求远端
+    const shouldFetch = forceRemote || !myReposState.repos.length;
+    if (shouldFetch) {
+      myReposState.loading = true;
+      myReposState.errorMessage = "";
+      try {
+        await this.fetchRemote(signal);
+      } catch (err: any) {
+        if (err.name === "AbortError") return;
+        myReposState.errorMessage = err.message || "获取个人仓库失败";
+      } finally {
+        myReposState.loading = false;
+      }
+    } else {
+      // SWR 后台静默刷新，不打扰当前界面
       void this.fetchRemote(signal).catch(() => {});
-      return;
-    }
-
-    myReposState.loading = true;
-    myReposState.errorMessage = "";
-    try {
-      await this.fetchRemote(signal);
-    } catch (err: any) {
-      if (err.name === "AbortError") return;
-      myReposState.errorMessage = err.message || "获取个人仓库失败";
-    } finally {
-      myReposState.loading = false;
     }
   }
 
@@ -179,14 +183,28 @@ export class MyReposController {
 
   private hydrateRepos(rawRepos: MyRepoItem[]): void {
     myReposState.repos = rawRepos.map(repo => {
-      const assigned = myReposState.repoGroupsMap[repo.fullName] ||
-                       myReposState.repoGroupsMap[repo.name] ||
-                       myReposState.repoGroupsMap[repo.fullName.toLowerCase()] ||
-                       myReposState.repoGroupsMap[repo.name.toLowerCase()] ||
-                       repo.localGroups || [];
+      // 优先级 1: 历史已存在的分组映射 (fullName, repoName, 小写全名, 小写仓库名)
+      const mapped = myReposState.repoGroupsMap[repo.fullName] ||
+                     myReposState.repoGroupsMap[repo.name] ||
+                     myReposState.repoGroupsMap[repo.fullName.toLowerCase()] ||
+                     myReposState.repoGroupsMap[repo.name.toLowerCase()];
+
+      // 优先级 2: 之前如果打过 GitHub Topics（如 browser-extension, command-alias 等），平滑自动继承到对应的分组列
+      const fallbackFromTopics = repo.topics && repo.topics.length
+        ? repo.topics.filter(t => myReposState.customGroups.some(cg => cg.toLowerCase() === t.toLowerCase() || cg.toLowerCase().includes(t.toLowerCase())))
+        : [];
+
+      const assigned = mapped || repo.localGroups || fallbackFromTopics;
+
+      const validGroups = [...new Set(assigned.filter(Boolean))];
+      // 同步回写映射
+      if (validGroups.length && !myReposState.repoGroupsMap[repo.fullName]) {
+        myReposState.repoGroupsMap[repo.fullName] = validGroups;
+      }
+
       return {
         ...repo,
-        localGroups: [...new Set(assigned.filter(Boolean))]
+        localGroups: validGroups
       };
     });
   }
