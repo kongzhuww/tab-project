@@ -815,7 +815,13 @@ export class GitHubService {
   }
 
   public selectFolder(title: string): void {
-    this.active = title; this.page = 1; this.publishAll();
+    this.active = title;
+    this.page = 1;
+    this.publishAll();
+    // 切换到具体列表或未分类时，若全量 Star 尚未完全载入，后台自动补全拉取后续页，确保卡片数量与侧边栏计数精准对齐
+    if (!this.allStarsLoaded && !this.loadingAllStars) {
+      void this.ensureAllStarsLoaded();
+    }
   }
 
   public async deleteFolder(title: string): Promise<void> {
