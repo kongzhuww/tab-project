@@ -481,6 +481,7 @@ onUnmounted(() => {
 
           <!-- 折叠切换 -->
           <button
+            v-if="defaultColumnRepos.length"
             type="button"
             class="shelf-toggle-btn"
             :title="isDefaultShelfCollapsed ? t('github.myRepos.expandShelf') : t('github.myRepos.collapseShelf')"
@@ -492,6 +493,7 @@ onUnmounted(() => {
       </header>
 
       <div
+        v-if="defaultColumnRepos.length"
         v-show="!isDefaultShelfCollapsed"
         ref="shelfScrollRef"
         class="shelf-cards-scroll"
@@ -537,10 +539,6 @@ onUnmounted(() => {
               {{ formatDate(repo.pushedAt || repo.updatedAt) }}
             </span>
           </div>
-        </div>
-
-        <div v-if="!defaultColumnRepos.length" class="empty-shelf-placeholder">
-          <span>暂无未分类仓库，所有仓库都已归入下方自定义板块</span>
         </div>
       </div>
     </section>
