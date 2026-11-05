@@ -27,7 +27,7 @@ export const SYNC_WHITELIST_KEYS: readonly string[] = [
   ...BASE_KEYS, SHORTCUT_KEY, SEARCH_IGNORED_BOOKMARK_FOLDERS_KEY,
   "wereadSortIds", "foGroups",
   "foTree", "foCollapsedGroupsV1", "biliFollowingGroupsV1", "biliSubCustomChannelsV1", "biliRadioSeriesV1",
-  "ghRepoRemarksV1", "gh_my_repo_groups_v2", "gh_my_repo_groups_map_v2",
+  "ghRepoRemarksV1", "ghLocalStarGroupsV1", "gh_my_repo_groups_v2", "gh_my_repo_groups_map_v2",
   "ghUser", "ghToken", "todoistToken", "todoistActiveProjectIdV1", "lw_private_chat_v1", "googleCalendarSessionTokenV1", "lw_webdav_config",
   "launcherGroups", "launcherFolders", "quickLinks", "quickLinkGroupSizes",
   "launcherPages", "launcherPageLabels", "launcherActivePage", "launcherFolderPositionV1",
@@ -58,10 +58,25 @@ const launcherMirrorKeys = new Set([
 export async function readSyncSettings(): Promise<Record<string, unknown>> {
   if (typeof chrome !== "undefined" && chrome.storage?.local) {
     const data = await new Promise<Record<string, unknown>>((resolve, reject) => {
-      chrome.storage.local.get(SYNC_WHITELIST_KEYS, (res: Record<string, unknown>) => {
+      chrome.storage.local.get(null, (res: Record<string, unknown>) => {
         const error = chrome.runtime.lastError;
-        if (error) reject(new Error(error.message || "读取本地配置失败"));
-        else resolve(res || {});
+        if (error) {
+          reject(new Error(error.message || "读取本地配置失败"));
+          return;
+        }
+        const filtered: Record<string, unknown> = {};
+        const all = res || {};
+        for (const k of SYNC_WHITELIST_KEYS) {
+          if (all[k] !== undefined) filtered[k] = all[k];
+        }
+        // 自动汇聚所有按账号划分的 ghLocalStarGroupsV1: 前缀配置
+        const starGroupKeys = Object.keys(all).filter(k => k.startsWith("ghLocalStarGroupsV1:"));
+        if (starGroupKeys.length) {
+          const map: Record<string, unknown> = {};
+          for (const gk of starGroupKeys) map[gk] = all[gk];
+          filtered["ghLocalStarGroupsV1"] = map;
+        }
+        resolve(filtered);
       });
     });
     // Include localStorage items (e.g. private chat config) if not present in chrome.storage.local
@@ -73,6 +88,20 @@ export async function readSyncSettings(): Promise<Record<string, unknown>> {
           if (val !== null) {
             try { data[k] = JSON.parse(val); } catch { data[k] = val; }
           }
+        }
+      }
+      // 聚合备份所有以 ghLocalStarGroupsV1: 为前缀的账号分组，确保多账号与切换账号时完整持久化与云同步
+      const localStarGroupKeys = Object.keys(localStorage).filter(k => k.startsWith("ghLocalStarGroupsV1:"));
+      if (localStarGroupKeys.length && !data["ghLocalStarGroupsV1"]) {
+        const groupsMap: Record<string, unknown> = {};
+        for (const gk of localStarGroupKeys) {
+          const raw = localStorage.getItem(gk);
+          if (raw) {
+            try { groupsMap[gk] = JSON.parse(raw); } catch { groupsMap[gk] = raw; }
+          }
+        }
+        if (Object.keys(groupsMap).length) {
+          data["ghLocalStarGroupsV1"] = groupsMap;
         }
       }
       for (const key of launcherMirrorKeys) {
@@ -118,7 +147,24 @@ export async function restoreSyncBackup(data: unknown) {
         else resolve();
       });
     });
-    // 同步更新 localStorage 中的常用网站镜像，杜绝旧页面或本地镜像读取到空数据
+    // 恢复 ghLocalStarGroupsV1 复合分组映射或按 key 还原到存储
+    if (settings["ghLocalStarGroupsV1"] && typeof settings["ghLocalStarGroupsV1"] === "object") {
+      const gMap = settings["ghLocalStarGroupsV1"] as Record<string, unknown>;
+      const toSet: Record<string, unknown> = {};
+      for (const [gk, gVal] of Object.entries(gMap)) {
+        if (gk.startsWith("ghLocalStarGroupsV1:")) {
+          toSet[gk] = gVal;
+          if (typeof localStorage !== "undefined") {
+            try { localStorage.setItem(gk, JSON.stringify(gVal)); } catch {}
+          }
+        }
+      }
+      if (Object.keys(toSet).length) {
+        await new Promise<void>((res) => {
+          chrome.storage.local.set(toSet, () => res());
+        });
+      }
+    }
     if (typeof localStorage !== "undefined") {
       for (const [key, value] of Object.entries(settings)) {
         try {

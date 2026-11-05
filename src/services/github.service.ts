@@ -288,6 +288,15 @@ export class GitHubService {
       analyzeAi: () => this.batchAnalyzeWithAi(),
       unstar: () => this.batchUnstar()
     });
+
+    if (typeof window !== "undefined") {
+      window.addEventListener("logicweaver:sync-restored", (ev: any) => {
+        const detail = ev?.detail;
+        if (detail && typeof detail === "object" && (detail.ghLocalStarGroupsV1 || detail.ghUser)) {
+          void this.loadLists();
+        }
+      });
+    }
   }
 
   // ============================================================================

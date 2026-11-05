@@ -17,7 +17,7 @@ const arrayKeys = new Set([
 const objectKeys = new Set([
   "customShortcuts", "launcherFolders", "quickLinkGroupSizes",
   "launcherPageLabels", "launcherFolderPositionV1",
-  "foTree", "ghRepoRemarksV1",
+  "foTree", "ghRepoRemarksV1", "ghLocalStarGroupsV1",
   "lw_private_chat_v1", "lw_webdav_config", "googleCalendarSessionTokenV1"
 ]);
 
