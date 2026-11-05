@@ -147,6 +147,15 @@ try {
       '请登录 [Chrome Web Store 开发者信息中心](https://chrome.google.com/webstore/devconsole) 检查草稿并手动点击提交审核。'
     );
     process.exit(0);
+  } else if (message.includes('ITEM_NOT_UPDATABLE')) {
+    const warning = `::warning::Chrome Web Store item is currently in pending review. Submit ${tag} after the current review finishes.`;
+    console.log(warning);
+    await summary(
+      '### ⚠️ Chrome 商店正在审核中\n\n' +
+      `检测到前序版本当前正在 Chrome 官方审核队列中（状态: \`ITEM_NOT_UPDATABLE\`）。\n\n` +
+      'Google 限制在同一时间只能有一个版本处于审核流程。请待当前审核通过后，或登录 [Chrome Web Store 开发者信息中心](https://chrome.google.com/webstore/devconsole) 取消前序审核后重新运行。'
+    );
+    process.exit(0);
   } else {
     await summary(
       '### ❌ Chrome 商店自动上传发布失败\n\n' +
