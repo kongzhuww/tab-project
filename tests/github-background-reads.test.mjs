@@ -100,12 +100,14 @@ test('home exit synchronizes fullscreen state and body navigation markers', asyn
     getDockModule: () => undefined, touchDockModuleTransition: () => {}, bindFullscreenCardActions: () => {},
     windowManagerController: { releaseFocus: () => {} },
     window: { scrollTo: () => {} }, sessionStorage: { removeItem: k => storage.delete(k) },
-    document: { body: { dataset: { page: 'daily' }, classList: { remove: k => classes.delete(k) } } } });
+    document: { body: { dataset: { page: 'daily' }, classList: {
+      remove: k => classes.delete(k), toggle: (k, enabled) => enabled ? classes.add(k) : classes.delete(k)
+    } } } });
   // This module has one multiline import and one re-export in addition to normal imports.
   let code = await source('src/core/fullscreen-cards.store.ts');
   code = code.replace(/import \{[\s\S]*?\} from "\.\/fullscreen-card-state";/, '')
     .replace(/^\{ fullscreenCardState \} from .*;$/gm, '');
-  vm.runInContext(code + '\nfullscreenCardsController.exit();', ctx);
+  vm.runInContext(await source('src/core/fullscreen-presentation.ts') + '\n' + code + '\nfullscreenCardsController.exit();', ctx);
   assert.equal(ctx.fullscreenCardState.activeId, null);
   assert.equal(ctx.document.body.dataset.page, 'home');
   assert.equal(classes.has('has-card-fullscreen'), false);

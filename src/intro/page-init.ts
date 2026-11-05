@@ -9,7 +9,7 @@
     document.body.classList.toggle("is-starting", enabled);
     const card = location.hash.slice(1) || sessionStorage.getItem("lw_active_card");
     if (["todoist", "card-github", "daily-aihot", "daily-bilibili", "daily-youtube", "daily-pricing"].includes(card || "")) {
-      html.classList.add("has-card-fullscreen");
+      // The body exists here; use the same CSS owner as runtime navigation.
       document.body.classList.add("has-card-fullscreen");
     }
   } catch {

@@ -4,6 +4,7 @@ import "./builtins";
 import { getDockModule } from "./registry";
 import { appMountedState, runningAppsState, dockLifecycleController } from "../dock/dock-lifecycle.store";
 import { fullscreenCardState } from "../core/fullscreen-card-state";
+import { syncFullscreenPresentation } from "../core/fullscreen-presentation";
 const props = defineProps<{ id: string }>();
 // Each keyed host occupies the exact original card slot and adds no layout wrapper.
 const module = getDockModule(props.id);
@@ -25,10 +26,7 @@ function handleBackHome() {
     fullscreenCardState.activeId = null;
   }
   dockLifecycleController.hideApp(definition.id);
-  if (typeof document !== "undefined") {
-    document.body.classList.toggle("has-card-fullscreen", Boolean(fullscreenCardState.activeId));
-    document.body.dataset.page = fullscreenCardState.activeId ? "daily" : "home";
-  }
+  syncFullscreenPresentation(fullscreenCardState.activeId);
 }
 
 function handleReload() {

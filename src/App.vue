@@ -37,6 +37,7 @@ import AppOverlays from "./layout/AppOverlays.vue";
 import { windowManagerController } from "./core/window-manager.store";
 import { activeViewId } from "./core/navigation-state";
 import { fullscreenCardState } from "./core/fullscreen-cards.store";
+import { syncFullscreenPresentation } from "./core/fullscreen-presentation";
 import { navWheelRuntime } from "./nav-wheel/runtime";
 import { shortcutService } from "./services/shortcut.service";
 import { launcherRuntime } from "./launcher/runtime";
@@ -166,10 +167,7 @@ watch(
 
 const activeWorkspaceId = computed(() => activeViewId.value === "home" ? "" : activeViewId.value);
 
-watch(() => fullscreenCardState.activeId, (id) => {
-  document.body.classList.toggle("has-card-fullscreen", Boolean(id));
-  document.body.dataset.page = id ? "daily" : "home";
-}, { immediate: true, flush: "sync" });
+watch(() => fullscreenCardState.activeId, syncFullscreenPresentation, { immediate: true, flush: "sync" });
 
 onMounted(() => {
   if (typeof document !== "undefined") {

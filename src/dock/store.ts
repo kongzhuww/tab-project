@@ -1,6 +1,7 @@
 import { reactive, readonly, type DeepReadonly } from "vue";
 import { windowManagerController } from "../core/window-manager.store";
 import { fullscreenCardState, hideRegisteredCard } from "../core/fullscreen-card-state";
+import { syncFullscreenPresentation } from "../core/fullscreen-presentation";
 import { getStandaloneCardId } from "../core/navigation-state";
 import { mergeBuiltinDockTools, mergeBuiltinDockCards } from "../modules/builtins";
 import { pluginMarketController } from "../modules/market-store";
@@ -286,10 +287,6 @@ export const macDockController: MacDockController = {
         boundActions.onHomeClick();
         return;
       }
-      if (document.body) {
-        document.body.dataset.page = "home";
-        document.body.classList.remove("has-card-fullscreen");
-      }
       const dailyBtn = document.getElementById("daily-toggle");
       if (dailyBtn && dailyBtn.classList.contains("active")) {
         dailyBtn.classList.remove("active");
@@ -297,6 +294,7 @@ export const macDockController: MacDockController = {
 
       const activeCard = fullscreenCardState.activeId;
       if (activeCard) hideRegisteredCard(activeCard);
+      syncFullscreenPresentation(fullscreenCardState.activeId);
 
       if (typeof window !== "undefined") {
         window.scrollTo({ top: 0, left: 0, behavior: "instant" as ScrollBehavior });
