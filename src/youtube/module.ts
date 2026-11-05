@@ -4,7 +4,7 @@ import { homePrefsState } from "../launcher/home-prefs-state";
 
 export const youtubeDockModule = {
   schemaVersion: 1, id: "daily-youtube", title: "youtube插件", icon: "assets/nav-youtube.svg",
-  presentation: "card", dockBefore: "daily-pricing", rootId: "daily-youtube",
+  presentation: "card", rootId: "daily-youtube",
   showInDock: true,
   settingsKeys: ["youtubeModuleSettingsV1"],
   capabilities: ["workspace:fullscreen", "view:retained", "youtube:recommendations", "youtube:favorites"],

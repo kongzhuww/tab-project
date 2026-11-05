@@ -120,22 +120,6 @@ export const PLUGIN_CATALOG: readonly PluginMarketItem[] = [
     builtIn: true
   },
   {
-    id: "daily-pricing",
-    title: "模型插件",
-    version: "v1.6.0",
-    kind: "plugin",
-    category: "productivity",
-    categoryLabel: "全屏插件 · 算力实验",
-    icon: "assets/nav-pricing.svg",
-    emoji: "📐",
-    desc: "全球主流 LLM 大语言模型价格性价比全景雷达、性能天梯排行榜与推理成本测算器；当前处于实验开发阶段。",
-    author: "tab-project Lab",
-    tags: ["实验性", "LLM定价", "性能跑分"],
-    builtIn: true,
-    isDev: true,
-    devNotice: "开发实验中，功能尚在完善中"
-  },
-  {
     id: "daily-youtube",
     title: "youtube插件",
     version: "v1.0.0",

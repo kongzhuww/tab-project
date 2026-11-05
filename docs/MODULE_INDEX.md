@@ -16,22 +16,10 @@
 | **后台服务 (Service Worker)** | `manifest.json` → `generated/background.js`<br>（源自 `src/background/index.ts`） | MV3 规范后台。负责扩展快捷键监听、侧边栏呼出、B站/YouTube/QQ图片代理、防盗链 DNR 规则注入、受限下载流管理。 |
 | **覆盖式侧边栏 (In-Page Overlay Sidebar)** | 动态注入 / `sidepanel.html` → `generated/sidepanel-ui.js`<br>（源自 `src/sidepanel/SidePanelApp.vue` / `src/sidepanel/in-page-drawer.ts`） | 覆盖式浮层侧边栏（不挤压网页宽度，不使用原生 `sidePanel` API），支持快捷键呼出（建议绑定 Alt+W），提供独立书签、小窗及便签导航。 |
 | **极速搜索独立页** | `newtab-search.html` → `generated/search-ui.js`<br>（源自 `src/search/SearchLauncher.vue`） | 轻量零干扰搜索页，支持多引擎秒切与本地优先联想。 |
-| **全屏卡片独立标签页** | `bilibili.html`、`github.html`、`aihot.html`、`pricing.html`、`youtube.html` | 均为产品的正式既有入口，由 Vue 构建 bundle 独立装配运行，不强行与主页合并。 |
+| **全屏卡片独立标签页** | `bilibili.html`、`github.html`、`aihot.html`、`youtube.html` | 均为产品的正式既有入口，由 Vue 构建 bundle 独立装配运行，不强行与主页合并。 |
 | **独立设置页** | `options.html` → `src/settings/SettingsView.vue` | 独立全功能选项页，复用主页设置组件。 |
 | **壁纸沙箱** | `wallpaper-sandbox.html` → `src/wallpaper/sandbox.ts` | 具有沙箱权限的隔离页面，用于运行用户自定义动态壁纸。 |
 | **汉化浮层 (Content Script)** | `src/localizer/main.ts` → `generated/page-localizer-ui.js` | 注入外部网页的 Shadow DOM 单词翻译与编辑浮层。 |
-
----
-
-## 2. 顶栏区域与基础组件 (TopBar)
-
-| 用户口令 / 区域 | 对应源码文件 | 核心职责与状态仓储 |
-| :--- | :--- | :--- |
-| **头像 / 通知中心** | `src/notifications/NotificationCenter.vue`<br>`src/profile/ProfileMenu.vue`<br>`src/profile/TabManagerPanel.vue` | 顶栏最左侧头像。点击直达持久通知中心（聚合重要 Toast 与任务闹钟）；右键提供无模态标签页管理器（树状分组与聚焦）。 |
-| **书签栏 / 看板** | `src/bookmarks/BookmarkFolderStrip.vue`<br>`src/bookmarks/BookmarkBoard.vue` | 顶栏书签文件夹横条，点击平铺展开书签看板，支持拖拽移动、多级目录进入与真实浏览器书签同步。 |
-| **滚动立方体** | `src/layout/TopInfoCube.vue`<br>`src/layout/CubeConfigDialog.vue` | 顶栏 3D 旋转信息块（音乐默认面、倒计时、便签、链接快捷面配置）。 |
-| **主题切换** | `src/layout/AppTopBar.vue` (`#theme-toggle`) | 一键轮换 Light / Lonetrail / Dark 主题。 |
-| **全局设置** | `src/settings/SettingsDialog.vue`<br>`src/settings/SettingsView.vue` | 包含显示外观、组件启停、搜索偏好、快捷键管理、文件夹与存储、WebDAV 云同步备份。 |
 
 ---
 
@@ -58,7 +46,6 @@
 | **b站插件** | `src/bilibili/BilibiliWorkspace.vue` | B站双栏收藏夹整理、AI 字幕提取、刹那观察室订阅视频、小窗播放与电台系列管理。电台优先抓取 DASH 纯音频流（M4A，~3MB），防盗链与 8 秒卡顿自动切备用 CDN 源。 |
 | **github插件** | `src/github/GitHubWorkspaceCard.vue`<br>`src/github/GitHubMyRepos.vue` | GitHub 工作区：Star 仓库深度检索、资源专区、开阔式 Markdown README 阅读与一键创建关联待办；**「我的仓库」** Todoist 风格看板（默认板块与 Topic 多列聚合、就地拖拽归类、重命名与远端 GitHub Topics 实时同步）。 |
 | **ai hot插件** | `src/aihot/AihotFeed.vue`<br>`src/viewers/AihotViewer.vue` | 每日精选 AI 资讯热榜与沉浸式阅读器。 |
-| **模型插件** | `src/pricing/ModelPricingCard.vue` | 全网主流大模型 Token 价格雷达与性价比对比。 |
 | **youtube插件** | `src/youtube/YouTubeCard.vue` | YouTube 频道订阅、个性推荐（紫色胶囊卡片）与视频播放。 |
 
 ---

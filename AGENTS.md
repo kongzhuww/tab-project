@@ -20,7 +20,7 @@
 
 1. **Chromium Manifest V3 扩展运行架构**：
    - 新标签页入口以 manifest 为准：`newtab-bootstrap.html` → `newtab.html` → `generated/vue-ui.js` → `src/intro/main.ts` / `src/App.vue`；不要因旧文档省略引导页；
-   - B站、GitHub、AI HOT、模型价格、设置等**独立标签页为产品既有功能**，拥有独立入口，切勿强行合并或随意关闭用户已有标签；已有主页时优先切回，避免凭空新建第二个主页；
+   - B站、GitHub、AI HOT、设置等**独立标签页为产品既有功能**，拥有独立入口，切勿强行合并或随意关闭用户已有标签；已有主页时优先切回，避免凭空新建第二个主页；
    - manifest 当前加载 `generated/background.js`，源文件为 `src/background/index.ts`；根 `background.js` 也是构建输出，但不是 manifest 当前入口。MV3 Service Worker 会被浏览器回收，不依赖永久驻留或仅内存状态；
    - 当前仅维护桌面 Chromium 扩展；独立移动端应用已按用户要求删除，不提供 Android / iOS 构建或 APK 更新入口。
 2. **验证与安全铁律**：
@@ -96,7 +96,7 @@
 | **b站插件** | `src/bilibili/BilibiliWorkspace.vue` | B站双栏收藏夹整理、AI 字幕提取、刹那观察室订阅视频与小窗播放 |
 | **github插件** | `src/github/GitHubWorkspaceCard.vue` | GitHub Star 仓库深度检索、资源专区（原Awesome专区）、开阔式标准 Markdown README 阅读与一键创建关联任务 |
 | **ai hot插件** | `src/aihot/AihotFeed.vue` | 每日精选 AI 科技资讯热榜与沉浸阅读器 |
-| **模型插件** | `src/pricing/ModelPricingCard.vue` | 全网主流大模型 Token 价格雷达与性价比对比 |
+| **模型插件** | *已彻底移除* | 退役 | ❌ 彻底移除模型评测与价格看板，保持专注 |
 | **youtube插件** | `src/youtube/YouTubeCard.vue` | ⚠️ **【状态：封藏】** 用户指示暂未达到发布标准，暂不对外暴露，禁止主动扩展 |
 
 ### 3.5 独立模块与商店（Dock 栏右侧 · 独立非模态弹窗）

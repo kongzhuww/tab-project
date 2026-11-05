@@ -274,8 +274,7 @@ export const macDockController: MacDockController = {
     const isStandalonePage = currentHref.includes("bilibili.html") ||
       currentHref.includes("github.html") ||
       currentHref.includes("aihot.html") ||
-      currentHref.includes("youtube.html") ||
-      currentHref.includes("pricing.html");
+      currentHref.includes("youtube.html");
 
     if (type === "home") {
       if (isStandalonePage) {
@@ -307,8 +306,7 @@ export const macDockController: MacDockController = {
         "daily-bilibili": "bilibili.html",
         "card-github": "github.html",
         "daily-aihot": "aihot.html",
-        "daily-youtube": "youtube.html",
-        "daily-pricing": "pricing.html"
+        "daily-youtube": "youtube.html"
       };
 
       // 如果在独立子页面点击了其它卡片，切换对应独立页面或切回主页

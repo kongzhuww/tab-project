@@ -49,7 +49,7 @@ Include your installed extension version, browser version, and reproduction step
 | **GitHub Workspace** | Starred repository classification, multi-rule search, distraction-free Markdown README viewer, one-click issue-to-todo linking | **Optional Module** | Public viewing needs no token; deep queries and task integration require a personal GitHub Token |
 | **Todoist Task Kanban** | 0ms offline instant rendering, auto-hierarchical layout mapped from linked GitHub repos, task calendar, and real-time cross-tab cache invalidation | **Optional Module** | Requires a Todoist API Token entered in settings |
 | **Music Workspace** | NetEase Cloud Music direct web session login, Monster Siren Records album library, 3D rotating vinyl turntable with synced lyrics display | **Optional Module** | Monster Siren is available out-of-the-box; NetEase requires logging in on the official site in the same browser |
-| **AI HOT / Model Pricing** | Curated daily AI news headlines with an immersive reader; LLM token pricing radar and cost-efficiency benchmark chart | **Optional Module** | Ships with curated news feeds and built-in baseline model price tables |
+| **AI HOT Intelligence** | Curated daily AI news headlines with an immersive reader; technical trends and papers | **Optional Module** | Ships with curated news feeds and article view |
 
 ### Optional Components & Extended Services
 

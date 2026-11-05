@@ -22,7 +22,7 @@
 | --- | --- |
 | 新标签页 | manifest 的 `newtab-bootstrap.html` → `newtab.html` → `generated/vue-ui.js` → `src/intro/main.ts` / `src/App.vue`；首页首帧主题由外部 `generated/theme-init.js` 初始化；`generated/newtab-init.js` 设置开屏首帧状态，避免 MV3 CSP 拦截内联 JavaScript |
 | 侧边栏 | 新标签页使用 `InPageSideDrawer.vue`；普通 HTTP(S) 网页由 `src/background/web-side-drawer.ts` 按需注入隔离容器，内嵌 `sidepanel.html` → `src/sidepanel/index.ts` / `SidePanelApp.vue`。manifest 不再声明原生 `side_panel` 或 `sidePanel` 权限；无 `default_popup`。见 [SIDE_DRAWER.md](SIDE_DRAWER.md) |
-| 独立工作区 | `bilibili.html`、`github.html`、`aihot.html`、`pricing.html`、`youtube.html`；保留独立页，不为统一 SPA 而关闭或合并用户标签 |
+| 独立工作区 | `bilibili.html`、`github.html`、`aihot.html`、`youtube.html`；保留独立页，不为统一 SPA 而关闭或合并用户标签 |
 | 独立工具 | `options.html`、`newtab-search.html`、`stickers.html`、`sticker-sidepanel.html`、`sync-bridge.html`；按 HTML 与 Vite 输入核对实际 bundle |
 | 后台 | manifest 加载 `generated/background.js`，源文件 `src/background/index.ts`；根 `background.js` 同时作为构建输出保留，不应误当 manifest 当前目标 |
 | 构建 | `package.json`、`vite.ui.config.ts`、`vite.sandbox.config.ts`、`vite.localizer.config.ts`；不要从历史测试文件推导允许执行的验证方式 |

@@ -10,7 +10,7 @@ FEATURES
 - Connect Todoist to view and manage tasks and configure reminders.
 - Browse GitHub starred repositories, read repository information and link repository work with tasks.
 - Organize Bilibili favorites and explore supported video and subtitle tools.
-- Read AI news and compare model pricing information.
+- Read daily curated AI news headlines and tech updates.
 - Access supported NetEase Cloud Music and Monster Siren music features.
 - Use side-panel tools to save the current page and collect selected page images.
 - Optionally enable the experimental chat component and connect your own compatible chat server. Chat is disabled by default.

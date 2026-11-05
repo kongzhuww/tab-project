@@ -43,7 +43,6 @@ import { stickersService, StickersService } from "../services/stickers.service";
 import { profileService, ProfileService } from "../services/profile.service";
 import { bookmarksService, BookmarksService } from "../services/bookmarks.service";
 import { calendarService, CalendarService } from "../services/calendar.service";
-import { pricingController } from "../pricing/pricing-store";
 import { biliFavoritesController } from "../bilibili/bili-favorites-store";
 import { biliOrganizerDialogController } from "../bilibili/organizer-dialog-store";
 import { biliUpGroupManagerController } from "../bilibili/up-group-manager-store";
@@ -125,7 +124,6 @@ declare global {
     LogicWeaverTodoistTaskList?: typeof todoistTaskListController;
     LogicWeaverBiliMessagePanel?: typeof biliMessagePanelController;
     LogicWeaverStickerBoard?: typeof stickerBoardController;
-    LogicWeaverPricing?: typeof pricingController;
     LogicWeaverBiliFavorites?: typeof biliFavoritesController;
     LogicWeaverBiliRadioTape?: typeof radioTapeController;
     LogicWeaverBiliOrganizerDialogs?: typeof biliOrganizerDialogController;
@@ -224,8 +222,6 @@ export function installGlobalControllers(commands: CommandRegistry, features: Fe
   window.LogicWeaverBiliMessagePanel = biliMessagePanelController;
   window.LogicWeaverStickerBoard = stickerBoardController;
   window.LogicWeaverStickersService = stickersService;
-  // Shared standalone data only; each mounted board owns its Vue action subscription.
-  window.LogicWeaverPricing = pricingController;
   window.LogicWeaverBiliFavorites = biliFavoritesController;
   window.LogicWeaverBiliRadioTape = radioTapeController;
   window.LogicWeaverBiliOrganizerDialogs = biliOrganizerDialogController;

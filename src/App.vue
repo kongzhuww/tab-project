@@ -79,11 +79,6 @@ const VIEW_METAS: Record<string, ViewMeta> = {
     icon: "assets/nav-youtube.svg",
     iconType: "image/svg+xml"
   },
-  "daily-pricing": {
-    title: "模型评测 · 价格排行",
-    icon: "assets/nav-pricing.svg",
-    iconType: "image/svg+xml"
-  },
   "todoist": {
     title: "Todoist · 任务",
     icon: "assets/nav-todoist.svg",

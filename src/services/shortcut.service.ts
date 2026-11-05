@@ -117,10 +117,6 @@ export class ShortcutService {
         navWheelRuntime.toggleTools(true);
         return true;
       }
-      case "pricing": {
-        fullscreenCardsController.enter("daily-pricing");
-        return true;
-      }
       case "search": {
         if (typeof document !== "undefined") {
           const input = document.getElementById("search-input") as HTMLInputElement | null;

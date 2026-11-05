@@ -100,8 +100,7 @@ function handleExternalOpen() {
     "daily-bilibili": "https://www.bilibili.com",
     "card-github": "https://github.com",
     "daily-aihot": "https://news.ycombinator.com",
-    "daily-youtube": "https://www.youtube.com",
-    "daily-pricing": "https://openai.com/api/pricing"
+    "daily-youtube": "https://www.youtube.com"
   };
   const url = urls[props.target.id] || "https://www.bilibili.com";
   window.open(url, "_blank");

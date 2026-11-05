@@ -3,7 +3,7 @@ import { fullscreenCardState, openRegisteredCard, hideRegisteredCard } from "../
 
 export const aihotDockModule = {
   schemaVersion: 1, id: "daily-aihot", title: "ai hot插件", icon: "assets/nav-aihot.svg",
-  presentation: "card", dockBefore: "daily-pricing", rootId: "daily-aihot",
+  presentation: "card", rootId: "daily-aihot",
   // Existing localStorage preferences; registration neither reads nor migrates them.
   settingsKeys: ["lw-info-feed-view", "lw-aihot-feed-cat", "lw-aihot-feed-window"],
   capabilities: ["workspace:fullscreen", "view:retained", "aihot:aggregate"],

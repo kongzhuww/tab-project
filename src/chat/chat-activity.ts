@@ -37,9 +37,6 @@ export function detectCurrentActivity(): UserActivity | undefined {
   if (activeCard === "daily-youtube") {
     return { type: "youtube", title: "YouTube 精选视频流", updatedAt: Date.now() };
   }
-  if (activeCard === "daily-pricing") {
-    return { type: "idle", title: "大模型 API 定价与算力比对", updatedAt: Date.now() };
-  }
   if (activeCard === "todoist") {
     return { type: "idle", title: "Todoist 待办任务清单", updatedAt: Date.now() };
   }

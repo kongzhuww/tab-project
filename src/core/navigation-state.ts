@@ -6,8 +6,7 @@ const standaloneCards: Record<string, CardId> = {
   "bilibili.html": "daily-bilibili",
   "github.html": "card-github",
   "aihot.html": "daily-aihot",
-  "youtube.html": "daily-youtube",
-  "pricing.html": "daily-pricing"
+  "youtube.html": "daily-youtube"
 };
 
 export function getStandaloneCardId(): CardId | null {

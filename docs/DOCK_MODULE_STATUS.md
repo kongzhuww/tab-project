@@ -6,7 +6,7 @@
 
 Dock 入口来自注册表合并，旧卡片/工具数组均为空。当前共 **9 个注册模块**（登记于 `src/modules/builtins.ts`）：
 - **3 个浮窗/工具**：`chat`（海狸聊天室，实验性）、`stickers`（表情包辅助窗口，`showInDock: false`）、`music`（网易云模块）。
-- **6 个卡片**：`todoist`、`bilibili`、`github`、`aihot`、`youtube`、`pricing`（模型价格）。
+- **全屏卡片现存 5 项**：`todoist`、`bilibili`、`github`、`aihot`、`youtube`；模型插件模块已彻底移除。
 
 实际显示受安装/偏好/导航状态影响。原 `multica`、`obsidian`（笔记本）、`qq`、独立频道及旧监控/工作流、课表已彻底物理移除，严禁恢复；`siren`（塞壬唱片）、`sync`（同步）、`calendar`（日历）等以独立弹窗或子功能形式存在，未在 builtins 登记为 Dock 模块。不能把旧 12 项或 17 项统计继续当事实。
 

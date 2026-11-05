@@ -36,11 +36,6 @@ onMounted(() => {
         <DockCardModuleHost id="daily-youtube" />
       </div>
 
-      <!-- 模型插件 -->
-      <div id="vue-pricing-root">
-        <DockCardModuleHost id="daily-pricing" />
-      </div>
-
       <!-- AI HOT -->
       <div id="vue-aihot-root">
         <DockCardModuleHost id="daily-aihot" />

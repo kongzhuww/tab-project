@@ -9,7 +9,7 @@ import { getDockModule, touchDockModuleTransition } from "../modules/registry";
 import { windowManagerController } from "./window-manager.store";
 import { syncFullscreenPresentation } from "./fullscreen-presentation";
 
-const cards: CardId[] = ["todoist", "card-github", "daily-aihot", "daily-bilibili", "daily-youtube", "daily-pricing"];
+const cards: CardId[] = ["todoist", "card-github", "daily-aihot", "daily-bilibili", "daily-youtube"];
 
 let pausedBackgroundVideo: HTMLVideoElement | null = null;
 

@@ -1,13 +1,12 @@
 import { reactive, watch } from "vue";
-export type CardId = "todoist" | "card-github" | "daily-aihot" | "daily-bilibili" | "daily-youtube" | "daily-pricing";
+export type CardId = "todoist" | "card-github" | "daily-aihot" | "daily-bilibili" | "daily-youtube";
 
 export const VALID_FULLSCREEN_CARDS: readonly CardId[] = [
   "todoist",
   "card-github",
   "daily-aihot",
   "daily-bilibili",
-  "daily-youtube",
-  "daily-pricing"
+  "daily-youtube"
 ];
 export const ACTIVE_CARD_SESSION_KEY = "lw_active_card";
 
