@@ -7,7 +7,8 @@
 <p align="center"><strong>A Browser New-Tab Personal Productivity Workspace</strong></p>
 
 <p align="center">
-  <a href="https://microsoftedge.microsoft.com/addons/detail/tabproject-%E6%96%B0%E6%A0%87%E7%AD%BE%E9%A1%B5/dbkaiojfbolnkpaegflocfbdgpmhjcco"><img src="https://img.shields.io/badge/Microsoft_Edge-Install-0078D4?style=for-the-badge" alt="Install from Microsoft Edge Add-ons" /></a>
+  <a href="https://chromewebstore.google.com/detail/tab-project-%E6%96%B0%E6%A0%87%E7%AD%BE%E9%A1%B5/hogpkihhicjhiakkgjkbchpdoicmbolj"><img src="https://img.shields.io/badge/Chrome_Web_Store-Install-4285F4?style=for-the-badge&logo=googlechrome&logoColor=white" alt="Install from Chrome Web Store" /></a>
+  <a href="https://microsoftedge.microsoft.com/addons/detail/tabproject-%E6%96%B0%E6%A0%87%E7%AD%BE%E9%A1%B5/dbkaiojfbolnkpaegflocfbdgpmhjcco"><img src="https://img.shields.io/badge/Microsoft_Edge-Install-0078D4?style=for-the-badge&logo=microsoftedge&logoColor=white" alt="Install from Microsoft Edge Add-ons" /></a>
 </p>
 
 <p align="center">
@@ -15,7 +16,8 @@
 </p>
 
 <p align="center">
-  <a href="https://microsoftedge.microsoft.com/addons/detail/tabproject-%E6%96%B0%E6%A0%87%E7%AD%BE%E9%A1%B5/dbkaiojfbolnkpaegflocfbdgpmhjcco"><strong>Install from Edge Add-ons</strong></a> ·
+  <a href="https://chromewebstore.google.com/detail/tab-project-%E6%96%B0%E6%A0%87%E7%AD%BE%E9%A1%B5/hogpkihhicjhiakkgjkbchpdoicmbolj"><strong>Chrome Web Store</strong></a> ·
+  <a href="https://microsoftedge.microsoft.com/addons/detail/tabproject-%E6%96%B0%E6%A0%87%E7%AD%BE%E9%A1%B5/dbkaiojfbolnkpaegflocfbdgpmhjcco"><strong>Edge Add-ons</strong></a> ·
   <a href="https://github.com/kongzhuww/tab-project/releases/latest">Release Downloads</a> ·
   <a href="CHANGELOG.md">Changelog</a> ·
   <a href="#quick-guide-which-path-fits-you">Quick Start</a> ·
@@ -23,9 +25,13 @@
   <a href="#development">Development</a>
 </p>
 
-> **Core Concept**: `tab-project` is a browser new-tab workspace extension built with **Vue 3, TypeScript, and Chromium Manifest V3** (for Microsoft Edge and Google Chrome). It unifies frequently visited websites, bookmark kanban boards, daily tasks, and multimedia widgets—which are typically scattered across different tabs and apps—into a clean, responsive, theme-adaptive command center for your daily workflows.
+> **Core Concept**: `tab-project` is a browser new-tab workspace extension built with **Vue 3, TypeScript, and Chromium Manifest V3** (for Google Chrome and Microsoft Edge). It unifies frequently visited websites, bookmark kanban boards, daily tasks, and multimedia widgets—which are typically scattered across different tabs and apps—into a clean, responsive, theme-adaptive command center for your daily workflows.
 
-> **Now available on Microsoft Edge Add-ons**: [Install tab-project](https://microsoftedge.microsoft.com/addons/detail/tabproject-%E6%96%B0%E6%A0%87%E7%AD%BE%E9%A1%B5/dbkaiojfbolnkpaegflocfbdgpmhjcco) without Developer mode. Edge manages automatic updates for store installations. Each new version still requires a separate store submission and review; GitHub commits and releases do not immediately update the store version.
+> **Officially Available on Both Web Stores**:
+> - **Chrome Web Store**: [Install tab-project from Chrome Web Store](https://chromewebstore.google.com/detail/tab-project-%E6%96%B0%E6%A0%87%E7%AD%BE%E9%A1%B5/hogpkihhicjhiakkgjkbchpdoicmbolj) (ID: `hogpkihhicjhiakkgjkbchpdoicmbolj`)
+> - **Microsoft Edge Add-ons**: [Install tab-project from Edge Add-ons](https://microsoftedge.microsoft.com/addons/detail/tabproject-%E6%96%B0%E6%A0%87%E7%AD%BE%E9%A1%B5/dbkaiojfbolnkpaegflocfbdgpmhjcco)
+>
+> Store installations do not require Developer mode and benefit from browser-managed automated updates. Each new release requires store review; store updates may lag slightly behind GitHub commits and releases.
 
 > **Repository Version**: **1.0.9**, featuring Manifest permission minimization, immutable release safety, 51 offline regression tests, and full cleanup of legacy styles and residues. The store listing and installed version are authoritative for store users and may lag behind GitHub Releases. See the [Changelog](CHANGELOG.md) and [Release Notes](docs/RELEASE_1.0.9.md).
 
@@ -100,8 +106,10 @@ These screenshots use fictional demo data rather than personal tasks or collecti
 
 Choose the best path for your needs:
 
-- **Everyday Edge User**: [Install from Edge Add-ons](https://microsoftedge.microsoft.com/addons/detail/tabproject-%E6%96%B0%E6%A0%87%E7%AD%BE%E9%A1%B5/dbkaiojfbolnkpaegflocfbdgpmhjcco); no extraction or Developer mode required.
-- **Chrome / Manual Installation**: Read [Manual Installation: Prebuilt Release Packages](#manual-installation-prebuilt-release-packages).
+- **Everyday User (Recommended)**: Install directly from the official store with one click—no developer mode or manual extraction needed, with automatic updates:
+  - **Chrome Users**: [Install from Chrome Web Store](https://chromewebstore.google.com/detail/tab-project-%E6%96%B0%E6%A0%87%E7%AD%BE%E9%A1%B5/hogpkihhicjhiakkgjkbchpdoicmbolj).
+  - **Edge Users**: [Install from Edge Add-ons](https://microsoftedge.microsoft.com/addons/detail/tabproject-%E6%96%B0%E6%A0%87%E7%AD%BE%E9%A1%B5/dbkaiojfbolnkpaegflocfbdgpmhjcco).
+- **Manual / Release Zip**: Read [Manual Installation: Prebuilt Release Packages](#manual-installation-prebuilt-release-packages).
 - **Developer / Contributor**: Read [Building from Source](#building-from-source) and [Development Commands](#development).
 - **Self-Hosting Beaver Chatroom**: Read the [Private Chat Server Deployment Guide](server/private-chat/README.md).
 - **Mobile Support Inquiries**: The project focuses solely on desktop Chromium browsers (Edge / Chrome). Standalone Android / Capacitor builds are retired; the desktop layout features responsive mobile-width adaptation.
@@ -111,13 +119,19 @@ Choose the best path for your needs:
 
 ## 📦 Installation
 
-### Recommended: Install from Edge Add-ons
+### Recommended: Install from Official Web Stores (One-Click & Auto Updates)
 
+#### 1. Google Chrome Web Store
+1. Open [tab-project on Chrome Web Store](https://chromewebstore.google.com/detail/tab-project-%E6%96%B0%E6%A0%87%E7%AD%BE%E9%A1%B5/hogpkihhicjhiakkgjkbchpdoicmbolj).
+2. Click **Add to Chrome** and confirm adding the extension.
+3. Open a new tab. If Chrome displays a prompt asking to keep the change, select **Keep changes**.
+
+#### 2. Microsoft Edge Add-ons
 1. Open [tab-project on Microsoft Edge Add-ons](https://microsoftedge.microsoft.com/addons/detail/tabproject-%E6%96%B0%E6%A0%87%E7%AD%BE%E9%A1%B5/dbkaiojfbolnkpaegflocfbdgpmhjcco).
 2. Click **Get** and confirm adding the extension.
 3. Open a new tab. If Edge asks you to confirm the new-tab change, choose to keep this extension.
 
-No Developer mode is required. Edge manages future automatic updates. GitHub commits, GitHub Releases, and store review/publication are separate workflows, so store updates may arrive later.
+> **Tip**: Store installations require no Developer mode and are automatically updated by the browser store. GitHub commits, releases, and store reviews are independent, and store review timelines may cause slight delays.
 
 **Switching from an unpacked installation?** The store version may use a different extension ID and will not automatically inherit local data from the development installation. Export important settings first, keep the original installation, and confirm recovery before disabling it. Do not uninstall or clear the original data first.
 

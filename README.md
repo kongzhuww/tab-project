@@ -7,7 +7,8 @@
 <p align="center"><strong>以浏览器新标签页为核心的个人生产力工作台</strong></p>
 
 <p align="center">
-  <a href="https://microsoftedge.microsoft.com/addons/detail/tabproject-%E6%96%B0%E6%A0%87%E7%AD%BE%E9%A1%B5/dbkaiojfbolnkpaegflocfbdgpmhjcco"><img src="https://img.shields.io/badge/Microsoft_Edge-Install-0078D4?style=for-the-badge" alt="从 Microsoft Edge 商店安装" /></a>
+  <a href="https://chromewebstore.google.com/detail/tab-project-%E6%96%B0%E6%A0%87%E7%AD%BE%E9%A1%B5/hogpkihhicjhiakkgjkbchpdoicmbolj"><img src="https://img.shields.io/badge/Chrome_Web_Store-Install-4285F4?style=for-the-badge&logo=googlechrome&logoColor=white" alt="从 Chrome 网上应用店安装" /></a>
+  <a href="https://microsoftedge.microsoft.com/addons/detail/tabproject-%E6%96%B0%E6%A0%87%E7%AD%BE%E9%A1%B5/dbkaiojfbolnkpaegflocfbdgpmhjcco"><img src="https://img.shields.io/badge/Microsoft_Edge-Install-0078D4?style=for-the-badge&logo=microsoftedge&logoColor=white" alt="从 Microsoft Edge 商店安装" /></a>
 </p>
 
 <p align="center">
@@ -15,7 +16,8 @@
 </p>
 
 <p align="center">
-  <a href="https://microsoftedge.microsoft.com/addons/detail/tabproject-%E6%96%B0%E6%A0%87%E7%AD%BE%E9%A1%B5/dbkaiojfbolnkpaegflocfbdgpmhjcco"><strong>从 Edge 商店安装</strong></a> ·
+  <a href="https://chromewebstore.google.com/detail/tab-project-%E6%96%B0%E6%A0%87%E7%AD%BE%E9%A1%B5/hogpkihhicjhiakkgjkbchpdoicmbolj"><strong>Chrome 商店安装</strong></a> ·
+  <a href="https://microsoftedge.microsoft.com/addons/detail/tabproject-%E6%96%B0%E6%A0%87%E7%AD%BE%E9%A1%B5/dbkaiojfbolnkpaegflocfbdgpmhjcco"><strong>Edge 商店安装</strong></a> ·
   <a href="https://github.com/kongzhuww/tab-project/releases/latest">Release 下载</a> ·
   <a href="CHANGELOG.md">更新日志</a> ·
   <a href="#快速指引如何选择适合你的路径">快速起步</a> ·
@@ -23,9 +25,13 @@
   <a href="#开发">开发说明</a>
 </p>
 
-> **核心定位**：tab-project 是一个基于 **Vue 3、TypeScript 和 Chromium Manifest V3** 的浏览器新标签页工作台（面向 Edge / Chrome）。它优先解决**常用网站、书签看板、日常任务和多媒体工具分散在多个页面**的割裂痛点，在一个清爽、自适应主题的统一界面中聚合高频工作流。
+> **核心定位**：tab-project 是一个基于 **Vue 3、TypeScript 和 Chromium Manifest V3** 的浏览器新标签页工作台（面向 Chrome / Edge）。它优先解决**常用网站、书签看板、日常任务和多媒体工具分散在多个页面**的割裂痛点，在一个清爽、自适应主题的统一界面中聚合高频工作流。
 
-> **已上架 Microsoft Edge 加载项商店**：[安装 tab-project 新标签页](https://microsoftedge.microsoft.com/addons/detail/tabproject-%E6%96%B0%E6%A0%87%E7%AD%BE%E9%A1%B5/dbkaiojfbolnkpaegflocfbdgpmhjcco)，无需开启开发者模式。商店安装由 Edge 管理自动更新；每次新版本仍需单独提交商店审核，GitHub 提交或 Release 不会立即更新商店版。
+> **已双端上架官方应用商店**：
+> - **Chrome 网上应用店**：[安装 tab-project 新标签页](https://chromewebstore.google.com/detail/tab-project-%E6%96%B0%E6%A0%87%E7%AD%BE%E9%A1%B5/hogpkihhicjhiakkgjkbchpdoicmbolj)（ID: `hogpkihhicjhiakkgjkbchpdoicmbolj`）
+> - **Microsoft Edge 加载项商店**：[安装 tab-project 新标签页](https://microsoftedge.microsoft.com/addons/detail/tabproject-%E6%96%B0%E6%A0%87%E7%AD%BE%E9%A1%B5/dbkaiojfbolnkpaegflocfbdgpmhjcco)
+>
+> 商店安装由浏览器官方托管安全检查与自动更新，无需开启开发者模式。每次新版本仍需单独提交各商店审核，GitHub 提交或 Release 与商店版可能存在发布时间差。
 
 > **仓库版本**：**1.0.9**，实现 Manifest 权限收敛与退役域名清理、不可变发布防护、51 项回归测试套件，并全面收口历史样式与废弃代码。商店版本以商店页面及实际安装版本为准，可能与 GitHub Release 存在时间差。详见 [更新日志](CHANGELOG.md)及[发行说明](docs/RELEASE_1.0.9.md)。
 
@@ -90,8 +96,10 @@
 
 根据你的使用场景，选择最适合的指引快速起步：
 
-- **Edge 日常使用**：推荐直接[从 Edge 商店安装](https://microsoftedge.microsoft.com/addons/detail/tabproject-%E6%96%B0%E6%A0%87%E7%AD%BE%E9%A1%B5/dbkaiojfbolnkpaegflocfbdgpmhjcco)，无需下载解压或开启开发者模式。
-- **Chrome 或手动安装**：阅读 [手动安装：使用 Release 下载包](#手动安装使用-release-下载包)。
+- **日常使用（推荐）**：直接从官方商店一键安装，无需解压或开启开发者模式，支持静默自动更新：
+  - **Chrome 用户**：推荐直接[从 Chrome 网上应用店安装](https://chromewebstore.google.com/detail/tab-project-%E6%96%B0%E6%A0%87%E7%AD%BE%E9%A1%B5/hogpkihhicjhiakkgjkbchpdoicmbolj)。
+  - **Edge 用户**：推荐直接[从 Edge 加载项商店安装](https://microsoftedge.microsoft.com/addons/detail/tabproject-%E6%96%B0%E6%A0%87%E7%AD%BE%E9%A1%B5/dbkaiojfbolnkpaegflocfbdgpmhjcco)。
+- **手动安装或尝鲜 Release**：阅读 [手动安装：使用 Release 下载包](#手动安装使用-release-下载包)。
 - **想参与功能开发或本地修改**：请阅读 [从源码构建](#从源码构建) 与 [本地开发指令](#开发)。
 - **想部署或接入海狸私有聊天室**：请阅读 [私有聊天室服务端部署指南](server/private-chat/README.md)。
 - **想了解移动端状况**：当前项目仅专注维护桌面 Chromium 扩展（Edge / Chrome），独立 Android / Capacitor 移动应用已退役归档，无需单独构建；桌面窗口已内置窄屏自适应布局。
@@ -99,13 +107,19 @@
 
 ## 安装
 
-### 推荐：从 Edge 商店安装
+### 推荐：从官方应用商店安装（一键安装 & 自动更新）
 
+#### 1. Google Chrome 商店
+1. 打开 [tab-project 新标签页 · Chrome 网上应用店](https://chromewebstore.google.com/detail/tab-project-%E6%96%B0%E6%A0%87%E7%AD%BE%E9%A1%B5/hogpkihhicjhiakkgjkbchpdoicmbolj)。
+2. 点击“添加至 Chrome”，按浏览器提示确认添加扩展。
+3. 打开新标签页；若 Chrome 弹出提示询问是否保留新标签页更改，点击“保留更改”。
+
+#### 2. Microsoft Edge 商店
 1. 打开 [tab-project 新标签页 · Microsoft Edge 加载项商店](https://microsoftedge.microsoft.com/addons/detail/tabproject-%E6%96%B0%E6%A0%87%E7%AD%BE%E9%A1%B5/dbkaiojfbolnkpaegflocfbdgpmhjcco)。
 2. 点击“获取”，按浏览器提示确认添加扩展。
 3. 打开新标签页；若 Edge 提示确认新标签页更改，请确认保留本扩展。
 
-商店安装无需开发者模式，后续通过 Edge 自动更新。GitHub 的源码提交、Release 发布与商店审核发布是独立流程，商店版可能稍晚上线。
+> **提示**：商店安装无需开发者模式，后续由浏览器官方商店自动更新。GitHub 的源码提交、Release 发布与商店审核发布是独立流程，各平台审核周期不同，商店版更新上线可能略有差异。
 
 **已有解压安装用户**：商店版可能使用不同的扩展 ID，不会自动继承开发版的本地数据。切换前请先导出重要配置，保留原安装，确认可恢复后再停用旧版；不要先卸载或清空原数据。
 
