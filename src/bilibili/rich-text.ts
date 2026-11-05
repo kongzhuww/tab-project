@@ -85,8 +85,8 @@ export function parseBiliRichText(
 
   const pattern = new RegExp(
     [
-      // 1. 标准 HTTP/HTTPS 链接
-      "(https?:\\/\\/[^\\s\\u4e00-\\u9fa5<>\"'()\\[\\]]+)",
+      // 1. 标准 HTTP/HTTPS 链接（或常见裸域名如 github.com/xxx, bilibili.com/xxx）
+      "((?:https?:\\/\\/|(?<![\\w@])(?:[a-zA-Z0-9-]+\\.)+(?:com|cn|net|org|io|me|cc|tv|xyz|top|app|dev|site|vip)(?:\\/[^\\s\\u4e00-\\u9fa5<>\"'()\\[\\]]*)?)[^\\s\\u4e00-\\u9fa5<>\"'()\\[\\]]*)",
       // 2. GitHub 仓库标记文本: GitHub - user/repo 或 GitHub: user/repo
       "(GitHub\\s*[-–—:]\\s*([A-Za-z0-9_.\\-]+)\\/([A-Za-z0-9_.\\-]+))",
       // 3. B站视频号: BV 或 av
@@ -107,10 +107,11 @@ export function parseBiliRichText(
     }
 
     if (match[1]) {
-      // 标准链接
+      // 标准链接或自动补齐 https:// 协议的网页链接
       const raw = match[1];
       const cleaned = raw.replace(TRAILING_PUNCTUATION_REGEX, "");
-      tokens.push({ type: "link", text: cleaned, url: cleaned });
+      const fullUrl = /^https?:\/\//i.test(cleaned) ? cleaned : `https://${cleaned}`;
+      tokens.push({ type: "link", text: cleaned, url: fullUrl });
       if (cleaned.length < raw.length) {
         tokens.push({ type: "text", text: raw.slice(cleaned.length) });
       }

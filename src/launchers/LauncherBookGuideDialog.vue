@@ -1,9 +1,14 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from "vue";
+import type { GuideSpread } from "./book-guide-types";
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   open: boolean;
-}>();
+  title?: string;
+  spreads?: GuideSpread[];
+  helpSelector?: string;
+}>(), { title: "常用网站使用手册", helpSelector: ".launcher-page-help" });
+const bookCaseRef = ref<HTMLElement | null>(null);
 
 const emit = defineEmits<{
   (e: "close"): void;
@@ -11,25 +16,7 @@ const emit = defineEmits<{
 
 const currentSpreadIndex = ref(0);
 
-interface PageTopic {
-  tag: string;
-  title: string;
-  badge?: string;
-  steps: {
-    icon: string;
-    title: string;
-    desc: string;
-    tip?: string;
-  }[];
-}
-
-interface Spread {
-  chapterTitle: string;
-  left: PageTopic;
-  right: PageTopic;
-}
-
-const spreads: Spread[] = [
+const defaultSpreads: GuideSpread[] = [
   {
     chapterTitle: "基础篇 · 文件夹与整理",
     left: {
@@ -130,7 +117,8 @@ const spreads: Spread[] = [
   }
 ];
 
-const currentSpread = computed(() => spreads[currentSpreadIndex.value] || spreads[0]);
+const spreads = computed(() => props.spreads?.length ? props.spreads : defaultSpreads);
+const currentSpread = computed(() => spreads.value[currentSpreadIndex.value] || spreads.value[0]);
 
 function prevSpread() {
   if (currentSpreadIndex.value > 0) {
@@ -139,7 +127,7 @@ function prevSpread() {
 }
 
 function nextSpread() {
-  if (currentSpreadIndex.value < spreads.length - 1) {
+  if (currentSpreadIndex.value < spreads.value.length - 1) {
     currentSpreadIndex.value++;
   }
 }
@@ -159,8 +147,8 @@ function onWindowPointerDown(e: PointerEvent) {
   if (!props.open) return;
   const target = e.target as HTMLElement | null;
   // 点击问号按钮本身时不重复处理
-  if (target?.closest(".launcher-page-help")) return;
-  const bookEl = document.querySelector(".launcher-book-case");
+  if (target?.closest(props.helpSelector)) return;
+  const bookEl = bookCaseRef.value;
   if (bookEl && !bookEl.contains(target as Node)) {
     emit("close");
   }
@@ -185,9 +173,9 @@ onUnmounted(() => {
         v-if="open"
         class="launcher-book-window"
         role="region"
-        aria-label="常用网站使用手册"
+        :aria-label="title"
       >
-        <div class="launcher-book-case">
+        <div ref="bookCaseRef" class="launcher-book-case">
           <!-- 书本顶部装饰丝带与关闭 -->
           <button
             type="button"

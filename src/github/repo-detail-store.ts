@@ -6,6 +6,7 @@ import { ReadSessionSlot } from "../core/read-session";
 import { markdownAstEngine } from "../utils/markdown-ast";
 import { GitHubDetailReadError, readRepositoryDocument, readRepositorySpecificDocument } from "./detail-read";
 import { githubTaskCreation } from "../todoist/github-task-target";
+import { prepareReadmeHtml } from "./readme-html";
 
 export interface RepoHeadingItem {
   id: string;
@@ -177,9 +178,11 @@ export function formatTimeAgo(isoString: string): string {
 
 class GitHubRepoDetailController {
   private readonly reads = new ReadSessionSlot();
+  private readonly documentCache = new Map<string, { savedAt: number; snapshot: RepoDetailState }>();
   private pageActive = typeof document !== "undefined" && !document.hidden;
   private watchingAccount = false;
   private invalidateAccount = (): void => {
+    this.documentCache.clear();
     if (!state.isOpen) return;
     this.stopReading(); ++state.revision;
     state.readmeMarkdown = ""; state.readmeHtml = ""; state.headings = [];
@@ -209,6 +212,7 @@ class GitHubRepoDetailController {
     if (githubTaskCreation.saving) return;
     const fullName = repoName ? `${fullNameOrOwner.trim()}/${repoName.trim()}` : fullNameOrOwner.trim();
     if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(fullName) || fullName.split("/").some(part => part === "." || part === "..")) return;
+    if (state.isOpen && state.fullName.toLowerCase() === fullName.toLowerCase() && state.isLoading) return;
     this.stopReading(); this.watchAccount();
     ++state.revision;
     const [owner, repo] = fullName.split("/");
@@ -225,8 +229,18 @@ class GitHubRepoDetailController {
       readmeMarkdown: "", readmeHtml: "", headings: [], isZh: false,
       hasReadme: false, notice: "", error: null
     });
-    if (this.pageActive) void this.readOnOpen();
-    else state.error = "读取已暂停，请返回页面后重新打开仓库详情。";
+    const cached = this.documentCache.get(fullName.toLowerCase());
+    if (cached && Date.now() - cached.savedAt < 5 * 60 * 1000) {
+      Object.assign(state, cached.snapshot, { isOpen: true, revision: state.revision, isLoading: false, error: null });
+    } else void this.readOnOpen();
+  }
+
+  private cacheDocument(): void {
+    if (!state.hasReadme) return;
+    const key = state.fullName.toLowerCase();
+    this.documentCache.delete(key);
+    this.documentCache.set(key, { savedAt: Date.now(), snapshot: { ...state, topics: [...state.topics], headings: [...state.headings] } });
+    if (this.documentCache.size > 8) this.documentCache.delete(this.documentCache.keys().next().value!);
   }
 
   private stopReading(): void {
@@ -235,24 +249,23 @@ class GitHubRepoDetailController {
 
   public close(): void {
     if (githubTaskCreation.saving) return;
-    this.stopReading(); this.unwatchAccount(); ++state.revision; state.isOpen = false;
+    this.stopReading(); ++state.revision; state.isOpen = false;
+    // Keep the singleton account listener so closed-detail caches also invalidate.
   }
 
   public setPageActive(active: boolean): void {
     this.pageActive = active;
-    if (!active && this.reads.pending) {
-      this.stopReading();
-      state.error = "读取已暂停，请返回页面后重新打开仓库详情。";
-    }
+    // Hidden pages may finish read-only work. Close, replacement and account
+    // changes still cancel requests and reject late results.
   }
 
   private async readOnOpen(): Promise<void> {
-    if (!state.isOpen || !this.pageActive || state.isLoading) return;
+    if (!state.isOpen || state.isLoading) return;
     const revision = ++state.revision;
     const { owner, repo } = state;
     const request = this.reads.begin({
       timeoutMs: 45000,
-      isCurrent: () => state.isOpen && this.pageActive && state.revision === revision,
+      isCurrent: () => state.isOpen && state.revision === revision,
       onStop: reason => {
         state.isLoading = false;
         if (reason === "timeout") state.error = "README 读取超过整体 45 秒上限，请重新打开仓库详情。";
@@ -269,7 +282,7 @@ class GitHubRepoDetailController {
       // 双保险：优先使用官方权威预渲染 HTML，若官方未返回则无缝使用本地 markdownAstEngine 渲染
       const html = (result.html && result.html.trim().length > 30)
         ? result.html
-        : markdownAstEngine.renderMarkdown(markdown, { renderMode: "rendered" });
+        : markdownAstEngine.renderMarkdown(markdown, { renderMode: "rendered", linkMode: "web" });
       if (!current()) return;
       const data = result.metadata;
       if (data) {
@@ -283,8 +296,10 @@ class GitHubRepoDetailController {
         state.topics = Array.isArray(data.topics) ? data.topics.filter((t: unknown) => typeof t === "string") : [];
       }
       state.defaultBranch = result.branch; state.isZh = result.isZh; state.notice = result.notice;
-      state.readmeMarkdown = markdown; state.readmeHtml = html;
+      state.readmeMarkdown = markdown;
+      state.readmeHtml = prepareReadmeHtml(html, owner, repo, result.branch, result.path);
       state.headings = extractHeadings(markdown); state.hasReadme = true;
+      this.cacheDocument();
     } catch (error) {
       if (current()) state.error = error instanceof GitHubDetailReadError ? error.message
         : request.signal.aborted ? "README 读取已取消或超过整体 45 秒上限，请重新打开仓库详情。"
@@ -312,7 +327,7 @@ class GitHubRepoDetailController {
     const revision = ++state.revision;
     const request = this.reads.begin({
       timeoutMs: 30000,
-      isCurrent: () => state.isOpen && this.pageActive && state.revision === revision,
+      isCurrent: () => state.isOpen && state.revision === revision,
       onStop: () => { state.isLoading = false; }
     });
 
@@ -324,13 +339,14 @@ class GitHubRepoDetailController {
       const markdown = cleanAndNormalizeReadme(result.markdown, owner, repo, defaultBranch, result.path);
       const html = (result.html && result.html.trim().length > 30)
         ? result.html
-        : markdownAstEngine.renderMarkdown(markdown, { renderMode: "rendered" });
+        : markdownAstEngine.renderMarkdown(markdown, { renderMode: "rendered", linkMode: "web" });
 
       state.isZh = result.isZh;
       state.readmeMarkdown = markdown;
-      state.readmeHtml = html;
+      state.readmeHtml = prepareReadmeHtml(html, owner, repo, defaultBranch, result.path);
       state.headings = extractHeadings(markdown);
       state.hasReadme = true;
+      this.cacheDocument();
     } catch (error: any) {
       if (request.current()) {
         state.notice = `切换文档版本失败: ${error?.message || "未找到目标文档"}`;

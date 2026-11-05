@@ -36,7 +36,6 @@ export type GitHubTrendingActionHandler = (action: GitHubTrendingAction, payload
 const actionHandlers = new Set<GitHubTrendingActionHandler>();
 let viewSignal: AbortSignal | undefined;
 const reads = new ReadSessionSlot();
-let attempted = false;
 
 async function readThirdPartyJson(url: string, parent: AbortSignal): Promise<any> {
   parent.throwIfAborted();
@@ -114,24 +113,13 @@ async function fetchRepos(days: number, signal: AbortSignal): Promise<{ repos: G
 
 export const gitHubTrendingController = {
   get state() { return gitHubTrendingState; },
-  // Only a mounted, visible View may own network work. Returning keeps the
-  // previous result/error; an interrupted request requires explicit refresh.
+  // View attachment permits starting reads; detaching does not cancel an
+  // already requested read. Range changes still replace the old session.
   attachView(signal: AbortSignal): () => void {
-    reads.cancel(); gitHubTrendingState.isLoading = false;
     viewSignal = signal;
-    const cancel = () => {
-      if (viewSignal !== signal) return;
-      if (reads.pending) {
-        reads.cancel();
-        gitHubTrendingState.isLoading = false;
-        gitHubTrendingState.errorMessage = "读取已暂停，返回后可点击刷新。";
-      }
-    };
-    signal.addEventListener("abort", cancel, { once: true });
-    if (!signal.aborted && !attempted) void this.refresh();
+    if (!signal.aborted && !gitHubTrendingState.hasLoaded && !reads.pending) void this.refresh();
     return () => {
-      signal.removeEventListener("abort", cancel);
-      if (viewSignal === signal) { cancel(); viewSignal = undefined; }
+      if (viewSignal === signal) viewSignal = undefined;
     };
   },
   switchTab(tab: "stars" | "trending") {
@@ -153,8 +141,8 @@ export const gitHubTrendingController = {
     if (!parent || parent.aborted || gitHubTrendingState.isLoading) return;
     const days = gitHubTrendingState.sinceDays;
     const own = reads.begin({
-      signal: parent, timeoutMs: 45000,
-      isCurrent: () => viewSignal === parent && gitHubTrendingState.sinceDays === days,
+      timeoutMs: 45000,
+      isCurrent: () => gitHubTrendingState.sinceDays === days,
       onStop: reason => {
         gitHubTrendingState.isLoading = false;
         if (reason === "timeout") gitHubTrendingState.errorMessage = "数据源读取超过整体45秒上限，请手动刷新；没有继续请求备用源。";
@@ -162,7 +150,6 @@ export const gitHubTrendingController = {
     });
     const current = own.current;
     if (!current()) return;
-    attempted = true;
     gitHubTrendingState.isLoading = true; gitHubTrendingState.errorMessage = "";
     try {
       const result = await own.wait(() => fetchRepos(days, own.signal));

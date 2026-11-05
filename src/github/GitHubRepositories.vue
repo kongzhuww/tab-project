@@ -260,7 +260,7 @@ const isLoading = computed(() => {
               v-for="folderName in card.folders"
               :key="folderName"
               class="gh-badge-folder"
-              :title="`GitHub 列表：${folderName}（点击管理所属列表）`"
+              :title="`本地分组：${folderName}（点击管理所属列表）`"
               @click.stop="openCategoryPickerDirectly(card, $event)"
             >
               📁 {{ folderName }}
@@ -269,7 +269,7 @@ const isLoading = computed(() => {
           <span
             v-else
             class="gh-badge-folder uncat"
-            title="未分类（点击加入 GitHub 列表）"
+            title="未分类（点击加入 本地分组）"
             @click.stop="openCategoryPickerDirectly(card, $event)"
           >
             ＋ 未分类
@@ -319,14 +319,14 @@ const isLoading = computed(() => {
       @click.stop
       @contextmenu.prevent
     >
-      <!-- 1. 所属 GitHub 列表（悬停即展开子菜单） -->
+      <!-- 1. 所属 本地分组（悬停即展开子菜单） -->
       <div
         class="gh-menu-has-sub"
         :class="{ 'is-active': activeSubMenu === 'folder' }"
         @mouseenter="activeSubMenu = 'folder'"
       >
         <button class="fo-cover-menu-item with-sub-arrow" type="button">
-          <span>📁 所属 GitHub 列表</span>
+          <span>📁 所属 本地分组</span>
           <span class="sub-arrow">›</span>
         </button>
         <!-- 侧边级联飞出子菜单 -->

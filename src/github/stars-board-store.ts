@@ -2,23 +2,22 @@
  * Star Repositories Kanban Board Store
  * Star 收藏多列看板响应式数据模型
  * - 顶部未分类 Star 仓库（单排 10 个一页，支持滑至末尾快捷卡片与顶栏翻页器）
- * - 下方各 GitHub 原生 Lists 横向多列看板
- * - 拖拽就地归类，实时与 GitHub 官方 Lists GraphQL 同步
+ * - 下方各本地分组横向多列看板
+ * - 收藏从 GitHub 读取，拖拽归类只保存到本机
  */
 
 import { reactive, computed } from "vue";
 import { gitHubService, type GitHubRawRepo } from "../services/github.service";
+import { starBoardData, getStarBoardRepoFolders } from "./stars-board-data";
 
 interface StarBoardState {
   uncatPage: number;
   pageSize: number; // 默认 10 个一页
-  searchQuery: string;
 }
 
 export const starBoardState = reactive<StarBoardState>({
   uncatPage: 1,
-  pageSize: 10,
-  searchQuery: ""
+  pageSize: 10
 });
 
 export class StarBoardController {
@@ -61,8 +60,8 @@ export class StarBoardController {
    * 未分类的所有 Star 仓库（带搜索过滤）
    */
   public get filteredUncatRepos(): GitHubRawRepo[] {
-    const q = starBoardState.searchQuery.trim().toLowerCase();
-    const list = gitHubService.repos.filter(r => gitHubService.getRepoFolders(r.full_name).length === 0);
+    const q = starBoardData.searchQuery.trim().toLowerCase();
+    const list = starBoardData.repos.filter(r => getStarBoardRepoFolders(r.full_name).length === 0);
     if (!q) return list;
     return list.filter(r =>
       r.full_name.toLowerCase().includes(q) ||
@@ -83,18 +82,19 @@ export class StarBoardController {
   }
 
   /**
-   * 各个 GitHub 原生 Lists 板块列表
+   * 各个本地分组板块列表（根据当前激活的大分组标签过滤）
    */
   public get lists() {
-    return gitHubService.lists;
+    const sec = starBoardData.activeSection || "默认";
+    return starBoardData.lists.filter(l => (l.section || "默认") === sec);
   }
 
   /**
    * 获取归属于指定 GitHub List 的 Star 仓库（带搜索过滤）
    */
   public getReposForList(listName: string): GitHubRawRepo[] {
-    const q = starBoardState.searchQuery.trim().toLowerCase();
-    const list = gitHubService.repos.filter(r => gitHubService.getRepoFolders(r.full_name).includes(listName));
+    const q = starBoardData.searchQuery.trim().toLowerCase();
+    const list = starBoardData.repos.filter(r => getStarBoardRepoFolders(r.full_name).includes(listName));
     if (!q) return list;
     return list.filter(r =>
       r.full_name.toLowerCase().includes(q) ||

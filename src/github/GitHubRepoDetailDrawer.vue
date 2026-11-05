@@ -90,6 +90,19 @@ async function copyText(text: string, label: string) {
   if (current()) copyTimer = setTimeout(() => { if (current()) copyStatus.value = ""; }, 2000);
 }
 
+function handleImageError(event: Event) {
+  const img = event.target;
+  if (!(img instanceof HTMLImageElement)) return;
+  const fallback = img.getAttribute("data-readme-fallback");
+  if (fallback) {
+    img.removeAttribute("data-readme-fallback");
+    img.src = fallback;
+    return;
+  }
+  img.classList.add("gh-image-unavailable");
+  img.title = `图片加载失败（可能是源站不可达或私有资源）：${img.getAttribute("src") || "无地址"}`;
+}
+
 function handleArticleClick(e: MouseEvent) {
   const target = e.target as HTMLElement | null;
   const img = target?.closest("img") as HTMLImageElement | null;
@@ -104,6 +117,14 @@ function handleArticleClick(e: MouseEvent) {
     const rawHref = link.getAttribute("href") || "";
     // 1. 内部页面锚点 (#heading)
     if (rawHref.startsWith("#")) {
+      e.preventDefault();
+      e.stopPropagation();
+      let id = rawHref.slice(1);
+      try { id = decodeURIComponent(id); } catch {}
+      const container = readmeContainerRef.value;
+      const destination = Array.from(container?.querySelectorAll("[id], a[name]") || []).find(el =>
+        el.id === id || el.id === `user-content-${id}` || el.getAttribute("name") === id);
+      destination?.scrollIntoView({ behavior: "smooth", block: "start" });
       return;
     }
 
@@ -127,7 +148,7 @@ function handleArticleClick(e: MouseEvent) {
     }
 
     // 4. 普通超链接：在浏览器新标签页安全打开 (过滤掉可能导致本地 404 的 chrome-extension:// 链接)
-    if (link.href && !link.href.startsWith("chrome-extension://")) {
+    if (/^(https?:|mailto:)/i.test(link.href)) {
       e.preventDefault();
       e.stopPropagation();
       window.open(link.href, "_blank", "noopener,noreferrer");
@@ -349,6 +370,7 @@ onUnmounted(() => {
           v-else
           ref="readmeContainerRef"
           class="gh-readme-rendered markdown-rendered allow-copy"
+          @error.capture="handleImageError"
           v-html="state.readmeHtml"
           @click="handleArticleClick"
         ></article>
@@ -840,6 +862,12 @@ onUnmounted(() => {
   border-radius: 6px;
   margin: 8px auto;
   display: block;
+}
+
+.gh-readme-rendered :deep(.gh-image-unavailable) {
+  border: 1px dashed var(--border);
+  color: var(--muted);
+  font-size: 12px;
 }
 
 /* GitHub 官方预渲染 HTML 特征元素适配 */

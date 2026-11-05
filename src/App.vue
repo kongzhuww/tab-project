@@ -168,6 +168,7 @@ const activeWorkspaceId = computed(() => activeViewId.value === "home" ? "" : ac
 
 watch(() => fullscreenCardState.activeId, (id) => {
   document.body.classList.toggle("has-card-fullscreen", Boolean(id));
+  document.body.dataset.page = id ? "daily" : "home";
 }, { immediate: true, flush: "sync" });
 
 onMounted(() => {

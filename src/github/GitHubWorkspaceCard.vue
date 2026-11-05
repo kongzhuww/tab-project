@@ -20,6 +20,8 @@ import {
   gitHubNotificationsController
 } from "./github-notifications-store";
 const GitHubSettingsModal = defineAsyncComponent(() => import("./GitHubSettingsModal.vue"));
+const GitHubBookGuide = defineAsyncComponent(() => import("../launchers/LauncherBookGuideDialog.vue"));
+import { githubGuideSpreads } from "./guide-content";
 import { gitHubService, type GitHubSearchRule } from "../services/github.service";
 import { fullscreenCardState } from "../core/fullscreen-card-state";
 import { gitHubTrendingController } from "./trending-store";
@@ -38,6 +40,8 @@ const isChannelsCollapsed = ref(false);
 const searchScope = ref<"local" | "global">("local");
 const searchText = ref("");
 const isSettingsOpen = ref(false);
+const isGuideOpen = ref(false);
+watch(active, visible => { if (!visible) isGuideOpen.value = false; });
 const aiSettingsRequest = ref(0);
 function openAiSettings() {
   if (!active.value) return;
@@ -122,22 +126,23 @@ function onAccountReload() {
   initialError.value = "";
 }
 watch(active, async visible => {
-  const version = ++initialVersion;
   clearTimeout(searchTimer);
-  repositoryReadScope?.abort();
-  repositoryReadScope = new AbortController();
-  if (!visible) repositoryReadScope.abort();
-  gitHubService.setRepositoryViewSignal(repositoryReadScope.signal);
   if (!visible) return;
+  const version = ++initialVersion;
+  // The mounted workspace, not its visibility, owns repository reads.
+  if (!repositoryReadScope || repositoryReadScope.signal.aborted) {
+    repositoryReadScope = new AbortController();
+    gitHubService.setRepositoryViewSignal(repositoryReadScope.signal);
+  }
   if (initialized) { await gitHubService.resumeRepositoryReads(); return; }
   if (gitHubService.repos.length || gitHubService.loadingAllStars || gitHubService.loadingPage) { initialized = true; return; }
   try {
     const account = await loadGitHubAccountSettings();
-    if (!active.value || version !== initialVersion) return;
+    if (version !== initialVersion || repositoryReadScope.signal.aborted) return;
     initialized = true;
     await gitHubService.loadGitHub(account.ghUser, account.ghToken);
   } catch {
-    if (!active.value || version !== initialVersion) return;
+    if (version !== initialVersion || repositoryReadScope?.signal.aborted) return;
     initialized = false;
     initialError.value = t("github.initError");
   }
@@ -343,8 +348,8 @@ onBeforeUnmount(() => { gitHubService.setAiViewActive(false); ++initialVersion; 
             </div>
             <button class="fo-sidebar-add" id="gh-folder-add-btn" type="button" :title="t('github.lists.new')" :aria-label="t('github.lists.new')" @click="gitHubService.promptCreateFolder()">＋</button>
           </header>
-          <nav class="gh-bili-folder-list" id="gh-folder-list" @click="handleSelectFolder">
-            <GitHubFolders :active="active" />
+          <nav class="gh-bili-folder-list" id="gh-folder-list">
+            <GitHubFolders :active="active" @select="handleSelectFolder" />
           </nav>
         </aside>
 
@@ -360,7 +365,7 @@ onBeforeUnmount(() => { gitHubService.setAiViewActive(false); ++initialVersion; 
           />
           <template v-else-if="activeChannel === 'stars'">
             <header class="gh-bili-hero" id="gh-hero">
-              <GitHubHero @open-ai-settings="openAiSettings" />
+              <GitHubHero @open-ai-settings="openAiSettings" @open-guide="isGuideOpen = true" />
             </header>
             <div id="vue-github-repositories-root" style="flex: 1; min-height: 0; display: flex; flex-direction: column;">
               <GitHubStarsBoard :active="active && activeChannel === 'stars'" />
@@ -384,6 +389,7 @@ onBeforeUnmount(() => { gitHubService.setAiViewActive(false); ++initialVersion; 
         </section>
       </div>
     </div>
+    <GitHubBookGuide v-if="isGuideOpen" :open="isGuideOpen" title="GitHub 使用手册" :spreads="githubGuideSpreads" help-selector=".gh-github-help-btn" @close="isGuideOpen = false" />
     <!-- GitHub 消息与通知中心弹窗 -->
     <GitHubNotificationPanel />
     <!-- GitHub 消息通知详情抽屉 -->

@@ -71,6 +71,8 @@ function escapeAttr(str: string): string {
 
 export interface MarkdownRenderOptions {
   renderMode?: "rendered" | "md" | string;
+  /** Web README links are not Obsidian note links; caller sanitizes HTML. */
+  linkMode?: "web";
 }
 
 export interface FootnoteDefinition {
@@ -381,7 +383,7 @@ export class MarkdownAstEngine {
 
   public inlineMarkdown(
     value: string,
-    options: { renderMode?: string; footnotesContext?: { definitions: Map<string, FootnoteDefinition>; references: Map<string, number> } } = {}
+    options: { renderMode?: string; linkMode?: "web"; footnotesContext?: { definitions: Map<string, FootnoteDefinition>; references: Map<string, number> } } = {}
   ): string {
     const code: string[] = [];
     const semanticSpans: string[] = [];
@@ -414,6 +416,10 @@ export class MarkdownAstEngine {
 
     // 保护合法白名单 HTML 标签不被 escapeHtml 转义（支持 GitHub README 常见的原生 HTML）
     const safeHtmlTokens: string[] = [];
+    if (options.linkMode === "web") {
+      text = text.replace(/<\/?(?:a|img)\b[^>]*\/?>/gi, tag =>
+        `\u0000HTML${safeHtmlTokens.push(tag) - 1}\u0000`);
+    }
     text = text.replace(/<\/?(?:h[1-6]|p|div|span|hr|br|sup|sub|strong|b|em|i|u|s|del|kbd|details|summary|table|thead|tbody|tr|th|td|ul|ol|li|picture|source)\b[^>]*\/?>/gi, (tag) => {
       if (/on\w+\s*=/i.test(tag) || /javascript:/i.test(tag)) {
         return "";
@@ -457,9 +463,12 @@ export class MarkdownAstEngine {
     // 标准链接 [label](target)
     text = text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, label, target) => {
       const cleanTarget = target.trim();
-      if (/\.md(?:#.*)?$/i.test(cleanTarget)) {
+      if (options.linkMode !== "web" && /\.md(?:#.*)?$/i.test(cleanTarget)) {
         const noteTarget = cleanTarget.split("#")[0].replace(/\\/g, "/").split("/").pop()?.replace(/\.md$/i, "") || cleanTarget;
         return `<a class="obs-wikilink" href="#" data-target="${escapeAttr(noteTarget)}">${label}</a>`;
+      }
+      if (options.linkMode === "web" && cleanTarget.startsWith("#")) {
+        return `<a href="${escapeAttr(cleanTarget)}">${label}</a>`;
       }
       if (/^https?:\/\//i.test(cleanTarget) || /^mailto:/i.test(cleanTarget)) {
         return `<a class="obs-external-link" href="${escapeAttr(cleanTarget)}" target="_blank" rel="noopener noreferrer">${label}</a>`;

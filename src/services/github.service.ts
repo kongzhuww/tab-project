@@ -6,6 +6,7 @@
  */
 
 import { githubStatusController } from "../github/store";
+import { starBoardData } from "../github/stars-board-data";
 import { githubFolderController, type GitHubFolderView } from "../github/folders";
 import { githubHeroController } from "../github/hero";
 import { githubRepositoryController, type GitHubRepositoryCardView } from "../github/repositories";
@@ -13,14 +14,8 @@ import { githubBatchBarController } from "../github/batch-bar";
 import { githubRepoDetailController } from "../github/repo-detail-store";
 import { storageCache } from "./storage-cache.service";
 import { categoryFeedback, type CategoryData } from "../github/category-storage";
-import {
-  fetchGitHubUserLists,
-  createGitHubUserList,
-  deleteGitHubUserList,
-  updateGitHubItemLists,
-  type GitHubUserList,
-  type GitHubListsSnapshot
-} from "../github/lists-client";
+import type { GitHubUserList } from "../github/lists-client";
+import { loadLocalStarGroups, changeLocalStarGroups, projectLocalStarGroups, addLocalGroup, removeLocalGroup, renameLocalGroup, pinLocalGroup, togglePinLocalGroup, reorderLocalGroups, assignLocalGroup, addSection, removeSection, setActiveSection, type LocalStarGroups } from "../github/local-star-groups";
 import { githubAiJob } from "../github/ai-job";
 import { REPOSITORY_DRAG_TYPE } from "../github/repository-drag";
 import { readAiReadme, requestGitHubAi, parseGitHubAiOutput } from "../github/ai-request";
@@ -119,7 +114,8 @@ export class GitHubService {
     this.readSession?.controller.abort();
     this.readSession = undefined;
     ++this.pageReadVersion;
-    this.loadingPage = 0; this.loadingAllStars = false; this.initializing = false;
+    this.loadingPage = 0; this.loadingAllStars = false; this.initializing = false; this.listsLoading = false;
+    this.publishBoardLoading();
   }
 
   private getReadSession(): GitHubReadSession | undefined {
@@ -148,7 +144,7 @@ export class GitHubService {
   }
 
   public async resumeRepositoryReads(): Promise<void> {
-    if (this.viewReadSignal?.aborted || this.starWrites || this.starVerificationSession === this.readSession && this.verifyingStars) return;
+    if (this.initializing || this.loadingPage || this.loadingAllStars || this.viewReadSignal?.aborted || this.starWrites || this.starVerificationSession === this.readSession && this.verifyingStars) return;
     if (this.pendingInitialization) {
       const { user, token } = this.pendingInitialization;
       await this.loadGitHub(user, token);
@@ -163,7 +159,6 @@ export class GitHubService {
     if (this.pendingInitialization) { await this.resumeRepositoryReads(); return; }
     if (!await this.verifyUncertainStars()) return;
     await this.loadGitHub(this.configuredUser, this.token);
-    void this.loadLists();
   }
 
   private async verifyUncertainStars(): Promise<boolean> {
@@ -211,6 +206,7 @@ export class GitHubService {
   public repoListIds = new Map<string, string[]>();
   public repoNodeIds = new Map<string, string>();
   private listsRevision = 0;
+  private listsLoading = false;
   public remarks: Record<string, any> = {};
   private remarksRevision = 0;
   private categoryRevision = 0;
@@ -310,8 +306,14 @@ export class GitHubService {
     const session = this.getReadSession();
     if (!session) return;
     const current = () => this.isReadCurrent(session);
+    const previousOwner = this.cacheKey;
+    let preserveView = Boolean(previousOwner) && user === this.configuredUser && token === this.token;
     this.initializing = true;
     this.pendingPage = undefined; this.pendingFullRead = false;
+    if (!preserveView) {
+      this.cacheKey = "";
+      this.lists = []; this.repoListNames.clear(); this.repoListIds.clear(); this.repoNodeIds.clear();
+    }
     this.configuredUser = user;
     githubStatusController.update({ accountConfigured: Boolean(user.trim() || token.trim()) });
     try {
@@ -334,8 +336,10 @@ export class GitHubService {
     this.baseUrl = baseUrl;
     this.headers = headers;
     this.token = token || "";
-    this.pages.clear(); this.repos = []; this.categoryRepos = []; this.total = 0;
-    this.selectedRepos.clear();
+    if (!preserveView) {
+      this.pages.clear(); this.repos = []; this.categoryRepos = []; this.total = 0;
+      this.selectedRepos.clear();
+    }
     this.actionMessage = "正在读取 GitHub 账号与仓库…"; this.actionError = false; this.publishAll();
     if (token) {
       const identity = await readGitHubResponse("https://api.github.com/user", headers, session.signal);
@@ -343,10 +347,16 @@ export class GitHubService {
       if (!identity.data?.id || typeof identity.data?.login !== "string") throw new Error("GitHub 账号身份无法确认");
       this.cacheKey = `github-id:${identity.data.id}`;
     } else this.cacheKey = `user:${String(user).toLowerCase()}`;
-    this.page = 1;
-    this.active = "全部";
-    this.categoryRepos = [];
-    this.allStarsLoaded = false;
+    if (preserveView && previousOwner !== this.cacheKey) {
+      // Even unchanged configuration must not retain another identity's data.
+      preserveView = false;
+      this.pages.clear(); this.repos = []; this.categoryRepos = []; this.total = 0;
+      this.lists = []; this.repoListNames.clear(); this.repoListIds.clear(); this.repoNodeIds.clear();
+      this.selectedRepos.clear(); this.publishAll();
+    }
+    if (!preserveView) {
+      this.page = 1; this.active = "全部"; this.categoryRepos = []; this.allStarsLoaded = false;
+    }
     this.loadingAllStars = false;
 
     // 读取持久化数据
@@ -373,15 +383,18 @@ export class GitHubService {
     if (!savedAiCfg || typeof savedAiCfg !== "object" || Array.isArray(savedAiCfg)) savedAiCfg = null;
     this.aiConfig = savedAiCfg ? { ...DEFAULT_GH_AI_CONFIG, ...savedAiCfg } : { ...DEFAULT_GH_AI_CONFIG };
 
-    // 0ms 秒开：先从本地恢复 Lists 缓存
-    await this.restoreListsCache(this.cacheKey);
-
-    this.pages.clear();
-    this.repos = [];
+    // Never downgrade a live same-account snapshot to a smaller disk cache.
+    if (!preserveView) {
+      await this.restoreListsCache(this.cacheKey, current);
+      if (!current()) return;
+      await this.loadLists(session);
+      if (!current()) return;
+      this.pages.clear(); this.repos = [];
+    }
 
     // 恢复本地页面缓存秒开
     const cached = stored.ghStarredCache;
-    if ((cached?.format === 3 || (!token && cached?.format === 2)) && cached.owner === this.cacheKey && cached.pages) {
+    if (!preserveView && (cached?.format === 3 || (!token && cached?.format === 2)) && cached.owner === this.cacheKey && cached.pages) {
       Object.entries(cached.pages).forEach(([p, items]) => {
         if (Array.isArray(items)) this.pages.set(Number(p), items as GitHubRawRepo[]);
       });
@@ -393,7 +406,7 @@ export class GitHubService {
     this.publishAll();
 
     // 🌟 极速首屏：直接拉取第一页（20项）同时从其 Header 中解析总数，避免串行等待！
-    const hasCache = this.pages.has(1);
+    const hasCache = preserveView || this.pages.has(1);
     if (!hasCache) {
       this.actionMessage = "正在读取 GitHub Star…";
       this.actionError = false;
@@ -401,6 +414,18 @@ export class GitHubService {
     }
 
     try {
+      if (preserveView) {
+        const repositories = await this.readAllStarRepositories(baseUrl, headers, token, session.signal);
+        if (!current()) return;
+        this.commitStarSnapshot(repositories);
+        this.pendingInitialization = undefined;
+        this.actionMessage = ""; this.actionError = false;
+        this.publishAll();
+        await this.saveCompletedStarSnapshot(current);
+        if (!current()) return;
+        await this.loadLists(session);
+        return;
+      }
       const page1Result = await this.fetchStarredWithRetry(
         `${baseUrl}${baseUrl.includes("?") ? "&" : "?"}per_page=20&page=1`,
         headers,
@@ -411,15 +436,13 @@ export class GitHubService {
 
       this.total = this.parseStarTotal(page1Result.link, page1Result.items.length);
       if (!this.total) {
-        this.pages.clear();
-        this.repos = [];
-        await this.savePageCache(current);
-        if (!current()) return;
+        this.commitStarSnapshot([]);
+        this.pendingInitialization = undefined;
         this.actionMessage = "";
         this.actionError = false;
         this.publishAll();
-        this.pendingInitialization = undefined;
-        this.allStarsLoaded = true;
+        await this.saveCompletedStarSnapshot(current);
+        if (!current()) return;
         return;
       }
 
@@ -434,13 +457,12 @@ export class GitHubService {
       if (!this.actionError) this.actionMessage = "";
       this.publishAll();
 
-      // 列表在后台异步加载，不阻塞首屏
-      void this.loadLists(session);
     } catch (error: any) {
       if (!current()) return;
       if (hasCache) {
-        // 如果有缓存，网络即使抖动也安静降级保留本地缓存，不给用户刺眼的报错
-        if (!this.actionError) this.actionMessage = "";
+        this.actionMessage = "GitHub 刷新未完成，已保留上次内容；请稍后手动刷新。";
+        this.actionError = true;
+        this.pendingInitialization = undefined;
         this.publishAll();
       } else {
         this.actionMessage = "GitHub 同步失败，请检查网络、令牌或 API 额度。";
@@ -463,7 +485,7 @@ export class GitHubService {
         this.actionError = true; this.publishStatus();
       }
     } finally {
-      if (current()) this.initializing = false;
+      if (current()) { this.initializing = false; this.publishStatus(); }
     }
   }
 
@@ -480,6 +502,7 @@ export class GitHubService {
       this.page = target; this.pendingPage = undefined; this.loadingPage = 0; this.publishAll(); return;
     }
     this.loadingPage = target;
+    this.publishStatus();
     const headers = { ...this.headers }, token = this.token, baseUrl = this.baseUrl;
     const request = new AbortController();
     this.pageRequest = request;
@@ -500,7 +523,7 @@ export class GitHubService {
     } finally {
       session.signal.removeEventListener("abort", abort);
       if (this.pageRequest === request) this.pageRequest = undefined;
-      if (current()) { this.loadingPage = 0; this.pendingPage = undefined; }
+      if (current()) { this.loadingPage = 0; this.pendingPage = undefined; this.publishStatus(); }
     }
   }
 
@@ -511,29 +534,60 @@ export class GitHubService {
     const current = () => this.isReadCurrent(session);
     this.loadingAllStars = true;
     this.pendingFullRead = true;
-    if (!this.actionError) { this.actionMessage = "正在补全 Star 列表…"; this.publishStatus(); }
+    if (!this.actionError) this.actionMessage = "正在补全 Star 列表…";
+    this.publishStatus();
     const baseUrl = this.baseUrl, headers = { ...this.headers }, token = this.token;
-    const pageCount = Math.max(1, Math.ceil(this.total / 100));
     try {
-      const repositories: GitHubRawRepo[] = [];
-      for (let page = 1; page <= pageCount; page++) {
-        if (!current()) return;
-        const result = await this.fetchStarredWithRetry(`${baseUrl}${baseUrl.includes("?") ? "&" : "?"}per_page=100&page=${page}`, headers, token, session.signal);
-        if (!current()) return;
-        repositories.push(...result.items);
-        this.categoryRepos = [...repositories]; this.rebuildLoadedRepos(); this.publishAll();
-        if (result.items.length < 100) break;
-      }
+      const repositories = await this.readAllStarRepositories(baseUrl, headers, token, session.signal);
       if (!current()) return;
-      this.allStarsLoaded = true;
+      this.commitStarSnapshot(repositories);
       if (!this.actionError) this.actionMessage = "";
       this.publishAll();
+      await this.saveCompletedStarSnapshot(current);
     } catch {
       if (current()) {
         this.actionMessage = "完整 Star 列表读取失败，保留已读取内容；请手动刷新。";
         this.actionError = true; this.publishStatus();
       }
-    } finally { if (current()) { this.loadingAllStars = false; this.pendingFullRead = false; } }
+    } finally { if (current()) { this.loadingAllStars = false; this.pendingFullRead = false; this.publishStatus(); } }
+  }
+
+  /** Read into a draft. A partially read collection never replaces visible cards. */
+  private async readAllStarRepositories(baseUrl: string, headers: Record<string, string>, token: string, signal: AbortSignal): Promise<GitHubRawRepo[]> {
+    const repositories = new Map<string, GitHubRawRepo>();
+    for (let page = 1; ; page++) {
+      signal.throwIfAborted();
+      const result = await this.fetchStarredWithRetry(`${baseUrl}${baseUrl.includes("?") ? "&" : "?"}per_page=100&page=${page}`, headers, token, signal);
+      signal.throwIfAborted();
+      result.items.forEach(repo => repositories.set(repo.full_name.toLowerCase(), repo));
+      if (result.items.length < 100 || !/rel="next"/.test(String(result.link || ""))) break;
+    }
+    return [...repositories.values()];
+  }
+
+  private commitStarSnapshot(repositories: GitHubRawRepo[]): void {
+    this.pages.clear();
+    for (let start = 0; start < repositories.length; start += 20) {
+      this.pages.set(start / 20 + 1, repositories.slice(start, start + 20));
+    }
+    this.categoryRepos = [...repositories];
+    this.total = repositories.length;
+    this.allStarsLoaded = true;
+    this.page = Math.max(1, Math.min(this.page, Math.ceil(repositories.length / 20)));
+    this.rebuildLoadedRepos();
+  }
+
+  private async saveCompletedStarSnapshot(current: () => boolean): Promise<void> {
+    try {
+      await this.savePageCache(current);
+      if (!current()) return;
+      await this.saveListsCache();
+    } catch {
+      if (current()) {
+        this.actionMessage = "仓库已更新，但本地缓存保存失败；本页可继续使用。";
+        this.actionError = true; this.publishStatus();
+      }
+    }
   }
 
   private async fetchStarredWithRetry(url: string, headers: Record<string, string>, token: string, signal: AbortSignal): Promise<{ items: GitHubRawRepo[]; link: string }> {
@@ -634,199 +688,102 @@ export class GitHubService {
   }
 
   public async loadLists(inheritedSession?: GitHubReadSession): Promise<void> {
-    if (!this.token) {
-      this.lists = [];
-      this.repoListNames.clear();
-      this.repoListIds.clear();
-      this.publishFolders();
-      return;
-    }
-    const revision = ++this.listsRevision;
-    const session = inheritedSession || this.getReadSession();
+    const owner = this.cacheKey;
+    if (!owner) return;
+    const revision = ++this.listsRevision, session = inheritedSession || this.getReadSession();
+    if (!session || !this.isReadCurrent(session)) return;
+    this.listsLoading = true; categoryFeedback.busy = true; this.publishBoardLoading();
     try {
-      categoryFeedback.busy = true;
-      const snapshot = await fetchGitHubUserLists(this.token, session?.signal);
-      if (revision !== this.listsRevision) return;
-      this.applyListsSnapshot(snapshot);
-      await this.saveListsCache();
-      this.publishAll();
+      const data = await loadLocalStarGroups(owner, { lists: this.lists, names: this.repoListNames });
+      if (revision !== this.listsRevision || owner !== this.cacheKey || !this.isReadCurrent(session)) return;
+      this.applyLocalGroups(data); categoryFeedback.message = ""; this.publishAll();
     } catch (error) {
-      if (revision !== this.listsRevision) return;
-      console.warn("加载 GitHub Lists 失败", error);
-    } finally {
-      if (revision === this.listsRevision) categoryFeedback.busy = false;
-    }
-  }
-
-  private applyListsSnapshot(snapshot: GitHubListsSnapshot): void {
-    this.lists = snapshot.lists;
-    this.repoListNames = snapshot.repoListNames;
-    this.repoListIds = snapshot.repoListIds;
-    for (const [key, id] of snapshot.repoNodeIds) {
-      this.repoNodeIds.set(key, id);
-    }
-
-    // 🌟 将 GraphQL 附带的 Lists 仓库完整卡片数据直接合并到仓库池，0 毫秒极速就绪，免除漫长串行分页
-    if (snapshot.repositories && snapshot.repositories.size > 0) {
-      const existingMap = new Map<string, GitHubRawRepo>();
-      this.categoryRepos.forEach(r => existingMap.set(r.full_name.toLowerCase(), r));
-      this.repos.forEach(r => existingMap.set(r.full_name.toLowerCase(), r));
-
-      for (const [key, repo] of snapshot.repositories) {
-        if (!existingMap.has(key)) {
-          existingMap.set(key, repo as GitHubRawRepo);
-        }
+      if (revision === this.listsRevision && owner === this.cacheKey && this.isReadCurrent(session)) {
+        this.actionMessage = error instanceof Error ? error.message : "本地分组读取失败，请刷新核对。";
+        this.actionError = true; categoryFeedback.message = this.actionMessage; this.publishStatus();
       }
-      this.categoryRepos = [...existingMap.values()];
-      this.rebuildLoadedRepos();
-    }
-
-    if (this.active !== "全部" && this.active !== this.UNCAT && !this.cats.includes(this.active)) {
-      this.active = "全部";
+    } finally {
+      if (revision === this.listsRevision) { this.listsLoading = false; categoryFeedback.busy = false; this.publishBoardLoading(); }
     }
   }
 
-  private async saveListsCache(): Promise<void> {
-    if (typeof chrome !== "undefined" && chrome.storage?.local && this.cacheKey) {
-      try {
-        const repoDetails = this.categoryRepos.length ? this.categoryRepos : this.repos;
-        await chrome.storage.local.set({
-          [`ghListsCache_${this.cacheKey}`]: {
-            lists: this.lists,
-            repoListNames: Object.fromEntries(this.repoListNames),
-            repoListIds: Object.fromEntries(this.repoListIds),
-            repoNodeIds: Object.fromEntries(this.repoNodeIds),
-            cachedRepos: repoDetails.slice(0, 500),
-            savedAt: Date.now()
-          }
-        });
-      } catch {}
-    }
+  public sections: string[] = ["默认"];
+  public activeSection = "默认";
+
+  public async createSection(name: string): Promise<void> {
+    const owner = this.cacheKey;
+    if (!owner) return;
+    await this.mutateLocalGroups(data => addSection(data, name), `已创建分组标签「${name}」。`, owner);
   }
 
-  private async restoreListsCache(key: string): Promise<void> {
-    if (typeof chrome !== "undefined" && chrome.storage?.local && key) {
-      try {
-        const stored = await chrome.storage.local.get([`ghListsCache_${key}`]);
-        const cached = stored[`ghListsCache_${key}`];
-        if (cached && Array.isArray(cached.lists)) {
-          this.lists = cached.lists;
-          this.repoListNames = new Map(Object.entries(cached.repoListNames || {}));
-          this.repoListIds = new Map(Object.entries(cached.repoListIds || {}));
-          this.repoNodeIds = new Map(Object.entries(cached.repoNodeIds || {}));
-          if (Array.isArray(cached.cachedRepos) && cached.cachedRepos.length) {
-            this.categoryRepos = cached.cachedRepos;
-            this.rebuildLoadedRepos();
-          }
-          this.publishFolders();
-        }
-      } catch {}
-    }
-  }
-
-  public async getOrFetchRepoNodeId(fullName: string): Promise<string> {
-    const key = fullName.toLowerCase();
-    const existing = this.repoNodeIds.get(key);
-    if (existing) return existing;
-    const repo = this.repos.find(r => r.full_name.toLowerCase() === key);
-    if (repo?.node_id) {
-      this.repoNodeIds.set(key, repo.node_id);
-      return repo.node_id;
-    }
-    const [owner, name] = fullName.split("/");
-    const query = `query GetRepoId($owner: String!, $name: String!) { repository(owner: $owner, name: $name) { id } }`;
-    const res = await fetch("https://api.github.com/graphql", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${this.token}`,
-        "Content-Type": "application/json",
-        Accept: "application/vnd.github+json"
-      },
-      body: JSON.stringify({ query, variables: { owner, name } })
+  public async deleteSection(name: string): Promise<void> {
+    const owner = this.cacheKey;
+    if (!owner) return;
+    const confirmed = await appDialog.confirm({
+      title: "删除分组标签",
+      message: `确定删除分组标签「${name}」吗？里面的文件夹会自动合并至默认分组，仓库不会丢失。`,
+      danger: true
     });
-    const json = await res.json();
-    const id = json?.data?.repository?.id;
-    if (!id) throw new Error(`未找到仓库 ${fullName} 的 Node ID`);
-    this.repoNodeIds.set(key, id);
-    return id;
+    if (confirmed && owner === this.cacheKey) {
+      await this.mutateLocalGroups(data => removeSection(data, name), `已删除分组标签「${name}」。`, owner);
+    }
+  }
+
+  public async switchSection(name: string): Promise<void> {
+    const owner = this.cacheKey;
+    if (!owner) return;
+    await this.mutateLocalGroups(data => setActiveSection(data, name), "", owner);
+  }
+
+  private applyLocalGroups(data: LocalStarGroups): void {
+    const projected = projectLocalStarGroups(data);
+    this.lists = projected.lists; this.repoListIds = projected.repoListIds; this.repoListNames = projected.repoListNames;
+    this.sections = projected.sections;
+    this.activeSection = projected.activeSection;
+    if (this.active !== "全部" && this.active !== this.UNCAT && !this.cats.includes(this.active)) this.active = "全部";
+  }
+
+  private async mutateLocalGroups(change: (data: LocalStarGroups) => void, message: string, owner = this.cacheKey): Promise<boolean> {
+    if (!owner || owner !== this.cacheKey || categoryFeedback.busy) return false;
+    categoryFeedback.busy = true;
+    try {
+      const data = await changeLocalStarGroups(owner, change, { lists: this.lists, names: this.repoListNames });
+      if (owner !== this.cacheKey) return false;
+      this.applyLocalGroups(data); this.actionMessage = message; this.actionError = false; categoryFeedback.message = "";
+      this.publishAll(); return true;
+    } catch (error) {
+      if (owner === this.cacheKey) {
+        this.actionMessage = error instanceof Error ? error.message : "本地分组保存失败，请刷新核对。";
+        this.actionError = true; this.publishStatus();
+      }
+      return false;
+    } finally { categoryFeedback.busy = false; }
+  }
+
+  // Keep the legacy Lists cache untouched as a one-time import/backup source.
+  private async saveListsCache(): Promise<void> {
+    if (typeof chrome !== "undefined" && chrome.storage?.local && this.cacheKey)
+      await chrome.storage.local.set({ [`ghStarRepoPoolV1:${this.cacheKey}`]: { owner: this.cacheKey, repos: this.repos.slice(0, 500) } });
+  }
+
+  private async restoreListsCache(key: string, current: () => boolean = () => true): Promise<void> {
+    if (typeof chrome !== "undefined" && chrome.storage?.local && key) {
+      const poolKey = `ghStarRepoPoolV1:${key}`, legacyKey = `ghListsCache_${key}`;
+      const stored = await chrome.storage.local.get([poolKey, legacyKey]);
+      if (!current() || key !== this.cacheKey) return;
+      const pool = stored[poolKey], repos = pool?.owner === key ? pool.repos : stored[legacyKey]?.cachedRepos;
+      if (Array.isArray(repos)) { this.categoryRepos = repos; this.rebuildLoadedRepos(); }
+    }
   }
 
   public async toggleRepoList(fullName: string, listName: string): Promise<boolean> {
-    if (!this.token) {
-      this.actionMessage = "请先配置具备 user 权限的 Token。";
-      this.actionError = true;
-      this.publishStatus();
-      return false;
-    }
-    const targetList = this.lists.find(l => l.name === listName);
-    if (!targetList) return false;
-
-    const key = fullName.toLowerCase();
-    const currentListIds = this.repoListIds.get(key) || [];
-    const isMember = currentListIds.includes(targetList.id);
-    const nextListIds = isMember
-      ? currentListIds.filter(id => id !== targetList.id)
-      : [...currentListIds, targetList.id];
-
-    categoryFeedback.busy = true;
-    this.actionMessage = `${isMember ? "正在从" : "正在加入"} GitHub 列表「${listName}」…`;
-    this.actionError = false;
-    this.publishStatus();
-
-    try {
-      const nodeId = await this.getOrFetchRepoNodeId(fullName);
-      const updatedLists = await updateGitHubItemLists(this.token, nodeId, nextListIds);
-
-      this.repoListIds.set(key, updatedLists.map(l => l.id));
-      this.repoListNames.set(key, updatedLists.map(l => l.name));
-      await this.saveListsCache();
-
-      this.actionMessage = isMember
-        ? `已从列表「${listName}」移出：${fullName}`
-        : `已加入列表「${listName}」：${fullName}`;
-      this.actionError = false;
-      this.publishAll();
-      return true;
-    } catch (error) {
-      this.actionMessage = error instanceof Error ? error.message : "更新列表所属失败";
-      this.actionError = true;
-      this.publishStatus();
-      return false;
-    } finally {
-      categoryFeedback.busy = false;
-    }
+    const target = this.lists.find(list => list.name === listName);
+    if (!target) return false;
+    return this.mutateLocalGroups(data => assignLocalGroup(data, [fullName], target.id, "toggle"), "本地分组归属已保存。");
   }
 
   public async clearRepoLists(fullName: string): Promise<boolean> {
-    if (!this.token) {
-      this.actionMessage = "请先配置具备 user 权限的 Token。";
-      this.actionError = true;
-      this.publishStatus();
-      return false;
-    }
-    const key = fullName.toLowerCase();
-    categoryFeedback.busy = true;
-    this.actionMessage = `正在清空 ${fullName} 的所有列表归属…`;
-    this.actionError = false;
-    this.publishStatus();
-    try {
-      const nodeId = await this.getOrFetchRepoNodeId(fullName);
-      await updateGitHubItemLists(this.token, nodeId, []);
-      this.repoListIds.set(key, []);
-      this.repoListNames.set(key, []);
-      await this.saveListsCache();
-      this.actionMessage = `已将 ${fullName} 设为未分类。`;
-      this.actionError = false;
-      this.publishAll();
-      return true;
-    } catch (error) {
-      this.actionMessage = error instanceof Error ? error.message : "清空列表所属失败";
-      this.actionError = true;
-      this.publishStatus();
-      return false;
-    } finally {
-      categoryFeedback.busy = false;
-    }
+    return this.mutateLocalGroups(data => assignLocalGroup(data, [fullName], null, "clear"), "已移到本地未分组，GitHub 收藏未改变。");
   }
 
   public async setRepoFolder(fullName: string, folder: string): Promise<boolean> {
@@ -846,100 +803,60 @@ export class GitHubService {
     }
   }
 
-  public async deleteFolder(title: string): Promise<void> {
-    if (!this.token) {
-      this.actionMessage = "请先配置具备 user 权限的 Token。";
-      this.actionError = true;
-      this.publishStatus();
-      return;
-    }
-    const target = this.lists.find(l => l.name === title);
-    if (!target) return;
-    const confirmed = await appDialog.confirm({
-      title: "删除 GitHub 列表",
-      message: `确定在 GitHub 官网删除列表「${title}」吗？列表内的仓库仍保留 Star 收藏，不会被取消。`,
-      danger: true
-    });
-    if (!confirmed) return;
-
-    this.actionMessage = `正在 GitHub 删除列表「${title}」…`;
-    this.actionError = false;
-    this.publishStatus();
-    categoryFeedback.busy = true;
+  public async renameFolder(id: string, oldName: string): Promise<void> {
+    const owner = this.cacheKey;
+    if (!owner) return;
+    let newName: string | null;
     try {
-      await deleteGitHubUserList(this.token, target.id);
-      this.lists = this.lists.filter(l => l.id !== target.id);
-      for (const [key, names] of this.repoListNames) {
-        if (names.includes(title)) {
-          this.repoListNames.set(key, names.filter(n => n !== title));
-        }
-      }
-      for (const [key, ids] of this.repoListIds) {
-        if (ids.includes(target.id)) {
-          this.repoListIds.set(key, ids.filter(id => id !== target.id));
-        }
-      }
-      if (this.active === title) this.active = "全部";
-      await this.saveListsCache();
-      this.actionMessage = `GitHub 列表「${title}」已删除。`;
-      this.actionError = false;
-      this.publishAll();
-    } catch (error) {
-      this.actionMessage = error instanceof Error ? error.message : "删除列表失败";
-      this.actionError = true;
-      this.publishStatus();
-    } finally {
-      categoryFeedback.busy = false;
-    }
+      newName = await appDialog.prompt({
+        title: "重命名本地分组",
+        message: `将「${oldName}」修改为新的分组名称：`,
+        placeholder: "新分组名称…",
+        defaultValue: oldName
+      });
+    } catch { return; }
+    const trimmed = newName?.trim();
+    if (!trimmed || trimmed === oldName || owner !== this.cacheKey) return;
+    await this.mutateLocalGroups(data => renameLocalGroup(data, id, trimmed), `本地分组已重命名为「${trimmed}」。`, owner);
+  }
+
+  public async togglePinFolder(id: string): Promise<void> {
+    const owner = this.cacheKey;
+    if (!owner) return;
+    let isPinned = false;
+    await this.mutateLocalGroups(data => {
+      isPinned = togglePinLocalGroup(data, id);
+    }, "", owner);
+    this.actionMessage = isPinned ? "本地分组已置顶。" : "本地分组已取消置顶。";
+    this.publishStatus();
+  }
+
+  public async pinFolder(id: string): Promise<void> {
+    return this.togglePinFolder(id);
+  }
+
+  public async reorderFolders(fromId: string, toId: string): Promise<void> {
+    const owner = this.cacheKey;
+    if (!owner || fromId === toId) return;
+    await this.mutateLocalGroups(data => reorderLocalGroups(data, fromId, toId), "本地分组排序已保存。", owner);
+  }
+
+  public async deleteFolder(title: string): Promise<void> {
+    const target = this.lists.find(list => list.name === title), owner = this.cacheKey;
+    if (!target || !owner) return;
+    const confirmed = await appDialog.confirm({ title: "删除本地分组", message: `确定删除本机分组「${title}」吗？其他分组和 GitHub 收藏不会改变。`, danger: true });
+    if (confirmed && owner === this.cacheKey)
+      await this.mutateLocalGroups(data => removeLocalGroup(data, target.id), "本地分组已删除，GitHub 收藏未改变。", owner);
   }
 
   public async promptCreateFolder(): Promise<void> {
-    if (!this.token) {
-      this.actionMessage = "请先在 GitHub 模块设置中配置具备 user 权限的 Token。";
-      this.actionError = true;
-      this.publishStatus();
-      return;
-    }
-    let name: string | null = null;
-    try {
-      name = await appDialog.prompt({
-        title: "新建 GitHub 列表",
-        message: "在 GitHub 官网上创建一个新的 Star 列表：",
-        placeholder: "列表名称（如：前端工具、深度学习）…"
-      });
-    } catch { return; }
-    const trimmed = name?.trim();
-    if (!trimmed) return;
-    if (trimmed === "全部" || trimmed === this.UNCAT) {
-      this.actionMessage = "列表名称不能与系统保留名称冲突。";
-      this.actionError = true;
-      this.publishStatus();
-      return;
-    }
-    if (this.cats.includes(trimmed)) {
-      this.actionMessage = `列表「${trimmed}」已存在。`;
-      this.actionError = true;
-      this.publishStatus();
-      return;
-    }
-    this.actionMessage = `正在 GitHub 创建列表「${trimmed}」…`;
-    this.actionError = false;
-    this.publishStatus();
-    categoryFeedback.busy = true;
-    try {
-      const created = await createGitHubUserList(this.token, trimmed);
-      this.lists.push(created);
-      await this.saveListsCache();
-      this.actionMessage = `GitHub 列表「${trimmed}」创建成功！`;
-      this.actionError = false;
-      this.publishAll();
-    } catch (error) {
-      this.actionMessage = error instanceof Error ? error.message : "创建列表失败";
-      this.actionError = true;
-      this.publishStatus();
-    } finally {
-      categoryFeedback.busy = false;
-    }
+    const owner = this.cacheKey;
+    if (!owner) { this.actionMessage = "请先配置 GitHub 账号并读取收藏。"; this.actionError = true; this.publishStatus(); return; }
+    let name: string | null;
+    try { name = await appDialog.prompt({ title: "新建本地分组", message: "分组仅保存在本机，不创建 GitHub Lists。", placeholder: "分组名称（如：前端工具、深度学习）…" }); }
+    catch { return; }
+    if (!name?.trim() || owner !== this.cacheKey) return;
+    await this.mutateLocalGroups(data => addLocalGroup(data, name), "本地分组已创建。", owner);
   }
 
   public async dropRepositoryIntoFolder(fullName: string, folderTitle: string): Promise<void> {
@@ -1131,96 +1048,26 @@ export class GitHubService {
     } finally { this.unstarBusy.delete(repo.full_name); this.publishAll(); }
   }
 
+  private async batchLocalGroups(names: string[], folder: string, owner: string): Promise<boolean> {
+    const target = folder ? this.lists.find(list => list.name === folder) : undefined;
+    if (!names.length || owner !== this.cacheKey || (folder && !target)) return false;
+    return this.mutateLocalGroups(data => assignLocalGroup(data, names, target?.id || null, target ? "add" : "clear"),
+      `已在本机整理 ${names.length} 个仓库，GitHub 收藏未改变。`, owner);
+  }
+
   public async batchAddToList(targetListTitle: string): Promise<boolean> {
-    if (!this.token) {
-      this.actionMessage = "请先配置具备 user 权限的 Token。";
-      this.actionError = true;
-      this.publishStatus();
-      return false;
-    }
-    const targetList = this.lists.find(l => l.name === targetListTitle);
-    if (!targetList) return false;
-    const names = [...this.selectedRepos];
-    if (!names.length) return false;
-
-    this.actionMessage = `正在将 ${names.length} 个仓库加入列表「${targetListTitle}」…`;
-    this.actionError = false;
-    this.publishStatus();
-    categoryFeedback.busy = true;
-
-    let successCount = 0;
-    try {
-      for (const name of names) {
-        try {
-          const key = name.toLowerCase();
-          const currentIds = this.repoListIds.get(key) || [];
-          if (!currentIds.includes(targetList.id)) {
-            const nodeId = await this.getOrFetchRepoNodeId(name);
-            const nextIds = [...currentIds, targetList.id];
-            const updated = await updateGitHubItemLists(this.token, nodeId, nextIds);
-            this.repoListIds.set(key, updated.map(l => l.id));
-            this.repoListNames.set(key, updated.map(l => l.name));
-          }
-          successCount++;
-        } catch (e) {
-          console.warn(`添加 ${name} 到列表失败`, e);
-        }
-      }
-      await this.saveListsCache();
-      this.actionMessage = `已成功将 ${successCount}/${names.length} 个仓库加入列表「${targetListTitle}」。`;
-      this.actionError = false;
-      this.publishAll();
-      return true;
-    } finally {
-      categoryFeedback.busy = false;
-    }
+    return this.batchLocalGroups([...this.selectedRepos], targetListTitle, this.cacheKey);
   }
 
   public prepareBatchMove(): { names: string[]; submit: (folder: string) => Promise<boolean> } | undefined {
-    if (!this.token) {
-      this.actionMessage = "请先配置具备 user 权限的 Token。";
-      this.actionError = true;
-      this.publishStatus();
-      return;
-    }
-    const names = [...this.selectedRepos];
-    if (!names.length) return;
-    return {
-      names: [...names],
-      submit: async (folder: string) => {
-        if (!folder) {
-          categoryFeedback.busy = true;
-          this.actionMessage = `正在清空 ${names.length} 个仓库的列表归属…`;
-          this.actionError = false;
-          this.publishStatus();
-          try {
-            for (const name of names) {
-              try {
-                const nodeId = await this.getOrFetchRepoNodeId(name);
-                await updateGitHubItemLists(this.token, nodeId, []);
-                this.repoListIds.set(name.toLowerCase(), []);
-                this.repoListNames.set(name.toLowerCase(), []);
-              } catch {}
-            }
-            await this.saveListsCache();
-            this.actionMessage = `已将选中的 ${names.length} 个仓库设为未分类。`;
-            this.actionError = false;
-            this.publishAll();
-            return true;
-          } finally {
-            categoryFeedback.busy = false;
-          }
-        } else {
-          return this.batchAddToList(folder);
-        }
-      }
-    };
+    const names = [...this.selectedRepos], owner = this.cacheKey;
+    if (!names.length || !owner) return;
+    return { names: [...names], submit: folder => this.batchLocalGroups(names, folder, owner) };
   }
 
   public async batchMoveToFolder(folder: string): Promise<boolean> {
     const prepared = this.prepareBatchMove();
-    if (!prepared) return false;
-    return prepared.submit(folder);
+    return prepared ? prepared.submit(folder) : false;
   }
 
   public async updateRepoRemark(fullName: string, data: Partial<{ summary: string; aiSummary: string; userRemark: string; tags: string[]; platforms: string[]; updatedAt: number; provider: string; model: string }>, expectedUserRemark?: string, beforeWrite?: () => void): Promise<void> {
@@ -1442,7 +1289,12 @@ ${repoInfo}`;
     this.publishBatchBar(filtered);
   }
 
+  private publishBoardLoading(): void {
+    starBoardData.loading = this.initializing || this.loadingPage > 0 || this.loadingAllStars || this.listsLoading;
+  }
+
   public publishStatus(): void {
+    this.publishBoardLoading();
     const uncertain = [...this.uncertainStars.values()].some(item => item.owner === this.cacheKey);
     githubStatusController.update({
       actionText: this.actionMessage + (uncertain ? " [存在未确认的 Star 操作，请使用“刷新 / 核对”。]" : ""),
@@ -1451,6 +1303,15 @@ ${repoInfo}`;
   }
 
   public publishFolders(): void {
+    // Publish replaced snapshots, including membership edits made in-place in Maps.
+    starBoardData.ownerKey = this.cacheKey;
+    starBoardData.searchQuery = this.searchQuery;
+    starBoardData.sections = [...this.sections];
+    starBoardData.activeSection = this.activeSection;
+    starBoardData.repos = [...this.repos];
+    starBoardData.lists = [...this.lists];
+    starBoardData.repoListNames = new Map([...this.repoListNames].map(([name, lists]) => [name, [...lists]]));
+    this.publishBoardLoading();
     const counts: Record<string, number> = { [this.UNCAT]: 0 };
     this.cats.forEach((c) => { counts[c] = 0; });
 
@@ -1497,7 +1358,7 @@ ${repoInfo}`;
 
     githubHeroController.update({
       title: this.active,
-      description: `${filtered.length} 个 Star 仓库 · GitHub 官方 Lists 实时云端同步`,
+      description: `${filtered.length} 个 GitHub 收藏 · 分组仅保存在本机`,
       kind: heroKind,
       batchMode: this.batchMode
     });

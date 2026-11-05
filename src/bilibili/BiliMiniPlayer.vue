@@ -1077,6 +1077,7 @@ onUnmounted(() => {
               v-for="c in state.comments"
               :key="c.id"
               class="bili-comment-item"
+              :class="{ 'is-top-comment': c.isTop }"
             >
               <img
                 :src="c.avatar || 'assets/default-avatar.svg'"
@@ -1093,6 +1094,11 @@ onUnmounted(() => {
                     title="点击查看 UP 主/作者详情与近期投稿"
                     @click.stop="openUpPreview($event, { mid: c.mid, name: c.uname, face: c.avatar })"
                   >{{ c.uname }}</span>
+                  <span
+                    v-if="c.isTop"
+                    class="bili-comment-top-badge"
+                    title="UP主置顶评论"
+                  >📌 置顶</span>
                   <span
                     v-if="c.isUp || c.uname === state.author || (state.authorMid && String(c.mid) === String(state.authorMid))"
                     class="bili-comment-up-badge"
@@ -1283,5 +1289,30 @@ onUnmounted(() => {
   vertical-align: middle;
   flex-shrink: 0;
   user-select: none;
+}
+
+.bili-comment-top-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 8.5px;
+  line-height: 1;
+  padding: 1.5px 5px;
+  border-radius: 4px;
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: #ffffff !important;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  box-shadow: 0 1px 4px rgba(245, 158, 11, 0.3);
+  vertical-align: middle;
+  flex-shrink: 0;
+  user-select: none;
+}
+
+.bili-comment-item.is-top-comment {
+  background: rgba(245, 158, 11, 0.05);
+  border-radius: 8px;
+  padding: 8px 8px 10px 8px;
+  border: 1px dashed rgba(245, 158, 11, 0.3);
 }
 </style>

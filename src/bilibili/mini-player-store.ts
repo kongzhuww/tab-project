@@ -21,6 +21,7 @@ export interface BiliMiniPlayerComment {
   emotes?: Record<string, string>;
   pictures: string[];
   isUp?: boolean;
+  isTop?: boolean;
   replies?: Array<{ id: string | number; userName: string; message: string; pictures: string[]; emotes?: Record<string, string> }>;
   subRepliesExpanded?: boolean;
   subRepliesLoading?: boolean;
@@ -611,6 +612,7 @@ export const biliMiniPlayerController = {
           emotes: c.emotes,
           pictures: c.pictures || [],
           isUp,
+          isTop: Boolean(c.isTop),
           replies: (c.replies || []).map((r) => ({
             id: String(r.rpid),
             userName: r.uname,

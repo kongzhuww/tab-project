@@ -501,6 +501,9 @@ var MarkdownAstEngine = class _MarkdownAstEngine {
       return `\0SEM${semanticSpans.push(safeTag) - 1}\0`;
     }).replace(/`([^`]+)`/g, (_, content) => `\0CODE${code.push(`<code class="obs-inline-code">${escapeHtml(content)}</code>`) - 1}\0`);
     const safeHtmlTokens = [];
+    if (options.linkMode === "web") {
+      text = text.replace(/<\/?(?:a|img)\b[^>]*\/?>/gi, (tag) => `\0HTML${safeHtmlTokens.push(tag) - 1}\0`);
+    }
     text = text.replace(/<\/?(?:h[1-6]|p|div|span|hr|br|sup|sub|strong|b|em|i|u|s|del|kbd|details|summary|table|thead|tbody|tr|th|td|ul|ol|li|picture|source)\b[^>]*\/?>/gi, (tag) => {
       if (/on\w+\s*=/i.test(tag) || /javascript:/i.test(tag)) {
         return "";
@@ -533,9 +536,12 @@ var MarkdownAstEngine = class _MarkdownAstEngine {
     });
     text = text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, label, target) => {
       const cleanTarget = target.trim();
-      if (/\.md(?:#.*)?$/i.test(cleanTarget)) {
+      if (options.linkMode !== "web" && /\.md(?:#.*)?$/i.test(cleanTarget)) {
         const noteTarget = cleanTarget.split("#")[0].replace(/\\/g, "/").split("/").pop()?.replace(/\.md$/i, "") || cleanTarget;
         return `<a class="obs-wikilink" href="#" data-target="${escapeAttr(noteTarget)}">${label}</a>`;
+      }
+      if (options.linkMode === "web" && cleanTarget.startsWith("#")) {
+        return `<a href="${escapeAttr(cleanTarget)}">${label}</a>`;
       }
       if (/^https?:\/\//i.test(cleanTarget) || /^mailto:/i.test(cleanTarget)) {
         return `<a class="obs-external-link" href="${escapeAttr(cleanTarget)}" target="_blank" rel="noopener noreferrer">${label}</a>`;

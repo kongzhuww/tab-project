@@ -10,6 +10,8 @@ export interface GitHubUserList {
   description: string;
   isPrivate: boolean;
   totalCount: number;
+  pinned?: boolean;
+  section?: string;
 }
 
 export interface GitHubUserListDetail extends GitHubUserList {

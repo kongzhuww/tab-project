@@ -26,7 +26,8 @@ function handleBackHome() {
   }
   dockLifecycleController.hideApp(definition.id);
   if (typeof document !== "undefined") {
-    document.body.classList.remove("has-card-fullscreen");
+    document.body.classList.toggle("has-card-fullscreen", Boolean(fullscreenCardState.activeId));
+    document.body.dataset.page = fullscreenCardState.activeId ? "daily" : "home";
   }
 }
 

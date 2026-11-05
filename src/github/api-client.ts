@@ -95,7 +95,7 @@ function httpFailure(response: Response, authenticated: boolean): GitHubReadErro
 }
 
 // GET only, one attempt. Session ownership, domain schemas and retry policy stay with callers.
-async function request<T>(path: string, options: GitHubReadOptions, json: boolean): Promise<GitHubJsonResult<T>> {
+async function request<T>(path: string, options: GitHubReadOptions, json: boolean | "text"): Promise<GitHubJsonResult<T>> {
   options.signal?.throwIfAborted();
   const url = apiUrl(path);
   let headers: Record<string, string>;
@@ -138,7 +138,10 @@ async function request<T>(path: string, options: GitHubReadOptions, json: boolea
         catch { throw new GitHubReadError("format", "GitHub 响应不是有效的 UTF-8 文本。"); }
       }
       controller.signal.throwIfAborted();
-      try { return { ...info, data: JSON.parse(text + decoder.decode()) as T }; }
+      try {
+        const body = text + decoder.decode();
+        return { ...info, data: (json === "text" ? body : JSON.parse(body)) as T };
+      }
       catch { throw new GitHubReadError("format", "GitHub 响应不是有效的 UTF-8 JSON。"); }
     } finally { void reader.cancel().catch(() => undefined); reader.releaseLock(); }
   } catch (error) {
@@ -149,6 +152,7 @@ async function request<T>(path: string, options: GitHubReadOptions, json: boolea
   } finally { clearTimeout(timer); options.signal?.removeEventListener("abort", abort); }
 }
 export function readGitHubJson<T = unknown>(path: string, options: GitHubReadOptions): Promise<GitHubJsonResult<T>> { return request<T>(path, options, true); }
+export function readGitHubText(path: string, options: GitHubReadOptions): Promise<GitHubJsonResult<string>> { return request<string>(path, options, "text"); }
 export async function readGitHubStatus(path: string, options: GitHubReadOptions): Promise<GitHubReadMetadata> {
   const { data: _data, ...info } = await request<never>(path, options, false);
   return info;

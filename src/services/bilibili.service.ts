@@ -131,6 +131,7 @@ export interface BiliCommentItem {
   timeText: string;
   like: number;
   rcount?: number;
+  isTop?: boolean;
   pictures?: string[];
   emotes?: Record<string, string>;
   replies?: BiliCommentItem[];
@@ -1607,10 +1608,11 @@ export class BilibiliService {
       `https://api.bilibili.com/x/v2/reply?type=1&oid=${aid}&pn=${pn}&ps=${ps}&sort=${sort}`
     );
     const repliesRaw = data?.replies || [];
+    const topObj = data?.top || data?.upper?.top || null;
     const pageObj = data?.page || {};
     const total = Number(pageObj.count || 0);
 
-    const comments: BiliCommentItem[] = repliesRaw.map((r: any) => {
+    const parseComment = (r: any, isTop = false): BiliCommentItem => {
       const emotes: Record<string, string> = {};
       if (r.content?.emote && typeof r.content.emote === "object") {
         for (const [key, val] of Object.entries(r.content.emote)) {
@@ -1641,11 +1643,25 @@ export class BilibiliService {
         timeText: new Date(Number(r.ctime || 0) * 1000).toLocaleString(),
         like: Number(r.like || 0),
         rcount: Number(r.rcount || 0),
+        isTop,
         pictures: parseBiliCommentPictures(r.content?.pictures),
         emotes,
         replies: subReplies
       };
-    });
+    };
+
+    const comments: BiliCommentItem[] = [];
+
+    // 第一页优先注入官方置顶评论 (B站 top / upper.top)
+    if (pn === 1 && topObj && typeof topObj === "object" && topObj.rpid) {
+      comments.push(parseComment(topObj, true));
+    }
+
+    const topRpid = topObj?.rpid ? String(topObj.rpid) : "";
+    for (const r of repliesRaw) {
+      if (topRpid && String(r.rpid) === topRpid) continue; // 去重防重复
+      comments.push(parseComment(r, false));
+    }
 
     return {
       comments,

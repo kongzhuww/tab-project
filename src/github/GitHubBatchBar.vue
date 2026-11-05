@@ -59,10 +59,10 @@ watch(() => props.active && state.active, active => { if (!active) pendingMove.v
       class="gh-batch-action-btn"
       id="gh-batch-move-btn"
       :disabled="!props.active || categoryFeedback.busy || state.selectedCount === 0"
-      title="固定当前选择，批量加入所选 GitHub 列表"
+      title="固定当前选择，批量加入所选本地分组"
       @click="prepareMove"
     >
-      📁 归入 GitHub 列表
+      📁 归入本地分组
     </button>
     <button
       type="button"

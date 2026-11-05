@@ -1,4 +1,4 @@
-import { GitHubReadError as GitHubDetailReadError, readGitHubJson, loadGitHubReadHeaders } from "./api-client";
+import { GitHubReadError as GitHubDetailReadError, readGitHubJson, readGitHubText, loadGitHubReadHeaders } from "./api-client";
 export { GitHubReadError as GitHubDetailReadError } from "./api-client";
 
 async function readDetailJson(path: string, signal: AbortSignal, headers: Record<string, string>): Promise<any> {
@@ -28,80 +28,22 @@ function localChineseLink(markdown: string, readmePath: string): string | undefi
   return decodeURIComponent(url.pathname.slice(1));
 }
 
-/**
- * 尝试通过 GitHub 官方 application/vnd.github.html+json 管道拉取预渲染的权威 HTML
- */
+/** Optional official HTML uses a short budget and the bounded read transport. */
 async function fetchOfficialReadmeHtml(
-  owner: string,
-  repo: string,
-  filePath: string,
-  branch: string,
-  headers: Record<string, string>,
-  signal: AbortSignal
+  owner: string, repo: string, filePath: string, branch: string,
+  headers: Record<string, string>, signal: AbortSignal
 ): Promise<string> {
+  const prefix = `${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`;
+  const path = filePath.split("/").map(encodeURIComponent).join("/");
   try {
-    const prefix = `${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`;
-    const ref = branch ? `?ref=${encodeURIComponent(branch)}` : "";
-    let url: string;
-    // 关键修复：只有明确是根目录默认 readme.md 时才用 /readme 端点；任何中文或指定路径文件均请求 contents/{path}
-    if (filePath && filePath.toLowerCase() !== "readme.md") {
-      url = `https://api.github.com/repos/${prefix}/contents/${filePath.split("/").map(encodeURIComponent).join("/")}${ref}`;
-    } else {
-      url = `https://api.github.com/repos/${prefix}/readme${ref}`;
-    }
-
-    const res = await fetch(url, {
-      method: "GET",
-      signal,
-      cache: "no-store",
-      headers: {
-        ...headers,
-        Accept: "application/vnd.github.html+json",
-        "X-GitHub-Api-Version": "2022-11-28",
-      },
-    });
-
-    if (res.ok) {
-      const text = await res.text();
-      if (text && text.trim().length > 30) {
-        return text;
-      }
-    }
-  } catch {}
-  return "";
-}
-
-/**
- * 备选：通过 GitHub 官方 POST /markdown 接口携带仓库上下文完成权威渲染
- */
-async function renderWithOfficialMarkdown(
-  text: string,
-  context: string,
-  headers: Record<string, string>,
-  signal: AbortSignal
-): Promise<string> {
-  if (!text) return "";
-  try {
-    const res = await fetch("https://api.github.com/markdown", {
-      method: "POST",
-      signal,
-      cache: "no-store",
-      headers: {
-        ...headers,
-        "Content-Type": "application/json",
-        Accept: "application/vnd.github+json",
-        "X-GitHub-Api-Version": "2022-11-28",
-      },
-      body: JSON.stringify({ text, mode: "gfm", context }),
-    });
-    if (res.ok) {
-      const html = await res.text();
-      if (html && html.trim().length > 30) {
-        return html;
-      }
-    }
-  } catch {}
-  return "";
+    return (await readGitHubText(`/repos/${prefix}/contents/${path}?ref=${encodeURIComponent(branch)}`, {
+      headers: { ...headers, Accept: "application/vnd.github.html+json" },
+      signal, timeoutMs: 4000, maxBytes: 2 * 1024 * 1024
+    })).data;
+  } catch {
+    signal.throwIfAborted();
+    return "";
+  }
 }
 
 export async function readRepositoryDocument(owner: string, repo: string, signal: AbortSignal) {
@@ -110,14 +52,16 @@ export async function readRepositoryDocument(owner: string, repo: string, signal
   const prefix = `${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`;
   let metadata: any = null;
   let notice = "";
-  try { metadata = await read(prefix); }
-  catch (error) {
-    signal.throwIfAborted();
+  const [metaResult, readmeResult] = await Promise.allSettled([read(prefix), read(`${prefix}/readme`)]);
+  signal.throwIfAborted();
+  if (metaResult.status === "fulfilled") metadata = metaResult.value;
+  else {
+    const error = metaResult.reason;
     if (error instanceof GitHubDetailReadError && ["auth", "rate", "forbidden"].includes(error.kind)) throw error;
     notice = "仓库元数据未刷新，概览可能来自列表快照。";
   }
-  const ref = typeof metadata?.default_branch === "string" ? `?ref=${encodeURIComponent(metadata.default_branch)}` : "";
-  const original = await read(`${prefix}/readme${ref}`);
+  if (readmeResult.status === "rejected") throw readmeResult.reason;
+  const original = readmeResult.value;
   signal.throwIfAborted();
   let document = decodeReadme(original);
   let branch = typeof metadata?.default_branch === "string" ? metadata.default_branch : "";
@@ -159,10 +103,7 @@ export async function readRepositoryDocument(owner: string, repo: string, signal
   let officialHtml = "";
   try {
     officialHtml = await fetchOfficialReadmeHtml(owner, repo, document.path, branch, headers, signal);
-    if (!officialHtml && document.markdown) {
-      officialHtml = await renderWithOfficialMarkdown(document.markdown, `${owner}/${repo}`, headers, signal);
-    }
-  } catch {}
+  } catch { signal.throwIfAborted(); }
 
   return { ...document, html: officialHtml, metadata, branch, isZh, notice };
 }
@@ -196,10 +137,7 @@ export async function readRepositorySpecificDocument(
   let officialHtml = "";
   try {
     officialHtml = await fetchOfficialReadmeHtml(owner, repo, document.path, branch, headers, signal);
-    if (!officialHtml && document.markdown) {
-      officialHtml = await renderWithOfficialMarkdown(document.markdown, `${owner}/${repo}`, headers, signal);
-    }
-  } catch {}
+  } catch { signal.throwIfAborted(); }
 
   return { ...document, html: officialHtml, branch, isZh };
 }

@@ -2,7 +2,9 @@
 import { ref, computed, onMounted, onUnmounted, reactive } from "vue";
 import { gitHubService, type GitHubRawRepo } from "../services/github.service";
 import { starBoardController as controller, starBoardState as state } from "./stars-board-store";
+import { starBoardData, getStarBoardRepoFolders } from "./stars-board-data";
 import { githubRepoDetailController } from "./repo-detail-store";
+import { REPOSITORY_DRAG_TYPE, readRepositoryDrag } from "./repository-drag";
 import { t } from "../i18n";
 
 const props = defineProps<{
@@ -31,9 +33,8 @@ function onShelfWheel(event: WheelEvent) {
 }
 
 // 是否正在加载
-const isLoading = computed(() => {
-  return gitHubService.loadingAllStars || (!gitHubService.repos.length && !controller.filteredUncatRepos.length && !controller.lists.length);
-});
+const isLoading = computed(() => starBoardData.loading);
+const showShelfSkeleton = computed(() => isLoading.value && !starBoardData.repos.length);
 
 // 拖拽状态
 const activeDragRepo = ref<GitHubRawRepo | null>(null);
@@ -58,6 +59,99 @@ function stopAutoScroll() {
     autoScrollTimer = null;
   }
   autoScrollVelocity = 0;
+}
+
+// 列表列更多操作上下文菜单
+const listMenuState = reactive<{
+  visible: boolean;
+  x: number;
+  y: number;
+  list: any | null;
+}>({
+  visible: false,
+  x: 0,
+  y: 0,
+  list: null
+});
+
+function closeListMenu(): void {
+  listMenuState.visible = false;
+  listMenuState.list = null;
+}
+
+function handleOpenListMenu(e: MouseEvent, list: any) {
+  e.preventDefault();
+  e.stopPropagation();
+  closeContextMenu();
+  const menuWidth = 150;
+  const menuHeight = 130;
+  const x = Math.min(e.clientX, window.innerWidth - menuWidth - 10);
+  const y = Math.min(e.clientY, window.innerHeight - menuHeight - 10);
+  listMenuState.x = x;
+  listMenuState.y = y;
+  listMenuState.list = list;
+  listMenuState.visible = true;
+}
+
+async function handleRenameList() {
+  const l = listMenuState.list;
+  closeListMenu();
+  if (!l) return;
+  await gitHubService.renameFolder(l.id, l.name);
+}
+
+async function handlePinList() {
+  const l = listMenuState.list;
+  closeListMenu();
+  if (!l) return;
+  await gitHubService.pinFolder(l.id);
+}
+
+async function handleDeleteList() {
+  const l = listMenuState.list;
+  closeListMenu();
+  if (!l) return;
+  await gitHubService.deleteFolder(l.name);
+}
+
+// 分组列拖拽换位
+const draggingColumnId = ref<string | null>(null);
+const hoverColumnId = ref<string | null>(null);
+
+function onColDragStart(event: DragEvent, list: any) {
+  closeListMenu();
+  closeContextMenu();
+  draggingColumnId.value = list.id;
+  if (event.dataTransfer) {
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("application/x-gh-col-id", list.id);
+  }
+}
+
+function onColDragEnd() {
+  draggingColumnId.value = null;
+  hoverColumnId.value = null;
+}
+
+function onColDragOver(event: DragEvent, targetListId: string) {
+  if (!draggingColumnId.value || draggingColumnId.value === targetListId) return;
+  event.preventDefault();
+  if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
+  hoverColumnId.value = targetListId;
+}
+
+function onColDragLeave(event: DragEvent, targetListId: string) {
+  if (hoverColumnId.value === targetListId) {
+    hoverColumnId.value = null;
+  }
+}
+
+async function onColDrop(event: DragEvent, targetListId: string) {
+  if (!draggingColumnId.value || draggingColumnId.value === targetListId) return;
+  event.preventDefault();
+  const fromId = draggingColumnId.value;
+  onColDragEnd();
+  await gitHubService.reorderFolders(fromId, targetListId);
 }
 
 // 右键上下文菜单
@@ -137,14 +231,16 @@ async function handleCopyCloneCommand() {
 
 function onGlobalPointerDown(event: PointerEvent): void {
   const target = event.target as HTMLElement | null;
-  if (!target?.closest(".fo-cover-context-menu") && !target?.closest(".col-popover-menu")) {
+  if (!target?.closest(".fo-cover-context-menu") && !target?.closest(".col-popover-menu") && !target?.closest(".gh-list-col-menu")) {
     closeContextMenu();
+    closeListMenu();
   }
 }
 
 function onGlobalKeyDown(event: KeyboardEvent): void {
   if (event.key === "Escape") {
     closeContextMenu();
+    closeListMenu();
   }
 }
 
@@ -210,6 +306,7 @@ function onDragStart(event: DragEvent, repo: GitHubRawRepo, fromList: string | n
   activeDragFromList.value = fromList;
   if (event.dataTransfer) {
     event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData(REPOSITORY_DRAG_TYPE, repo.full_name);
     event.dataTransfer.setData("text/plain", `${repo.full_name}:${fromList || "uncategorized"}`);
   }
   window.addEventListener("wheel", onWindowWheelWhileDragging, { passive: false });
@@ -224,7 +321,7 @@ function onDragEnd() {
 }
 
 function onDragOver(event: DragEvent, columnId: string) {
-  if (!activeDragRepo.value) return;
+  if (!props.active || (!activeDragRepo.value && !Array.from(event.dataTransfer?.types || []).includes(REPOSITORY_DRAG_TYPE))) return;
   event.preventDefault();
   if (event.dataTransfer) {
     event.dataTransfer.dropEffect = "move";
@@ -244,10 +341,10 @@ function onDragLeave(event: DragEvent, columnId: string) {
 
 async function onDropToColumn(event: DragEvent, targetList: string) {
   event.preventDefault();
-  const repo = activeDragRepo.value;
+  const fullName = activeDragRepo.value?.full_name || readRepositoryDrag(event.dataTransfer);
   onDragEnd();
-  if (!repo) return;
-  await controller.moveRepoToList(repo.full_name, targetList);
+  if (!props.active || !fullName) return;
+  await controller.moveRepoToList(fullName, targetList === "uncategorized" ? gitHubService.UNCAT : targetList);
 }
 
 function openRepoDetail(repo: GitHubRawRepo) {
@@ -286,6 +383,7 @@ onUnmounted(() => {
     <!-- 1. 上方：未分类 Star 仓库全宽长方形单排托盘 -->
     <section
       class="default-shelf-area"
+      :data-gh-list-drop="gitHubService.UNCAT"
       :class="{ 'is-collapsed': isDefaultShelfCollapsed, 'drop-active': hoverTargetColumn === 'uncategorized' }"
       @dragover="onDragOver($event, 'uncategorized')"
       @dragleave="onDragLeave($event, 'uncategorized')"
@@ -296,27 +394,10 @@ onUnmounted(() => {
           <span class="shelf-icon">📁</span>
           <span class="shelf-title">未分类 Star 收藏</span>
           <span class="shelf-badge">{{ controller.filteredUncatRepos.length }}</span>
-          <span class="shelf-sub-tip">（拖入此处即可取消列表归属；单排 10 个一页）</span>
+          <span class="shelf-sub-tip">（拖入此处即可取消本地分组归属；单排 10 个一页）</span>
         </div>
 
         <div class="shelf-right">
-          <!-- 搜索框 -->
-          <div class="shelf-search-wrap">
-            <span class="search-icon">🔍</span>
-            <input
-              v-model="state.searchQuery"
-              type="text"
-              class="shelf-search-input"
-              placeholder="搜索 Star 仓库名称、简介或语言…"
-            />
-            <button
-              v-if="state.searchQuery"
-              type="button"
-              class="clear-search-btn"
-              @click="state.searchQuery = ''"
-            >✕</button>
-          </div>
-
           <!-- 顶栏分页器：[ < 1/5页 > ] -->
           <div v-if="controller.filteredUncatRepos.length > state.pageSize" class="shelf-pager">
             <button
@@ -341,6 +422,8 @@ onUnmounted(() => {
             type="button"
             class="shelf-btn-refresh"
             title="刷新 Star 列表"
+            :disabled="isLoading"
+            :aria-busy="isLoading"
             @click="gitHubService.refreshRepositories()"
           >
             <span :class="{ spinning: isLoading }">🔄</span>
@@ -362,10 +445,11 @@ onUnmounted(() => {
 
       <!-- 骨架屏占位（当加载中且暂无卡片时展示） -->
       <div
-        v-if="isLoading && !controller.filteredUncatRepos.length"
+        v-if="showShelfSkeleton"
+        v-show="!isDefaultShelfCollapsed"
         class="shelf-cards-scroll"
       >
-        <div v-for="i in 6" :key="'skel-shelf-' + i" class="repo gh-card skel-card">
+        <div v-for="i in 6" :key="'skel-shelf-' + i" class="repo gh-card shelf-card skel-card">
           <div class="skel-line skel-title"></div>
           <div class="skel-line skel-desc"></div>
           <div class="skel-line skel-meta"></div>
@@ -466,6 +550,9 @@ onUnmounted(() => {
           </div>
         </div>
       </div>
+      <p v-else-if="!isDefaultShelfCollapsed" class="shelf-empty" role="status">
+        {{ starBoardData.searchQuery ? "没有匹配的未分类仓库" : "暂无未分类 Star 仓库" }}
+      </p>
     </section>
 
     <!-- 2. 下方：各个 GitHub 原生 Lists 看板横向多列滚动区 -->
@@ -497,27 +584,40 @@ onUnmounted(() => {
           v-for="list in controller.lists"
           :key="list.id"
           class="board-column list-column"
-          :class="{ 'drop-active': hoverTargetColumn === list.name }"
-          @dragover="onDragOver($event, list.name)"
-          @dragleave="onDragLeave($event, list.name)"
-          @drop="onDropToColumn($event, list.name)"
+          :data-gh-list-drop="list.name"
+          :class="{
+            'drop-active': hoverTargetColumn === list.name,
+            'col-dragging': draggingColumnId === list.id,
+            'col-hover-target': hoverColumnId === list.id
+          }"
+          @dragover="activeDragRepo ? onDragOver($event, list.name) : onColDragOver($event, list.id)"
+          @dragleave="activeDragRepo ? onDragLeave($event, list.name) : onColDragLeave($event, list.id)"
+          @drop="activeDragRepo ? onDropToColumn($event, list.name) : onColDrop($event, list.id)"
         >
-          <header class="column-header">
+          <header
+            class="column-header"
+            :title="'拖动此列可调换位置；右侧更多可重命名、置顶或删除'"
+          >
             <div class="column-title-group">
               <span class="col-dot list-dot"></span>
-              <h3 class="column-title" :title="list.description || ('GitHub 列表: ' + list.name)">
+              <h3 class="column-title" :title="list.description || ('本地分组: ' + list.name)">
                 📁 {{ list.name }}
               </h3>
+              <span v-if="list.pinned" class="col-pinned-icon" title="已置顶分组">📌</span>
               <span class="badge-count">{{ controller.getReposForList(list.name).length }}</span>
             </div>
 
             <div class="column-actions">
               <button
                 type="button"
-                class="col-more-btn"
-                title="删除此 GitHub 列表"
-                @click="gitHubService.deleteFolder(list.name)"
-              >✕</button>
+                class="col-more-btn col-drag-handle"
+                title="按住拖动可调换分组位置；点击打开更多操作"
+                draggable="true"
+                aria-label="分组操作与拖拽手柄"
+                @dragstart="onColDragStart($event, list)"
+                @dragend="onColDragEnd"
+                @click.stop="handleOpenListMenu($event, list)"
+              >⋮</button>
             </div>
           </header>
 
@@ -609,7 +709,7 @@ onUnmounted(() => {
           </div>
         </section>
 
-        <!-- 新建 GitHub 列表卡片列 -->
+        <!-- 新建本地分组卡片列 -->
         <section class="board-column add-column-panel">
           <button
             type="button"
@@ -617,7 +717,7 @@ onUnmounted(() => {
             @click="gitHubService.promptCreateFolder()"
           >
             <span class="plus-icon">＋</span>
-            <span>新建 GitHub 列表</span>
+            <span>新建本地分组</span>
           </button>
         </section>
       </div>
@@ -643,7 +743,7 @@ onUnmounted(() => {
             type="button"
             @click.stop="activeSubMenu = activeSubMenu === 'folder' ? null : 'folder'"
           >
-            <span>移动/加入列表</span>
+            <span>移动/加入本地分组</span>
             <span class="sub-arrow">›</span>
           </button>
 
@@ -663,11 +763,11 @@ onUnmounted(() => {
               v-for="l in controller.lists"
               :key="l.id"
               class="fo-cover-menu-item"
-              :class="{ primary: gitHubService.getRepoFolders(contextMenuState.repo.full_name).includes(l.name) }"
+              :class="{ primary: getStarBoardRepoFolders(contextMenuState.repo.full_name).includes(l.name) }"
               type="button"
               @click="handleMoveToList(l.name)"
             >
-              {{ gitHubService.getRepoFolders(contextMenuState.repo.full_name).includes(l.name) ? "✓ " : "  " }}📁 {{ l.name }}
+              {{ getStarBoardRepoFolders(contextMenuState.repo.full_name).includes(l.name) ? "✓ " : "  " }}📁 {{ l.name }}
             </button>
           </div>
         </div>
@@ -697,6 +797,37 @@ onUnmounted(() => {
           @click="handleCopyCloneCommand"
         >
           复制克隆命令 (git clone)
+        </button>
+      </div>
+
+      <!-- 分组列更多操作菜单 (重命名、置顶、删除) -->
+      <div
+        v-if="listMenuState.visible && listMenuState.list"
+        class="fo-cover-context-menu gh-list-col-menu"
+        :style="{ left: `${listMenuState.x}px`, top: `${listMenuState.y}px` }"
+        @click.stop
+        @contextmenu.prevent
+      >
+        <button
+          class="fo-cover-menu-item"
+          type="button"
+          @click="handleRenameList"
+        >
+          ✏️ 重命名分组
+        </button>
+        <button
+          class="fo-cover-menu-item"
+          type="button"
+          @click="handlePinList"
+        >
+          <span>{{ listMenuState.list?.pinned ? '📍 取消置顶' : '📌 置顶此分组' }}</span>
+        </button>
+        <button
+          class="fo-cover-menu-item danger"
+          type="button"
+          @click="handleDeleteList"
+        >
+          🗑️ 删除分组
         </button>
       </div>
     </Teleport>
@@ -878,6 +1009,18 @@ onUnmounted(() => {
   color: #0284c7;
 }
 
+.shelf-empty {
+  padding: 12px 16px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.shelf-btn-refresh:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+
 .spinning {
   display: inline-block;
   animation: spin 1s linear infinite;
@@ -905,7 +1048,8 @@ onUnmounted(() => {
   width: 270px;
   min-width: 270px;
   max-width: 270px;
-  flex-shrink: 0;
+  flex: 0 0 270px;
+  box-sizing: border-box;
   margin-bottom: 0 !important;
 }
 
@@ -1055,6 +1199,14 @@ onUnmounted(() => {
   white-space: nowrap;
 }
 
+.col-pinned-icon {
+  font-size: 11px;
+  flex-shrink: 0;
+  line-height: 1;
+  margin-left: -2px;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.15));
+}
+
 .badge-count {
   font-size: 11px;
   background: var(--surface, #f1f5f9);
@@ -1070,15 +1222,49 @@ onUnmounted(() => {
   background: none;
   border: none;
   color: var(--muted, #94a3b8);
-  font-size: 13px;
+  font-size: 14px;
+  font-weight: 700;
   cursor: pointer;
   padding: 2px 6px;
   border-radius: 4px;
+  user-select: none;
 }
 
 .col-more-btn:hover {
   background: var(--surface, #f1f5f9);
-  color: #ef4444;
+  color: #0284c7;
+}
+
+.col-drag-handle {
+  cursor: grab;
+}
+
+.col-drag-handle:active {
+  cursor: grabbing;
+}
+
+.board-column.col-dragging {
+  opacity: 0.35;
+  transform: scale(0.98);
+}
+
+.board-column.col-hover-target {
+  outline: 2px dashed #0284c7;
+  outline-offset: -2px;
+  background: rgba(2, 132, 199, 0.05);
+}
+
+.gh-list-col-menu {
+  min-width: 140px;
+}
+
+.gh-list-col-menu .fo-cover-menu-item.danger {
+  color: var(--danger, #ef4444);
+}
+
+.gh-list-col-menu .fo-cover-menu-item.danger:hover {
+  background: rgba(239, 68, 68, 0.08);
+  color: #dc2626;
 }
 
 .column-cards-scroll {

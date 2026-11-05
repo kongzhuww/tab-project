@@ -1,6 +1,6 @@
 import { reactive, readonly, type DeepReadonly } from "vue";
 import { windowManagerController } from "../core/window-manager.store";
-import { fullscreenCardState } from "../core/fullscreen-card-state";
+import { fullscreenCardState, hideRegisteredCard } from "../core/fullscreen-card-state";
 import { getStandaloneCardId } from "../core/navigation-state";
 import { mergeBuiltinDockTools, mergeBuiltinDockCards } from "../modules/builtins";
 import { pluginMarketController } from "../modules/market-store";
@@ -295,8 +295,8 @@ export const macDockController: MacDockController = {
         dailyBtn.classList.remove("active");
       }
 
-      (window as any).exitFullscreenCard?.();
-      (window as any).LogicWeaverFullscreen?.exit?.();
+      const activeCard = fullscreenCardState.activeId;
+      if (activeCard) hideRegisteredCard(activeCard);
 
       if (typeof window !== "undefined") {
         window.scrollTo({ top: 0, left: 0, behavior: "instant" as ScrollBehavior });
