@@ -1,5 +1,6 @@
 import { createSyncBackup, extractSyncPayload, readSyncSettings, restoreSyncBackup, SYNC_WHITELIST_KEYS } from "./sync.service";
 import { parseSyncBackup, SyncBackupError } from "./sync-payload";
+import { webDavFetch } from "./webdav-request";
 
 export interface WebDavConfig {
   url: string;
@@ -96,7 +97,7 @@ export class WebDavService {
    */
   public async ensureDirectory(dirUrl: string, auth: string): Promise<boolean> {
     try {
-      const resp = await fetch(dirUrl, {
+      const resp = await webDavFetch(dirUrl, {
         method: "MKCOL",
         headers: { Authorization: auth },
         signal: AbortSignal.timeout(6000)
@@ -124,7 +125,7 @@ export class WebDavService {
       // 优先尝试探测目录或建目录
       await this.ensureDirectory(targetUrl, auth);
 
-      const resp = await fetch(targetUrl, {
+      const resp = await webDavFetch(targetUrl, {
         method: "PROPFIND",
         headers: {
           Authorization: auth,
@@ -152,7 +153,7 @@ export class WebDavService {
         return { ok: false, message: `目录不存在 (404)，请在坚果云网页版创建对应文件夹` };
       }
 
-      const optResp = await fetch(targetUrl, {
+      const optResp = await webDavFetch(targetUrl, {
         method: "OPTIONS",
         headers: { Authorization: auth },
         signal: AbortSignal.timeout(6000)
@@ -190,7 +191,7 @@ export class WebDavService {
         // 先确保目录存在
         await this.ensureDirectory(candidate.dirUrl, auth);
 
-        const resp = await fetch(candidate.fileUrl, {
+        const resp = await webDavFetch(candidate.fileUrl, {
           method: "PUT",
           headers: {
             Authorization: auth,
@@ -243,7 +244,7 @@ export class WebDavService {
 
     for (const candidate of candidates) {
       try {
-        const resp = await fetch(candidate.fileUrl, {
+        const resp = await webDavFetch(candidate.fileUrl, {
           method: "GET",
           headers: {
             Authorization: auth,
