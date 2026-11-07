@@ -842,9 +842,9 @@ export default {
   "profile.menu.refreshBili": "刷新 B站账号信息",
   "profile.menu.switchUser": "切换用户（打开 B站）",
   "profile.menu.biliCenter": "打开 B站个人中心",
-  "storage.note": "目录选择立即生效，不用再点底部保存。浏览器只提供文件夹名称，不提供完整磁盘路径。",
-  "storage.stickersTitle": "表情包图片文件夹",
-  "storage.biliCacheTitle": "B站视频缓存目录",
+
+
+
   "dock.home": "常用主页",
   "dock.market": "模块与全屏插件管理",
   "dock.menu.running": "运行中",
@@ -862,9 +862,9 @@ export default {
   "dock.quitSubtitle": "当前页面的应用已请求退出，不代表外部进程或远端任务已停止",
   "settings.brandSub": "CONTROL CENTER",
   "settings.navCategory": "设置分类",
-  "settings.guestPreviewOn": "👀 恢复真实数据",
-  "settings.guestPreviewOff": "🧪 页面内空态预览",
-  "settings.guestPreviewDesc": "零数据空态视角，体验新用户初次打开的开箱状态。",
+
+
+
 
   "common.save": "保存",
   "common.cancel": "取消",
@@ -928,7 +928,7 @@ export default {
   "settings.tab.privacy": "搜索书签过滤",
   "settings.tab.appearance": "主题与外观",
   "settings.tab.sync": "数据备份与同步",
-  "settings.tab.storage": "文件夹与存储",
+
 
   // 主题与外观 (Themes & Appearance)
   "theme.sectionTitle": "主题与外观定制",

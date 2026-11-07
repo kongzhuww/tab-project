@@ -4,7 +4,6 @@ import { StickersService } from "../services/stickers.service";
 import { createStickerBoardController, type StickerCardItem } from "../stickers/sticker-board-store";
 import { withStickersWrite } from "../stickers/module-state";
 import { windowManagerController } from "../core/window-manager.store";
-import { settingsController } from "../settings/store";
 
 const props = withDefaults(defineProps<{ active?: boolean }>(), { active: true });
 const emit = defineEmits<{ close: []; select: [image: Blob] }>();
@@ -57,11 +56,10 @@ async function chooseFiles() {
   if (!active() || busy.value || state.loading) return;
   const target = service.getActiveTargetHandle();
   if (state.storageKind === "directory" && (!target || !await service.ensureHandlePermission(target.handle))) {
-    notice.value = "请先在图库设置中授权读取/添加图片"; return;
+    notice.value = "图片目录暂不可用，请检查已有目录授权；未更改原有数据"; return;
   }
   if (active()) fileInputRef.value?.click();
 }
-function openSettings() { emit("close"); settingsController.open("storage", "stickers"); windowManagerController.activate("settings"); }
 function openWorkspace() { emit("close"); windowManagerController.activate("stickers"); }
 function pause() { version++; service.pauseReads(); service.clearBlobUrlCache(); }
 function visibility() { pageVisible.value = !document.hidden; if (active()) service.activate(); else pause(); }
@@ -79,7 +77,6 @@ onBeforeUnmount(() => { alive = false; pause(); detachActions?.(); service.dispo
       <div class="sticker-head-left"><span class="sticker-head-title">我的表情包</span><span class="sticker-head-count">({{ state.totalCount }})</span></div>
       <div class="sticker-head-actions">
         <button type="button" class="sticker-act-btn" :disabled="busy || state.loading" @click="chooseFiles">＋ 添加</button>
-        <button type="button" class="sticker-act-btn" @click="openSettings">图库设置</button>
         <button type="button" class="sticker-act-btn" @click="openWorkspace">表情库</button>
         <button type="button" class="sticker-close-btn" aria-label="关闭表情面板" @click="emit('close')">✕</button>
       </div>
@@ -92,7 +89,7 @@ onBeforeUnmount(() => { alive = false; pause(); detachActions?.(); service.dispo
     <p v-if="notice" class="picker-hint" role="status">{{ notice }}</p>
     <div class="sticker-grid-wrap">
       <div v-if="state.loading" class="sticker-state-empty">正在读取图库…</div>
-      <div v-else-if="!state.items.length" class="sticker-state-empty">{{ state.emptyText || '当前分类没有图片，可在图库设置中选择文件夹。' }}</div>
+      <div v-else-if="!state.items.length" class="sticker-state-empty">{{ state.emptyText || '当前分类没有图片，可点击“添加”导入图片。' }}</div>
       <div v-else class="sticker-grid">
         <button v-for="sticker in state.items" :key="sticker.id" type="button" class="sticker-grid-item" :disabled="busy" :title="'发送图片：' + sticker.file" @click="pick(sticker)">
           <img v-if="sticker.url" :src="sticker.url" :alt="sticker.file" class="sticker-img" loading="lazy" />

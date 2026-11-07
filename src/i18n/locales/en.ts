@@ -844,9 +844,9 @@ const en: Record<TranslationKey, string> = {
   "profile.menu.refreshBili": "Refresh Bilibili Account",
   "profile.menu.switchUser": "Switch User (Open Bilibili)",
   "profile.menu.biliCenter": "Open Bilibili Profile",
-  "storage.note": "Folder selections take effect immediately without clicking Save. The browser provides only folder names, not full disk paths.",
-  "storage.stickersTitle": "Sticker Image Folder",
-  "storage.biliCacheTitle": "Bilibili Video Cache Directory",
+
+
+
   "dock.home": "Home Launcher",
   "dock.market": "Module & Fullscreen Plugins Manager",
   "dock.menu.running": "Running",
@@ -864,9 +864,9 @@ const en: Record<TranslationKey, string> = {
   "dock.quitSubtitle": "The app on this page has requested to exit, which does not imply remote tasks have stopped.",
   "settings.brandSub": "CONTROL CENTER",
   "settings.navCategory": "Settings Categories",
-  "settings.guestPreviewOn": "👀 Restore Real Data",
-  "settings.guestPreviewOff": "🧪 In-Page Empty State Preview",
-  "settings.guestPreviewDesc": "Zero-data empty view, preview the out-of-the-box state for new users.",
+
+
+
 
   "common.save": "Save",
   "common.cancel": "Cancel",
@@ -930,7 +930,7 @@ const en: Record<TranslationKey, string> = {
   "settings.tab.privacy": "Search & Filters",
   "settings.tab.appearance": "Themes & Appearance",
   "settings.tab.sync": "Backup & Cloud Sync",
-  "settings.tab.storage": "Storage & Files",
+
 
   // 主题与外观 (Themes & Appearance)
   "theme.sectionTitle": "Themes & Appearance",

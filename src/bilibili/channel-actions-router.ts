@@ -4,8 +4,6 @@
  */
 import { biliFavoritesController } from "./bili-favorites-store";
 import { biliTheaterController } from "./theater-store";
-import { settingsController } from "../settings/store";
-import { windowManagerController } from "../core/window-manager.store";
 import type {
   BiliFeedState,
   BiliSubChannelInfo,
@@ -58,10 +56,6 @@ export function bindChannelFavoritesActions(target: ChannelActionsTarget): void 
           break;
         case "open-cache":
           void target.openCachedView();
-          break;
-        case "cache-open-settings":
-          settingsController.open("storage", "bili-cache");
-          windowManagerController.activate("settings");
           break;
         case "cache-play": {
           const item = biliFavoritesController.state.organizer.cachedVideos.find((v) => v.id === String(payload));

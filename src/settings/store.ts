@@ -1,14 +1,12 @@
 import { reactive } from "vue";
 
-export type SettingsSection = "modules" | "shortcuts" | "privacy" | "wallpaper" | "sync" | "storage" | "bili-cache" | "stickers";
-export type StorageSettingsTarget = "stickers" | "bili-cache";
+export type SettingsSection = "modules" | "shortcuts" | "privacy" | "wallpaper" | "sync";
 
 export interface SettingsDialogState {
   mounted: boolean;
   isOpen: boolean;
   frameSrc: string;
   requestedSection: SettingsSection | null;
-  requestedStorageTarget: StorageSettingsTarget | null;
   sectionRequest: number;
 }
 
@@ -17,7 +15,6 @@ const state = reactive<SettingsDialogState>({
   isOpen: false,
   frameSrc: "",
   requestedSection: null,
-  requestedStorageTarget: null,
   sectionRequest: 0
 });
 
@@ -42,12 +39,9 @@ export const settingsController = {
     return undefined;
   },
 
-  open(section?: SettingsSection, storageTarget?: StorageSettingsTarget) {
+  open(section?: SettingsSection) {
     if (section) {
-      // Preserve old module deep links without keeping duplicate settings categories.
-      const legacyDirectory = section === "bili-cache" || section === "stickers";
-      state.requestedSection = legacyDirectory ? "storage" : section;
-      state.requestedStorageTarget = legacyDirectory ? section : section === "storage" ? storageTarget ?? null : null;
+      state.requestedSection = section;
       ++state.sectionRequest;
     }
     state.isOpen = true;

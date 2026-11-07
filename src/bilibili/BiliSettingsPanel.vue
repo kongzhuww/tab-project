@@ -89,7 +89,12 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
+.bili-cache-settings { margin-top:18px; }
 .cache-directory-name { margin:8px 0 12px; color:var(--text); overflow-wrap:anywhere; }
+.hint { margin:12px 0 0; color:var(--muted); font-size:12px; line-height:1.6; }
+.btn-secondary { padding:9px 14px; border:1px solid var(--border); border-radius:8px; background:var(--panel); color:var(--text); cursor:pointer; }
+.btn-secondary:hover:not(:disabled) { background:var(--surface); }
+.btn-secondary:disabled { opacity:0.55; cursor:default; }
 .cache-directory-actions { display:flex; flex-wrap:wrap; gap:8px; }
 .cache-directory-message.is-error { color:var(--danger, var(--text)); }
 </style>

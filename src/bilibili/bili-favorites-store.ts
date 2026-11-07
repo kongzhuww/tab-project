@@ -314,7 +314,6 @@ export type BiliFavoritesAction =
   | "organizer-play-video"
   | "organizer-video-action"
   | "organizer-open"
-  | "cache-open-settings"
   | "cache-play"
   | "cache-open-web"
   | "cache-delete"

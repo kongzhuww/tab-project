@@ -1,8 +1,8 @@
-import { d as w, o as b, g as f, h as o, p as m, n as v, q as y, C as U, t as x, i as B, b as l, c as D } from "./chunks/vendor-vue-D8gPZiit.js";
-const C = { class: "card" }, I = {
+import { d as w, o as b, e as f, i as o, m, l as v, n as y, A as U, t as x, f as B, b as l, c as D } from "./chunks/vendor-vue-9b0eS4bW.js";
+const I = { class: "card" }, C = {
   class: "step-box",
   style: { background: "rgba(99,102,241,.06)", "border-color": "rgba(99,102,241,.25)" }
-}, $ = { class: "bridge-form" }, V = ["disabled"], j = ["disabled"], A = /* @__PURE__ */ w({
+}, $ = { class: "bridge-form" }, A = ["disabled"], V = ["disabled"], j = /* @__PURE__ */ w({
   __name: "SyncBridgeApp",
   setup(M) {
     const r = l(""), a = l(""), i = l(!1), u = l(""), d = l("");
@@ -52,7 +52,7 @@ B站 UID: ${e.biliUserMid || "未配置"}
         i.value = !1;
       }
     }
-    return (e, t) => (b(), f("div", C, [
+    return (e, t) => (b(), f("div", I, [
       t[6] || (t[6] = o("div", { style: { "font-size": "44px", "margin-bottom": "8px" } }, "📲 ⇄ 💻", -1)),
       t[7] || (t[7] = o("h1", null, "电脑配置过继到手机 App", -1)),
       t[8] || (t[8] = o("p", null, "这是单独的凭据过继功能，不是普通备份。点击直推会把下方手动填写的 Token / UID 明文送到本机同步池，再供手机接收；仅在你信任此服务时使用。", -1)),
@@ -63,7 +63,7 @@ B站 UID: ${e.biliUserMid || "未配置"}
         o("br"),
         m(" 如确需过继，可在下方明确填写并直推，再到手机接收；这里不会自动读取模块凭据。 ")
       ], -1)),
-      o("div", I, [
+      o("div", C, [
         t[4] || (t[4] = o("b", null, "直接填写并推送到手机", -1)),
         t[5] || (t[5] = o("br", null, null, -1)),
         o("div", $, [
@@ -93,7 +93,7 @@ B站 UID: ${e.biliUserMid || "未配置"}
             type: "button",
             disabled: i.value,
             onClick: g
-          }, "🚀 立即直推到手机端", 8, V)
+          }, "🚀 立即直推到手机端", 8, A)
         ])
       ]),
       o("button", {
@@ -101,7 +101,7 @@ B站 UID: ${e.biliUserMid || "未配置"}
         type: "button",
         disabled: i.value,
         onClick: T
-      }, "🔍 检查当前电脑同步池状态", 8, j),
+      }, "🔍 检查当前电脑同步池状态", 8, V),
       u.value ? (b(), f("div", {
         key: 0,
         class: U(["status", d.value]),
@@ -111,4 +111,4 @@ B站 UID: ${e.biliUserMid || "未配置"}
     ]));
   }
 }), k = document.getElementById("vue-sync-bridge-root");
-k && D(A).mount(k);
+k && D(j).mount(k);

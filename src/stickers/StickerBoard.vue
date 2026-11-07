@@ -93,7 +93,6 @@
                 <strong id="sticker-library-title">{{ state.displayTitle }}</strong>
                 <span id="sticker-library-count">{{ state.totalCountText }}</span>
               </div>
-              <button type="button" class="tool-btn" @click="openLibrarySettings">图库设置</button>
               <button
                 type="button"
                 class="tool-btn sticker-quick-import-btn"
@@ -292,9 +291,7 @@ import { stickerBoardController as sharedController, createStickerBoardControlle
 import { stickersModuleState, withStickersWrite, onStickersPause } from "./module-state";
 import { windowManagerController } from "../core/window-manager.store";
 import StickerFolderCards from "./StickerFolderCards.vue";
-import { settingsController } from "../settings/store";
 import { t } from "../i18n";
-function openLibrarySettings() { settingsController.open("storage", "stickers"); windowManagerController.activate("settings"); }
 const classificationTarget = ref("__choose__");
 async function handleMenuClassify() {
   const item = contextMenu.item, path = classificationTarget.value;
@@ -459,7 +456,7 @@ async function onPickFiles() {
   if (!active() || busy.value) return;
   const target = service.getActiveTargetHandle();
   if (state.storageKind === "directory" && (!target || !await service.ensureHandlePermission(target.handle))) {
-    showNotice("请先在图库设置中授权读取或允许添加图片。", true); return;
+    showNotice("图片目录暂不可用，请检查已有目录授权；未更改原有数据。", true); return;
   }
   if (active()) fileInput.value?.click();
 }

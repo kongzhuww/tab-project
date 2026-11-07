@@ -9,6 +9,7 @@ import BiliSubscriptionHeader from "./BiliSubscriptionHeader.vue";
 import BiliSubscriptionTranscript from "./BiliSubscriptionTranscript.vue";
 import BiliSubscriptionPlayer from "./BiliSubscriptionPlayer.vue";
 import BiliOrganizerDialogs from "./BiliOrganizerDialogs.vue";
+import BiliCacheSettingsView from "./BiliCacheSettingsView.vue";
 import BiliUpGroupManager from "./BiliUpGroupManager.vue";
 import BiliRadioTapePlayer from "./BiliRadioTapePlayer.vue";
 import BiliVideoLyricDockBar from "./BiliVideoLyricDockBar.vue";
@@ -115,6 +116,7 @@ function toggleMessagePanel() {
 }
 
 const organizer = computed(() => biliFavoritesState.organizer);
+const cacheSettingsOpen = ref(false);
 const { active: recommendationHostActive } = useCardActivity("daily-bilibili", "/bilibili.html");
 watch(() => recommendationHostActive.value && organizer.value.mode === "recommendations", active => {
   bilibiliChannelService.setRecommendationsActive(active);
@@ -125,6 +127,9 @@ watch(() => recommendationHostActive.value && organizer.value.mode === "followin
 watch(() => recommendationHostActive.value && organizer.value.mode === "subscription", active => {
   bilibiliChannelService.setSubscriptionActive(active);
 }, { immediate: true, flush: "sync" });
+watch(() => recommendationHostActive.value && organizer.value.mode === "cache", active => {
+  if (!active) cacheSettingsOpen.value = false;
+});
 const searchQuery = ref(organizer.value.query);
 const initialOrganizerRetryDone = ref(false);
 const vueOrganizerMounted = ref(false);
@@ -1099,9 +1104,11 @@ function onRadioVideoDragStart(event: DragEvent, video: { bvid: string; title: s
             </template>
           </section>
           <section v-else-if="organizer.mode === 'cache'" id="fo-vue-cache-main" class="fo-bili-main">
+            <BiliCacheSettingsView v-if="cacheSettingsOpen" :active="recommendationHostActive" @back="cacheSettingsOpen = false" />
+            <template v-else>
             <header class="fo-bili-hero fo-hero-persistent fo-cached-hero">
-              <div class="fo-hero-left"><div class="fo-bili-cover">💾</div><div class="fo-hero-folder-info"><h3>缓存视频</h3><p>{{ organizer.cachedVideos.length }} 个缓存记录 · 存放目录可在设置中选择</p></div></div>
-              <div class="fo-bili-actions"><button type="button" class="primary" @click="dispatch('organizer-open')">返回收藏夹</button><button type="button" @click="dispatch('cache-open-settings')">缓存设置</button></div>
+              <div class="fo-hero-left"><div class="fo-bili-cover">💾</div><div class="fo-hero-folder-info"><h3>缓存视频</h3><p>{{ organizer.cachedVideos.length }} 个缓存记录 · 点击缓存设置管理存放目录</p></div></div>
+              <div class="fo-bili-actions"><button type="button" class="primary" @click="dispatch('organizer-open')">返回收藏夹</button><button type="button" @click="cacheSettingsOpen = true">缓存设置</button></div>
             </header>
             <div v-if="organizer.cacheLoading" class="fo-bili-loading"><i></i><span>正在读取本地缓存…</span></div>
             <div v-else class="fo-bili-grid fo-cached-video-grid">
@@ -1112,6 +1119,7 @@ function onRadioVideoDragStart(event: DragEvent, video: { bvid: string; title: s
                 <div class="fo-bili-meta"><span>{{ item.sizeText }}</span><span>缓存于 {{ item.cachedDate }}</span></div>
               </article>
             </div>
+            </template>
           </section>
           <section v-else-if="organizer.mode === 'recommendations'" id="fo-vue-recommend-main" class="fo-bili-main">
             <header class="fo-bili-hero">

@@ -44,18 +44,7 @@
           </button>
         </nav>
 
-        <!-- 开发者与测试：新用户开箱视角体验沙箱 -->
-        <div class="settings-nav-dev-card">
-          <button
-            type="button"
-            class="btn-nav-dev-preview secondary"
-            :class="{ active: isGuestPreviewActive }"
-            @click="handleToggleGuestPreview"
-          >
-            <span>{{ isGuestPreviewActive ? t('settings.guestPreviewOn') : t('settings.guestPreviewOff') }}</span>
-          </button>
-          <p>{{ t('settings.guestPreviewDesc') }}</p>
-        </div>
+
       </aside>
 
       <!-- 主设置内容区域 -->
@@ -821,18 +810,6 @@
             </div>
           </div>
         </section>
-        <section v-show="currentTab === 'storage'" class="settings-panel">
-          <header class="panel-head">
-            <span class="panel-index">06</span>
-            <div><h2>文件夹与存储</h2><p>按用途管理本地目录，各目录独立授权。</p></div>
-          </header>
-          <StorageSettings
-            v-if="currentTab === 'storage'"
-            :active="props.active && currentTab === 'storage'"
-            :target="settingsController.state.requestedStorageTarget"
-            :request="settingsController.state.sectionRequest"
-          />
-        </section>
         </fieldset>
       </main>
     </div>
@@ -851,7 +828,6 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, watch, onMounted, onUnmounted, defineAsyncComponent, nextTick } from "vue";
-const StorageSettings = defineAsyncComponent(() => import("./StorageSettings.vue"));
 import settingsCss from "./settings-view.css?inline";
 import { useExtensionUpdates } from "./useExtensionUpdates";
 import { ensureViewStyles } from "../core/view-styles";
@@ -883,7 +859,6 @@ import {
   resetSearchSlotsToDefault,
   persistSlots
 } from "../search/search-slots.store";
-import { isGuestPreviewActive, guestPreviewController } from "../core/guest-preview-store";
 import { t, currentLanguage, setLanguage, SUPPORTED_LANGUAGES } from "../i18n";
 import CustomSelect, { type CustomSelectOption } from "../core/CustomSelect.vue";
 
@@ -896,8 +871,7 @@ const tabs = computed(() => [
   { id: "shortcuts", index: "02", name: t("settings.tab.shortcuts") },
   { id: "privacy", index: "03", name: t("settings.tab.privacy") },
   { id: "wallpaper", index: "04", name: t("settings.tab.appearance") },
-  { id: "sync", index: "05", name: t("settings.tab.sync") },
-  { id: "storage", index: "06", name: t("settings.tab.storage") }
+  { id: "sync", index: "05", name: t("settings.tab.sync") }
 ]);
 
 const currentTab = ref("modules");
@@ -1087,16 +1061,6 @@ async function handleImportLocalJson(event: Event) {
     localBackupMsg.value = `恢复失败: ${e.message || "文件格式不匹配"}`;
   } finally {
     target.value = "";
-  }
-}
-
-function handleToggleGuestPreview() {
-  guestPreviewController.toggle();
-  if (guestPreviewController.isActive) {
-    notify("已切入「新用户空态视角」沙箱，常用网站已清空，真实数据已安全封存");
-    settingsController.close();
-  } else {
-    notify("已恢复真实数据");
   }
 }
 
