@@ -12,13 +12,15 @@ const booleanKeys = new Set([
 const arrayKeys = new Set([
   "searchIgnoredBookmarkFolders", "wereadSortIds",
   "foGroups", "launcherGroups", "quickLinks", "launcherPages",
-  "foCollapsedGroupsV1", "biliFollowingGroupsV1", "biliSubCustomChannelsV1", "biliRadioSeriesV1"
+  "foCollapsedGroupsV1", "biliFollowingGroupsV1", "biliSubCustomChannelsV1", "biliRadioSeriesV1",
+  "gh_my_repo_groups_v2"
 ]);
 const objectKeys = new Set([
   "customShortcuts", "launcherFolders", "quickLinkGroupSizes",
   "launcherPageLabels", "launcherFolderPositionV1",
   "foTree", "ghRepoRemarksV1", "ghLocalStarGroupsV1",
-  "lw_private_chat_v1", "lw_webdav_config", "googleCalendarSessionTokenV1"
+  "lw_private_chat_v1", "lw_webdav_config", "googleCalendarSessionTokenV1",
+  "gh_my_repo_groups_map_v2"
 ]);
 
 export function isRecord(value: unknown): value is Record<string, unknown> {

@@ -20,4 +20,28 @@ test('WebDAV sync payload whitelist includes and preserves ghLocalStarGroupsV1',
   const gitHubServiceRaw = await readFile(new URL('../src/services/github.service.ts', import.meta.url), 'utf8');
   assert.match(gitHubServiceRaw, /logicweaver:sync-restored/);
   assert.match(gitHubServiceRaw, /detail\.ghLocalStarGroupsV1/);
+
+  // 5. 静态契约：个人仓库分组 (gh_my_repo_groups_v2) 与映射 (gh_my_repo_groups_map_v2) 必须在白名单与结构集内
+  assert.match(syncServiceRaw, /"gh_my_repo_groups_v2"/);
+  assert.match(syncServiceRaw, /"gh_my_repo_groups_map_v2"/);
+  assert.match(syncPayloadRaw, /"gh_my_repo_groups_v2"/);
+  assert.match(syncPayloadRaw, /"gh_my_repo_groups_map_v2"/);
+});
+
+test('selectSyncSettings validates and accepts gh_my_repo_groups_v2 array and gh_my_repo_groups_map_v2 object', async () => {
+  const { selectSyncSettings } = await import('../src/services/sync-payload.ts');
+  const payload = {
+    gh_my_repo_groups_v2: ['前端工具', 'AI与模型', '自建脚本'],
+    gh_my_repo_groups_map_v2: {
+      'kongzhu/tab-project': ['前端工具'],
+      'kongzhu/agent': ['AI与模型']
+    }
+  };
+  const result = selectSyncSettings(payload, ['gh_my_repo_groups_v2', 'gh_my_repo_groups_map_v2']);
+  assert.equal(result.count, 2);
+  assert.deepEqual(result.sanitized.gh_my_repo_groups_v2, ['前端工具', 'AI与模型', '自建脚本']);
+  assert.deepEqual(result.sanitized.gh_my_repo_groups_map_v2, {
+    'kongzhu/tab-project': ['前端工具'],
+    'kongzhu/agent': ['AI与模型']
+  });
 });
