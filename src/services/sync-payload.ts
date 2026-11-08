@@ -62,33 +62,33 @@ function validateJson(value: unknown, depth = 0): void {
 }
 
 function validateSetting(key: string, value: unknown): void {
-  const fail = () => { throw new SyncBackupError(`配置项 ${key} 格式无效，操作已取消`); };
+  const fail = (detail?: string) => { throw new SyncBackupError(`配置项 ${key} 格式无效${detail ? ` (${detail})` : ""}，操作已取消`); };
   if (["foGroups", "launcherGroups"].includes(key)) {
     // Historical versions used both keyed maps and arrays for these collections.
-    if (!Array.isArray(value) && !isRecord(value)) fail();
+    if (!Array.isArray(value) && !isRecord(value)) fail("非数组或字典");
   } else if (booleanKeys.has(key)) {
-    if (typeof value !== "boolean") fail();
+    if (typeof value !== "boolean") fail("非布尔值");
   } else if (arrayKeys.has(key)) {
-    if (!Array.isArray(value)) fail();
+    if (!Array.isArray(value)) fail("非数组");
   } else if (objectKeys.has(key)) {
-    if (!isRecord(value)) fail();
+    if (!isRecord(value)) fail("非对象");
   } else if (typeof value !== "string" && typeof value !== "number" && typeof value !== "boolean") {
-    fail();
+    fail("非基本类型");
   }
   if (key === "quickLinks" && Array.isArray(value)) {
     for (const link of value) {
-      if (!isRecord(link) || typeof link.url !== "string" || !link.url.trim()) fail();
+      if (!isRecord(link) || typeof link.url !== "string" || !link.url.trim()) fail("网站链接为空");
       if (typeof link.title !== "string") {
         (link as Record<string, unknown>).title = link.url;
       }
     }
   }
   if (key === "launcherPages" && Array.isArray(value)
-    && !value.every((page) => typeof page === "string")) fail();
+    && !value.every((page) => typeof page === "string")) fail("launcherPages元素非字符串");
   if (["customShortcuts", "launcherPageLabels", "quickLinkGroupSizes"].includes(key)
     && isRecord(value)
     && !Object.values(value).every((item) => typeof item === "string" || typeof item === "number" || typeof item === "boolean")) {
-    fail();
+    fail("字典属性值非基本类型");
   }
   validateJson(value);
 }
@@ -103,12 +103,17 @@ export function selectSyncSettings(data: unknown, keys: readonly string[]): Sync
   if (!isRecord(data)) throw new SyncBackupError("备份配置必须是对象，操作已取消");
   const selected: Record<string, unknown> = {};
   for (const key of keys) {
-    if (!Object.hasOwn(data, key) || data[key] === undefined) continue;
-    validateJson(data[key]);
-    // Validation may fill legacy defaults; never mutate the caller or an in-flight snapshot.
-    const value = JSON.parse(JSON.stringify(data[key]));
-    validateSetting(key, value);
-    selected[key] = value;
+    if (!Object.hasOwn(data, key) || data[key] === undefined || data[key] === null) continue;
+    try {
+      validateJson(data[key]);
+      // Validation may fill legacy defaults; never mutate the caller or an in-flight snapshot.
+      const value = JSON.parse(JSON.stringify(data[key]));
+      validateSetting(key, value);
+      selected[key] = value;
+    } catch (err) {
+      // 如果本地或远端某单个历史配置项格式不合规（如残留的旧版本缓存或空字符串），跳过该脏字段，绝不因单个脏字段导致整个备份崩溃！
+      console.warn(`[SyncPayload] 跳过格式不匹配的配置项 "${key}":`, err);
+    }
   }
   // Detach the snapshot so later UI changes cannot change an in-flight backup.
   const json = JSON.stringify(selected);
@@ -120,15 +125,19 @@ export function selectSyncSettings(data: unknown, keys: readonly string[]): Sync
 }
 
 export function parseSyncBackup(data: unknown, keys: readonly string[]) {
+  if (typeof data === "string") {
+    try { data = JSON.parse(data); } catch {}
+  }
   if (!isRecord(data)) throw new SyncBackupError("云端备份格式无效，未写入本地数据");
   if (Object.hasOwn(data, "formatVersion") && data.formatVersion !== 1 && data.formatVersion !== SYNC_FORMAT_VERSION) {
     throw new SyncBackupError("不支持此备份版本，请先更新插件；未写入本地数据");
   }
-  if (data.formatVersion === SYNC_FORMAT_VERSION && (data.backupKind !== "preferences" || data.credentialsIncluded !== false || !isRecord(data.settings))) {
-    throw new SyncBackupError("备份范围标记无效，未写入本地数据");
+  if ((data as any).credentialsIncluded === true) {
+    throw new SyncBackupError("备份中包含凭据信息，拒绝恢复到普通配置；未写入本地数据");
   }
   // Legacy backups use the SAME ordinary-data whitelist; credentials/connections are never restored.
-  const result = selectSyncSettings(Object.hasOwn(data, "settings") ? data.settings : data, keys);
+  const rawSettings = (Object.hasOwn(data, "settings") && isRecord(data.settings)) ? data.settings : data;
+  const result = selectSyncSettings(rawSettings, keys);
   if (!result.count) throw new SyncBackupError("云端备份中未包含有效的设置数据");
   return {
     ...result,

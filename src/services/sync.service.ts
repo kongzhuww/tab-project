@@ -5,6 +5,9 @@ import {
 
 import { sendNativeRequest } from "../core/native-messaging";
 import { nativeRecord, type NativeReply, type NativeRequest } from "../core/native-protocol";
+import { getLocalDeviceInfo, type DeviceInfo } from "./device-identity";
+import { computeConfigDiff, type ChangeSummary } from "./sync-diff";
+import { mergeSyncSettings } from "./sync-merger";
 
 export { MAX_SAFE_SYNC_PAYLOAD_BYTES } from "./sync-payload";
 export type { SyncPayloadResult } from "./sync-payload";
@@ -159,6 +162,14 @@ export async function restoreSyncBackup(data: unknown) {
           }
         }
       }
+      // 容错兼容：如果远端存储的是单一账号的 LocalStarGroups 结构（包含 owner 字段），自动还原对应账号的前缀 key
+      if (typeof (gMap as any).owner === "string" && (gMap as any).owner) {
+        const ownerKey = `ghLocalStarGroupsV1:${(gMap as any).owner}`;
+        toSet[ownerKey] = gMap;
+        if (typeof localStorage !== "undefined") {
+          try { localStorage.setItem(ownerKey, JSON.stringify(gMap)); } catch {}
+        }
+      }
       if (Object.keys(toSet).length) {
         await new Promise<void>((res) => {
           chrome.storage.local.set(toSet, () => res());
@@ -214,15 +225,48 @@ export async function restoreSyncBackup(data: unknown) {
   return { restoredCount: parsed.count, clientDevice: parsed.clientDevice };
 }
 
-export function createSyncBackup(settings: Record<string, unknown>) {
-  const userAgent = typeof navigator === "undefined" ? "" : navigator.userAgent;
+export interface SyncBackupEnvelope {
+  formatVersion: number;
+  clientDevice: string;
+  deviceId?: string;
+  deviceName?: string;
+  exportedAt: string;
+  backupKind: string;
+  credentialsIncluded: boolean;
+  changeSummary?: ChangeSummary[];
+  settings: Record<string, unknown>;
+}
+
+export const LAST_SYNCED_SNAPSHOT_KEY = "lw_last_synced_snapshot_v1";
+
+export async function createSyncBackup(settings: Record<string, unknown>, device?: DeviceInfo): Promise<SyncBackupEnvelope> {
+  const dev = device || await getLocalDeviceInfo();
+  let prevSnapshot: Record<string, any> | null = null;
+  if (typeof localStorage !== "undefined") {
+    const raw = localStorage.getItem(LAST_SYNCED_SNAPSHOT_KEY);
+    if (raw) {
+      try { prevSnapshot = JSON.parse(raw); } catch {}
+    }
+  }
+
+  const sanitized = extractSyncPayload(settings).sanitized;
+  const changes = computeConfigDiff(prevSnapshot, sanitized);
+
+  // 记录本次本地同步基准
+  if (typeof localStorage !== "undefined") {
+    try { localStorage.setItem(LAST_SYNCED_SNAPSHOT_KEY, JSON.stringify(sanitized)); } catch {}
+  }
+
   return {
     formatVersion: SYNC_FORMAT_VERSION,
-    clientDevice: /Macintosh|Mac OS X/i.test(userAgent) ? "macOS" : /Windows/i.test(userAgent) ? "Windows" : "PC",
+    clientDevice: dev.os === "macOS" ? "macOS" : dev.os === "Windows" ? "Windows" : "PC",
+    deviceId: dev.deviceId,
+    deviceName: dev.deviceName,
     exportedAt: new Date().toISOString(),
     backupKind: "preferences",
     credentialsIncluded: false,
-    settings: extractSyncPayload(settings).sanitized
+    changeSummary: changes,
+    settings: sanitized
   };
 }
 
@@ -255,7 +299,7 @@ export class SyncService {
     try {
       const { sanitized, count } = extractSyncPayload(await readSyncSettings());
       if (!count) return { ok: false, errorKind: "policy", error: "未检测到有效的普通备份配置项" };
-      const payload = createSyncBackup(sanitized);
+      const payload = await createSyncBackup(sanitized);
       const message = { command: "logicweaver-sync-put", key: "ui.settings", value: payload };
       // Include envelope overhead, not just the settings object. Never slice user data.
       const byteLength = new TextEncoder().encode(JSON.stringify(message)).length;

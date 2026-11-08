@@ -7,7 +7,7 @@ import ts from 'typescript';
 import * as vue from 'vue';
 
 const read = path => readFile(new URL('../' + path, import.meta.url), 'utf8');
-const paths = ['src/core/fullscreen-card-state.ts', 'src/core/fullscreen-presentation.ts', 'src/core/fullscreen-cards.store.ts', 'src/dock/store.ts'];
+const paths = ['src/core/fullscreen-card-state.ts', 'src/core/fullscreen-presentation.ts', 'src/core/fullscreen-cards.store.ts', 'src/dock/store.ts', 'src/dock/default-order.ts'];
 const compiled = new Map(await Promise.all(paths.map(async path => [path, ts.transpileModule(await read(path), {
   compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 }
 }).outputText])));

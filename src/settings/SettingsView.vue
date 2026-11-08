@@ -683,7 +683,7 @@
                   </div>
                 </div>
 
-                <!-- WebDAV 操作按钮行 -->
+                <!-- WebDAV 连接配置操作栏 -->
                 <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 4px;">
                   <button type="button" class="btn-primary" :disabled="webdavBusy" @click="handleSaveWebDav">
                     保存连接设置
@@ -691,17 +691,86 @@
                   <button type="button" class="btn-secondary" :disabled="webdavBusy" @click="handleTestWebDav">
                     测试连接
                   </button>
-                  <button type="button" class="btn-save-green" :disabled="webdavBusy" @click="handlePushWebDav">
-                    ⬆️ 上传备份到云端
+                  <button type="button" class="btn-save-green" :disabled="webdavBusy" title="双向无损融合：将本地与云端两边的网站全部合并，并同步到云端" @click="() => handlePushWebDav(true)">
+                    ⬆️ 提交合并到云端
                   </button>
-                  <button type="button" class="btn-secondary" :disabled="webdavBusy" style="color: #0284c7;" @click="handlePullWebDav">
-                    ⬇️ 从云端恢复备份
+                  <button type="button" class="btn-secondary" :disabled="webdavBusy" style="color: #0284c7;" title="单向下载融合：把云端独有的内容合并到当前这台电脑" @click="() => handlePullWebDav(true)">
+                    ⬇️ 合并云端到本地
+                  </button>
+                  <button type="button" class="btn-secondary" :disabled="webdavBusy" title="刷新云端最新设备与修改记录" @click="() => handleInspectRemoteSync(false)">
+                    🔄 刷新对比
                   </button>
                 </div>
 
                 <!-- 提示反馈 -->
                 <div v-if="webdavStatusMsg" style="font-size: 11px; padding: 6px 10px; border-radius: 6px; background: var(--panel); border: 1px solid var(--border); color: var(--text);">
                   {{ webdavStatusMsg }}
+                </div>
+
+                <!-- 🌟 云端最新设备与改动动态看板 (默认常驻展开，开箱即览) -->
+                <div v-if="remoteSyncMeta" style="margin-top: 6px; padding: 12px 14px; border-radius: 8px; background: var(--panel); border: 1px solid var(--border); display: flex; flex-direction: column; gap: 10px;">
+                  <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                      <span style="font-size: 14px;">{{ remoteSyncMeta.clientDevice === 'macOS' ? '💻' : '🖥️' }}</span>
+                      <strong style="font-size: 12px; color: var(--heading);">{{ remoteSyncMeta.deviceName || remoteSyncMeta.clientDevice }}</strong>
+                      <span style="font-size: 10px; color: var(--muted); background: var(--surface); padding: 2px 6px; border-radius: 4px;">{{ remoteSyncMeta.timeAgo }}</span>
+                    </div>
+                    <span style="font-size: 10px; color: var(--muted);">云端最新版本</span>
+                  </div>
+
+                  <div v-if="remoteSyncMeta.changeSummary && remoteSyncMeta.changeSummary.length" style="display: flex; flex-direction: column; gap: 6px;">
+                    <span style="font-size: 10.5px; color: var(--muted);">两端数据对比明细：</span>
+                    <ul style="margin: 0; padding-left: 0; list-style: none; display: flex; flex-direction: column; gap: 4px; font-size: 11px; color: var(--text);">
+                      <li
+                        v-for="(item, idx) in remoteSyncMeta.changeSummary"
+                        :key="idx"
+                        style="display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 4px 8px; background: var(--surface); border-radius: 6px;"
+                      >
+                        <div style="display: flex; align-items: center; gap: 6px;">
+                          <strong style="color: var(--heading);">[{{ item.categoryLabel }}]</strong>
+                          <span>{{ item.text }}</span>
+                        </div>
+                        <span
+                          v-if="item.badge"
+                          :style="{
+                            fontSize: '10px',
+                            fontWeight: '700',
+                            padding: '1px 6px',
+                            borderRadius: '4px',
+                            whiteSpace: 'nowrap',
+                            fontFamily: 'monospace',
+                            backgroundColor: item.badge.type === 'plus' ? 'rgba(16, 185, 129, 0.15)' : item.badge.type === 'minus' ? 'rgba(239, 68, 68, 0.15)' : 'rgba(59, 130, 246, 0.15)',
+                            color: item.badge.type === 'plus' ? '#10b981' : item.badge.type === 'minus' ? '#ef4444' : '#3b82f6',
+                            border: `1px solid ${item.badge.type === 'plus' ? 'rgba(16, 185, 129, 0.3)' : item.badge.type === 'minus' ? 'rgba(239, 68, 68, 0.3)' : 'rgba(59, 130, 246, 0.3)'}`
+                          }"
+                        >
+                          {{ item.badge.text }}
+                        </span>
+                      </li>
+                    </ul>
+                  </div>
+
+                  <!-- 核心同步操作栏：只保留 2 个核心按钮 + 1 个折叠次要高级覆盖选项 -->
+                  <div style="display: flex; gap: 10px; margin-top: 2px; align-items: center; flex-wrap: wrap;">
+                    <button type="button" class="btn-save-green" :disabled="webdavBusy" style="font-size: 11px; padding: 6px 14px;" title="双向无损融合：将本地与云端两边的网站全部合并，并同步到云端" @click="() => handlePushWebDav(true)">
+                      ⬆️ 提交本地改动合并到云端
+                    </button>
+                    <button type="button" class="btn-primary" :disabled="webdavBusy" style="font-size: 11px; padding: 6px 14px;" title="单向下载融合：把云端独有的内容合并到当前这台电脑" @click="() => handlePullWebDav(true)">
+                      ⬇️ 合并云端到本地
+                    </button>
+
+                    <details style="margin-left: auto; font-size: 11px; color: var(--muted); cursor: pointer;">
+                      <summary style="user-select: none;">更多覆盖选项…</summary>
+                      <div style="display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap;">
+                        <button type="button" class="btn-secondary" :disabled="webdavBusy" style="font-size: 10px; padding: 2px 8px;" title="用本地配置完全覆盖云端备份" @click="() => handlePushWebDav(false)">
+                          强制覆盖云端
+                        </button>
+                        <button type="button" class="btn-secondary" :disabled="webdavBusy" style="font-size: 10px; padding: 2px 8px; color: #ef4444;" title="放弃本地所有修改，完全覆盖为云端版本" @click="() => handlePullWebDav(false)">
+                          强制覆盖本地
+                        </button>
+                      </div>
+                    </details>
+                  </div>
                 </div>
               </div>
             </div>
@@ -926,6 +995,7 @@ function handleMinimize() {
 }
 
 import { webDavService } from "../services/webdav.service";
+import { computeConfigDiff, compareLocalAndRemote } from "../services/sync-diff";
 import { createSyncBackup, restoreSyncBackup, readSyncSettings } from "../services/sync.service";
 import { loadWebDavSettings, saveWebDavSettings, toWebDavConfig, type WebDavSettings } from "../sync/settings";
 
@@ -941,12 +1011,65 @@ const webdavInitial = ref<WebDavSettings>({ ...webdavDraft });
 const webdavStatusMsg = ref("");
 const webdavBusy = ref(false);
 const localBackupMsg = ref("");
+const remoteSyncMeta = ref<any>(null);
+
+function formatTimeAgo(dateStr: string): string {
+  try {
+    const delta = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000);
+    if (delta < 60) return "刚刚";
+    if (delta < 3600) return `${Math.floor(delta / 60)} 分钟前`;
+    if (delta < 86400) return `${Math.floor(delta / 3600)} 小时前`;
+    return `${Math.floor(delta / 86400)} 天前`;
+  } catch {
+    return dateStr;
+  }
+}
+
+async function handleInspectRemoteSync(silent = false) {
+  if (webdavBusy.value) return;
+  if (!silent) {
+    webdavBusy.value = true;
+    webdavStatusMsg.value = "正在读取云端最新修改动态…";
+  }
+  try {
+    const config = toWebDavConfig(webdavDraft);
+    const res = await webDavService.download(config);
+    if (res.ok && res.data) {
+      const data = res.data;
+      const remoteSettings = data.settings || data;
+      // 现场双向比对：比对当前本地数据与云端数据的真实差异（云端独有 vs 本地独有），杜绝误报“移除了”
+      const localSettings = await readSyncSettings();
+      const summaries = compareLocalAndRemote(localSettings, remoteSettings);
+
+      remoteSyncMeta.value = {
+        deviceName: data.deviceName || (data.clientDevice === "macOS" ? "Mac" : "Windows PC"),
+        clientDevice: data.clientDevice || "PC",
+        exportedAt: data.exportedAt,
+        timeAgo: data.exportedAt ? formatTimeAgo(data.exportedAt) : "未知时间",
+        changeSummary: summaries
+      };
+      if (!silent) {
+        webdavStatusMsg.value = `✓ 已获取云端设备动态（来自 ${remoteSyncMeta.value.deviceName}，${remoteSyncMeta.value.timeAgo}）`;
+      }
+    } else if (!silent) {
+      webdavStatusMsg.value = `✕ 读取失败: ${res.error || "云端无有效记录"}`;
+    }
+  } catch (e: any) {
+    if (!silent) webdavStatusMsg.value = `✕ 异常: ${e.message}`;
+  } finally {
+    if (!silent) webdavBusy.value = false;
+  }
+}
 
 async function initWebDav() {
   try {
     const s = await loadWebDavSettings();
     webdavInitial.value = { ...s };
     Object.assign(webdavDraft, s);
+    // 首次进入设置若已配置好 WebDAV，自动静默拉取云端动态，直接常驻展开卡片
+    if (webdavDraft.webdavUrl && webdavDraft.webdavUsername && webdavDraft.webdavPassword) {
+      void handleInspectRemoteSync(true);
+    }
   } catch {}
 }
 
@@ -986,16 +1109,20 @@ async function handleTestWebDav() {
   }
 }
 
-async function handlePushWebDav() {
+async function handlePushWebDav(mergeMode = true) {
   if (webdavBusy.value) return;
   webdavBusy.value = true;
-  webdavStatusMsg.value = "正在上传配置备份至 WebDAV…";
+  webdavStatusMsg.value = mergeMode ? "正在与云端合并并上传…" : "正在全量上传覆盖云端…";
   try {
     const config = toWebDavConfig(webdavDraft);
-    const res = await webDavService.pushCurrentConfig(config);
+    const res = await webDavService.pushCurrentConfig(config, { mergeRemote: mergeMode });
     if (res.ok) {
-      webdavStatusMsg.value = `✓ 上传成功！已将全部设置备份至云端 (${res.byteLength || 0} 字节)`;
-      notify("已成功上传云端备份！");
+      webdavStatusMsg.value = mergeMode
+        ? `✓ 合并上传成功！已将本地与云端无损融合并同步 (${res.byteLength || 0} 字节)`
+        : `✓ 全量覆盖上传成功！已用本地设置覆盖云端 (${res.byteLength || 0} 字节)`;
+      notify(mergeMode ? "已成功合并并同步至云端！" : "已成功全量覆盖云端备份！");
+      // 自动静默刷新一次对比动态
+      void handleInspectRemoteSync(true);
     } else {
       webdavStatusMsg.value = `✕ 上传失败: ${res.error || "请检查写入权限"}`;
     }
@@ -1006,22 +1133,29 @@ async function handlePushWebDav() {
   }
 }
 
-async function handlePullWebDav() {
+async function handlePullWebDav(mergeMode = true) {
   if (webdavBusy.value) return;
-  if (!confirm("确定从 WebDAV 恢复备份吗？恢复后将覆盖当前本地设置。")) return;
+  const promptText = mergeMode
+    ? "确定合并云端到本地吗？云端新增的常用网站与 Star 分组将无损合并至本地，不删除本地内容。"
+    : "确定全量覆盖本地吗？警告：这将放弃本地独有的网站和改动，完全还原为云端一模一样。";
+  if (!confirm(promptText)) return;
   webdavBusy.value = true;
-  webdavStatusMsg.value = "正在从 WebDAV 拉取配置并恢复…";
+  webdavStatusMsg.value = mergeMode ? "正在合并云端到本地…" : "正在用云端全量覆盖本地…";
   try {
     const config = toWebDavConfig(webdavDraft);
-    const res = await webDavService.pullCurrentConfig(config);
+    const res = await webDavService.pullCurrentConfig(config, { merge: mergeMode });
     if (res.ok) {
-      webdavStatusMsg.value = `✓ 恢复成功！已成功还原 ${res.restoredCount || 0} 项配置。请刷新页面查看。`;
-      notify(`恢复成功！已还原 ${res.restoredCount || 0} 项配置`);
+      webdavStatusMsg.value = mergeMode
+        ? `✓ 合并成功！已无损融合云端配置。请刷新页面查看。`
+        : `✓ 覆盖成功！已还原 ${res.restoredCount || 0} 项配置。请刷新页面查看。`;
+      notify(mergeMode ? "已成功合并云端配置！" : `覆盖成功！已还原 ${res.restoredCount || 0} 项配置`);
+      // 自动静默刷新一次对比动态
+      void handleInspectRemoteSync(true);
     } else {
-      webdavStatusMsg.value = `✕ 恢复失败: ${res.error || "未在服务器找到对应备份文件"}`;
+      webdavStatusMsg.value = `✕ ${mergeMode ? '合并失败' : '覆盖失败'}: ${res.error || "未在服务器找到对应备份文件"}`;
     }
   } catch (e: any) {
-    webdavStatusMsg.value = `✕ 恢复异常: ${e.message}`;
+    webdavStatusMsg.value = `✕ 操作异常: ${e.message}`;
   } finally {
     webdavBusy.value = false;
   }
@@ -1031,7 +1165,7 @@ async function handlePullWebDav() {
 async function handleExportLocalJson() {
   try {
     const rawSettings = await readSyncSettings();
-    const backup = createSyncBackup(rawSettings);
+    const backup = await createSyncBackup(rawSettings);
     const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");

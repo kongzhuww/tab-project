@@ -1,6 +1,7 @@
 import { createSyncBackup, extractSyncPayload, readSyncSettings, restoreSyncBackup, SYNC_WHITELIST_KEYS } from "./sync.service";
-import { parseSyncBackup, SyncBackupError } from "./sync-payload";
+import { parseSyncBackup, SyncBackupError, isRecord } from "./sync-payload";
 import { webDavFetch } from "./webdav-request";
+import { mergeSyncSettings } from "./sync-merger";
 
 export interface WebDavConfig {
   url: string;
@@ -58,18 +59,18 @@ export class WebDavService {
     if (isJianguo) {
       try {
         const u = new URL(base);
-        const path = u.pathname.replace(/\/+$/, "");
+        const path = decodeURIComponent(u.pathname.replace(/\/+$/, ""));
         // 如果用户只填写了 https://dav.jianguoyun.com/dav/ 或根目录，自动生成子目录候选
         if (path === "/dav" || path === "") {
           const origin = u.origin;
           return [
             {
-              dirUrl: `${origin}/dav/LogicWeaver/`,
-              fileUrl: `${origin}/dav/LogicWeaver/${filename}`
+              dirUrl: `${origin}/dav/%E6%88%91%E7%9A%84%E5%9D%9A%E6%9E%9C%E4%BA%91/`,
+              fileUrl: `${origin}/dav/%E6%88%91%E7%9A%84%E5%9D%9A%E6%9E%9C%E4%BA%91/${filename}`
             },
             {
-              dirUrl: `${origin}/dav/我的坚果云/`,
-              fileUrl: `${origin}/dav/我的坚果云/${filename}`
+              dirUrl: `${origin}/dav/LogicWeaver/`,
+              fileUrl: `${origin}/dav/LogicWeaver/${filename}`
             }
           ];
         }
@@ -178,9 +179,22 @@ export class WebDavService {
     }
 
     const auth = this.getAuthHeader(config);
-    // This public upload boundary must enforce the same ordinary-backup policy as its callers.
-    const parsed = parseSyncBackup(payload, SYNC_WHITELIST_KEYS);
-    const jsonStr = JSON.stringify(createSyncBackup(parsed.sanitized), null, 2);
+    let backupEnvelope: any;
+
+    // 检查 payload 是否已经是合法格式的信封
+    if (payload && typeof payload === "object" && payload.settings && typeof payload.settings === "object") {
+      const { sanitized } = extractSyncPayload(payload.settings);
+      backupEnvelope = {
+        ...payload,
+        settings: sanitized
+      };
+    } else {
+      // 纯设置字典，自动打包为信封
+      const { sanitized } = extractSyncPayload(payload);
+      backupEnvelope = await createSyncBackup(sanitized);
+    }
+
+    const jsonStr = JSON.stringify(backupEnvelope, null, 2);
     const byteLength = new TextEncoder().encode(jsonStr).length;
     const candidates = this.getCandidateUrls(config);
 
@@ -256,7 +270,10 @@ export class WebDavService {
         if (resp.status === 200) {
           const textData = await resp.text();
           try {
-            const parsed = JSON.parse(textData);
+            let parsed = JSON.parse(textData);
+            if (typeof parsed === "string") {
+              try { parsed = JSON.parse(parsed); } catch {}
+            }
             return { ok: true, data: parsed };
           } catch {
             return { ok: false, error: "云端返回的文件内容并非合法的 JSON 格式" };
@@ -288,39 +305,85 @@ export class WebDavService {
 
   /**
    * 一键将本机全部配置与常用网站清洗打包并推送到 WebDAV
+   * 支持 mergeRemote: true 先拉取云端无损并集合并，再上传推送（双向安全合并上传）
    */
-  public async pushCurrentConfig(config: WebDavConfig): Promise<WebDavOperationResult> {
+  public async pushCurrentConfig(config: WebDavConfig, options: { mergeRemote?: boolean } = {}): Promise<WebDavOperationResult> {
     try {
-      const { sanitized, count, byteLength } = extractSyncPayload(await readSyncSettings());
-      if (count === 0) {
-        return { ok: false, errorKind: "policy", error: "未检测到有效的普通备份配置项" };
+      let localSettings = await readSyncSettings();
+
+      if (options.mergeRemote) {
+        // 先下载云端现有配置做预合并
+        try {
+          const dl = await this.download(config);
+          if (dl.ok && dl.data) {
+            const remoteSettings = dl.data.settings || dl.data;
+            // 将本地与云端无损融合
+            localSettings = mergeSyncSettings(localSettings, remoteSettings);
+          }
+        } catch (dlErr) {
+          console.warn("[WebDAV Push] 预拉取云端数据跳过，直接上传当前本地配置:", dlErr);
+        }
       }
 
-      const payload = createSyncBackup(sanitized);
+      // 生成安全的上传信封
+      const payload = await createSyncBackup(localSettings);
 
       const res = await this.upload(config, payload);
       if (res.ok) {
-        return { ok: true, count, byteLength: res.byteLength || byteLength };
+        // 上传坚果云成功后，再静默将融合后的配置固化到当前本地
+        if (options.mergeRemote) {
+          try {
+            await restoreSyncBackup(payload);
+          } catch (e) {
+            console.warn("[WebDAV Push] 本地持久化融合快照告警:", e);
+          }
+        }
+        return { ok: true, count: payload.settings ? Object.keys(payload.settings).length : 0, byteLength: res.byteLength };
       }
       return { ok: false, error: res.error || "上传坚果云失败" };
     } catch (err: any) {
-      return { ok: false, errorKind: err instanceof SyncBackupError ? "policy" : "operation", error: err instanceof SyncBackupError ? err.message : "备份过程发生异常" };
+      const msg = err?.message || String(err);
+      return { ok: false, errorKind: err instanceof SyncBackupError ? "policy" : "operation", error: `备份过程发生异常: ${msg}` };
     }
   }
 
   /**
    * 一键从 WebDAV 拉取配置并对齐恢复到本地
    */
-  public async pullCurrentConfig(config: WebDavConfig): Promise<WebDavOperationResult> {
+  public async pullCurrentConfig(config: WebDavConfig, options: { merge?: boolean } = {}): Promise<WebDavOperationResult> {
     try {
       const res = await this.download(config);
       if (!res.ok || !res.data) {
-        return { ok: false, error: res.error || "拉取失败" };
+        return { ok: false, error: res.error || "未在服务器找到对应备份文件" };
       }
 
-      return { ok: true, ...await restoreSyncBackup(res.data) };
+      let dataToRestore = res.data;
+      if (typeof dataToRestore === "string") {
+        try { dataToRestore = JSON.parse(dataToRestore); } catch {}
+      }
+
+      if (options.merge) {
+        const localSettings = await readSyncSettings();
+        const remoteSettings = (dataToRestore && typeof dataToRestore === "object" && dataToRestore.settings)
+          ? dataToRestore.settings
+          : dataToRestore;
+        const merged = mergeSyncSettings(localSettings, remoteSettings);
+        dataToRestore = {
+          ...(typeof dataToRestore === "object" ? dataToRestore : {}),
+          settings: merged
+        };
+      }
+
+      const restoreResult = await restoreSyncBackup(dataToRestore);
+      return { ok: true, ...restoreResult };
     } catch (err: any) {
-      return { ok: false, errorKind: err instanceof SyncBackupError ? "policy" : "operation", error: err instanceof SyncBackupError ? err.message : "恢复过程发生异常，请检查实际写入结果；未自动重试" };
+      console.error("[WebDAV Pull] 恢复失败详情:", err);
+      const msg = err?.message || String(err);
+      return {
+        ok: false,
+        errorKind: (err instanceof SyncBackupError || err?.name === "SyncBackupError") ? "policy" : "operation",
+        error: (err instanceof SyncBackupError || err?.name === "SyncBackupError") ? err.message : `恢复过程发生异常: ${msg}`
+      };
     }
   }
 }

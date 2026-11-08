@@ -4,6 +4,7 @@ import { fullscreenCardState, hideRegisteredCard } from "../core/fullscreen-card
 import { syncFullscreenPresentation } from "../core/fullscreen-presentation";
 import { getStandaloneCardId } from "../core/navigation-state";
 import { mergeBuiltinDockTools, mergeBuiltinDockCards } from "../modules/builtins";
+import { defaultDockCards } from "./default-order";
 import { pluginMarketController } from "../modules/market-store";
 import { getDockModule } from "../modules/registry";
 
@@ -51,7 +52,7 @@ export interface MacDockController {
   setActions(actions: Partial<MacDockActions>): void;
 }
 
-export const DOCK_CARDS: DockCardItem[] = mergeBuiltinDockCards([]);
+export const DOCK_CARDS: DockCardItem[] = defaultDockCards(mergeBuiltinDockCards([]));
 
 export const DOCK_TOOLS: DockToolItem[] = mergeBuiltinDockTools([
 ]);
