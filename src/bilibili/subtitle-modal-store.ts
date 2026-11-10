@@ -1,6 +1,12 @@
 import { reactive } from "vue";
 import { bilibiliService } from "../services/bilibili.service";
 
+export interface SubtitleCueItem {
+  from: number;
+  to: number;
+  content: string;
+}
+
 export interface SubtitleModalState {
   isOpen: boolean;
   loading: boolean;
@@ -11,6 +17,7 @@ export interface SubtitleModalState {
   fullText: string;
   charCount: number;
   copied: boolean;
+  cues: SubtitleCueItem[];
 }
 
 export const subtitleModalState = reactive<SubtitleModalState>({
@@ -22,7 +29,8 @@ export const subtitleModalState = reactive<SubtitleModalState>({
   cid: undefined,
   fullText: "",
   charCount: 0,
-  copied: false
+  copied: false,
+  cues: []
 });
 
 export const subtitleModalController = {
@@ -39,6 +47,7 @@ export const subtitleModalController = {
     subtitleModalState.bvid = params.bvid;
     subtitleModalState.cid = params.cid;
     subtitleModalState.copied = false;
+    subtitleModalState.cues = [];
 
     try {
       const res = await bilibiliService.fetchVideoSubtitleDetails(params.bvid, params.cid);
@@ -46,7 +55,10 @@ export const subtitleModalController = {
         subtitleModalState.error = res.reason || "该视频暂无可用字幕轨道";
         return;
       }
-      const lines = res.cues.map((c) => c.content.trim()).filter(Boolean);
+      subtitleModalState.cues = res.cues
+        .map((c) => ({ from: c.from, to: c.to, content: c.content.trim() }))
+        .filter((c) => Boolean(c.content));
+      const lines = subtitleModalState.cues.map((c) => c.content);
       const full = lines.join("\n");
       subtitleModalState.fullText = full;
       subtitleModalState.charCount = full.length;

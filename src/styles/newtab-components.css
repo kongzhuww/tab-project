@@ -2305,7 +2305,10 @@ a.fo-upper-link:hover { color:#c4b5fd;text-decoration:underline; }
 
 /* 全屏卡片头部通用物理碰撞流式弹性布局（GitHub / B站 / AI HOT / YouTube） */
 #card-github.card-fullscreen .card-head,
-#daily-bilibili.card-fullscreen .card-head,
+#daily-bilibili.card-fullscreen .card-head {
+  display: none !important;
+}
+
 #daily-aihot.card-fullscreen .card-head,
 #daily-youtube.card-fullscreen .card-head {
   display: flex !important;
@@ -2834,12 +2837,37 @@ body.has-card-fullscreen .ms-tv {
   gap: 6px;
 }
 .gh-bili-hero {
-  display: grid;
-  grid-template-columns: 56px minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 14px;
-  padding-bottom: 6px;
-  border-bottom: 1px solid var(--border);
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 14px !important;
+  padding-bottom: 8px !important;
+  border-bottom: 1px solid var(--border) !important;
+  min-height: 52px !important;
+}
+.gh-hero-left {
+  display: flex !important;
+  align-items: center !important;
+  gap: 12px !important;
+  flex-shrink: 0 !important;
+  min-width: 0 !important;
+}
+.gh-bili-cover {
+  flex-shrink: 0 !important;
+}
+.gh-bili-heading {
+  flex-shrink: 0 !important;
+  min-width: 0 !important;
+}
+.gh-hero-search-area {
+  flex: 1 1 auto !important;
+  min-width: 200px !important;
+  max-width: 520px !important;
+  margin: 0 8px !important;
+}
+.gh-hero-search-area .card-fullscreen-gh-search {
+  width: 100% !important;
+  margin: 0 !important;
 }
 .gh-bili-cover {
   display: grid;

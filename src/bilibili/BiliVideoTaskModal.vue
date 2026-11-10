@@ -9,6 +9,7 @@ import { notifications } from "../sdk/notifications";
 import TodoistDatePickerPopover from "../todoist/TodoistDatePickerPopover.vue";
 import CustomSelect, { type CustomSelectOption } from "../core/CustomSelect.vue";
 import { attachBiliVideo } from "../todoist/bili-video-links";
+import { t } from "../i18n";
 
 const windowRef = ref<HTMLElement | null>(null);
 const pos = ref<{ x: number; y: number } | null>(null);
@@ -246,11 +247,22 @@ async function loadSectionsForProject(projId: string) {
   }
 }
 
+function isInboxProject(p: TodoistRawProject): boolean {
+  return Boolean(p.inbox_project || p.is_inbox_project || /^(Inbox|收件箱)$/i.test(p.name.trim()));
+}
+
+function getProjectDisplayName(p: TodoistRawProject): string {
+  if (isInboxProject(p)) {
+    return t("todoist.inbox") || "收件箱";
+  }
+  return p.name;
+}
+
 const projectOptions = computed<CustomSelectOption[]>(() => {
   return projects.value.map(p => ({
     value: String(p.id),
-    label: p.name,
-    icon: "📁"
+    label: getProjectDisplayName(p),
+    icon: isInboxProject(p) ? "📥" : "📁"
   }));
 });
 

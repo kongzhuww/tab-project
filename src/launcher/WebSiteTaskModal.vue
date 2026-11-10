@@ -147,6 +147,7 @@ import { todoistTaskListController } from "../todoist/task-list-store";
 import CustomSelect, { type CustomSelectOption } from "../core/CustomSelect.vue";
 import TodoistDatePickerPopover from "../todoist/TodoistDatePickerPopover.vue";
 import { attachWebSite } from "../todoist/web-site-links";
+import { t } from "../i18n";
 
 const target = computed(() => state.target);
 
@@ -175,11 +176,22 @@ const timeValid = ref(true);
 const isSubmitting = ref(false);
 const error = ref("");
 
+function isInboxProject(p: TodoistRawProject): boolean {
+  return Boolean(p.inbox_project || p.is_inbox_project || /^(Inbox|收件箱)$/i.test(p.name.trim()));
+}
+
+function getProjectDisplayName(p: TodoistRawProject): string {
+  if (isInboxProject(p)) {
+    return t("todoist.inbox") || "收件箱";
+  }
+  return p.name;
+}
+
 const projectOptions = computed<CustomSelectOption[]>(() => {
   return projects.value.map(p => ({
     value: String(p.id),
-    label: p.name,
-    icon: "📁"
+    label: getProjectDisplayName(p),
+    icon: isInboxProject(p) ? "📥" : "📁"
   }));
 });
 

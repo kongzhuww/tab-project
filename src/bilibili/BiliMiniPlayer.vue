@@ -183,6 +183,27 @@ function openUpPreview(
   );
 }
 
+const biliWebUrl = computed(() => {
+  const page = state.pages?.[state.currentPageIndex]?.page || (state.currentPageIndex > 0 ? state.currentPageIndex + 1 : undefined);
+  const pQuery = page && page > 1 ? `?p=${page}` : "";
+  if (state.bvid) {
+    return `https://www.bilibili.com/video/${state.bvid}${pQuery}`;
+  }
+  if (state.aid) {
+    return `https://www.bilibili.com/video/av${state.aid}${pQuery}`;
+  }
+  return "https://www.bilibili.com";
+});
+
+function openInBilibili() {
+  const url = biliWebUrl.value;
+  if (typeof chrome !== "undefined" && chrome?.tabs?.create) {
+    chrome.tabs.create({ url, active: true });
+  } else {
+    window.open(url, "_blank", "noopener,noreferrer");
+  }
+}
+
 function openSubtitleWindow() {
   if (!state.bvid) return;
   void subtitleModalController.open({
@@ -884,6 +905,16 @@ onUnmounted(() => {
                 @click.stop="nextEpisode"
               >›</button>
             </div>
+
+            <!-- 跳转 B站 网页按钮 -->
+            <button
+              class="bili-mini-speed-btn bili-mini-link-btn"
+              type="button"
+              :title="t('bili.player.openInBiliTitle')"
+              @click.stop="openInBilibili"
+            >
+              {{ t('bili.player.openInBili') }}
+            </button>
 
             <!-- 字幕纯文本提取按钮 -->
             <button

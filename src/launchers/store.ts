@@ -30,6 +30,7 @@ export interface LauncherGroupsSnapshot {
   groupSizes: Record<string, "small" | "large">;
   folders: LauncherFolderMap;
   showSites: boolean;
+  sitesView: "sites" | "bookmarks";
   hasTodo: boolean;
   hasBili: boolean;
 }
@@ -58,6 +59,7 @@ export interface LauncherGroupsController {
   setPageLabels(labels: Record<string, string>): void;
   setLinks(links: LauncherLink[]): void;
   setPrefs(showSites: boolean, hasTodo: boolean, hasBili: boolean): void;
+  setSitesView(view: "sites" | "bookmarks"): void;
   setActions(actions: Partial<LauncherGroupsActions>): void;
   setExternalDragHandler(handler: ((hover: LauncherExternalDragHover | null) => void) | null): void;
   setExternalDropHandler(handler: ((link: LauncherLink) => Promise<boolean>) | null): void;
@@ -84,6 +86,7 @@ const initialState = (): LauncherGroupsSnapshot => ({
   groupSizes: {},
   folders: {},
   showSites: true,
+  sitesView: "sites",
   hasTodo: true,
   hasBili: false
 });
@@ -162,6 +165,9 @@ export const launcherGroupsController: LauncherGroupsController = {
     launcherGroupsState.showSites = showSites;
     launcherGroupsState.hasTodo = hasTodo;
     launcherGroupsState.hasBili = hasBili;
+  },
+  setSitesView(view: "sites" | "bookmarks") {
+    launcherGroupsState.sitesView = view;
   },
   setActions(actions) {
     boundActions = { ...boundActions, ...actions };

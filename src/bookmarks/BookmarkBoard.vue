@@ -10,6 +10,7 @@ import { removeBookmarkIcon } from './icon-storage';
 import { launcherDialogsController } from '../launcher/dialogs-store';
 import { notifications } from '../sdk/notifications';
 import CustomSelect, { type CustomSelectOption } from '../core/CustomSelect.vue';
+import { pendingBookmarkLocate } from './bookmark-locate';
 const BookmarkFolderDialog = defineAsyncComponent(() => import('./BookmarkFolderDialog.vue'));
 const BookmarkBoardMenu = defineAsyncComponent(() => import('./BookmarkBoardMenu.vue'));
 const props = defineProps<{ headerTarget: string }>();
@@ -75,17 +76,10 @@ const drag = useLauncherPointerDrag<BookmarkBoardItem>({
   commit: async (item, parentId, beforeId, atEnd) => { try { await moveItem(item, parentId, beforeId, atEnd); } catch { /* status owns failure; never retry */ } }
 });
 const draggedId = drag.activeId, overFolder = drag.overFolder, ghost = drag.ghost, previews = drag.previews;
-const folderFilter = ref('');
 const displayedItems = computed(() => section.value ? (previews.value[section.value.id] || section.value.items) : []);
 const folderItems = computed(() => {
   if (!dialogFolder.value) return [];
-  const base = previews.value[dialogFolder.value.id] || dialogFolder.value.items;
-  const kw = folderFilter.value.trim().toLowerCase();
-  if (!kw) return base;
-  return base.filter(item => {
-    return (item.title || '').toLowerCase().includes(kw) ||
-      (item.kind === 'link' && (item.url || '').toLowerCase().includes(kw));
-  });
+  return previews.value[dialogFolder.value.id] || dialogFolder.value.items;
 });
 // Match FavoriteSites: offer only the visible top-level partitions, not every nested folder.
 const destinations = computed(() => {
@@ -100,16 +94,15 @@ const outerParentId = computed(() => {
 });
 function selectSection(id: string) {
   if (saving.value || !closeMenu()) return;
-  drag.cancel(); sectionId.value = id; openedFolderId.value = ''; folderFilter.value = ''; limit.value = 60;
+  drag.cancel(); sectionId.value = id; openedFolderId.value = ''; limit.value = 60;
 }
 function selectSource() { selectSection(source.value?.sections[0]?.id || sections.value[0]?.id || ''); }
 function openFolder(folder: BookmarkBoardFolder) {
   if (saving.value || !closeMenu()) return;
-  drag.cancel(); openedFolderId.value = folder.id; folderFilter.value = ''; folderLimit.value = 60;
+  drag.cancel(); openedFolderId.value = folder.id; folderLimit.value = 60;
 }
-function closeFolder() { if (!saving.value && !menu.value) { drag.cancel(); openedFolderId.value = ''; folderFilter.value = ''; } }
+function closeFolder() { if (!saving.value && !menu.value) { drag.cancel(); openedFolderId.value = ''; } }
 function goUp() {
-  folderFilter.value = '';
   const parentId = dialogFolder.value?.parentId;
   const parent = parentId ? board.value.folders.get(parentId) : undefined;
   if (!parent || parent.id === sectionId.value) closeFolder(); else openFolder(parent);
@@ -234,8 +227,122 @@ function remove(item: BookmarkBoardItem): Promise<void> {
     if (item.kind === 'folder') deleteFolderRecursiveIcons(item);
   });
 }
-onMounted(() => { unsubscribe = subscribeBookmarkBoard(scheduleRefresh); void refresh(); });
-onUnmounted(() => { mounted = false; ++generation; unsubscribe(); clearTimeout(refreshTimer); drag.cancel(); });
+
+async function locateBookmark(targetNodeId?: string, targetUrl?: string): Promise<boolean> {
+  if (!board.value.sources.length) {
+    await refreshBoard();
+  }
+
+  let foundItem: BookmarkBoardItem | undefined;
+  let containingFolderId = '';
+
+  for (const [folderId, folder] of board.value.folders.entries()) {
+    const item = folder.items.find(i =>
+      (targetNodeId && String(i.id) === String(targetNodeId)) ||
+      (targetUrl && i.kind === 'link' && i.url === targetUrl)
+    );
+    if (item) {
+      foundItem = item;
+      containingFolderId = folderId;
+      break;
+    }
+  }
+
+  if (!foundItem && targetNodeId && board.value.folders.has(targetNodeId)) {
+    foundItem = board.value.folders.get(targetNodeId);
+    containingFolderId = foundItem?.parentId || '';
+  }
+
+  if (!foundItem) return false;
+
+  let currentId = containingFolderId;
+  let targetSectionId = '';
+  let targetSourceId = '';
+
+  for (const src of board.value.sources) {
+    const sec = src.sections.find(s => s.id === currentId);
+    if (sec) {
+      targetSectionId = sec.id;
+      targetSourceId = src.id;
+      break;
+    }
+  }
+
+  if (!targetSectionId && currentId) {
+    let curr = board.value.folders.get(currentId);
+    while (curr && curr.parentId && curr.parentId !== '0') {
+      for (const src of board.value.sources) {
+        const sec = src.sections.find(s => s.id === curr!.id);
+        if (sec) {
+          targetSectionId = sec.id;
+          targetSourceId = src.id;
+          break;
+        }
+      }
+      if (targetSectionId) break;
+      curr = board.value.folders.get(curr.parentId);
+    }
+  }
+
+  if (targetSourceId && sourceId.value !== targetSourceId) {
+    sourceId.value = targetSourceId;
+  }
+  if (targetSectionId && sectionId.value !== targetSectionId) {
+    selectSection(targetSectionId);
+  }
+
+  if (containingFolderId && containingFolderId !== targetSectionId && board.value.folders.has(containingFolderId)) {
+    openFolder(board.value.folders.get(containingFolderId)!);
+  } else {
+    closeFolder();
+  }
+
+  setTimeout(() => {
+    let el: HTMLElement | null = null;
+    if (foundItem?.id) {
+      el = document.querySelector(`[data-bookmark-node="${foundItem.id}"]`) as HTMLElement | null;
+    }
+    if (!el && targetUrl) {
+      el = document.querySelector(`.bookmark-board [href="${targetUrl}"]`) as HTMLElement | null;
+    }
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+      el.classList.remove('launcher-locate-highlight');
+      void el.offsetWidth;
+      el.classList.add('launcher-locate-highlight');
+      setTimeout(() => {
+        el?.classList.remove('launcher-locate-highlight');
+      }, 3200);
+    }
+  }, 140);
+
+  return true;
+}
+
+function onLocateBookmarkEvent(e: Event) {
+  const custom = e as CustomEvent<{ nodeId?: string; url?: string }>;
+  void locateBookmark(custom.detail?.nodeId, custom.detail?.url);
+}
+
+onMounted(() => {
+  unsubscribe = subscribeBookmarkBoard(scheduleRefresh);
+  window.addEventListener('logicweaver:locate-bookmark', onLocateBookmarkEvent);
+  void refresh().then(() => {
+    if (pendingBookmarkLocate.timestamp && Date.now() - pendingBookmarkLocate.timestamp < 4000) {
+      const { nodeId, url } = pendingBookmarkLocate;
+      pendingBookmarkLocate.timestamp = 0;
+      void locateBookmark(nodeId, url);
+    }
+  });
+});
+onUnmounted(() => {
+  mounted = false;
+  ++generation;
+  unsubscribe();
+  window.removeEventListener('logicweaver:locate-bookmark', onLocateBookmarkEvent);
+  clearTimeout(refreshTimer);
+  drag.cancel();
+});
 </script>
 
 <template>
@@ -270,7 +377,7 @@ onUnmounted(() => { mounted = false; ++generation; unsubscribe(); clearTimeout(r
       <button v-if="displayedItems.length > limit" class="bookmark-board-more" type="button" @click="limit += 60">显示更多（剩余 {{ displayedItems.length - limit }}）</button>
       <p v-if="!loading && !displayedItems.length" class="bookmark-board-empty">{{ error ? '书签读取失败，请刷新核对' : '暂无书签，右键创建文件夹或拖入网站' }}</p>
     </div>
-    <BookmarkFolderDialog v-if="dialogFolder" v-model:filter="folderFilter" :folder="dialogFolder" :busy="saving || !!menu" :status="status" @close="closeFolder" @up="goUp">
+    <BookmarkFolderDialog v-if="dialogFolder" :folder="dialogFolder" :busy="saving || !!menu" :status="status" @close="closeFolder" @up="goUp">
       <div class="bookmark-folder-drop-area" :data-bookmark-drop="dialogFolder.id" @contextmenu="blankMenu(dialogFolder.id, $event)">
         <BookmarkTiles :items="folderItems.slice(0, folderLimit)" :folder-id="dialogFolder.id" :busy="saving" :dragged-id="draggedId" :over-folder="overFolder" :sizes="sizes"
           @pointer-down="drag.start" @activate="activate" @menu="tileMenu" />

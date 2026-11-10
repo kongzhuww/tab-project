@@ -2,7 +2,10 @@
 import { ref, reactive, computed, nextTick, onMounted, onUnmounted, TransitionGroup, defineAsyncComponent } from "vue";
 const BookmarkBoard = defineAsyncComponent(() => import("../bookmarks/BookmarkBoard.vue"));
 const LauncherBookGuideDialog = defineAsyncComponent(() => import("./LauncherBookGuideDialog.vue"));
-const sitesView = ref<"sites" | "bookmarks">("sites");
+const sitesView = computed<"sites" | "bookmarks">({
+  get: () => launcherGroupsState.sitesView || "sites",
+  set: (v) => launcherGroupsController.setSitesView(v)
+});
 const bookmarkSaving = ref(false);
 const isGuideOpen = ref(false);
 function openGuide() {

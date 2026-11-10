@@ -1,5 +1,13 @@
 html {
-  scrollbar-gutter: stable;
+  height: 100%;
+  overflow: hidden;
+  scrollbar-gutter: auto;
+}
+html::-webkit-scrollbar,
+body::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
 }
 
 /* Design tokens ported from the LogicWeaver site (dark theme). */
@@ -760,10 +768,16 @@ html[data-theme="light"] .date { color: #334155 !important; text-shadow: none !i
   padding: 16px var(--launcher-pad-x) 96px;
   overflow-y: auto;
   overflow-x: hidden;
-  scrollbar-width: thin;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
   transition: padding-right 0.2s;
   transform: translate3d(0, 0, 0);
   contain: layout style;
+}
+.launcher-inner::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
 }
 .launcher-overview {
   display: grid;

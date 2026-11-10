@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, reactive } from "vue";
+import { ref, computed, onMounted, onUnmounted, reactive, watch } from "vue";
 import { gitHubService, type GitHubRawRepo } from "../services/github.service";
 import { starBoardController as controller, starBoardState as state } from "./stars-board-store";
 import { starBoardData, getStarBoardRepoFolders } from "./stars-board-data";
 import { githubRepoDetailController } from "./repo-detail-store";
+import { githubTaskModalController } from "./github-task-modal-store";
 import { REPOSITORY_DRAG_TYPE, readRepositoryDrag } from "./repository-drag";
 import { t } from "../i18n";
 
@@ -35,6 +36,83 @@ function onShelfWheel(event: WheelEvent) {
 // 是否正在加载
 const isLoading = computed(() => starBoardData.loading);
 const showShelfSkeleton = computed(() => isLoading.value && !starBoardData.repos.length);
+
+// 当前处于下钻模式的父文件夹名称（null 为全部视图）
+const activeDrilldownParent = ref<string | null>(null);
+
+// 统一解析文件夹名称，支持半角 / 与中文全角 ／，以及斜杠两侧任意空格
+function parseFolderHierarchy(name: string): { parentPrefix: string; childName: string } | null {
+  if (!name) return null;
+  const match = name.match(/^(.+?)[/／](.+)$/);
+  if (!match) return null;
+  const parentPrefix = match[1].trim();
+  const childName = match[2].trim();
+  if (!parentPrefix || !childName) return null;
+  return { parentPrefix, childName };
+}
+
+// 判断某文件夹是否为某个现有父文件夹的子级，若是则返回父文件夹全名，否则返回 null
+function getParentFolderName(name: string): string | null {
+  const parsed = parseFolderHierarchy(name);
+  if (!parsed) return null;
+  const targetParentLower = parsed.parentPrefix.toLowerCase();
+  const parent = controller.lists.find(l => l.name.trim().toLowerCase() === targetParentLower);
+  return parent ? parent.name : null;
+}
+
+// 获取某个父文件夹下的所有子文件夹
+function getChildLists(parentName: string): any[] {
+  const targetParentLower = parentName.trim().toLowerCase();
+  return controller.lists.filter(l => {
+    const parsed = parseFolderHierarchy(l.name);
+    return parsed !== null && parsed.parentPrefix.toLowerCase() === targetParentLower;
+  });
+}
+
+// 判断某个文件夹是否包含子文件夹
+function isParentList(name: string): boolean {
+  return getChildLists(name).length > 0;
+}
+
+// 当前下钻视图下的子分组数量
+const currentSubListsCount = computed(() => {
+  if (!activeDrilldownParent.value) return 0;
+  return getChildLists(activeDrilldownParent.value).length;
+});
+
+function handleDrilldown(parentName: string) {
+  activeDrilldownParent.value = parentName;
+  if (boardViewportRef.value) {
+    boardViewportRef.value.scrollLeft = 0;
+  }
+}
+
+// 实际在看板中渲染展示的 Lists 列
+const visibleLists = computed(() => {
+  const allLists = controller.lists;
+  if (!activeDrilldownParent.value) {
+    // 默认全部视图：只展示顶层文件夹（即没有对应父文件夹的文件夹）
+    // 带有父文件夹的子项在默认视图下自动归纳进父文件夹内，不平铺展示
+    return allLists.filter(l => getParentFolderName(l.name) === null);
+  }
+  // 下钻视图：展示该父文件夹自身 + 所有子文件夹
+  const targetParent = activeDrilldownParent.value.trim().toLowerCase();
+  const parentList = allLists.find(l => l.name.trim().toLowerCase() === targetParent);
+  const children = getChildLists(activeDrilldownParent.value);
+  if (!parentList && !children.length) {
+    activeDrilldownParent.value = null;
+    return allLists.filter(l => getParentFolderName(l.name) === null);
+  }
+  return parentList ? [parentList, ...children] : children;
+});
+
+watch(() => starBoardData.activeSection, () => {
+  activeDrilldownParent.value = null;
+});
+
+function handleCreateFolderInBoard(): void {
+  void gitHubService.promptCreateFolder(activeDrilldownParent.value || undefined);
+}
 
 // 拖拽状态
 const activeDragRepo = ref<GitHubRawRepo | null>(null);
@@ -184,7 +262,7 @@ function handleOpenContextMenu(e: MouseEvent, repo: GitHubRawRepo, fromList: str
   e.stopPropagation();
 
   const menuWidth = 190;
-  const menuHeight = 220;
+  const menuHeight = 270;
   const x = Math.min(e.clientX, window.innerWidth - menuWidth - 10);
   const y = Math.min(e.clientY, window.innerHeight - menuHeight - 10);
 
@@ -229,6 +307,26 @@ async function handleCopyCloneCommand() {
   } catch {}
 }
 
+function handleCreateTask() {
+  const repo = contextMenuState.repo;
+  closeContextMenu();
+  if (!repo) return;
+  githubTaskModalController.open({
+    fullName: repo.full_name,
+    description: repo.description || "",
+    stars: repo.stargazers_count,
+    language: repo.language || undefined,
+    updated: repo.updated_at
+  });
+}
+
+function handleOpenInGitHub() {
+  const repo = contextMenuState.repo;
+  closeContextMenu();
+  if (!repo?.html_url) return;
+  openRepoUrl(repo.html_url);
+}
+
 function onGlobalPointerDown(event: PointerEvent): void {
   const target = event.target as HTMLElement | null;
   if (!target?.closest(".fo-cover-context-menu") && !target?.closest(".col-popover-menu") && !target?.closest(".gh-list-col-menu")) {
@@ -239,6 +337,10 @@ function onGlobalPointerDown(event: PointerEvent): void {
 
 function onGlobalKeyDown(event: KeyboardEvent): void {
   if (event.key === "Escape") {
+    if (activeDrilldownParent.value) {
+      activeDrilldownParent.value = null;
+      return;
+    }
     closeContextMenu();
     closeListMenu();
   }
@@ -556,6 +658,31 @@ onUnmounted(() => {
     </section>
 
     <!-- 2. 下方：各个 GitHub 原生 Lists 看板横向多列滚动区 -->
+    <!-- 🌟 子分组下钻面包屑导航栏 -->
+    <div v-if="activeDrilldownParent" class="gh-drilldown-header">
+      <button
+        type="button"
+        class="gh-drilldown-back-btn"
+        title="返回查看全部一级分组 (Esc)"
+        @click="activeDrilldownParent = null"
+      >
+        ‹ 返回全部
+      </button>
+      <span class="gh-drilldown-sep">/</span>
+      <span class="gh-drilldown-current">📁 {{ activeDrilldownParent }}</span>
+      <span class="gh-drilldown-sub-count">
+        (含 {{ currentSubListsCount }} 个子分组)
+      </span>
+      <button
+        type="button"
+        class="gh-drilldown-exit-btn"
+        title="退出下钻视图"
+        @click="activeDrilldownParent = null"
+      >
+        ✕
+      </button>
+    </div>
+
     <div
       ref="boardViewportRef"
       class="board-viewport"
@@ -563,7 +690,7 @@ onUnmounted(() => {
       @dragover="onViewportDragOver"
     >
       <!-- 骨架屏占位（当加载中且暂无 Lists 时展示） -->
-      <div v-if="isLoading && !controller.lists.length" class="board-columns-track">
+      <div v-if="isLoading && !visibleLists.length" class="board-columns-track">
         <div v-for="c in 4" :key="'skel-col-' + c" class="board-column skel-column">
           <div class="column-header">
             <div class="skel-line" style="width: 120px; height: 16px;"></div>
@@ -581,7 +708,7 @@ onUnmounted(() => {
       <!-- 真实各 Lists 看板列 -->
       <div v-else class="board-columns-track">
         <section
-          v-for="list in controller.lists"
+          v-for="list in visibleLists"
           :key="list.id"
           class="board-column list-column"
           :data-gh-list-drop="list.name"
@@ -596,15 +723,32 @@ onUnmounted(() => {
         >
           <header
             class="column-header"
-            :title="'拖动此列可调换位置；右侧更多可重命名、置顶或删除'"
+            :title="isParentList(list.name)
+              ? `📁 ${list.name}（包含 ${getChildLists(list.name).length} 个子分组，点击下钻进入）`
+              : '拖动此列可调换位置；右侧更多可重命名、置顶或删除'"
           >
-            <div class="column-title-group">
+            <div
+              class="column-title-group"
+              :class="{ 'is-parent-folder': isParentList(list.name) && !activeDrilldownParent }"
+              @click="isParentList(list.name) && !activeDrilldownParent && handleDrilldown(list.name)"
+            >
               <span class="col-dot list-dot"></span>
-              <h3 class="column-title" :title="list.description || ('本地分组: ' + list.name)">
+              <h3
+                class="column-title"
+                :class="{ 'title-clickable': isParentList(list.name) && !activeDrilldownParent }"
+                :title="list.description || ('本地分组: ' + list.name)"
+              >
                 📁 {{ list.name }}
               </h3>
               <span v-if="list.pinned" class="col-pinned-icon" title="已置顶分组">📌</span>
               <span class="badge-count">{{ controller.getReposForList(list.name).length }}</span>
+              <span
+                v-if="isParentList(list.name) && !activeDrilldownParent"
+                class="col-sub-badge"
+                title="点击下钻查看所有子分组"
+              >
+                {{ getChildLists(list.name).length }}个子分组 ›
+              </span>
             </div>
 
             <div class="column-actions">
@@ -714,10 +858,11 @@ onUnmounted(() => {
           <button
             type="button"
             class="btn-trigger-add-col"
-            @click="gitHubService.promptCreateFolder()"
+            :title="activeDrilldownParent ? `在「${activeDrilldownParent}」下新建子分组` : '新建本地分组'"
+            @click="handleCreateFolderInBoard"
           >
             <span class="plus-icon">＋</span>
-            <span>新建本地分组</span>
+            <span>{{ activeDrilldownParent ? `新建 ${activeDrilldownParent} 子分组` : '新建本地分组' }}</span>
           </button>
         </section>
       </div>
@@ -797,6 +942,24 @@ onUnmounted(() => {
           @click="handleCopyCloneCommand"
         >
           复制克隆命令 (git clone)
+        </button>
+
+        <button
+          class="fo-cover-menu-item"
+          type="button"
+          @mouseenter="activeSubMenu = null"
+          @click="handleCreateTask"
+        >
+          创建任务
+        </button>
+
+        <button
+          class="fo-cover-menu-item"
+          type="button"
+          @mouseenter="activeSubMenu = null"
+          @click="handleOpenInGitHub"
+        >
+          在 GitHub 打开
         </button>
       </div>
 
@@ -1434,5 +1597,94 @@ onUnmounted(() => {
 .gh-sub-flyout.flyout-left {
   left: auto;
   right: 100%;
+}
+
+/* 🌟 子分组下钻面包屑导航栏 */
+.gh-drilldown-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  margin: 0 16px 10px 16px;
+  border-radius: 8px;
+  background: var(--surface, #f8fafc);
+  border: 1px solid var(--border, #e2e8f0);
+  font-size: 12px;
+  user-select: none;
+}
+
+.gh-drilldown-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid var(--border-strong, #cbd5e1);
+  border-radius: 6px;
+  background: var(--panel, #ffffff);
+  color: #0284c7;
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 3px 9px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.gh-drilldown-back-btn:hover {
+  background: #0284c7;
+  color: #ffffff;
+  border-color: #0284c7;
+}
+
+.gh-drilldown-sep {
+  color: var(--dim, #94a3b8);
+  font-size: 13px;
+}
+
+.gh-drilldown-current {
+  font-weight: 700;
+  color: var(--heading, #0f172a);
+}
+
+.gh-drilldown-sub-count {
+  color: var(--muted, #64748b);
+  font-size: 11px;
+}
+
+.gh-drilldown-exit-btn {
+  margin-left: auto;
+  border: 0;
+  background: transparent;
+  color: var(--muted, #64748b);
+  font-size: 12px;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+.gh-drilldown-exit-btn:hover {
+  background: var(--surface-hover, #f1f5f9);
+  color: var(--heading, #0f172a);
+}
+
+.column-title-group.is-parent-folder {
+  cursor: pointer;
+}
+.column-title-group.is-parent-folder:hover .column-title {
+  color: #0284c7 !important;
+  text-decoration: underline;
+}
+
+.col-sub-badge {
+  font-size: 9.5px;
+  font-weight: 600;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(2, 132, 199, 0.1);
+  color: #0284c7;
+  margin-left: 2px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: all 0.12s ease;
+}
+.column-title-group.is-parent-folder:hover .col-sub-badge {
+  background: #0284c7;
+  color: #ffffff;
 }
 </style>

@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from "vue";
+import { ref, computed, watch, nextTick, onMounted, onUnmounted } from "vue";
 import { subtitleModalState as state, subtitleModalController as controller } from "./subtitle-modal-store";
+import { biliMiniPlayerState } from "./mini-player-store";
 
 const windowRef = ref<HTMLElement | null>(null);
 const pos = ref<{ x: number; y: number } | null>(null);
@@ -9,6 +10,82 @@ let startMouseX = 0;
 let startMouseY = 0;
 let startPosX = 0;
 let startPosY = 0;
+
+// 🌟 实时跟踪当前视频播放进度
+const currentPlayTime = ref(0);
+let timeTrackerTimer: ReturnType<typeof setInterval> | null = null;
+
+function updateCurrentPlayTime() {
+  const video = document.querySelector(".bili-mini-screen video, .bili-sub-screen video") as HTMLVideoElement | null;
+  if (video && Number.isFinite(video.currentTime)) {
+    currentPlayTime.value = video.currentTime;
+  } else if (Number.isFinite(biliMiniPlayerState.currentTime)) {
+    currentPlayTime.value = biliMiniPlayerState.currentTime;
+  }
+}
+
+// 计算当前播放进度所对应的字幕行 (如 0:20)
+const activeCueIndex = computed(() => {
+  const time = currentPlayTime.value;
+  if (!state.cues || !state.cues.length) return -1;
+  const exact = state.cues.findIndex(c => time >= c.from && time <= c.to);
+  if (exact !== -1) return exact;
+  for (let i = state.cues.length - 1; i >= 0; i--) {
+    if (time >= state.cues[i].from) return i;
+  }
+  return 0;
+});
+
+function formatTime(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  return `${m}:${String(s).padStart(2, "0")}`;
+}
+
+const activeCueEl = ref<HTMLElement | null>(null);
+
+function scrollToActiveCue(smooth = true) {
+  nextTick(() => {
+    if (activeCueEl.value) {
+      activeCueEl.value.scrollIntoView({
+        behavior: smooth ? "smooth" : "auto",
+        block: "center"
+      });
+    }
+  });
+}
+
+function seekVideo(seconds: number) {
+  const video = document.querySelector(".bili-mini-screen video, .bili-sub-screen video") as HTMLVideoElement | null;
+  if (video) {
+    video.currentTime = Math.max(0, seconds);
+    if (video.paused) void video.play();
+  }
+  currentPlayTime.value = seconds;
+}
+
+watch(() => state.isOpen, (open) => {
+  if (open) {
+    updateCurrentPlayTime();
+    timeTrackerTimer = setInterval(updateCurrentPlayTime, 300);
+    setTimeout(() => {
+      scrollToActiveCue(false);
+    }, 120);
+  } else {
+    if (timeTrackerTimer) {
+      clearInterval(timeTrackerTimer);
+      timeTrackerTimer = null;
+    }
+  }
+});
+
+watch(() => state.loading, (loading) => {
+  if (!loading && state.cues.length) {
+    setTimeout(() => {
+      scrollToActiveCue(false);
+    }, 120);
+  }
+});
 
 function onHeaderMouseDown(e: MouseEvent) {
   if ((e.target as HTMLElement).closest("button, a, input")) return;
@@ -122,6 +199,21 @@ onUnmounted(() => {
           <div v-else-if="state.error" class="bili-sub-error">
             <span style="font-size: 24px;">⚠️</span>
             <p>{{ state.error }}</p>
+          </div>
+          <!-- 🌟 结构化时间轴字幕列表：当前 0:20 等台词突出高亮（蓝色背景 + 黑色加粗） -->
+          <div v-else-if="state.cues.length" class="bili-sub-cues-list">
+            <div
+              v-for="(cue, idx) in state.cues"
+              :key="idx"
+              :ref="el => { if (idx === activeCueIndex) activeCueEl = el as HTMLElement }"
+              class="bili-sub-cue-row"
+              :class="{ 'is-active': idx === activeCueIndex }"
+              :title="`点击跳转到 ${formatTime(cue.from)} 播放`"
+              @click="seekVideo(cue.from)"
+            >
+              <span class="bili-sub-cue-time">{{ formatTime(cue.from) }}</span>
+              <span class="bili-sub-cue-text">{{ cue.content }}</span>
+            </div>
           </div>
           <textarea
             v-else
@@ -270,9 +362,67 @@ onUnmounted(() => {
   flex: 1;
   display: flex;
   flex-direction: column;
-  padding: 10px;
+  padding: 6px;
   overflow: hidden;
   background-color: #ffffff !important;
+}
+
+.bili-sub-cues-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 4px 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.bili-sub-cue-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  border-left: 3px solid transparent;
+  transition: all 0.15s ease;
+  user-select: text;
+}
+
+.bili-sub-cue-row:hover {
+  background: #f1f5f9;
+}
+
+.bili-sub-cue-time {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 11px;
+  color: #94a3b8;
+  flex: none;
+  width: 36px;
+}
+
+.bili-sub-cue-text {
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: #334155;
+  word-break: break-word;
+}
+
+/* 🌟 用户要求的 0:20 等台词突出效果：蓝色背景 + 黑色加粗 */
+.bili-sub-cue-row.is-active {
+  background: rgba(0, 174, 236, 0.15) !important;
+  border-left-color: #00aeec !important;
+}
+
+.bili-sub-cue-row.is-active .bili-sub-cue-time {
+  color: #00aeec !important;
+  font-weight: 700 !important;
+}
+
+.bili-sub-cue-row.is-active .bili-sub-cue-text {
+  color: #000000 !important;
+  font-weight: 700 !important;
 }
 
 /* 🌟 正文文案区：纯正白底黑字、100% 实体绝不透光、极度清晰舒适 */

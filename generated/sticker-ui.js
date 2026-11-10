@@ -1,8 +1,8 @@
-import { d as F, B as M, x as P, o as a, e as n, i as o, f as d, p as v, t as h, F as g, g as V, u as w, A as z, C as y, b as p, c as D } from "./chunks/vendor-vue-9b0eS4bW.js";
-import { S as L } from "./chunks/StickerBoard-fTlKJryc.js";
-import { a as f, w as $ } from "./chunks/stickers.service-C9AVG1Bf.js";
-import { g as b, i as S, s as H } from "./chunks/quick-links-export.service-bmE4-0fH.js";
-import { _ as Q } from "./chunks/_plugin-vue_export-helper-BZmK54HO.js";
+import { d as F, B as M, x as P, o as n, e as a, i as o, f as d, p as v, t as h, F as g, g as V, u as b, A as z, C as w, b as p, c as D } from "./chunks/vendor-vue-9b0eS4bW.js";
+import { S as L } from "./chunks/StickerBoard-DreYTFj7.js";
+import { a as f, w as $ } from "./chunks/stickers.service-Bdd21-le.js";
+import { g as y, i as S, s as H } from "./chunks/quick-links-export.service-bmE4-0fH.js";
+import { _ as Q } from "./chunks/_plugin-vue_export-helper-BxikU0LD.js";
 const U = { class: "sticker-app" }, j = {
   key: 0,
   class: "sticker-side-nav"
@@ -18,7 +18,7 @@ const U = { class: "sticker-app" }, j = {
 }, O = ["title", "onClick"], R = ["src"], X = ["hidden"], Y = /* @__PURE__ */ F({
   __name: "StickerStandalone",
   setup(tt) {
-    const T = y(() => import("./chunks/SettingsDialog-COOpwwdG.js")), B = y(() => import("./chunks/AppPromptModal-BBxsuZ9f.js")), k = document.body.dataset.mode === "sidepanel", l = p([]), i = p("等待扫描"), u = p(""), _ = p(!1);
+    const T = w(() => import("./chunks/SettingsDialog-CVYav4Ip.js")), B = w(() => import("./chunks/AppPromptModal-B4AzoAKC.js")), k = document.body.dataset.mode === "sidepanel", l = p([]), i = p("等待扫描"), u = p(""), _ = p(!1);
     let m = 0;
     function r(s, e = !1) {
       u.value = s, _.value = e, clearTimeout(m), m = window.setTimeout(() => {
@@ -35,7 +35,7 @@ const U = { class: "sticker-app" }, j = {
     }
     async function I() {
       try {
-        const s = await b();
+        const s = await y();
         if (!S(s)) throw new Error("当前标签页不是普通网页");
         const e = await H(s);
         r(e.ok ? "已保存到常用网站" : e.error || "保存失败", !e.ok);
@@ -46,7 +46,7 @@ const U = { class: "sticker-app" }, j = {
     async function W() {
       i.value = "正在扫描…", l.value = [];
       try {
-        const s = await b();
+        const s = await y();
         if (!S(s) || !s?.id) throw new Error("当前标签页不是普通网页");
         const e = await chrome.scripting.executeScript({
           target: { tabId: s.id },
@@ -71,14 +71,14 @@ const U = { class: "sticker-app" }, j = {
         r(e?.message || "保存图片失败", !0);
       }
     }
-    return (s, e) => (a(), n(g, null, [
+    return (s, e) => (n(), a(g, null, [
       o("main", U, [
-        k ? (a(), n("nav", j, [...e[0] || (e[0] = [
+        k ? (n(), a("nav", j, [...e[0] || (e[0] = [
           o("a", { href: "sidepanel.html" }, "← 工具首页", -1),
           o("span", null, "表情包", -1)
         ])])) : d("", !0),
         v(L),
-        k ? (a(), n("div", q, [
+        k ? (n(), a("div", q, [
           o("button", {
             type: "button",
             onClick: A
@@ -88,7 +88,7 @@ const U = { class: "sticker-app" }, j = {
             onClick: I
           }, "☆ 保存网页到常用网站")
         ])) : d("", !0),
-        k ? (a(), n("section", G, [
+        k ? (n(), a("section", G, [
           o("header", null, [
             o("div", null, [
               e[1] || (e[1] = o("strong", null, "当前网页图片", -1)),
@@ -100,8 +100,8 @@ const U = { class: "sticker-app" }, j = {
             }, "扫描当前页")
           ]),
           o("div", J, [
-            i.value.endsWith("0 张 · 点击保存") ? (a(), n("div", K, "当前页面没有可收集的图片")) : d("", !0),
-            (a(!0), n(g, null, V(l.value, (t) => (a(), n("button", {
+            i.value.endsWith("0 张 · 点击保存") ? (n(), a("div", K, "当前页面没有可收集的图片")) : d("", !0),
+            (n(!0), a(g, null, V(l.value, (t) => (n(), a("button", {
               key: t.url,
               type: "button",
               class: "sticker-page-image",
@@ -118,8 +118,8 @@ const U = { class: "sticker-app" }, j = {
           ])
         ])) : d("", !0)
       ]),
-      v(w(T)),
-      v(w(B)),
+      v(b(T)),
+      v(b(B)),
       o("div", {
         id: "sticker-toast",
         class: z(["sticker-toast", { bad: _.value }]),
@@ -127,5 +127,5 @@ const U = { class: "sticker-app" }, j = {
       }, h(u.value), 11, X)
     ], 64));
   }
-}), Z = /* @__PURE__ */ Q(Y, [["__scopeId", "data-v-afcc7f36"]]), C = document.getElementById("vue-sticker-standalone-root");
+}), Z = /* @__PURE__ */ Q(Y, [["__scopeId", "data-v-7b038dbe"]]), C = document.getElementById("vue-sticker-standalone-root");
 C && D(Z).mount(C);

@@ -28,15 +28,6 @@
         </header>
 
         <div class="gh-task-body">
-          <!-- 已关联的任务列表 -->
-          <GitHubRepositoryLinkedTasks
-            :repository-name="repository.fullName"
-            :disabled="githubTaskCreation.saving"
-            @open-task="openCreatedTask"
-          />
-
-          <h3 class="task-create-heading">创建任务</h3>
-
           <div class="repository-reference">
             <span>◇</span>
             <div>
@@ -167,8 +158,8 @@ import { githubTaskCreation, type GitHubTaskTarget } from '../todoist/github-tas
 import { openTodoistTask } from '../todoist/task-navigation';
 import TaskRepositoryLinks from '../todoist/TaskRepositoryLinks.vue';
 import TodoistDatePickerPopover from '../todoist/TodoistDatePickerPopover.vue';
-import GitHubRepositoryLinkedTasks from './GitHubRepositoryLinkedTasks.vue';
 import CustomSelect, { type CustomSelectOption } from '../core/CustomSelect.vue';
+import { t } from '../i18n';
 
 const repository = computed(() => state.repository);
 
@@ -209,8 +200,20 @@ interface Attempt {
 const attempt = ref<Attempt | null>(null);
 const key = computed(() => 'github_task_attempt_v1:' + (repository.value?.fullName.toLowerCase() || ''));
 
+function isInboxProject(p: TodoistRawProject): boolean {
+  return Boolean(p.inbox_project || p.is_inbox_project || /^(Inbox|收件箱)$/i.test(p.name.trim()));
+}
+
+function getProjectDisplayName(p: TodoistRawProject): string {
+  if (isInboxProject(p)) {
+    return t('todoist.inbox') || '收件箱';
+  }
+  return p.name;
+}
+
 const selectedProjectName = computed(() => {
-  return projects.value.find(p => String(p.id) === selectedProjectId.value)?.name || '未命名项目';
+  const p = projects.value.find(p => String(p.id) === selectedProjectId.value);
+  return p ? getProjectDisplayName(p) : '未命名项目';
 });
 
 const selectedSectionName = computed(() => {
@@ -221,8 +224,8 @@ const selectedSectionName = computed(() => {
 const projectOptions = computed<CustomSelectOption[]>(() => {
   return projects.value.map(p => ({
     value: String(p.id),
-    label: p.name,
-    icon: '📁'
+    label: getProjectDisplayName(p),
+    icon: isInboxProject(p) ? '📥' : '📁'
   }));
 });
 

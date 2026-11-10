@@ -550,6 +550,8 @@ export default {
   "bili.player.prevEp": "上一集",
   "bili.player.nextEp": "下一集",
   "bili.player.toggleEpisodes": "展开/收起选集列表",
+  "bili.player.openInBili": "B站 ↗",
+  "bili.player.openInBiliTitle": "在 B站 网页中打开",
 
   "github.myRepos.copiedUrlTitle": "已复制链接",
   "github.myRepos.copiedUrlMsg": "已复制 {name} 仓库链接",

@@ -858,14 +858,41 @@ export class GitHubService {
       await this.mutateLocalGroups(data => removeLocalGroup(data, target.id), "本地分组已删除，GitHub 收藏未改变。", owner);
   }
 
-  public async promptCreateFolder(): Promise<void> {
+  public async promptCreateFolder(parentPrefix?: string): Promise<void> {
     const owner = this.cacheKey;
     if (!owner) { this.actionMessage = "请先配置 GitHub 账号并读取收藏。"; this.actionError = true; this.publishStatus(); return; }
     let name: string | null;
-    try { name = await appDialog.prompt({ title: "新建本地分组", message: "分组仅保存在本机，不创建 GitHub Lists。", placeholder: "分组名称（如：前端工具、深度学习）…" }); }
-    catch { return; }
-    if (!name?.trim() || owner !== this.cacheKey) return;
-    await this.mutateLocalGroups(data => addLocalGroup(data, name), "本地分组已创建。", owner);
+    const prefix = parentPrefix?.trim();
+    const isSub = Boolean(prefix);
+    try {
+      name = await appDialog.prompt({
+        title: isSub ? `新建「${prefix}」的子分组` : "新建本地分组",
+        message: isSub ? `将在「${prefix}」下创建子分组，系统会自动加上前缀。` : "分组仅保存在本机，不创建 GitHub Lists。",
+        placeholder: isSub ? `子分组名称（如：工具、论文），自动归入 ${prefix}/…` : "分组名称（如：前端工具、深度学习）…",
+        defaultValue: isSub ? `${prefix}/` : ""
+      });
+    } catch { return; }
+    const raw = name?.trim();
+    if (!raw || owner !== this.cacheKey) return;
+
+    let finalName = raw;
+    if (isSub && prefix) {
+      const cleanRaw = raw.replace(/^[/／]+/, "").trim();
+      const lowerPrefix = `${prefix.toLowerCase()}/`;
+      const lowerPrefixCn = `${prefix.toLowerCase()}／`;
+      if (!cleanRaw.toLowerCase().startsWith(lowerPrefix) && !cleanRaw.toLowerCase().startsWith(lowerPrefixCn)) {
+        finalName = `${prefix}/${cleanRaw}`;
+      } else {
+        finalName = cleanRaw.replace(/^([^/／]+)[/／]/, "$1/");
+      }
+    }
+    await this.mutateLocalGroups(data => addLocalGroup(data, finalName), `本地分组「${finalName}」已创建。`, owner);
+  }
+
+  public async addRepoToList(fullName: string, listName: string): Promise<boolean> {
+    const target = this.lists.find(list => list.name === listName);
+    if (!target) return false;
+    return this.mutateLocalGroups(data => assignLocalGroup(data, [fullName], target.id, "add"), "本地分组归属已保存。");
   }
 
   public async dropRepositoryIntoFolder(fullName: string, folderTitle: string): Promise<void> {
@@ -879,7 +906,7 @@ export class GitHubService {
     const key = fullName.toLowerCase();
     const currentListIds = this.repoListIds.get(key) || [];
     if (currentListIds.includes(targetList.id)) return;
-    await this.toggleRepoList(fullName, folderTitle);
+    await this.addRepoToList(fullName, folderTitle);
   }
 
   public findRepository(fullName: string): GitHubRawRepo | null {

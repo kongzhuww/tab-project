@@ -15,14 +15,21 @@ function decode(value: any, owner: string): LocalStarGroups {
       !value.memberships || typeof value.memberships !== "object" || Array.isArray(value.memberships)) throw new Error("本地分组数据异常，未覆盖原数据。");
   const groups: LocalStarGroups["groups"] = value.groups.map((group: any) => {
     if (typeof group?.id !== "string" || !group.id || typeof group.name !== "string" || !group.name.trim()) throw new Error("本地分组格式异常。");
-    return { id: group.id, name: group.name, pinned: Boolean(group.pinned), section: typeof group.section === "string" ? group.section.trim() : undefined };
+    return {
+      id: group.id,
+      name: group.name,
+      pinned: Boolean(group.pinned),
+      ...(typeof group.section === "string" && group.section.trim() ? { section: group.section.trim() } : {})
+    };
   });
   if (new Set(groups.map(group => group.id)).size !== groups.length || new Set(groups.map(group => group.name)).size !== groups.length) throw new Error("本地分组存在重复记录。");
   const ids = new Set(groups.map(group => group.id));
   const memberships: Record<string, string[]> = Object.create(null);
-  for (const [name, raw] of Object.entries(value.memberships)) {
+  const sortedNames = Object.keys(value.memberships).sort();
+  for (const name of sortedNames) {
+    const raw = value.memberships[name];
     if (!/^[a-z0-9-]+\/[a-z0-9_.-]+$/i.test(name) || !Array.isArray(raw) || raw.some(id => typeof id !== "string" || !ids.has(id))) throw new Error("本地仓库归属格式异常。");
-    memberships[name.toLowerCase()] = [...new Set(raw)] as string[];
+    memberships[name.toLowerCase()] = [...new Set(raw)].sort() as string[];
   }
   const rawSections: string[] = Array.isArray(value.sections) ? value.sections.filter((s: any) => typeof s === "string" && s.trim()) : ["默认"];
   const sections: string[] = [...new Set(rawSections.length ? rawSections : ["默认"])];
@@ -52,13 +59,45 @@ async function readOrSeed(owner: string, seed?: LocalGroupSeed): Promise<LocalSt
   await save(owner, data);
   return data;
 }
+function areLocalStarGroupsEquivalent(a: LocalStarGroups, b: LocalStarGroups): boolean {
+  if (a.version !== b.version || a.owner !== b.owner) return false;
+  if (a.activeSection !== b.activeSection) return false;
+  if (a.groups.length !== b.groups.length) return false;
+  for (let i = 0; i < a.groups.length; i++) {
+    const ga = a.groups[i], gb = b.groups[i];
+    if (ga.id !== gb.id || ga.name !== gb.name || Boolean(ga.pinned) !== Boolean(gb.pinned) || (ga.section || "") !== (gb.section || "")) {
+      return false;
+    }
+  }
+  const keysA = Object.keys(a.memberships).sort();
+  const keysB = Object.keys(b.memberships).sort();
+  if (keysA.length !== keysB.length) return false;
+  for (let i = 0; i < keysA.length; i++) {
+    if (keysA[i] !== keysB[i]) return false;
+    const listA = a.memberships[keysA[i]], listB = b.memberships[keysB[i]];
+    if (listA.length !== listB.length) return false;
+    const setB = new Set(listB);
+    if (!listA.every(id => setB.has(id))) return false;
+  }
+  const secA = a.sections || ["默认"], secB = b.sections || ["默认"];
+  if (secA.length !== secB.length || secA.some((s, i) => s !== secB[i])) return false;
+  return true;
+}
+
 async function save(owner: string, data: LocalStarGroups): Promise<void> {
   const key = keyFor(owner), valid = decode(data, owner);
   try {
     await chrome.storage.local.set({ [key]: valid });
-    const actual = decode((await chrome.storage.local.get(key))[key], owner);
-    if (JSON.stringify(actual) !== JSON.stringify(valid)) throw new Error("readback mismatch");
-  } catch { throw new Error("本地分组保存或核对未完成，可能已保存；请刷新核对后再操作。"); }
+    const stored = (await chrome.storage.local.get(key))[key];
+    if (!stored) throw new Error("readback empty");
+    const actual = decode(stored, owner);
+    if (JSON.stringify(actual) !== JSON.stringify(valid) && !areLocalStarGroupsEquivalent(actual, valid)) {
+      throw new Error("readback mismatch");
+    }
+  } catch (err) {
+    console.error("[local-star-groups] 保存或核对异常:", err);
+    throw new Error("本地分组保存或核对未完成，可能已保存；请刷新核对后再操作。");
+  }
 }
 export async function loadLocalStarGroups(owner: string, seed?: LocalGroupSeed): Promise<LocalStarGroups> {
   return exclusive(owner, () => readOrSeed(owner, seed));

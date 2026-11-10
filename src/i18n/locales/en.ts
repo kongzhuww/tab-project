@@ -552,6 +552,8 @@ const en: Record<TranslationKey, string> = {
   "bili.player.prevEp": "Previous Episode",
   "bili.player.nextEp": "Next Episode",
   "bili.player.toggleEpisodes": "Toggle episodes list",
+  "bili.player.openInBili": "Bilibili ↗",
+  "bili.player.openInBiliTitle": "Open in Bilibili web",
 
   "github.myRepos.copiedUrlTitle": "Link Copied",
   "github.myRepos.copiedUrlMsg": "Copied {name} repository link",
