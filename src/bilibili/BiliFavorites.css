@@ -1093,7 +1093,7 @@
 .fo-cached-local-badge { position:absolute;left:6px;bottom:6px;padding:2px 6px;border-radius:4px;background:rgba(5,150,105,.88);color:#fff;font-size:8px;font-weight:800;letter-spacing:.6px;pointer-events:none; }
 .fo-cached-hero .fo-bili-cover { color:#fff;font-size:25px;background:linear-gradient(145deg,#10b981,#059669); }
 
-/* 收藏夹顶栏精简（左侧封面与信息，右侧操作按钮） */
+/* 收藏夹顶栏精简（左侧封面与信息，中间搜索栏，右侧操作按钮） */
 .fo-bili-hero.fo-hero-persistent,
 .fo-bili-hero.fo-radio-hero {
   display: flex !important;
@@ -1104,10 +1104,43 @@
   padding-bottom: 14px !important;
   border-bottom: 1px solid var(--border) !important;
 }
+.fo-bili-hero.fo-hero-persistent .fo-hero-left {
+  flex-shrink: 0 !important;
+}
+.fo-hero-bili-search {
+  flex: 1 1 auto !important;
+  max-width: 480px !important;
+  min-width: 200px !important;
+  margin: 0 12px !important;
+  position: relative !important;
+}
 .fo-bili-hero.fo-hero-persistent > .fo-bili-actions,
 .fo-bili-hero.fo-radio-hero > .fo-bili-actions {
   align-self: center !important;
   padding-top: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  flex-shrink: 0 !important;
+}
+.fo-bili-hero.fo-hero-persistent .hero-action-btn {
+  height: 32px !important;
+  padding: 0 12px !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  border-radius: 8px !important;
+  white-space: nowrap !important;
+  box-sizing: border-box !important;
+  transition: all 0.15s ease !important;
+}
+.fo-bili-hero.fo-hero-persistent .btn-refresh {
+  width: 32px !important;
+  padding: 0 !important;
+  justify-content: center !important;
+  font-size: 14px !important;
 }
 .fo-bili-hero.fo-radio-hero .fo-hero-folder-info {
   display: flex !important;

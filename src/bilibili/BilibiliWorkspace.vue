@@ -717,89 +717,6 @@ function onRadioVideoDragStart(event: DragEvent, video: { bvid: string; title: s
 
 <template>
   <section id="daily-bilibili" class="card wide" :class="{ 'card-fullscreen': isStandalone || fullscreenCardState.activeId === 'daily-bilibili' }">
-    <header class="card-head bili-header-unified-row">
-      <div class="bili-header-left">
-        <span class="bar" style="background: linear-gradient(180deg,#818cf8,#f472b6)"></span>
-        <h2>{{ t('bili.workspace.title') }}</h2>
-      </div>
-
-
-      <div class="bili-header-right">
-        <!-- B站互动消息按钮（位于搜索栏左侧，纯浏览模式） -->
-        <button
-          id="bili-header-msg-center-btn"
-          class="fm-tab bili-header-msg-btn"
-          type="button"
-          :class="{ 'is-active': biliMessagePanelState.isOpen }"
-          :title="t('bili.workspace.msgCenterTip')"
-          @click="toggleMessagePanel"
-        >
-          <span class="bili-header-msg-icon">🔔</span>
-          <span class="bili-header-msg-label">{{ t('bili.workspace.msgBtn') }}</span>
-        </button>
-
-        <!-- 移到右侧的高级 B站搜索（带热门推荐与实时视频联想下拉浮层） -->
-        <div class="card-fullscreen-bili-search" ref="searchHostRef">
-          <form class="card-fullscreen-bili-searchbar" role="search" @submit.prevent="onSearchSubmit">
-            <input
-              v-model="biliSearchQuery"
-              type="search"
-              autocomplete="off"
-              :placeholder="t('bili.workspace.searchPlaceholder')"
-              :aria-label="t('bili.workspace.searchAria')"
-              @focus="onSearchFocus"
-              @input="onSearchInputChange"
-            />
-            <button type="submit" :title="t('bili.workspace.searchBtnTip')">⌕</button>
-          </form>
-
-          <div
-            v-if="isSearchSuggestVisible"
-            class="card-fullscreen-bili-suggestions"
-            role="listbox"
-          >
-            <div class="card-fullscreen-bili-suggest-head">
-              <span>{{ searchSuggestHeadTitle }}</span>
-              <small>{{ searchSuggestHeadSubtitle }}</small>
-            </div>
-            <p v-if="isSearchLoading" class="card-fullscreen-bili-suggest-status">正在获取推荐 / 搜索中…</p>
-            <p v-else-if="!searchSuggestResults.length && !isSearchLoading" class="card-fullscreen-bili-suggest-status">没有找到相关视频，回车可在 B站 全网搜索</p>
-            <template v-else>
-              <button
-                v-for="item in searchSuggestResults"
-                :key="item.bvid || item.aid"
-                type="button"
-                class="card-fullscreen-bili-video-row"
-                role="option"
-                @click="openVideoItem(item)"
-                @contextmenu.prevent="openSuggestContextMenu($event, item)"
-              >
-                <span class="card-fullscreen-bili-thumb">
-                  <img :src="item.cover" alt="" referrerpolicy="no-referrer" loading="lazy" />
-                  <i v-if="item.durationText">{{ item.durationText }}</i>
-                </span>
-                <span class="card-fullscreen-bili-video-copy">
-                  <strong>{{ item.title }}</strong>
-                  <small>{{ item.upper }} · {{ item.playText }}播放</small>
-                </span>
-              </button>
-            </template>
-          </div>
-        </div>
-
-        <!-- 关注分组管理按钮移到右侧，与搜索框在同一行 -->
-        <button
-          id="bili-up-group-manager-top"
-          class="fm-tab bili-header-up-group-btn"
-          type="button"
-          :title="t('bili.workspace.upGroupManagerTip')"
-          @click="dispatch('manage-up-groups')"
-        >
-          {{ t('bili.workspace.upGroupManager') }}
-        </button>
-      </div>
-    </header>
-
     <div class="fm-pane" id="pane-organizer">
       <div id="fo-body">
         <div class="fo-bili-layout" :class="{ 'fo-picking-move-target': organizer.isTargetPickMode }" data-vue-organizer-shell="true" @wheel="onLayoutWheel">
@@ -813,7 +730,7 @@ function onRadioVideoDragStart(event: DragEvent, video: { bvid: string; title: s
               <div class="fo-sidebar-toggle-title">
                 <span class="fo-sidebar-toggle-icon">⚡</span>
                 <span>{{ t('bili.channel.title') }}</span>
-                <span v-if="isFeaturesCollapsed" class="fo-sidebar-toggle-pill">6</span>
+                <span v-if="isFeaturesCollapsed" class="fo-sidebar-toggle-pill">5</span>
               </div>
               <button
                 type="button"
@@ -855,12 +772,6 @@ function onRadioVideoDragStart(event: DragEvent, video: { bvid: string; title: s
                 <button id="fo-sidebar-radio-btn" type="button" class="fo-sidebar-sub-btn" :class="{ on: organizer.mode === 'radio' }" :title="t('bili.channel.radioTip')" @click="dispatch('open-radio')">
                   <div class="fo-sidebar-sub-main"><span class="fo-sidebar-sub-icon">📻</span><div class="fo-sidebar-sub-text"><strong>{{ t('bili.channel.radio') }}</strong><small>{{ t('bili.channel.radioSub') }}</small></div></div>
                   <span class="fo-sidebar-sub-badge">RADIO</span>
-                </button>
-              </div>
-              <div class="fo-sidebar-sub-wrap fo-sidebar-history-wrap">
-                <button id="fo-sidebar-history-btn" type="button" class="fo-sidebar-sub-btn" :class="{ on: organizer.mode === 'organizer' && biliFavoritesState.activeFolderId === '__history__' }" :title="t('bili.channel.historyTip')" @click="dispatch('select-folder', { id: '__history__', kind: 'other' })">
-                  <div class="fo-sidebar-sub-main"><span class="fo-sidebar-sub-icon">📜</span><div class="fo-sidebar-sub-text"><strong>{{ t('bili.channel.history') }}</strong><small>{{ t('bili.channel.historySub') }}</small></div></div>
-                  <span class="fo-sidebar-sub-badge">HISTORY</span>
                 </button>
               </div>
             </div>
@@ -990,12 +901,82 @@ function onRadioVideoDragStart(event: DragEvent, video: { bvid: string; title: s
                   <div class="fo-hero-folder-info"><h3>{{ organizer.folderTitle }}</h3><p>{{ organizer.folderSubtitle }}</p></div>
                 </div>
 
-                <!-- 🌟 放置在收集箱右侧的实时字幕条 (图 1 标准，支持左右拉伸调节宽度) -->
-                <BiliVideoLyricDockBar inline-hero />
+                <!-- 🌟 居中放置的 B站搜索（带热门推荐与实时视频联想下拉浮层） -->
+                <div class="card-fullscreen-bili-search fo-hero-bili-search" ref="searchHostRef">
+                  <form class="card-fullscreen-bili-searchbar" role="search" @submit.prevent="onSearchSubmit">
+                    <input
+                      v-model="biliSearchQuery"
+                      type="search"
+                      autocomplete="off"
+                      :placeholder="t('bili.workspace.searchPlaceholder')"
+                      :aria-label="t('bili.workspace.searchAria')"
+                      @focus="onSearchFocus"
+                      @input="onSearchInputChange"
+                    />
+                    <button type="submit" :title="t('bili.workspace.searchBtnTip')">⌕</button>
+                  </form>
+
+                  <div
+                    v-if="isSearchSuggestVisible"
+                    class="card-fullscreen-bili-suggestions"
+                    role="listbox"
+                  >
+                    <div class="card-fullscreen-bili-suggest-head">
+                      <span>{{ searchSuggestHeadTitle }}</span>
+                      <small>{{ searchSuggestHeadSubtitle }}</small>
+                    </div>
+                    <p v-if="isSearchLoading" class="card-fullscreen-bili-suggest-status">正在获取推荐 / 搜索中…</p>
+                    <p v-else-if="!searchSuggestResults.length && !isSearchLoading" class="card-fullscreen-bili-suggest-status">没有找到相关视频，回车可在 B站 全网搜索</p>
+                    <template v-else>
+                      <button
+                        v-for="item in searchSuggestResults"
+                        :key="item.bvid || item.aid"
+                        type="button"
+                        class="card-fullscreen-bili-video-row"
+                        role="option"
+                        @click="openVideoItem(item)"
+                        @contextmenu.prevent="openSuggestContextMenu($event, item)"
+                      >
+                        <span class="card-fullscreen-bili-thumb">
+                          <img :src="item.cover" alt="" referrerpolicy="no-referrer" loading="lazy" />
+                          <i v-if="item.durationText">{{ item.durationText }}</i>
+                        </span>
+                        <span class="card-fullscreen-bili-video-copy">
+                          <strong>{{ item.title }}</strong>
+                          <small>{{ item.upper }} · {{ item.playText }}播放</small>
+                        </span>
+                      </button>
+                    </template>
+                  </div>
+                </div>
 
                 <div class="fo-bili-actions">
-                  <button type="button" class="primary" :disabled="!organizer.videos.length" @click="dispatch('organizer-batch-toggle')">{{ organizer.batchMode ? t('bili.workspace.batchBack') : t('bili.workspace.batch') }}</button>
-                  <button type="button" :title="t('bili.workspace.refreshFolderTip')" @click="dispatch('organizer-refresh')">↻</button>
+                  <!-- B站互动消息按钮 -->
+                  <button
+                    id="bili-header-msg-center-btn"
+                    class="fm-tab bili-header-msg-btn hero-action-btn"
+                    type="button"
+                    :class="{ 'is-active': biliMessagePanelState.isOpen }"
+                    :title="t('bili.workspace.msgCenterTip')"
+                    @click="toggleMessagePanel"
+                  >
+                    <span class="bili-header-msg-icon">🔔</span>
+                    <span class="bili-header-msg-label">{{ t('bili.workspace.msgBtn') }}</span>
+                  </button>
+
+                  <!-- ⚙ 关注分组管理按钮 -->
+                  <button
+                    id="bili-up-group-manager-top"
+                    class="fm-tab bili-header-up-group-btn hero-action-btn"
+                    type="button"
+                    :title="t('bili.workspace.upGroupManagerTip')"
+                    @click="dispatch('manage-up-groups')"
+                  >
+                    {{ t('bili.workspace.upGroupManager') }}
+                  </button>
+
+                  <button type="button" class="primary hero-action-btn" :disabled="!organizer.videos.length" @click="dispatch('organizer-batch-toggle')">{{ organizer.batchMode ? t('bili.workspace.batchBack') : t('bili.workspace.batch') }}</button>
+                  <button type="button" class="hero-action-btn btn-refresh" :title="t('bili.workspace.refreshFolderTip')" @click="dispatch('organizer-refresh')">↻</button>
                 </div>
               </header>
 
@@ -1391,6 +1372,11 @@ function onRadioVideoDragStart(event: DragEvent, video: { bvid: string; title: s
         <span class="fo-context-icon">▤</span> 字幕转文本
       </button>
     </div>
+
+    <!-- 🌟 全局独立自由浮动台词胶囊栏 (支持用户任意拖拽摆放) -->
+    <Teleport to="body">
+      <BiliVideoLyricDockBar />
+    </Teleport>
   </section>
 </template>
 

@@ -40,48 +40,59 @@ async function handleSectionContextMenu(event: MouseEvent, sectionName: string) 
 </script>
 
 <template>
-  <div id="gh-hero-cover" class="gh-bili-cover">
-    <span v-if="state.kind === 'all'">⭐</span>
-    <span v-else-if="state.kind === 'uncategorized'">📄</span>
-    <i v-else class="fo-folder-icon"></i>
-  </div>
-  <div class="gh-bili-heading">
-    <div class="gh-hero-title-row">
-      <h3 id="gh-hero-title" :title="state.title">{{ state.title }}</h3>
-
-      <!-- 🌟 常用网站同款：大分组标签栏 (Tabs) -->
-      <div class="gh-hero-sections-tabs" role="tablist" aria-label="收藏大分组标签">
-        <button
-          v-for="sec in starBoardData.sections"
-          :key="sec"
-          type="button"
-          class="gh-section-tab"
-          :class="{ active: sec === starBoardData.activeSection }"
-          :title="`切换到分组「${sec}」；右键可删除此标签`"
-          @click="gitHubService.switchSection(sec)"
-          @contextmenu="handleSectionContextMenu($event, sec)"
-        >
-          {{ sec }}
-        </button>
-        <button
-          type="button"
-          class="gh-section-add-btn"
-          title="添加新分组标签"
-          aria-label="添加新分组标签"
-          @click="handleAddSection"
-        >
-          ＋
-        </button>
-      </div>
-
-      <div v-if="status.actionText" class="gh-hero-inline-status" :class="{ 'is-error': status.actionError }" :role="status.actionError ? 'alert' : 'status'" :aria-live="status.actionError ? 'assertive' : 'polite'" aria-atomic="true">
-        <span class="gh-hero-status-text" :title="status.actionText">{{ status.actionText }}</span>
-        <button type="button" :title="t('github.hero.closeTip')" :aria-label="t('github.hero.closeTip')" @click="githubStatusController.update({ actionText: '', actionError: false })">×</button>
-      </div>
+  <!-- 🌟 左侧信息区：封面与文字紧密靠拢 -->
+  <div class="gh-hero-left">
+    <div id="gh-hero-cover" class="gh-bili-cover">
+      <span v-if="state.kind === 'all'">⭐</span>
+      <span v-else-if="state.kind === 'uncategorized'">📄</span>
+      <i v-else class="fo-folder-icon"></i>
     </div>
-    <p id="gh-hero-desc">{{ state.description }}</p>
+    <div class="gh-bili-heading">
+      <div class="gh-hero-title-row">
+        <h3 id="gh-hero-title" :title="state.title">{{ state.title }}</h3>
+
+        <!-- 🌟 常用网站同款：大分组标签栏 (Tabs) -->
+        <div class="gh-hero-sections-tabs" role="tablist" aria-label="收藏大分组标签">
+          <button
+            v-for="sec in starBoardData.sections"
+            :key="sec"
+            type="button"
+            class="gh-section-tab"
+            :class="{ active: sec === starBoardData.activeSection }"
+            :title="`切换到分组「${sec}」；右键可删除此标签`"
+            @click="gitHubService.switchSection(sec)"
+            @contextmenu="handleSectionContextMenu($event, sec)"
+          >
+            {{ sec }}
+          </button>
+          <button
+            type="button"
+            class="gh-section-add-btn"
+            title="添加新分组标签"
+            aria-label="添加新分组标签"
+            @click="handleAddSection"
+          >
+            ＋
+          </button>
+        </div>
+
+        <div v-if="status.actionText" class="gh-hero-inline-status" :class="{ 'is-error': status.actionError }" :role="status.actionError ? 'alert' : 'status'" :aria-live="status.actionError ? 'assertive' : 'polite'" aria-atomic="true">
+          <span class="gh-hero-status-text" :title="status.actionText">{{ status.actionText }}</span>
+          <button type="button" :title="t('github.hero.closeTip')" :aria-label="t('github.hero.closeTip')" @click="githubStatusController.update({ actionText: '', actionError: false })">×</button>
+        </div>
+      </div>
+      <p id="gh-hero-desc">{{ state.description }}</p>
+    </div>
   </div>
+
+  <!-- 🌟 中间插槽：放置搜索栏 -->
+  <div class="gh-hero-search-area">
+    <slot name="search" />
+  </div>
+
   <div class="gh-bili-actions">
+    <!-- 🌟 右侧操作栏前缀：放置消息、设置按钮 -->
+    <slot name="actions-prefix" />
     <button
       type="button"
       class="gh-hero-btn gh-github-help-btn"
@@ -99,6 +110,14 @@ async function handleSectionContextMenu(event: MouseEvent, sectionName: string) 
 </template>
 
 <style scoped>
+.gh-hero-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+  min-width: 0;
+}
+
 /* The status shares the title's existing line, never a row above the repository grid. */
 .gh-hero-title-row {
   display: flex;

@@ -157,73 +157,6 @@ onBeforeUnmount(() => { gitHubService.setAiViewActive(false); ++initialVersion; 
       <span class="bar" style="background: linear-gradient(180deg,#22c55e,#06b6d4)"></span>
       <h2>GitHub</h2>
       <span id="gh-user" class="muted small" style="margin-left: 8px;"></span>
-      <div class="card-fullscreen-gh-search" id="gh-head-search-wrap">
-        <form id="gh-search-form" class="gh-search-box" @submit.prevent="submitSearch">
-          <button type="button" id="gh-search-mode-toggle" class="gh-search-mode-toggle" :title="searchScope === 'local' ? t('github.searchScope.toGlobal') : t('github.searchScope.toLocal')" @click="toggleSearchScope">
-            <span id="gh-mode-icon" class="gh-mode-icon">{{ searchScope === 'local' ? '⭐' : '🌐' }}</span>
-            <span id="gh-mode-text" class="gh-mode-text">{{ searchScope === 'local' ? t('github.searchScope.local') : t('github.searchScope.global') }}</span>
-            <span class="gh-mode-arrow">▾</span>
-          </button>
-          <input id="gh-search-input" v-model="searchText" :placeholder="searchPlaceholder" autocomplete="off" @input="updateLocalSearch" />
-
-          <!-- 🌟 规则切换按钮：放置在右边，点击切换下一个匹配规则 -->
-          <button
-            v-if="searchScope === 'local'"
-            type="button"
-            class="gh-search-rule-btn"
-            :class="`rule-${activeRuleMeta.id}`"
-            :title="t('github.ruleHint', { rule: activeRuleMeta.name, desc: activeRuleMeta.desc })"
-            @click.stop="cycleSearchRule"
-          >
-            <span class="gh-search-rule-icon">{{ activeRuleMeta.icon }}</span>
-            <span class="gh-search-rule-text">{{ activeRuleMeta.name }}</span>
-          </button>
-
-          <button v-show="searchText" type="button" id="gh-search-clear-btn" class="gh-search-clear-btn" :title="t('github.clearSearch')" @click="clearSearch">✕</button>
-          <button type="submit" id="gh-search-submit-btn" title="搜索">⌕</button>
-        </form>
-        <div id="gh-search-options" class="gh-search-options" aria-label="搜索来源" hidden>
-          <label title="精确：严格用你的原关键词搜索仓库名和描述"><input type="checkbox" value="exact" checked />精确</label>
-          <label title="宽松匹配：把关键词拆开搜索，并按名称/描述/语言/主题的相似度本地重排"><input type="checkbox" value="loose" />宽松匹配</label>
-          <label title="近义词：自动扩展相关英文词，例如 ai → llm / machine learning"><input type="checkbox" value="related" />近义词</label>
-          <label title="主题标签：搜索 GitHub Topics 标签，例如 topic:llm"><input type="checkbox" value="topic" />主题标签</label>
-          <label title="说明文档：搜索仓库 README 内容"><input type="checkbox" value="readme" />说明文档</label>
-        </div>
-        <div id="gh-search-suggest" class="gh-search-suggest" hidden></div>
-      </div>
-
-      <!-- 🔔 GitHub 消息通知按钮（与 B站 消息按钮完全对齐） -->
-      <button
-        id="gh-header-msg-center-btn"
-        class="gh-header-msg-btn"
-        type="button"
-        :class="{ 'has-unread': gitHubNotificationsState.unreadCount > 0, 'is-active': gitHubNotificationsState.isOpen }"
-        :title="gitHubNotificationsState.unreadCount > 0 ? t('github.header.msgUnread', { count: gitHubNotificationsState.unreadCount }) : t('github.header.msgCenter')"
-        @click="gitHubNotificationsController.toggle()"
-      >
-        <span class="gh-header-msg-icon">🔔</span>
-        <span class="gh-header-msg-label">{{ t('github.header.msg') }}</span>
-        <span v-if="gitHubNotificationsState.unreadCount > 0" class="gh-header-msg-badge">
-          {{ gitHubNotificationsState.unreadCount > 99 ? '99+' : gitHubNotificationsState.unreadCount }}
-        </span>
-      </button>
-
-      <!-- ⚙️ 独立模组自包含设置按钮 -->
-      <div class="gh-settings-anchor">
-        <button
-          type="button"
-          ref="settingsButton"
-          :aria-expanded="isSettingsOpen"
-          :aria-label="t('github.settings')"
-          class="gh-head-settings-btn"
-          :title="t('github.header.settings')"
-          @click="isSettingsOpen = !isSettingsOpen"
-        >
-          ⚙️
-        </button>
-        <!-- GitHub 专属非模态轻量设置面板 -->
-        <GitHubSettingsModal v-if="settingsMounted" :visible="active && isSettingsOpen" :anchor="settingsButton" :ai-request="aiSettingsRequest" @account-reload="onAccountReload" @close="isSettingsOpen = false" />
-      </div>
     </header>
 
     <p v-if="initialError" class="muted small" role="status">{{ initialError }}</p>
@@ -365,7 +298,79 @@ onBeforeUnmount(() => { gitHubService.setAiViewActive(false); ++initialVersion; 
           />
           <template v-else-if="activeChannel === 'stars'">
             <header class="gh-bili-hero" id="gh-hero">
-              <GitHubHero @open-ai-settings="openAiSettings" @open-guide="isGuideOpen = true" />
+              <GitHubHero @open-ai-settings="openAiSettings" @open-guide="isGuideOpen = true">
+                <template #search>
+                  <div class="card-fullscreen-gh-search gh-hero-search-box-wrap" id="gh-head-search-wrap">
+                    <form id="gh-search-form" class="gh-search-box" @submit.prevent="submitSearch">
+                      <button type="button" id="gh-search-mode-toggle" class="gh-search-mode-toggle" :title="searchScope === 'local' ? t('github.searchScope.toGlobal') : t('github.searchScope.toLocal')" @click="toggleSearchScope">
+                        <span id="gh-mode-icon" class="gh-mode-icon">{{ searchScope === 'local' ? '⭐' : '🌐' }}</span>
+                        <span id="gh-mode-text" class="gh-mode-text">{{ searchScope === 'local' ? t('github.searchScope.local') : t('github.searchScope.global') }}</span>
+                        <span class="gh-mode-arrow">▾</span>
+                      </button>
+                      <input id="gh-search-input" v-model="searchText" :placeholder="searchPlaceholder" autocomplete="off" @input="updateLocalSearch" />
+
+                      <!-- 🌟 规则切换按钮：放置在右边，点击切换下一个匹配规则 -->
+                      <button
+                        v-if="searchScope === 'local'"
+                        type="button"
+                        class="gh-search-rule-btn"
+                        :class="`rule-${activeRuleMeta.id}`"
+                        :title="t('github.ruleHint', { rule: activeRuleMeta.name, desc: activeRuleMeta.desc })"
+                        @click.stop="cycleSearchRule"
+                      >
+                        <span class="gh-search-rule-icon">{{ activeRuleMeta.icon }}</span>
+                        <span class="gh-search-rule-text">{{ activeRuleMeta.name }}</span>
+                      </button>
+
+                      <button v-show="searchText" type="button" id="gh-search-clear-btn" class="gh-search-clear-btn" :title="t('github.clearSearch')" @click="clearSearch">✕</button>
+                      <button type="submit" id="gh-search-submit-btn" title="搜索">⌕</button>
+                    </form>
+                    <div id="gh-search-options" class="gh-search-options" aria-label="搜索来源" hidden>
+                      <label title="精确：严格用你的原关键词搜索仓库名和描述"><input type="checkbox" value="exact" checked />精确</label>
+                      <label title="宽松匹配：把关键词拆开搜索，并按名称/描述/语言/主题的相似度本地重排"><input type="checkbox" value="loose" />宽松匹配</label>
+                      <label title="近义词：自动扩展相关英文词，例如 ai → llm / machine learning"><input type="checkbox" value="related" />近义词</label>
+                      <label title="主题标签：搜索 GitHub Topics 标签，例如 topic:llm"><input type="checkbox" value="topic" />主题标签</label>
+                      <label title="说明文档：搜索仓库 README 内容"><input type="checkbox" value="readme" />说明文档</label>
+                    </div>
+                    <div id="gh-search-suggest" class="gh-search-suggest" hidden></div>
+                  </div>
+                </template>
+
+                <template #actions-prefix>
+                  <!-- 🔔 GitHub 消息通知按钮（与 B站 消息按钮完全对齐） -->
+                  <button
+                    id="gh-header-msg-center-btn"
+                    class="gh-header-msg-btn"
+                    type="button"
+                    :class="{ 'has-unread': gitHubNotificationsState.unreadCount > 0, 'is-active': gitHubNotificationsState.isOpen }"
+                    :title="gitHubNotificationsState.unreadCount > 0 ? t('github.header.msgUnread', { count: gitHubNotificationsState.unreadCount }) : t('github.header.msgCenter')"
+                    @click="gitHubNotificationsController.toggle()"
+                  >
+                    <span class="gh-header-msg-icon">🔔</span>
+                    <span class="gh-header-msg-label">{{ t('github.header.msg') }}</span>
+                    <span v-if="gitHubNotificationsState.unreadCount > 0" class="gh-header-msg-badge">
+                      {{ gitHubNotificationsState.unreadCount > 99 ? '99+' : gitHubNotificationsState.unreadCount }}
+                    </span>
+                  </button>
+
+                  <!-- ⚙️ 独立模组自包含设置按钮 -->
+                  <div class="gh-settings-anchor">
+                    <button
+                      type="button"
+                      ref="settingsButton"
+                      :aria-expanded="isSettingsOpen"
+                      :aria-label="t('github.settings')"
+                      class="gh-head-settings-btn"
+                      :title="t('github.header.settings')"
+                      @click="isSettingsOpen = !isSettingsOpen"
+                    >
+                      ⚙️
+                    </button>
+                    <!-- GitHub 专属非模态轻量设置面板 -->
+                    <GitHubSettingsModal v-if="settingsMounted" :visible="active && isSettingsOpen" :anchor="settingsButton" :ai-request="aiSettingsRequest" @account-reload="onAccountReload" @close="isSettingsOpen = false" />
+                  </div>
+                </template>
+              </GitHubHero>
             </header>
             <div id="vue-github-repositories-root" style="flex: 1; min-height: 0; display: flex; flex-direction: column;">
               <GitHubStarsBoard :active="active && activeChannel === 'stars'" />
@@ -414,7 +419,7 @@ onBeforeUnmount(() => { gitHubService.setAiViewActive(false); ++initialVersion; 
   justify-content: center;
   font-size: 15px;
   cursor: pointer;
-  margin-left: 8px;
+  margin-left: 0;
   transition: all 0.15s ease;
   color: var(--text-color, #334155);
 }
@@ -428,7 +433,7 @@ onBeforeUnmount(() => { gitHubService.setAiViewActive(false); ++initialVersion; 
 /* 🔔 GitHub 顶栏消息通知按钮（契合系统主题变量，对标 B站 消息按钮） */
 .gh-header-msg-btn {
   position: relative !important;
-  margin: 0 0 0 10px !important;
+  margin: 0 !important;
   height: 32px !important;
   padding: 0 10px !important;
   white-space: nowrap !important;
@@ -460,6 +465,12 @@ onBeforeUnmount(() => { gitHubService.setAiViewActive(false); ++initialVersion; 
 
 .gh-header-msg-icon {
   font-size: 12px;
+}
+
+.gh-hero-search-box-wrap {
+  width: 100% !important;
+  max-width: 100% !important;
+  margin: 0 !important;
 }
 
 .gh-header-msg-label {

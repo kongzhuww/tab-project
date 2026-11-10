@@ -5,6 +5,8 @@ import { searchService } from "../services/search.service";
 import { gitHubService, type GitHubSearchRule } from "../services/github.service";
 import { launcherRuntime } from "../launcher/runtime";
 import { launcherService } from "../services/launcher.service";
+import { launcherGroupsController } from "../launchers/store";
+import { requestLocateBookmark } from "../bookmarks/bookmark-locate";
 import { useContextMenu } from "../sdk/interactions";
 import { t } from "../i18n";
 
@@ -219,47 +221,22 @@ const canLocateBookmark = computed(() => {
   return Boolean(contextItem.value.bookmarkId || contextItem.value.badge?.text?.includes("书签"));
 });
 
-async function onLocateBookmark() {
-  const item = contextItem.value;
+async function onLocateBookmark(itemToLocate?: SearchSuggestionItem) {
+  const item = (itemToLocate && "id" in itemToLocate) ? itemToLocate : contextItem.value;
   contextMenuVisible.value = false;
   if (!item) return;
 
   searchController.setSuggestionsVisible(false);
 
-  // 1. 查找目标书签节点与所属板块
-  let targetNodeId = item.bookmarkId;
-  let targetUrl = item.url || "";
+  // 1. 确保切到书签看板
+  launcherGroupsController.setSitesView("bookmarks");
 
-  // 2. 切换主视图到书签看板 (BookmarkBoard)
-  const sitesViewBtn = document.querySelector(".sites-view-switch button:nth-child(2)") as HTMLButtonElement | null;
-  if (sitesViewBtn) {
-    sitesViewBtn.click();
-  }
-
-  // 3. 延时寻找目标 DOM 并高亮
-  setTimeout(() => {
-    let el: HTMLElement | null = null;
-    if (targetNodeId) {
-      el = document.querySelector(`[data-bookmark-node="${targetNodeId}"]`) as HTMLElement | null;
-    }
-    if (!el && targetUrl) {
-      el = document.querySelector(`.bookmark-board [href="${targetUrl}"]`) as HTMLElement | null;
-    }
-
-    if (el) {
-      el.scrollIntoView({ behavior: "smooth", block: "center", inline: "center" });
-      el.classList.remove("launcher-locate-highlight");
-      void el.offsetWidth;
-      el.classList.add("launcher-locate-highlight");
-      setTimeout(() => {
-        el?.classList.remove("launcher-locate-highlight");
-      }, 3200);
-    }
-  }, 160);
+  // 2. 调用全树深度书签精准定位
+  requestLocateBookmark(item.bookmarkId, item.url);
 }
 
-async function onLocateLauncher() {
-  const item = contextItem.value;
+async function onLocateLauncher(itemToLocate?: SearchSuggestionItem) {
+  const item = (itemToLocate && "id" in itemToLocate) ? itemToLocate : contextItem.value;
   contextMenuVisible.value = false;
   if (!item) return;
 
@@ -270,8 +247,21 @@ async function onLocateLauncher() {
   }
   if (!targetId) return;
 
+  // 1. 确保切回到“常用网站”
+  launcherGroupsController.setSitesView("sites");
+
   searchController.setSuggestionsVisible(false);
   await launcherRuntime.locateLink(targetId);
+}
+
+function onBadgeClick(item: SearchSuggestionItem) {
+  if (item.launcherLinkId || item.badge?.text?.includes("常用网站")) {
+    void onLocateLauncher(item);
+  } else if (item.bookmarkId || item.badge?.text?.includes("书签")) {
+    void onLocateBookmark(item);
+  } else {
+    onSuggestionClick(item);
+  }
 }
 
 function onSuggestionClick(item: any) {
@@ -453,8 +443,9 @@ onUnmounted(() => {
       </span>
       <span
         v-if="item.badge"
-        :class="['search-suggestion-badge', item.badge.className]"
-        :title="item.badge.title"
+        :class="['search-suggestion-badge', item.badge.className, 'is-clickable']"
+        :title="item.badge.title || (item.launcherLinkId || (item.badge.text && item.badge.text.includes('常用网站')) ? '点击直接定位到常用网站位置' : '点击直接定位到书签位置')"
+        @click.stop="onBadgeClick(item)"
       >
         <i v-if="item.badge.icon" class="badge-icon">{{ item.badge.icon }}</i>
         <span>{{ item.badge.text }}</span>
@@ -481,7 +472,7 @@ onUnmounted(() => {
         v-if="canLocateLauncher"
         type="button"
         class="search-suggestion-menu-btn highlight-locate-btn"
-        @click="onLocateLauncher"
+        @click="onLocateLauncher()"
       >
         <span>🎯 定位到常用网站</span>
       </button>
@@ -489,7 +480,7 @@ onUnmounted(() => {
         v-if="canLocateBookmark"
         type="button"
         class="search-suggestion-menu-btn highlight-locate-bookmark-btn"
-        @click="onLocateBookmark"
+        @click="onLocateBookmark()"
       >
         <span>🔖 定位到书签</span>
       </button>
@@ -593,6 +584,17 @@ onUnmounted(() => {
 .highlight-locate-bookmark-btn:hover {
   background: rgba(2, 132, 199, 0.12);
   color: #0369a1;
+}
+
+.search-suggestion-badge.is-clickable {
+  cursor: pointer;
+  user-select: none;
+  transition: transform 0.12s ease, filter 0.12s ease, box-shadow 0.12s ease;
+}
+.search-suggestion-badge.is-clickable:hover {
+  transform: scale(1.05);
+  filter: brightness(1.08);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
 }
 
 .search-suggestion.is-selected {
