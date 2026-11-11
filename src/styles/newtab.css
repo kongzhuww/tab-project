@@ -731,9 +731,9 @@ html:not([data-theme]) .launcher {
   background-color: #060911;
 }
 html[data-theme="light"] .clock,
-html[data-theme="light"] .clock #secs { color: #0f172a !important; text-shadow: none !important; }
+html[data-theme="light"] .clock #secs { color: #0f172a; text-shadow: none; }
 html[data-theme="light"] .hero-clock #greeting,
-html[data-theme="light"] .date { color: #334155 !important; text-shadow: none !important; }
+html[data-theme="light"] .date { color: #334155; text-shadow: none; }
 .hero-background-media {
   position: absolute;
   inset: 0;
@@ -1324,13 +1324,13 @@ html[data-theme="light"] .background-library-import button,html[data-theme="lone
 
 .hero-clock.clock-color-black .clock,
 .hero-clock.clock-color-black .clock #secs {
-  color: #0f172a !important;
-  text-shadow: none !important;
+  color: #0f172a;
+  text-shadow: none;
 }
 .hero-clock.clock-color-black #greeting,
 .hero-clock.clock-color-black .date {
-  color: #334155 !important;
-  text-shadow: none !important;
+  color: #334155;
+  text-shadow: none;
 }
 .search {
   position: relative;

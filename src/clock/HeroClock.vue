@@ -122,10 +122,27 @@ onUnmounted(() => {
 <template>
   <div class="hero-clock-vue-container" @contextmenu="onClockContextMenu">
     <!-- 时钟与日期 -->
-    <p id="clock" class="clock" :style="{ fontFamily: clockState.fontFamily, color: clockState.colorHex }">
+    <p
+      id="clock"
+      class="clock"
+      :style="{
+        fontFamily: clockState.fontFamily,
+        color: clockState.colorHex,
+        textShadow: clockState.colorHex === '#0f172a' ? 'none' : '0 2px 14px rgba(0, 0, 0, 0.45)'
+      }"
+    >
       {{ clockState.timeText }}<span id="secs" :style="{ color: clockState.colorHex }">{{ clockState.secsText }}</span>
     </p>
-    <p id="date" class="date" :style="{ color: clockState.dateColor }">{{ clockState.dateText }}</p>
+    <p
+      id="date"
+      class="date"
+      :style="{
+        color: clockState.dateColor,
+        textShadow: clockState.dateColor === '#0f172a' ? 'none' : '0 1px 8px rgba(0, 0, 0, 0.35)'
+      }"
+    >
+      {{ clockState.dateText }}
+    </p>
   </div>
 </template>
 
