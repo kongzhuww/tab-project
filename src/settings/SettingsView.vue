@@ -691,7 +691,7 @@
                   <button type="button" class="btn-secondary" :disabled="webdavBusy" @click="handleTestWebDav">
                     测试连接
                   </button>
-                  <button type="button" class="btn-save-green" :disabled="webdavBusy" title="将本地配置同步上传至云端" @click="() => handlePushWebDav(true)">
+                  <button type="button" class="btn-save-green" :disabled="webdavBusy" title="将当前本地配置（含添加与删除）上传至云端保存" @click="() => handlePushWebDav(false)">
                     ⬆️ 上传到云端
                   </button>
                   <button type="button" class="btn-secondary" :disabled="webdavBusy" style="color: #0284c7;" title="单向下载融合：把云端独有的内容合并到当前这台电脑" @click="() => handlePullWebDav(true)">
@@ -752,7 +752,7 @@
 
                   <!-- 核心同步操作栏：只保留 2 个核心按钮 + 1 个折叠次要高级覆盖选项 -->
                   <div style="display: flex; gap: 10px; margin-top: 2px; align-items: center; flex-wrap: wrap;">
-                    <button type="button" class="btn-save-green" :disabled="webdavBusy" style="font-size: 11px; padding: 6px 14px;" title="将本地配置同步上传至云端" @click="() => handlePushWebDav(true)">
+                    <button type="button" class="btn-save-green" :disabled="webdavBusy" style="font-size: 11px; padding: 6px 14px;" title="将当前本地配置（含添加与删除）上传至云端保存" @click="() => handlePushWebDav(false)">
                       ⬆️ 上传到云端
                     </button>
                     <button type="button" class="btn-primary" :disabled="webdavBusy" style="font-size: 11px; padding: 6px 14px;" title="单向下载融合：把云端独有的内容合并到当前这台电脑" @click="() => handlePullWebDav(true)">
@@ -760,10 +760,10 @@
                     </button>
 
                     <details style="margin-left: auto; font-size: 11px; color: var(--muted); cursor: pointer;">
-                      <summary style="user-select: none;">更多覆盖选项…</summary>
+                      <summary style="user-select: none;">更多选项…</summary>
                       <div style="display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap;">
-                        <button type="button" class="btn-secondary" :disabled="webdavBusy" style="font-size: 10px; padding: 2px 8px;" title="用本地配置完全覆盖云端备份" @click="() => handlePushWebDav(false)">
-                          强制覆盖云端
+                        <button type="button" class="btn-secondary" :disabled="webdavBusy" style="font-size: 10px; padding: 2px 8px;" title="将本地与云端两边各自的新增项做并集融合后上传" @click="() => handlePushWebDav(true)">
+                          双向合并上传
                         </button>
                         <button type="button" class="btn-secondary" :disabled="webdavBusy" style="font-size: 10px; padding: 2px 8px; color: #ef4444;" title="放弃本地所有修改，完全覆盖为云端版本" @click="() => handlePullWebDav(false)">
                           强制覆盖本地
@@ -1109,18 +1109,18 @@ async function handleTestWebDav() {
   }
 }
 
-async function handlePushWebDav(mergeMode = true) {
+async function handlePushWebDav(mergeMode = false) {
   if (webdavBusy.value) return;
   webdavBusy.value = true;
-  webdavStatusMsg.value = mergeMode ? "正在与云端合并并上传…" : "正在全量上传覆盖云端…";
+  webdavStatusMsg.value = mergeMode ? "正在与云端合并并上传…" : "正在上传本地配置到云端…";
   try {
     const config = toWebDavConfig(webdavDraft);
     const res = await webDavService.pushCurrentConfig(config, { mergeRemote: mergeMode });
     if (res.ok) {
       webdavStatusMsg.value = mergeMode
-        ? `✓ 上传成功！已将本地最新配置同步至云端 (${res.byteLength || 0} 字节)`
-        : `✓ 全量覆盖上传成功！已用本地设置覆盖云端 (${res.byteLength || 0} 字节)`;
-      notify(mergeMode ? "已成功上传同步至云端！" : "已成功全量覆盖云端备份！");
+        ? `✓ 双向合并上传成功！已将两端内容融合并同步 (${res.byteLength || 0} 字节)`
+        : `✓ 上传成功！已将当前本地配置保存至云端 (${res.byteLength || 0} 字节)`;
+      notify(mergeMode ? "已成功双向合并并同步至云端！" : "已成功上传至云端备份！");
       // 自动静默刷新一次对比动态
       void handleInspectRemoteSync(true);
     } else {
