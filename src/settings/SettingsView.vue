@@ -1006,6 +1006,7 @@ import {
   scanWorkshopDirectory,
   getSavedWorkshopDirectoryHandle,
   verifyDirectoryPermission,
+  loadCachedWorkshopItems,
   type WorkshopItemInfo
 } from "../wallpaper/workshop-scanner";
 import { applyWorkshopWallpaper } from "../wallpaper/workshop-applier";
@@ -1710,7 +1711,14 @@ async function loadWallpaperData() {
     currentWallpaperValue.value = data.currentValue;
     void preloadWallpaperPreviews();
 
-    // 静默尝试探测本地工坊
+    // 1. 优先瞬间读取上次缓存的工坊壁纸卡片 (0 毫秒呈现，绝不要求重新选择)
+    void loadCachedWorkshopItems().then((cached) => {
+      if (cached.length && !settingsWorkshopItems.value.length) {
+        settingsWorkshopItems.value = cached;
+      }
+    });
+
+    // 2. 静默尝试探测本地工坊句柄并在权限存在时静默同步
     void getSavedWorkshopDirectoryHandle().then(async (handle) => {
       if (handle) {
         connectedWorkshopFolder.value = handle.name;

@@ -1,11 +1,13 @@
 /**
  * Steam 工坊壁纸一键克隆与即时应用器
  * 1. 0 毫秒即时上屏：直接使用本地 File 实例瞬间换壁纸，UI 绝不卡顿
- * 2. 后台异步静默写入 OPFS 保证冷启动 0 弹窗
- * 3. 绕过 IndexedDB 实体写入，彻底杜绝 180MB 上限与数据库膨胀
+ * 2. 持久化存储 heroBackground：确保页面刷新后 100% 保持当前壁纸不失效
+ * 3. 写入 OPFS 私有文件系统：保证关机重启、重开浏览器 0 弹窗秒播
+ * 4. 绕过 IndexedDB 实体大二进制写入：防止 180MB 限制报错
  */
 
 import type { WorkshopItemInfo } from "./workshop-scanner";
+import { getSavedWorkshopDirectoryHandle, verifyDirectoryPermission } from "./workshop-scanner";
 import { saveActiveWallpaperToOpfs } from "./opfs-storage";
 import { WallpaperService } from "../services/wallpaper.service";
 
@@ -29,7 +31,6 @@ async function collectFolderFiles(
         mime: file.type || undefined,
       });
     } else if (handle.kind === "directory") {
-      // 避免过深的异常嵌套目录
       if (basePath.split("/").length < 8) {
         const sub = await collectFolderFiles(handle as FileSystemDirectoryHandle, relPath);
         result.push(...sub);
@@ -44,11 +45,29 @@ async function collectFolderFiles(
  * 应用指定的本地 Steam 创意工坊壁纸
  */
 export async function applyWorkshopWallpaper(item: WorkshopItemInfo): Promise<boolean> {
-  if (!item.folderHandle) return false;
+  let folderHandle = item.folderHandle;
+
+  // 若从离线缓存恢复，自动通过已保存的根目录句柄恢复子文件夹引用
+  if (!folderHandle) {
+    const rootHandle = await getSavedWorkshopDirectoryHandle();
+    if (rootHandle) {
+      const hasPerm = await verifyDirectoryPermission(rootHandle, true);
+      if (hasPerm) {
+        try {
+          folderHandle = await rootHandle.getDirectoryHandle(item.id, { create: false });
+        } catch {
+          folderHandle = rootHandle;
+        }
+      }
+    }
+  }
+
+  if (!folderHandle) {
+    throw new Error("无法访问壁纸文件夹，请点击重新扫描关联目录");
+  }
 
   try {
-    // 快速收集该文件夹下的必要资产
-    const files = await collectFolderFiles(item.folderHandle);
+    const files = await collectFolderFiles(folderHandle);
     if (!files.length) {
       throw new Error("壁纸文件夹为空或无法读取");
     }
@@ -71,16 +90,14 @@ export async function applyWorkshopWallpaper(item: WorkshopItemInfo): Promise<bo
       isWorkshop: true
     };
 
-    // 1. 0 毫秒即刻上屏 (直接传递已在内存中的 pack，UI 零延迟换壁纸)
-    await WallpaperService.applyWallpaper(wallpaperVal, pack);
+    // 1. 0 毫秒即刻上屏并持久化 heroBackground (保证页面刷新不失效)
+    await WallpaperService.setWallpaper(wallpaperVal, pack);
 
-    // 2. 存入轻量历史记录 (不把几百 MB 的实体二进制存进 IndexedDB，防膨胀与 180MB 超限)
+    // 2. 存入轻量历史记录元数据
     await WallpaperService.addHistory(wallpaperVal, null);
 
-    // 3. 后台异步静默写入 OPFS 私有文件系统 (冷启动保证 0 弹窗)
-    void saveActiveWallpaperToOpfs(pack).catch(err => {
-      console.warn("[Workshop Applier] Background OPFS sync warning:", err);
-    });
+    // 3. 完整写入 OPFS 私有文件系统 (冷启动保证 0 弹窗秒播)
+    await saveActiveWallpaperToOpfs(pack);
 
     return true;
   } catch (err) {

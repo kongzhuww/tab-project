@@ -10,6 +10,7 @@ import {
   getSavedWorkshopDirectoryHandle,
   verifyDirectoryPermission,
   revokeWorkshopPreviews,
+  loadCachedWorkshopItems,
   type WorkshopItemInfo,
 } from "./workshop-scanner";
 import { applyWorkshopWallpaper } from "./workshop-applier";
@@ -224,7 +225,14 @@ onMounted(() => {
   if (typeof chrome !== "undefined") chrome.storage?.onChanged?.addListener(storageChanged);
   if (active.value) { window.addEventListener("keydown", onKeydown); initialRead(); }
 
-  // 尝试静默探测已保存的本地工坊目录
+  // 1. 优先读取上次缓存的工坊壁纸卡片 (0 毫秒呈现)
+  void loadCachedWorkshopItems().then((cached) => {
+    if (cached.length && !workshopItems.value.length) {
+      workshopItems.value = cached;
+    }
+  });
+
+  // 2. 尝试静默探测已保存的本地工坊目录并在权限就绪时自动刷新
   void getSavedWorkshopDirectoryHandle().then(async (handle) => {
     if (handle) {
       connectedFolderName.value = handle.name;
