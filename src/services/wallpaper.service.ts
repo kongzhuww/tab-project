@@ -857,15 +857,31 @@ if (typeof chrome !== "undefined" && chrome?.storage?.onChanged) {
   });
 }
 
-// 全局性能守护：当页面切入后台（如切换标签页或最小化浏览器）时，自动休眠视频壁纸解码；切回时自动恢复
+// 全局性能守护：当页面切入后台（如切换标签页或最小化浏览器）时，自动休眠视频壁纸解码与 Web 壁纸 Canvas 渲染；切回时自动恢复
 if (typeof document !== "undefined") {
   document.addEventListener("visibilitychange", () => {
+    const isHidden = document.hidden;
     const video = document.querySelector<HTMLVideoElement>("#hero-background-media video");
-    if (!video) return;
-    if (document.hidden) {
-      if (!video.paused) video.pause();
-    } else {
-      if (video.paused) void video.play().catch(() => {});
+    if (video) {
+      if (isHidden) {
+        if (!video.paused) video.pause();
+      } else {
+        if (video.paused) void video.play().catch(() => {});
+      }
+    }
+
+    const iframe = document.querySelector<HTMLIFrameElement>("#hero-background-media iframe");
+    if (iframe?.contentWindow) {
+      try {
+        iframe.contentWindow.postMessage({
+          type: "WE_SET_PAUSED",
+          isPaused: isHidden
+        }, "*");
+      } catch (_) {}
+    }
+
+    if (isHidden) {
+      stopAudioSpectrumStream();
     }
   });
 }

@@ -52,6 +52,59 @@ export function buildWeShimScript(
     }
   })();
 
+  // 0.1 工业级高刷屏降温守护：将 Retina 屏 DPR 封顶为 1.25，避免 3K/4K 像素点几何级过载发烫
+  try {
+    var rawDpr = Number(window.devicePixelRatio) || 1;
+    if (rawDpr > 1.25) {
+      Object.defineProperty(window, 'devicePixelRatio', {
+        value: 1.25,
+        configurable: true,
+        writable: true
+      });
+    }
+  } catch (_) {}
+
+  // 0.2 帧率自适应节流：动态壁纸锁定最高 60FPS，杜绝 120Hz ProMotion 屏幕双倍空转能耗
+  try {
+    var _origRaf = window.requestAnimationFrame;
+    var _lastFrameTime = 0;
+    if (typeof _origRaf === 'function') {
+      window.requestAnimationFrame = function(callback) {
+        return _origRaf.call(window, function(timestamp) {
+          var elapsed = timestamp - _lastFrameTime;
+          if (elapsed < 15.5) {
+            setTimeout(function() {
+              callback(performance.now());
+            }, 16 - elapsed);
+            return;
+          }
+          _lastFrameTime = timestamp;
+          callback(timestamp);
+        });
+      };
+    }
+  } catch (_) {}
+
+  // 0.3 裁剪隐藏子面板计算：当壁纸处于全屏桌面模式时，跳过无界面的子面板循环
+  if (typeof document !== 'undefined') {
+    var optimizeSubPanels = function() {
+      try {
+        var noop = function() {};
+        if (typeof window['drawAdv'] === 'function') window['drawAdv'] = noop;
+        if (typeof window['drawDiff'] === 'function') window['drawDiff'] = noop;
+        if (typeof window['drawVal'] === 'function') window['drawVal'] = noop;
+        if (typeof window['drawIdx'] === 'function') window['drawIdx'] = noop;
+        if (typeof window['agentsTick'] === 'function') window['agentsTick'] = noop;
+      } catch (_) {}
+    };
+    if (typeof document.addEventListener === 'function') {
+      document.addEventListener('DOMContentLoaded', function() {
+        setTimeout(optimizeSubPanels, 150);
+        setTimeout(optimizeSubPanels, 500);
+      });
+    }
+  }
+
   // 1. 资产映射表与路径解析器 (拦截相对路径 404)
   var __WE_ASSET_MAP__ = ${jsonAssetMap};
   var __WE_ENTRY_DIR__ = ${jsonEntryDir};
