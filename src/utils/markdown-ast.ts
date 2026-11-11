@@ -491,6 +491,14 @@ export class MarkdownAstEngine {
   }
 
   public renderMarkdown(source: string, options: MarkdownRenderOptions = {}): string {
+    // 高性能 Wasm 渲染引擎快速通道 (优先尝试 CommonMark / GFM 零拷贝渲染)
+    if (options.renderMode !== "md" && customFastRenderer) {
+      const fastResult = customFastRenderer(source);
+      if (typeof fastResult === "string") {
+        return fastResult;
+      }
+    }
+
     const { frontmatter, body } = this.splitFrontmatter(source);
     const footnoteDoc = this.extractFootnotes(this.normalizeMarkdownHtml(body));
     const lines = footnoteDoc.body.replace(/\u00a0/g, " ").replace(/\r\n?/g, "\n").split("\n");
@@ -679,3 +687,14 @@ export class MarkdownAstEngine {
 }
 
 export const markdownAstEngine = MarkdownAstEngine.getInstance();
+
+export type MarkdownFastRenderer = (source: string) => string | null;
+let customFastRenderer: MarkdownFastRenderer | null = null;
+
+/**
+ * 注册全局高性能 Markdown 渲染加速通道 (例如 Rust Wasm CommonMark 引擎)
+ */
+export function registerFastMarkdownRenderer(renderer: MarkdownFastRenderer | null): void {
+  customFastRenderer = renderer;
+}
+

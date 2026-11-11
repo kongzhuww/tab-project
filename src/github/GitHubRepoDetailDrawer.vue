@@ -7,6 +7,7 @@ import {
   type RepoHeadingItem
 } from "./repo-detail-store";
 import { images } from "../sdk/images";
+import { initFastSearch } from "../search/wasm-fast-search";
 import { githubTaskCreation } from "../todoist/github-task-target";
 import { openTodoistTask } from "../todoist/task-navigation";
 
@@ -217,6 +218,7 @@ function visibility() {
 function pageHide() { pagePresent = false; visibility(); }
 function pageShow() { pagePresent = true; visibility(); }
 onMounted(() => {
+  void initFastSearch();
   document.addEventListener("visibilitychange", visibility);
   window.addEventListener("pagehide", pageHide);
   window.addEventListener("pageshow", pageShow);
