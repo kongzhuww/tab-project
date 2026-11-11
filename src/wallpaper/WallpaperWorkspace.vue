@@ -514,8 +514,8 @@ function handleDrop(event: DragEvent) {
         <h4>关联本地 Steam 创意工坊壁纸库</h4>
         <p>
           选择你电脑上的工坊目录或任意存放壁纸的本地文件夹：<br>
-          <b>• macOS:</b> <code>~/Library/Application Support/Steam/steamapps/workshop/content/431960</code> (Finder 快捷键 <code>Cmd+Shift+G</code> 直达)<br>
-          <b>• Windows:</b> <code>Steam/steamapps/workshop/content/431960</code><br>
+          <b>• macOS (WallpaperMachine):</b> <code>~/Library/Application Support/WallpaperMachine/Library</code> (Finder 快捷键 <code>Cmd+Shift+G</code> 直达)<br>
+          <b>• Windows Steam:</b> <code>Steam/steamapps/workshop/content/431960</code><br>
           <b>• 自定义:</b> 任意解压后的壁纸文件夹或移动硬盘目录。
         </p>
         <div class="workshop-empty-actions">
