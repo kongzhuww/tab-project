@@ -662,10 +662,11 @@
                     />
                     <!-- 图片缩略图预览 -->
                     <img
-                      v-else-if="wallpaperPreviewMap[item.id] || (item as any).thumb"
-                      :src="wallpaperPreviewMap[item.id] || (item as any).thumb"
+                      v-else-if="item.previewUrl || wallpaperPreviewMap[item.id] || (item as any).thumb"
+                      :src="item.previewUrl || wallpaperPreviewMap[item.id] || (item as any).thumb"
                       alt=""
                       loading="lazy"
+                      style="width: 100%; height: 100%; object-fit: cover;"
                     />
                     <div v-else style="font-size: 20px; color: var(--muted);">
                       {{ item.kind === '视频' ? '▶' : '🖼️' }}
@@ -1739,7 +1740,11 @@ async function loadWallpaperData() {
 async function preloadWallpaperPreviews() {
   const items = [...paginatedUserWallpapers.value];
   for (const item of items) {
-    if ((item as any).thumb || (item as any).style || item.previewUrl || wallpaperPreviewMap[item.id]) continue;
+    if (item.previewUrl) {
+      wallpaperPreviewMap[item.id] = item.previewUrl;
+      continue;
+    }
+    if ((item as any).thumb || (item as any).style || wallpaperPreviewMap[item.id]) continue;
     const key = item.value?.storageKey;
     if (!key) continue;
     try {

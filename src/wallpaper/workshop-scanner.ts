@@ -176,17 +176,17 @@ export async function pickWorkshopDirectory(): Promise<FileSystemDirectoryHandle
 }
 
 /**
- * 尝试从指定文件夹中提取封面缩略图并生成 Blob URL
+ * 尝试从指定文件夹中提取封面缩略图并生成 Blob URL 与离线 Base64
  */
-async function extractPreviewUrl(
+async function extractPreviewData(
   dirHandle: FileSystemDirectoryHandle,
   specifiedFile?: string
-): Promise<string | undefined> {
+): Promise<{ previewUrl?: string; previewBase64?: string }> {
   const candidateNames = [
     specifiedFile,
+    "preview.gif",
     "preview.jpg",
     "preview.png",
-    "preview.gif",
     "preview.webp",
   ].filter(Boolean) as string[];
 
@@ -197,13 +197,19 @@ async function extractPreviewUrl(
       if (file && file.size > 0) {
         const url = URL.createObjectURL(file);
         previewUrls.push(url);
-        return url;
+        let base64 = "";
+        if (file.size <= 2 * 1024 * 1024) {
+          try {
+            base64 = await blobToBase64(file);
+          } catch (_) {}
+        }
+        return { previewUrl: url, previewBase64: base64 || url };
       }
     } catch (_) {
       // 当前候选名不存在，继续尝试下一个
     }
   }
-  return undefined;
+  return {};
 }
 
 /**
@@ -238,7 +244,7 @@ async function parseSingleWorkshopFolder(
       type = "scene";
     }
 
-    const previewUrl = await extractPreviewUrl(folderHandle, json.preview);
+    const previewData = await extractPreviewData(folderHandle, json.preview);
 
     return {
       id: String(json.workshopid || fallbackId),
@@ -246,7 +252,8 @@ async function parseSingleWorkshopFolder(
       description: json.description || "",
       type,
       entryFile,
-      previewUrl,
+      previewUrl: previewData.previewUrl,
+      previewBase64: previewData.previewBase64,
       properties: json.general?.properties || undefined,
       tags: Array.isArray(json.tags) ? json.tags : undefined,
       folderHandle,
