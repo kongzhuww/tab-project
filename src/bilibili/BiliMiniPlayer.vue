@@ -674,14 +674,14 @@ function onTimeUpdate() {
 }
 
 function onPlay() {
-  state.isPlaying = true;
+  controller.play();
   if (videoRef.value && state.bvid) {
     void attachBiliPlaybackSync({ bvid: state.bvid, title: state.title, cover: state.cover }, videoRef.value);
   }
 }
 
 function onPause() {
-  state.isPlaying = false;
+  controller.pause();
 }
 
 function onEnded() {

@@ -3,6 +3,9 @@ import { musicService } from "../services/music.service";
 import { neteaseService, type NeteaseUser, type NeteasePlaylist, type NeteaseSong } from "../services/netease.service";
 import { musicModuleState } from "./module-state";
 import { CACHED_FAVORITES_KEY, CACHED_PLAYLISTS_KEY, readPlaylistCache } from "./playlist-cache";
+import { NeteaseAuthMachine } from "./netease-auth-machine";
+
+export const neteaseAuthMachine = new NeteaseAuthMachine();
 
 export type PlayMode = "list" | "one" | "shuffle";
 export type PickerTab = "songs" | "albums" | "favorites" | "netease";
@@ -111,6 +114,7 @@ export interface HomeMusicController {
   logoutNetease(): Promise<void>;
   clearNeteaseRecent(): void;
   refreshRecentSongs(): void;
+  readonly authMachine?: any;
 }
 
 function formatTime(s: number): string {
@@ -166,6 +170,9 @@ export const homeMusicState = reactive<HomeMusicSnapshot>(initialState());
 let boundActions: HomeMusicActions = {};
 
 export const homeMusicController: HomeMusicController = {
+  get authMachine() {
+    return neteaseAuthMachine;
+  },
   getSnapshot() {
     return readonly(homeMusicState);
   },
@@ -466,16 +473,22 @@ export const homeMusicController: HomeMusicController = {
   async startNeteaseQrLogin() {
     // Legacy controller entry now uses the official browser session.
     this.stopNeteaseQrLogin();
+    if (!neteaseAuthMachine.send({ type: "START_CONNECT" })) return;
     try {
       await neteaseService.connectWebsiteAccount();
+      const user = neteaseService.getUser();
+      neteaseAuthMachine.send({ type: "CONNECT_SUCCESS", user });
       homeMusicState.neteaseQrStatus = "官网账户已连接";
       await this.loadNeteaseData();
     } catch (error: any) {
-      homeMusicState.neteaseQrStatus = error?.message || "请先在网易云官网登录。";
+      const msg = error?.message || "请先在网易云官网登录。";
+      neteaseAuthMachine.send({ type: "CONNECT_FAILURE", message: msg });
+      homeMusicState.neteaseQrStatus = msg;
     }
   },
   async logoutNetease() {
     await neteaseService.logout();
+    neteaseAuthMachine.send({ type: "LOGOUT" });
     homeMusicState.neteaseUser = null;
     homeMusicState.neteasePlaylists = [];
     homeMusicState.neteaseActivePlaylist = null;
@@ -488,6 +501,7 @@ export const homeMusicController: HomeMusicController = {
 if (typeof window !== "undefined") {
   window.addEventListener("netease:account-updated", () => {
     homeMusicState.neteaseUser = neteaseService.getUser();
+    neteaseAuthMachine.send({ type: "SYNC_USER", user: homeMusicState.neteaseUser });
     homeMusicState.neteasePlaylists = []; homeMusicState.neteaseSongs = [];
     homeMusicState.neteaseSearchResults = []; homeMusicState.neteaseActivePlaylist = null;
   });

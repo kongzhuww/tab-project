@@ -33,7 +33,7 @@
 >
 > Store installations do not require Developer mode and benefit from browser-managed automated updates. Each new release requires store review; store updates may lag slightly behind GitHub commits and releases.
 
-> **Repository Version**: **1.0.20**, featuring pure browser Wallpaper Engine runtime, native Steam Workshop (431960) scanning, 5 hardware cooling safeguards for Mac Retina and 120Hz ProMotion displays, clock customization with 3D shadows, and Bilibili timeline subtitle navigation with 156 regression tests. The store listing and installed version are authoritative for store users and may lag behind GitHub Releases. See the [Changelog](CHANGELOG.md).
+> **Repository Version**: **1.0.21**, featuring unified explicit finite state machine (FSM) architecture, Vue 3 state machine reactivity bridge (`useMachine`), AX runtime diagnostics bridge (`__TAB_MACHINES__`), and decoupled deterministic workflows across 10 core workspaces with 195 automated regression tests. The store listing and installed version are authoritative for store users and may lag behind GitHub Releases. See the [Changelog](CHANGELOG.md).
 
 ---
 

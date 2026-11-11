@@ -48,6 +48,7 @@ import { biliOrganizerDialogController } from "../bilibili/organizer-dialog-stor
 import { biliUpGroupManagerController } from "../bilibili/up-group-manager-store";
 import { biliUpPreviewController } from "../bilibili/up-preview-store";
 import { youTubeController } from "../youtube/youtube-store";
+import { getDiagnosticsMachines, registerMachineForDiagnostics } from "./state-machine";
 import { youTubeService, YouTubeService } from "../services/youtube.service";
 import { aihotFeedController } from "../aihot/aihot-feed-store";
 import { gitHubTrendingController } from "../github/trending-store";
@@ -311,4 +312,9 @@ export function installGlobalControllers(commands: CommandRegistry, features: Fe
   (window as any).setLauncherBackground = (val: any) => WallpaperService.setWallpaper(val);
   (window as any).backgroundDbClear = (key?: string) => backgroundDbClear(key);
   (window as any).openBackgroundHistory = () => wallpaperLibraryController.openDialog();
+
+  // 5. 显式状态机运行时诊断注册桥 (AX / DevTools)
+  registerMachineForDiagnostics("biliMiniPlayer", biliMiniPlayerController.machine);
+  registerMachineForDiagnostics("neteaseAuth", homeMusicController.authMachine);
+  (window as any).__TAB_MACHINES__ = getDiagnosticsMachines();
 }

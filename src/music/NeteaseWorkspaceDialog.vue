@@ -482,15 +482,19 @@
 <script setup lang="ts">
 import { CACHED_FAVORITES_KEY, CACHED_PLAYLISTS_KEY, removePlaylistCache } from "./playlist-cache";
 import { ref, computed, onMounted, onBeforeUnmount, watch } from "vue";
+import { useMachine } from "../core/useMachine";
 import { t } from "../i18n";
 import { createMusicWorkspaceData } from "./workspace-data";
 import { musicModuleState, onMusicPause } from "./module-state";
+import { neteaseService } from "../services/netease.service";
+import { neteaseAuthMachine } from "./store";
 const pageVisible = ref(!document.hidden);
 const active = computed(() => musicModuleState.visible && pageVisible.value);
 const workspace = createMusicWorkspaceData(() => active.value);
 const workspaceState = workspace.state;
 
-const websiteConnecting = ref(false);
+const neteaseAuthState = useMachine(neteaseAuthMachine);
+const websiteConnecting = computed(() => neteaseAuthState.value.phase === "connecting");
 const websiteStatus = ref("先在同一浏览器的网易云官网登录，再点击「连接官网账户」。无需音乐节点；插件断开不会退出官网。");
 
 function openOfficialWebsite() {
@@ -502,19 +506,22 @@ function openOfficialWebsite() {
 }
 async function connectWebsite() {
   if (websiteConnecting.value) return;
-  websiteConnecting.value = true;
+  if (!neteaseAuthMachine.send({ type: "START_CONNECT" })) return;
   websiteStatus.value = "正在使用浏览器官网会话读取账户…";
   try {
     await workspace.connectWebsite();
+    const user = neteaseService.getUser();
+    neteaseAuthMachine.send({ type: "CONNECT_SUCCESS", user });
     websiteStatus.value = "官网账户已连接。若歌单读取失败，请查看列表提示。";
   } catch (error: any) {
-    websiteStatus.value = error?.message || "官网账户连接失败，请确认已登录。";
-  } finally {
-    websiteConnecting.value = false;
+    const msg = error?.message || "官网账户连接失败，请确认已登录。";
+    neteaseAuthMachine.send({ type: "CONNECT_FAILURE", message: msg });
+    websiteStatus.value = msg;
   }
 }
 async function logoutNetease() {
   await workspace.logout();
+  neteaseAuthMachine.send({ type: "LOGOUT" });
   homeMusicState.neteaseUser = null;
   homeMusicState.neteaseSongs = [];
   homeMusicState.neteasePlaylists = [];

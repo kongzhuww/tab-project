@@ -1,4 +1,4 @@
-import "./chunks/main-BaBW0yov.js";
-import "./chunks/SearchBox-VNrw-hNk.js";
+import "./chunks/main-CB_HkLP-.js";
+import "./chunks/SearchBox-ZzGxlpyJ.js";
 /* empty css                       */
 import "./chunks/search.service-wriY3nvN.js";

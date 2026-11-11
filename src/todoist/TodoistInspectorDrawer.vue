@@ -152,7 +152,11 @@ const editStartTime = ref("");
 const editDueDate = ref("");
 const editDueTime = ref("");
 
-const isUploadingImg = ref(false);
+export type DrawerAsyncOp = "idle" | "uploading_img" | "submitting_comment";
+
+const activeAsyncOp = ref<DrawerAsyncOp>("idle");
+const isUploadingImg = computed(() => activeAsyncOp.value === "uploading_img");
+const isSubmittingComment = computed(() => activeAsyncOp.value === "submitting_comment");
 const isDragOver = ref(false);
 const fileInputRef = ref<HTMLInputElement | null>(null);
 
@@ -166,7 +170,6 @@ interface LocalSubtask {
 const isAddingSubtask = ref(false);
 const newSubtaskText = ref("");
 const newCommentText = ref("");
-const isSubmittingComment = ref(false);
 
 const subtasks = computed<LocalSubtask[]>(() => {
   const raw = state.description || "";
@@ -272,14 +275,14 @@ async function createOrSelectLabel(name: string) {
 
 // 评论提交
 async function submitComment() {
-  if (!newCommentText.value.trim() || isSubmittingComment.value) return;
+  if (!newCommentText.value.trim() || activeAsyncOp.value !== "idle") return;
   const content = newCommentText.value.trim();
-  isSubmittingComment.value = true;
+  activeAsyncOp.value = "submitting_comment";
   try {
     await todoistInspectorController.addComment(content);
     newCommentText.value = "";
   } finally {
-    isSubmittingComment.value = false;
+    activeAsyncOp.value = "idle";
   }
 }
 
@@ -464,9 +467,9 @@ function extractImageFromClipboard(e: ClipboardEvent): File | null {
 }
 
 async function handlePastedImage(file: File) {
-  if (isUploadingImg.value || !todoistModuleState.active || !state.taskId) return;
+  if (activeAsyncOp.value !== "idle" || !todoistModuleState.active || !state.taskId) return;
   const taskId = state.taskId;
-  isUploadingImg.value = true;
+  activeAsyncOp.value = "uploading_img";
   try {
     await flushDraft();
     if (state.taskId !== taskId || !state.isOpen || !todoistModuleState.active) return;
@@ -474,7 +477,7 @@ async function handlePastedImage(file: File) {
   } catch (error: unknown) {
     if (state.taskId === taskId) state.error = error instanceof Error ? error.message : "上传失败";
   } finally {
-    isUploadingImg.value = false;
+    activeAsyncOp.value = "idle";
   }
 }
 

@@ -1,6 +1,6 @@
 # AGENTS.md — tab-project 协作准则与系统架构规范
 
-> **现行产品与发布入口**：产品名为 **tab-project 新标签页**，正式仓库为 `kongzhuww/tab-project`；`tab-project-next` 和 `LogicWeaver` 是历史名称，现存内部标识不据此批量重命名。仓库现行版本为 **v1.0.20**（以 `manifest.json` 与 `package.json` 为准）。产品已上架 Microsoft Edge 加载项商店，正式安装入口：https://microsoftedge.microsoft.com/addons/detail/tabproject-%E6%96%B0%E6%A0%87%E7%AD%BE%E9%A1%B5/dbkaiojfbolnkpaegflocfbdgpmhjcco 。自动提交规则见第 6.1 节及 `docs/EDGE_STORE_PUBLISH.md`。
+> **现行产品与发布入口**：产品名为 **tab-project 新标签页**，正式仓库为 `kongzhuww/tab-project`；`tab-project-next` 和 `LogicWeaver` 是历史名称，现存内部标识不据此批量重命名。仓库现行版本为 **v1.0.21**（以 `manifest.json` 与 `package.json` 为准）。产品已上架 Microsoft Edge 加载项商店，正式安装入口：https://microsoftedge.microsoft.com/addons/detail/tabproject-%E6%96%B0%E6%A0%87%E7%AD%BE%E9%A1%B5/dbkaiojfbolnkpaegflocfbdgpmhjcco 。自动提交规则见第 6.1 节及 `docs/EDGE_STORE_PUBLISH.md`。
 
 > **当前范围优先**：本仓库源自旧 2.3.0 代码的全新历史迁移副本，旧版本号仅说明来源，不是当前产品版本。按用户要求已彻底移除 ArkPets、Neuro / Evil、Web Mascot、Spine、角色素材、桌宠快捷栏、独立设置页和控制命令。下文历史台账中的桌宠描述不代表当前能力，禁止据此恢复代码、素材或依赖。旧仓库与本地个人预览图不迁移；公开前检查参见 `docs/PUBLICATION_REVIEW.md`。
 
