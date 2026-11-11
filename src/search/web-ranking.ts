@@ -1,4 +1,5 @@
 import type { SearchSuggestionItem } from './store';
+import { fastWebMatchScore } from './wasm-fast-search';
 
 export interface WebCandidate {
   item: SearchSuggestionItem;
@@ -15,6 +16,9 @@ export function searchUrlKey(raw: string): string {
   } catch { return ''; }
 }
 export function webMatchScore(query: string, title: string, url: string): number {
+  const wasmScore = fastWebMatchScore(query, title, url);
+  if (typeof wasmScore === 'number' && wasmScore > 0) return wasmScore;
+
   const normalize = (value: string) => value.normalize('NFKC').toLowerCase().trim();
   const q = normalize(query), t = normalize(title), u = normalize(url);
   if (!q) return 0;

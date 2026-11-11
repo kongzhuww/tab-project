@@ -6,6 +6,7 @@
   "description": "tab-project-next desktop Chromium browser extension with Vue UI",
   "scripts": {
     "build": "npm run ui:build",
+    "build:wasm": "wasm-pack build crates/fast-search --target web --out-dir ../../src/wasm/fast-search",
     "clean:chunks": "node scripts/clean-chunks.mjs",
     "release:build": "node scripts/build-release.mjs",
     "check": "npm run ui:check",
