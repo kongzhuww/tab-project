@@ -53,6 +53,7 @@ test('WE Shim: intercept dynamic fetch relative path and map to Blob URL', () =>
     HTMLImageElement: mockWindow.HTMLImageElement,
     HTMLMediaElement: mockWindow.HTMLMediaElement,
     Element: mockWindow.Element,
+    setTimeout,
     console,
   });
 
@@ -117,6 +118,7 @@ test('WE Shim: synthetic mouse event generation on WE_MOUSE_MOVE message', () =>
     HTMLMediaElement: mockWindow.HTMLMediaElement,
     Element: mockWindow.Element,
     MouseEvent: mockWindow.MouseEvent,
+    setTimeout,
     console,
   });
 

@@ -657,17 +657,12 @@ export const WallpaperService = {
       if (pack?.type === "web") {
         const iframe = document.createElement("iframe");
         iframe.title = pack.name || "Web Wallpaper";
+        iframe.setAttribute("allow", "autoplay *");
+        (iframe as any).allow = "autoplay";
         const chromeApi = typeof chrome !== "undefined" ? chrome : null;
         iframe.src = chromeApi?.runtime?.getURL ? chromeApi.runtime.getURL("wallpaper-sandbox.html") : "wallpaper-sandbox.html";
-        // 增加 1.5 秒白屏自愈守护：若 iframe 异常或无法通讯，自动降级为默认自然壁纸，绝不呈现大白屏
-        const fallbackTimer = setTimeout(() => {
-          if (version === applyVersion && iframe.parentNode) {
-            console.warn("[Wallpaper] Web wallpaper timeout or failed, auto fallback to mountain");
-            void WallpaperService.setMountain();
-          }
-        }, 1500);
+
         iframe.onload = () => {
-          clearTimeout(fallbackTimer);
           iframe.contentWindow?.postMessage(pack, "*");
           if (iframe.contentWindow) {
             setupWallpaperInteractions(iframe.contentWindow);

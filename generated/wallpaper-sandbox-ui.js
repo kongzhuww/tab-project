@@ -1,15 +1,42 @@
-(function(){"use strict";function S(e,t){const i=JSON.stringify(e),a=JSON.stringify(t);return`
+(function(){"use strict";function U(e,n,o={}){const a=JSON.stringify(e),r=JSON.stringify(n),f=JSON.stringify(o);return`
 (function() {
   if (window.__WE_SHIM_INITIALIZED__) return;
   window.__WE_SHIM_INITIALIZED__ = true;
 
-  // 1. 资产映射表与路径解析器 (拦截相对路径 404)
-  var __WE_ASSET_MAP__ = ${i};
-  var __WE_ENTRY_DIR__ = ${a};
+  // 0. 内存级 Storage 垫片 (防止沙盒无 allow-same-origin 时读取 localStorage 抛 SecurityError)
+  (function initStoragePolyfill() {
+    function createMemoryStorage() {
+      var store = new Map();
+      return {
+        getItem: function(k) { return store.has(String(k)) ? store.get(String(k)) : null; },
+        setItem: function(k, v) { store.set(String(k), String(v)); },
+        removeItem: function(k) { store.delete(String(k)); },
+        clear: function() { store.clear(); },
+        key: function(i) { var keys = Array.from(store.keys()); return keys[i] !== undefined ? keys[i] : null; },
+        get length() { return store.size; }
+      };
+    }
+    var needsPolyfill = false;
+    try {
+      var testKey = '__we_storage_test__';
+      window.localStorage.setItem(testKey, '1');
+      window.localStorage.removeItem(testKey);
+    } catch (e) {
+      needsPolyfill = true;
+    }
+    if (needsPolyfill) {
+      try {
+        var memLocal = createMemoryStorage();
+        var memSession = createMemoryStorage();
+        Object.defineProperty(window, 'localStorage', { value: memLocal, configurable: true, writable: true });
+        Object.defineProperty(window, 'sessionStorage', { value: memSession, configurable: true, writable: true });
+      } catch (_) {}
+    }
+  })();
 
-  function normalizePath(p) {
-    return String(p || "").replace(/\\\\/g, "/").replace(/^\\.\\//, "").replace(/^\\/+/, "").toLowerCase();
-  }
+  // 1. 资产映射表与路径解析器 (拦截相对路径 404)
+  var __WE_ASSET_MAP__ = ${a};
+  var __WE_ENTRY_DIR__ = ${r};
 
   function resolveAssetUrl(rawUrl) {
     if (!rawUrl || typeof rawUrl !== 'string') return rawUrl;
@@ -89,7 +116,7 @@
 
     var origSetAttr = Element.prototype.setAttribute;
     Element.prototype.setAttribute = function(name, val) {
-      if (typeof name === 'string' && name.toLowerCase() === 'src') {
+      if (typeof name === 'string' && (name.toLowerCase() === 'src' || name.toLowerCase() === 'data-src')) {
         val = resolveAssetUrl(val);
       }
       return origSetAttr.call(this, name, val);
@@ -98,13 +125,31 @@
     console.warn('[WE Shim] Asset interception descriptor warning:', e);
   }
 
-  // 4. 全局监听器注册表
+  // 4. 全局监听器注册表与属性存储
   window._weAudioCallbacks = [];
   window._weMediaCallbacks = [];
-  window._weUserProperties = {};
+  window._weUserProperties = ${f};
 
-  // 5. Wallpaper Engine 标准核心接口
-  window.wallpaperPropertyListener = window.wallpaperPropertyListener || {};
+  var _rawPropertyListener = {};
+
+  // 拦截 wallpaperPropertyListener 的 set 赋值 (针对 wp.js 覆盖全局变量的场景)
+  Object.defineProperty(window, 'wallpaperPropertyListener', {
+    get: function() {
+      return _rawPropertyListener;
+    },
+    set: function(newVal) {
+      _rawPropertyListener = newVal || {};
+      // 一旦壁纸脚本覆盖赋值并注册了 applyUserProperties，立刻主动注入初始属性
+      if (typeof _rawPropertyListener.applyUserProperties === 'function' && window._weUserProperties) {
+        try {
+          _rawPropertyListener.applyUserProperties(window._weUserProperties);
+        } catch (e) {
+          console.error('[WE Shim] applyUserProperties on setter error:', e);
+        }
+      }
+    },
+    configurable: true
+  });
 
   window.wallpaperRegisterAudioListener = function(callback) {
     if (typeof callback === 'function') {
@@ -132,6 +177,30 @@
       callback(propertyName, '');
     }
   };
+
+  // 5. 自动唤醒音频状态机 (解决 HALOFLUX 等等待首次用户手势点击解锁 Audio 的逻辑)
+  function triggerAudioUnlockGesture() {
+    try {
+      var evtInit = { bubbles: true, cancelable: true, clientX: 10, clientY: 10 };
+      var targets = [document.body, document.documentElement, window].filter(Boolean);
+      targets.forEach(function(t) {
+        try {
+          if (typeof PointerEvent === 'function') t.dispatchEvent(new PointerEvent('pointerdown', evtInit));
+          t.dispatchEvent(new MouseEvent('click', evtInit));
+        } catch (_) {}
+      });
+    } catch (_) {}
+  }
+
+  if (document.readyState === 'complete' || document.readyState === 'interactive') {
+    setTimeout(triggerAudioUnlockGesture, 100);
+    setTimeout(triggerAudioUnlockGesture, 600);
+  } else {
+    document.addEventListener('DOMContentLoaded', function() {
+      setTimeout(triggerAudioUnlockGesture, 100);
+      setTimeout(triggerAudioUnlockGesture, 600);
+    });
+  }
 
   // 6. 消息总线：接收父页面传入的鼠标、音频与配置，并合成原生事件
   window.addEventListener('message', function(event) {
@@ -203,7 +272,7 @@
     // D. 属性调节热更新 (applyUserProperties)
     if (data.type === 'WE_USER_PROPERTIES') {
       var props = data.properties || {};
-      window._weUserProperties = Object.assign(window._weUserProperties, props);
+      window._weUserProperties = Object.assign(window._weUserProperties || {}, props);
       if (window.wallpaperPropertyListener && typeof window.wallpaperPropertyListener.applyUserProperties === 'function') {
         try {
           window.wallpaperPropertyListener.applyUserProperties(props);
@@ -235,5 +304,5 @@
     }
   });
 })();
-`}let h=[];function y(e){return h.push(e),e}function g(){for(const e of h)URL.revokeObjectURL(e);h=[]}function u(e){return String(e||"").replace(/\\/g,"/").replace(/^\.\//,"").replace(/^\/+/,"").toLowerCase()}function P(e,t){const i=String(t||"").trim().replace(/^['"]|['"]$/g,"");if(!i||/^(?:[a-z][a-z0-9+.-]*:|#|data:|blob:)/i.test(i))return"";const[a]=i.split(/[?#]/);if(!a)return"";const r=i.startsWith("/")?"":u(e).split("/").slice(0,-1).join("/"),f=`${r?`${r}/`:""}${a.replace(/^\/+/,"")}`.split("/"),s=[];for(const l of f)!l||l==="."||(l===".."?s.pop():s.push(l));return s.join("/").toLowerCase()}let m=null,E=!1;async function L(e){g();const t=document.getElementById("wallpaper-root");if(!t)return;t.replaceChildren();const i=Array.isArray(e.files)?e.files:[];let a=i.find(s=>{const l=u(s.path);return l.endsWith(".mp4")||l.endsWith(".webm")||l.endsWith(".mkv")});if(!a&&e.entry&&(a=i.find(s=>u(s.path)===u(e.entry))),!a?.file)return;const r=document.createElement("video");r.id="we-active-video",r.autoplay=!0,r.loop=!0,r.muted=!0,r.playsInline=!0,r.setAttribute("webkit-playsinline","true"),r.style.width="100%",r.style.height="100%",r.style.objectFit="cover",r.style.display="block",r.style.pointerEvents="none";const f=y(URL.createObjectURL(a.file));r.src=f,t.appendChild(r);try{await r.play()}catch(s){console.warn("[Video Wallpaper] Autoplay warning:",s)}}async function W(e){g();const t=document.getElementById("wallpaper-root");if(!t||(t.replaceChildren(),typeof e.entry!="string"))return;const i=e.entry,a=Array.isArray(e.files)?e.files:[],r=new Map,f={};for(const n of a){const p=u(n.path);if(r.set(p,n),n.file instanceof Blob){const o=y(URL.createObjectURL(new Blob([n.file],{type:n.mime||n.file.type||"application/octet-stream"})));f[p]=o}}function s(n,p){const o=P(n,p);return f[o]||p}function l(n,p){let o=String(n||"");for(const w of[...o.matchAll(/url\(([^)]+)\)/gi)]){const v=w[1].trim().replace(/^['"]|['"]$/g,""),b=s(p,v);o=o.replace(w[0],`url(${JSON.stringify(b)})`)}return o}function A(n,p,o,w){for(const v of n.querySelectorAll(p)){const b=v.getAttribute(o);b&&v.setAttribute(o,s(w,b))}}const _=r.get(u(i));if(!_?.file||!(_.file instanceof Blob))return;const d=new DOMParser().parseFromString(await _.file.text(),"text/html"),M=u(i).split("/").slice(0,-1).join("/"),U=d.createElement("script");U.textContent=S(f,M),d.head.prepend(U);for(const n of d.querySelectorAll('link[rel~="stylesheet"][href]')){const p=n.getAttribute("href")||"",o=r.get(P(i,p));if(o?.file instanceof Blob){const w=l(await o.file.text(),o.path);n.setAttribute("href",y(URL.createObjectURL(new Blob([w],{type:"text/css"}))))}}A(d,"img[src],script[src],source[src],video[src],audio[src]","src",i),A(d,"link[href]","href",i);for(const n of d.querySelectorAll("[style]"))n.setAttribute("style",l(n.getAttribute("style")||"",i));for(const n of d.querySelectorAll("style"))n.textContent=l(n.textContent||"",i);const c=document.createElement("iframe");c.id="we-wallpaper-iframe",c.title=e.name||"Web Wallpaper",c.sandbox.add("allow-scripts","allow-pointer-lock"),c.style.width="100%",c.style.height="100%",c.style.border="none",c.style.display="block",c.src=y(URL.createObjectURL(new Blob([`<!doctype html>
-${d.documentElement.outerHTML}`],{type:"text/html"}))),m=e.properties||null,c.addEventListener("load",()=>{m&&c.contentWindow?.postMessage({type:"WE_USER_PROPERTIES",properties:m},"*"),E&&c.contentWindow?.postMessage({type:"WE_SET_PAUSED",isPaused:!0},"*")},{once:!0}),t.appendChild(c)}window.addEventListener("message",e=>{if(e.source!==window.parent)return;const t=e.data;if(!t)return;if(t.type==="web"){W(t).catch(console.error);return}if(t.type==="video"){L(t).catch(console.error);return}if(t.type==="WE_USER_PROPERTIES"&&(m=t.properties),t.type==="WE_SET_PAUSED"){E=!!t.isPaused;const a=document.querySelector("#we-active-video");a&&(E?a.pause():a.play().catch(()=>{}))}const i=document.querySelector("#we-wallpaper-iframe");i?.contentWindow&&i.contentWindow.postMessage(t,"*")}),window.addEventListener("pagehide",g)})();
+`}let v=[];function b(e){return v.push(e),e}function h(){for(const e of v)URL.revokeObjectURL(e);v=[]}function w(e){return String(e||"").replace(/\\/g,"/").replace(/^\.\//,"").replace(/^\/+/,"").toLowerCase()}function _(e,n){const o=String(n||"").trim().replace(/^['"]|['"]$/g,"");if(!o||/^(?:[a-z][a-z0-9+.-]*:|#|data:|blob:)/i.test(o))return"";const[a]=o.split(/[?#]/);if(!a)return"";const r=o.startsWith("/")?"":w(e).split("/").slice(0,-1).join("/"),f=`${r?`${r}/`:""}${a.replace(/^\/+/,"")}`.split("/"),c=[];for(const p of f)!p||p==="."||(p===".."?c.pop():c.push(p));return c.join("/").toLowerCase()}let m=null,E=!1;async function L(e){h();const n=document.getElementById("wallpaper-root");if(!n)return;n.replaceChildren();const o=Array.isArray(e.files)?e.files:[];let a=o.find(c=>{const p=w(c.path);return p.endsWith(".mp4")||p.endsWith(".webm")||p.endsWith(".mkv")});if(!a&&e.entry&&(a=o.find(c=>w(c.path)===w(e.entry))),!a?.file)return;const r=document.createElement("video");r.id="we-active-video",r.autoplay=!0,r.loop=!0,r.muted=!0,r.playsInline=!0,r.setAttribute("webkit-playsinline","true"),r.style.width="100%",r.style.height="100%",r.style.objectFit="cover",r.style.display="block",r.style.pointerEvents="none";const f=b(URL.createObjectURL(a.file));r.src=f,n.appendChild(r);try{await r.play()}catch(c){console.warn("[Video Wallpaper] Autoplay warning:",c)}}async function k(e){h();const n=document.getElementById("wallpaper-root");if(!n||(n.replaceChildren(),typeof e.entry!="string"))return;const o=e.entry,a=Array.isArray(e.files)?e.files:[],r=new Map,f={};for(const t of a){const l=w(t.path);if(r.set(l,t),t.file instanceof Blob){const i=b(URL.createObjectURL(new Blob([t.file],{type:t.mime||t.file.type||"application/octet-stream"})));f[l]=i}}function c(t,l){const i=_(t,l);return f[i]||l}function p(t,l){let i=String(t||"");for(const y of[...i.matchAll(/url\(([^)]+)\)/gi)]){const d=y[1].trim().replace(/^['"]|['"]$/g,""),g=c(l,d);i=i.replace(y[0],`url(${JSON.stringify(g)})`)}return i}function P(t,l,i,y){for(const d of t.querySelectorAll(l)){const g=d.getAttribute(i);g&&d.setAttribute(i,c(y,g))}}const S=r.get(w(o));if(!S?.file||!(S.file instanceof Blob))return;const u=new DOMParser().parseFromString(await S.file.text(),"text/html"),M=w(o).split("/").slice(0,-1).join("/"),A=u.createElement("script");A.textContent=U(f,M,e.properties||{}),u.head.prepend(A);for(const t of u.querySelectorAll('link[rel~="stylesheet"][href]')){const l=t.getAttribute("href")||"",i=r.get(_(o,l));if(i?.file instanceof Blob){const y=p(await i.file.text(),i.path),d=u.createElement("style");d.textContent=y,t.parentNode?.replaceChild(d,t)}}for(const t of Array.from(u.querySelectorAll("script[src]"))){const l=t.getAttribute("src")||"",i=r.get(_(o,l));if(i?.file instanceof Blob){const y=await i.file.text(),d=u.createElement("script");d.textContent=y,t.parentNode?.replaceChild(d,t)}}P(u,"img[src],source[src],video[src],audio[src]","src",o),P(u,"audio[data-src],video[data-src],img[data-src]","data-src",o),P(u,"link[href]","href",o);for(const t of u.querySelectorAll("[style]"))t.setAttribute("style",p(t.getAttribute("style")||"",o));for(const t of u.querySelectorAll("style"))t.textContent=p(t.textContent||"",o);const s=document.createElement("iframe");s.id="we-wallpaper-iframe",s.title=e.name||"Web Wallpaper",s.sandbox.add("allow-scripts","allow-pointer-lock"),s.setAttribute("allow","autoplay *"),s.allow="autoplay",s.style.width="100%",s.style.height="100%",s.style.border="none",s.style.display="block",s.src=b(URL.createObjectURL(new Blob([`<!doctype html>
+${u.documentElement.outerHTML}`],{type:"text/html"}))),m=e.properties||null,s.addEventListener("load",()=>{m&&s.contentWindow?.postMessage({type:"WE_USER_PROPERTIES",properties:m},"*"),E&&s.contentWindow?.postMessage({type:"WE_SET_PAUSED",isPaused:!0},"*")},{once:!0}),n.appendChild(s)}window.addEventListener("message",e=>{if(e.source!==window.parent)return;const n=e.data;if(!n)return;if(n.type==="web"){k(n).catch(console.error);return}if(n.type==="video"){L(n).catch(console.error);return}if(n.type==="WE_USER_PROPERTIES"&&(m=n.properties),n.type==="WE_SET_PAUSED"){E=!!n.isPaused;const a=document.querySelector("#we-active-video");a&&(E?a.pause():a.play().catch(()=>{}))}const o=document.querySelector("#we-wallpaper-iframe");o?.contentWindow&&o.contentWindow.postMessage(n,"*")}),window.addEventListener("pagehide",h)})();
