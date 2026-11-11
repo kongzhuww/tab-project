@@ -34,6 +34,59 @@
     }
   })();
 
+  // 0.1 工业级高刷屏降温守护：将 Retina 屏 DPR 封顶为 1.25，避免 3K/4K 像素点几何级过载发烫
+  try {
+    var rawDpr = Number(window.devicePixelRatio) || 1;
+    if (rawDpr > 1.25) {
+      Object.defineProperty(window, 'devicePixelRatio', {
+        value: 1.25,
+        configurable: true,
+        writable: true
+      });
+    }
+  } catch (_) {}
+
+  // 0.2 帧率自适应节流：动态壁纸锁定最高 60FPS，杜绝 120Hz ProMotion 屏幕双倍空转能耗
+  try {
+    var _origRaf = window.requestAnimationFrame;
+    var _lastFrameTime = 0;
+    if (typeof _origRaf === 'function') {
+      window.requestAnimationFrame = function(callback) {
+        return _origRaf.call(window, function(timestamp) {
+          var elapsed = timestamp - _lastFrameTime;
+          if (elapsed < 15.5) {
+            setTimeout(function() {
+              callback(performance.now());
+            }, 16 - elapsed);
+            return;
+          }
+          _lastFrameTime = timestamp;
+          callback(timestamp);
+        });
+      };
+    }
+  } catch (_) {}
+
+  // 0.3 裁剪隐藏子面板计算：当壁纸处于全屏桌面模式时，跳过无界面的子面板循环
+  if (typeof document !== 'undefined') {
+    var optimizeSubPanels = function() {
+      try {
+        var noop = function() {};
+        if (typeof window['drawAdv'] === 'function') window['drawAdv'] = noop;
+        if (typeof window['drawDiff'] === 'function') window['drawDiff'] = noop;
+        if (typeof window['drawVal'] === 'function') window['drawVal'] = noop;
+        if (typeof window['drawIdx'] === 'function') window['drawIdx'] = noop;
+        if (typeof window['agentsTick'] === 'function') window['agentsTick'] = noop;
+      } catch (_) {}
+    };
+    if (typeof document.addEventListener === 'function') {
+      document.addEventListener('DOMContentLoaded', function() {
+        setTimeout(optimizeSubPanels, 150);
+        setTimeout(optimizeSubPanels, 500);
+      });
+    }
+  }
+
   // 1. 资产映射表与路径解析器 (拦截相对路径 404)
   var __WE_ASSET_MAP__ = ${a};
   var __WE_ENTRY_DIR__ = ${r};
@@ -310,5 +363,5 @@
     }
   });
 })();
-`}let v=[];function _(e){return v.push(e),e}function b(){for(const e of v)URL.revokeObjectURL(e);v=[]}function w(e){return String(e||"").replace(/\\/g,"/").replace(/^\.\//,"").replace(/^\/+/,"").toLowerCase()}function h(e,n){const o=String(n||"").trim().replace(/^['"]|['"]$/g,"");if(!o||/^(?:[a-z][a-z0-9+.-]*:|#|data:|blob:)/i.test(o))return"";const[a]=o.split(/[?#]/);if(!a)return"";const r=o.startsWith("/")?"":w(e).split("/").slice(0,-1).join("/"),f=`${r?`${r}/`:""}${a.replace(/^\/+/,"")}`.split("/"),c=[];for(const p of f)!p||p==="."||(p===".."?c.pop():c.push(p));return c.join("/").toLowerCase()}let m=null,E=!1;async function L(e){b();const n=document.getElementById("wallpaper-root");if(!n)return;n.replaceChildren();const o=Array.isArray(e.files)?e.files:[];let a=o.find(c=>{const p=w(c.path);return p.endsWith(".mp4")||p.endsWith(".webm")||p.endsWith(".mkv")});if(!a&&e.entry&&(a=o.find(c=>w(c.path)===w(e.entry))),!a?.file)return;const r=document.createElement("video");r.id="we-active-video",r.autoplay=!0,r.loop=!0,r.muted=!0,r.playsInline=!0,r.setAttribute("webkit-playsinline","true"),r.style.width="100%",r.style.height="100%",r.style.objectFit="cover",r.style.display="block",r.style.pointerEvents="none";const f=_(URL.createObjectURL(a.file));r.src=f,n.appendChild(r);try{await r.play()}catch(c){console.warn("[Video Wallpaper] Autoplay warning:",c)}}async function k(e){b();const n=document.getElementById("wallpaper-root");if(!n||(n.replaceChildren(),typeof e.entry!="string"))return;const o=e.entry,a=Array.isArray(e.files)?e.files:[],r=new Map,f={};for(const t of a){const l=w(t.path);if(r.set(l,t),t.file instanceof Blob){const i=_(URL.createObjectURL(new Blob([t.file],{type:t.mime||t.file.type||"application/octet-stream"})));f[l]=i}}function c(t,l){const i=h(t,l);return f[i]||l}function p(t,l){let i=String(t||"");for(const y of[...i.matchAll(/url\(([^)]+)\)/gi)]){const d=y[1].trim().replace(/^['"]|['"]$/g,""),g=c(l,d);i=i.replace(y[0],`url(${JSON.stringify(g)})`)}return i}function P(t,l,i,y){for(const d of t.querySelectorAll(l)){const g=d.getAttribute(i);g&&d.setAttribute(i,c(y,g))}}const S=r.get(w(o));if(!S?.file||!(S.file instanceof Blob))return;const u=new DOMParser().parseFromString(await S.file.text(),"text/html"),M=w(o).split("/").slice(0,-1).join("/"),A=u.createElement("script");A.textContent=U(f,M,e.properties||{}),u.head.prepend(A);for(const t of u.querySelectorAll('link[rel~="stylesheet"][href]')){const l=t.getAttribute("href")||"",i=r.get(h(o,l));if(i?.file instanceof Blob){const y=p(await i.file.text(),i.path),d=u.createElement("style");d.textContent=y,t.parentNode?.replaceChild(d,t)}}for(const t of Array.from(u.querySelectorAll("script[src]"))){const l=t.getAttribute("src")||"",i=r.get(h(o,l));if(i?.file instanceof Blob){const y=await i.file.text(),d=u.createElement("script");d.textContent=y,t.parentNode?.replaceChild(d,t)}}P(u,"img[src],source[src],video[src],audio[src]","src",o),P(u,"audio[data-src],video[data-src],img[data-src]","data-src",o),P(u,"link[href]","href",o);for(const t of u.querySelectorAll("[style]"))t.setAttribute("style",p(t.getAttribute("style")||"",o));for(const t of u.querySelectorAll("style"))t.textContent=p(t.textContent||"",o);const s=document.createElement("iframe");s.id="we-wallpaper-iframe",s.title=e.name||"Web Wallpaper",s.sandbox.add("allow-scripts","allow-pointer-lock","allow-same-origin"),s.setAttribute("allow","autoplay *"),s.allow="autoplay",s.style.width="100%",s.style.height="100%",s.style.border="none",s.style.display="block",s.src=_(URL.createObjectURL(new Blob([`<!doctype html>
-${u.documentElement.outerHTML}`],{type:"text/html"}))),m=e.properties||null,s.addEventListener("load",()=>{m&&s.contentWindow?.postMessage({type:"WE_USER_PROPERTIES",properties:m},"*"),E&&s.contentWindow?.postMessage({type:"WE_SET_PAUSED",isPaused:!0},"*")},{once:!0}),n.appendChild(s)}window.addEventListener("message",e=>{if(e.source!==window.parent)return;const n=e.data;if(!n)return;if(n.type==="web"){try{window.parent.postMessage({type:"WE_SANDBOX_ACK"},"*")}catch{}k(n).catch(console.error);return}if(n.type==="video"){try{window.parent.postMessage({type:"WE_SANDBOX_ACK"},"*")}catch{}L(n).catch(console.error);return}if(n.type==="WE_USER_PROPERTIES"&&(m=n.properties),n.type==="WE_SET_PAUSED"){E=!!n.isPaused;const a=document.querySelector("#we-active-video");a&&(E?a.pause():a.play().catch(()=>{}))}const o=document.querySelector("#we-wallpaper-iframe");o?.contentWindow&&o.contentWindow.postMessage(n,"*")}),window.addEventListener("pagehide",b);try{window.parent.postMessage({type:"WE_SANDBOX_READY"},"*")}catch{}})();
+`}let g=[];function b(e){return g.push(e),e}function _(){for(const e of g)URL.revokeObjectURL(e);g=[]}function y(e){return String(e||"").replace(/\\/g,"/").replace(/^\.\//,"").replace(/^\/+/,"").toLowerCase()}function h(e,n){const o=String(n||"").trim().replace(/^['"]|['"]$/g,"");if(!o||/^(?:[a-z][a-z0-9+.-]*:|#|data:|blob:)/i.test(o))return"";const[a]=o.split(/[?#]/);if(!a)return"";const r=o.startsWith("/")?"":y(e).split("/").slice(0,-1).join("/"),f=`${r?`${r}/`:""}${a.replace(/^\/+/,"")}`.split("/"),c=[];for(const p of f)!p||p==="."||(p===".."?c.pop():c.push(p));return c.join("/").toLowerCase()}let m=null,E=!1;async function k(e){_();const n=document.getElementById("wallpaper-root");if(!n)return;n.replaceChildren();const o=Array.isArray(e.files)?e.files:[];let a=o.find(c=>{const p=y(c.path);return p.endsWith(".mp4")||p.endsWith(".webm")||p.endsWith(".mkv")});if(!a&&e.entry&&(a=o.find(c=>y(c.path)===y(e.entry))),!a?.file)return;const r=document.createElement("video");r.id="we-active-video",r.autoplay=!0,r.loop=!0,r.muted=!0,r.playsInline=!0,r.setAttribute("webkit-playsinline","true"),r.style.width="100%",r.style.height="100%",r.style.objectFit="cover",r.style.display="block",r.style.pointerEvents="none";const f=b(URL.createObjectURL(a.file));r.src=f,n.appendChild(r);try{await r.play()}catch(c){console.warn("[Video Wallpaper] Autoplay warning:",c)}}async function L(e){_();const n=document.getElementById("wallpaper-root");if(!n||(n.replaceChildren(),typeof e.entry!="string"))return;const o=e.entry,a=Array.isArray(e.files)?e.files:[],r=new Map,f={};for(const t of a){const l=y(t.path);if(r.set(l,t),t.file instanceof Blob){const i=b(URL.createObjectURL(new Blob([t.file],{type:t.mime||t.file.type||"application/octet-stream"})));f[l]=i}}function c(t,l){const i=h(t,l);return f[i]||l}function p(t,l){let i=String(t||"");for(const w of[...i.matchAll(/url\(([^)]+)\)/gi)]){const u=w[1].trim().replace(/^['"]|['"]$/g,""),v=c(l,u);i=i.replace(w[0],`url(${JSON.stringify(v)})`)}return i}function P(t,l,i,w){for(const u of t.querySelectorAll(l)){const v=u.getAttribute(i);v&&u.setAttribute(i,c(w,v))}}const S=r.get(y(o));if(!S?.file||!(S.file instanceof Blob))return;const d=new DOMParser().parseFromString(await S.file.text(),"text/html"),M=y(o).split("/").slice(0,-1).join("/"),A=d.createElement("script");A.textContent=U(f,M,e.properties||{}),d.head.prepend(A);for(const t of d.querySelectorAll('link[rel~="stylesheet"][href]')){const l=t.getAttribute("href")||"",i=r.get(h(o,l));if(i?.file instanceof Blob){const w=p(await i.file.text(),i.path),u=d.createElement("style");u.textContent=w,t.parentNode?.replaceChild(u,t)}}for(const t of Array.from(d.querySelectorAll("script[src]"))){const l=t.getAttribute("src")||"",i=r.get(h(o,l));if(i?.file instanceof Blob){const w=await i.file.text(),u=d.createElement("script");u.textContent=w,t.parentNode?.replaceChild(u,t)}}P(d,"img[src],source[src],video[src],audio[src]","src",o),P(d,"audio[data-src],video[data-src],img[data-src]","data-src",o),P(d,"link[href]","href",o);for(const t of d.querySelectorAll("[style]"))t.setAttribute("style",p(t.getAttribute("style")||"",o));for(const t of d.querySelectorAll("style"))t.textContent=p(t.textContent||"",o);const s=document.createElement("iframe");s.id="we-wallpaper-iframe",s.title=e.name||"Web Wallpaper",s.sandbox.add("allow-scripts","allow-pointer-lock","allow-same-origin"),s.setAttribute("allow","autoplay *"),s.allow="autoplay",s.style.width="100%",s.style.height="100%",s.style.border="none",s.style.display="block",s.src=b(URL.createObjectURL(new Blob([`<!doctype html>
+${d.documentElement.outerHTML}`],{type:"text/html"}))),m=e.properties||null,s.addEventListener("load",()=>{m&&s.contentWindow?.postMessage({type:"WE_USER_PROPERTIES",properties:m},"*"),E&&s.contentWindow?.postMessage({type:"WE_SET_PAUSED",isPaused:!0},"*")},{once:!0}),n.appendChild(s)}window.addEventListener("message",e=>{if(e.source!==window.parent)return;const n=e.data;if(!n)return;if(n.type==="web"){try{window.parent.postMessage({type:"WE_SANDBOX_ACK"},"*")}catch{}L(n).catch(console.error);return}if(n.type==="video"){try{window.parent.postMessage({type:"WE_SANDBOX_ACK"},"*")}catch{}k(n).catch(console.error);return}if(n.type==="WE_USER_PROPERTIES"&&(m=n.properties),n.type==="WE_SET_PAUSED"){E=!!n.isPaused;const a=document.querySelector("#we-active-video");a&&(E?a.pause():a.play().catch(()=>{}))}const o=document.querySelector("#we-wallpaper-iframe");o?.contentWindow&&o.contentWindow.postMessage(n,"*")}),window.addEventListener("pagehide",_);try{window.parent.postMessage({type:"WE_SANDBOX_READY"},"*")}catch{}})();
