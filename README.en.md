@@ -59,14 +59,12 @@ Include your installed extension version, browser version, and reproduction step
 | **Beaver Chatroom** | Private secure chatroom, shared rooms, activity sensing, interactive card sharing, and restricted image messages | **Optional Service (Experimental)** | Disabled by default; toggle in Store; requires self-hosted HTTPS server and dedicated invite |
 | **My Memes & Sticker Library** | Sticker picker inside chatroom, local directory mounting via File System Access API, and categorized sticker management | **Auxiliary Module** | Invoked inside the chatroom without a standalone dock icon; mounting local disk requires explicit browser grant |
 | **WebDAV Cloud Roaming** | Backup to Nutstore (坚果云) or private WebDAV; one-click restore for site shortcuts, preferences, and custom radio stations | **Optional Service** | Requires a personal WebDAV server address, account, and application-specific password |
-| **Android / Mobile App** | Standalone mobile app and Android APK build pipeline | **Archived / Retired** | Deprecated and archived; project now focuses exclusively on desktop Chromium with built-in responsive narrow layout |
-| **Cloudflare Worker Proxy** | Historical reverse proxy and relay server | **Archived Architecture** | Completely transitioned to direct standard browser API requests; no cloud relay required |
 
 ---
 
 ## 🎨 Theme & Design Philosophy
 
-- **Unified CSS Variable Theming**: Strictly styled against theme variables (`var(--panel)`, `var(--text)`, etc.) to prevent jarring unstyled flashes. Supports 4 official themes (click `#theme-toggle` in the top right to switch):
+- **Unified CSS Variable Theming**: Strictly styled against theme variables (`var(--panel)`, `var(--text)`, etc.) to prevent jarring unstyled flashes. Centrally managed in the Settings dialog under "04 Theme & Appearance", supporting 4 official themes:
   - **Light (`light`)**: Clean white background with optimal contrast and high readability;
   - **Dark (`dark`)**: Immersive dark background, easy on the eyes in dim lighting;
   - **Endfield (`endfield`)**: Industrial dark-gray palette with engineering hazard yellow accents;
