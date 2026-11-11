@@ -25,7 +25,8 @@ let animFrameId: number | null = null;
 let targetWindow: Window | null = null;
 let isStreaming = false;
 let lastTickTime = 0;
-let isIdle = false;
+let silentFrameCount = 0;
+let listenersBound = false;
 
 // 预分配复用数组，杜绝 GC 抖动
 const rawLeftFreq = new Uint8Array(BIN_COUNT);
@@ -135,13 +136,13 @@ function syncActiveAudioSource(): HTMLAudioElement | null {
 
 /**
  * 每一帧通过对数频率划分提取 128 位归一化音频频谱
- * 性能优化：限制 30FPS 推流，并且在无音乐播放时自动休眠，杜绝 CPU 空转
+ * 严格事件驱动 + 30FPS 节流 + 连续静默挂起与 audioCtx.suspend()
  */
 function tick(timestamp: number): void {
   if (!isStreaming || !targetWindow) return;
 
-  // 帧率节流：视觉频谱最高限制为 30FPS (两帧间隔至少 32ms)，能耗暴降 75%
-  if (timestamp - lastTickTime < 32) {
+  // 严格按 30 FPS 节流 (每 33ms 一次)，禁止 120Hz 每帧跨 iframe postMessage
+  if (timestamp - lastTickTime < 33) {
     animFrameId = requestAnimationFrame(tick);
     return;
   }
@@ -149,25 +150,25 @@ function tick(timestamp: number): void {
 
   const activeAudio = syncActiveAudioSource();
 
-  // 若当前根本没有音频播放，发送一次清零信号后立即挂起休眠，彻底释放 CPU！
-  if (!activeAudio) {
-    if (!isIdle) {
-      isIdle = true;
-      try {
-        targetWindow.postMessage({
-          type: "WE_AUDIO_DATA",
-          audio: zeroBuffer,
-        }, "*");
-      } catch (_) {}
+  // 若音乐暂停或结束，发送一帧全 0 复位后立刻停止循环并挂起 AudioContext！0% CPU！
+  if (!activeAudio || activeAudio.paused || activeAudio.ended) {
+    try {
+      targetWindow.postMessage({
+        type: "WE_AUDIO_DATA",
+        audio: zeroBuffer,
+      }, "*");
+    } catch (_) {}
+    if (audioCtx && audioCtx.state === "running") {
+      audioCtx.suspend().catch(() => {});
     }
-    // 降频轮询待机 (每 500ms 检查一次是否有新播放)
-    animFrameId = setTimeout(() => {
-      animFrameId = requestAnimationFrame(tick) as any;
-    }, 500) as any;
+    if (animFrameId !== null) {
+      if (typeof cancelAnimationFrame === "function") {
+        cancelAnimationFrame(animFrameId);
+      }
+      animFrameId = null;
+    }
     return;
   }
-
-  isIdle = false;
 
   if (audioCtx && audioCtx.state === "suspended") {
     audioCtx.resume().catch(() => {});
@@ -197,6 +198,31 @@ function tick(timestamp: number): void {
     }
   }
 
+  if (!hasSignal) {
+    silentFrameCount++;
+    // 若连续 30 帧能量全为 0，发送复位帧后立刻挂起休眠
+    if (silentFrameCount >= 30) {
+      try {
+        targetWindow.postMessage({
+          type: "WE_AUDIO_DATA",
+          audio: zeroBuffer,
+        }, "*");
+      } catch (_) {}
+      if (audioCtx && audioCtx.state === "running") {
+        audioCtx.suspend().catch(() => {});
+      }
+      if (animFrameId !== null) {
+        if (typeof cancelAnimationFrame === "function") {
+          cancelAnimationFrame(animFrameId);
+        }
+        animFrameId = null;
+      }
+      return;
+    }
+  } else {
+    silentFrameCount = 0;
+  }
+
   try {
     targetWindow.postMessage({
       type: "WE_AUDIO_DATA",
@@ -207,17 +233,54 @@ function tick(timestamp: number): void {
   animFrameId = requestAnimationFrame(tick);
 }
 
+function onAudioPlayEvent(): void {
+  if (isStreaming && animFrameId === null) {
+    silentFrameCount = 0;
+    lastTickTime = 0;
+    animFrameId = requestAnimationFrame(tick);
+  }
+}
+
+function bindAudioLifecycleListeners(): void {
+  if (listenersBound) return;
+  listenersBound = true;
+  const musicAudio = musicService.getAudioElement();
+  const radioAudio = biliRadioPlayer.getAudioElement();
+  if (musicAudio) {
+    musicAudio.addEventListener("play", onAudioPlayEvent);
+    musicAudio.addEventListener("playing", onAudioPlayEvent);
+  }
+  if (radioAudio) {
+    radioAudio.addEventListener("play", onAudioPlayEvent);
+    radioAudio.addEventListener("playing", onAudioPlayEvent);
+  }
+}
+
 /**
- * 启动向壁纸沙盒的音频推流
+ * 启动向壁纸沙盒的音频推流 (事件驱动唤醒)
  */
 export function startAudioSpectrumStream(target: Window): void {
   targetWindow = target;
+  bindAudioLifecycleListeners();
   if (isStreaming) return;
 
   isStreaming = true;
   lastTickTime = 0;
-  isIdle = false;
-  animFrameId = requestAnimationFrame(tick);
+  silentFrameCount = 0;
+
+  // 只有在当前确实有音频处于播放状态时才开启 tick 循环，否则保持待机静默
+  const active = getActivePlayingAudio();
+  if (active) {
+    animFrameId = requestAnimationFrame(tick);
+  } else {
+    // 待机状态，向壁纸发送一次全 0 初始化复位
+    try {
+      targetWindow.postMessage({
+        type: "WE_AUDIO_DATA",
+        audio: zeroBuffer,
+      }, "*");
+    } catch (_) {}
+  }
 }
 
 /**
@@ -225,13 +288,17 @@ export function startAudioSpectrumStream(target: Window): void {
  */
 export function stopAudioSpectrumStream(): void {
   isStreaming = false;
-  isIdle = false;
+  silentFrameCount = 0;
   if (animFrameId !== null) {
     if (typeof cancelAnimationFrame === "function") {
       cancelAnimationFrame(animFrameId);
     }
     clearTimeout(animFrameId);
     animFrameId = null;
+  }
+
+  if (audioCtx && audioCtx.state === "running") {
+    audioCtx.suspend().catch(() => {});
   }
 
   if (targetWindow) {

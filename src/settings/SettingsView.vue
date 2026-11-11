@@ -648,13 +648,14 @@
                   class="wallpaper-item-card"
                   :class="{ 'is-active': isWallpaperActive(item) }"
                   @click="handleSelectWallpaper(item)"
+                  @mouseenter="playCardVideo($event)"
+                  @mouseleave="pauseCardVideo($event)"
                 >
                   <div class="wallpaper-card-preview">
-                    <!-- 视频缩略图预览 -->
+                    <!-- 视频缩略图预览 (仅 hover 悬停播放解码) -->
                     <video
                       v-if="item.kind === '视频' && wallpaperPreviewMap[item.id]"
                       :src="wallpaperPreviewMap[item.id]"
-                      autoplay
                       loop
                       muted
                       playsinline
@@ -1028,6 +1029,27 @@ import CustomSelect, { type CustomSelectOption } from "../core/CustomSelect.vue"
 
 declare const chrome: any;
 const props = withDefaults(defineProps<{ active?: boolean }>(), { active: true });
+
+function playCardVideo(e: MouseEvent) {
+  const video = (e.currentTarget as HTMLElement)?.querySelector("video");
+  if (video) video.play().catch(() => {});
+}
+function pauseCardVideo(e: MouseEvent) {
+  const video = (e.currentTarget as HTMLElement)?.querySelector("video");
+  if (video) {
+    video.pause();
+    video.currentTime = 0;
+  }
+}
+
+// 弹窗打开时自动暂停底层壁纸渲染，关闭时恢复，杜绝毛玻璃 backdrop-filter 拖垮 WindowServer
+watch(
+  () => props.active,
+  (isActive) => {
+    WallpaperService.pauseWallpaper(Boolean(isActive));
+  },
+  { immediate: true }
+);
 
 // Tabs 导航定义
 const tabs = computed(() => [

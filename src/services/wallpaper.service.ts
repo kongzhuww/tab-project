@@ -47,24 +47,42 @@ export function teardownWallpaperInteractions(): void {
 function setupWallpaperInteractions(targetWin: Window): void {
   teardownWallpaperInteractions();
 
-  let rafId: number | null = null;
-  let lastX = 0;
-  let lastY = 0;
+  let moveTimer: any = null;
+  let lastMoveTime = 0;
+  let curX = 0;
+  let curY = 0;
+  let sentX = -1;
+  let sentY = -1;
+
+  const flushMouseMove = () => {
+    moveTimer = null;
+    lastMoveTime = performance.now();
+    if (curX !== sentX || curY !== sentY) {
+      sentX = curX;
+      sentY = curY;
+      try {
+        targetWin.postMessage({
+          type: "WE_MOUSE_MOVE",
+          x: curX,
+          y: curY,
+        }, "*");
+      } catch (_) {}
+    }
+  };
 
   const onPointerMove = (e: PointerEvent | MouseEvent) => {
-    lastX = e.clientX;
-    lastY = e.clientY;
-    if (rafId === null) {
-      rafId = requestAnimationFrame(() => {
-        rafId = null;
-        try {
-          targetWin.postMessage({
-            type: "WE_MOUSE_MOVE",
-            x: lastX,
-            y: lastY,
-          }, "*");
-        } catch (_) {}
-      });
+    curX = e.clientX;
+    curY = e.clientY;
+    const now = performance.now();
+    // 33ms 节流 (30Hz) 并且坐标未变化时不重复发送
+    if (now - lastMoveTime >= 33) {
+      if (moveTimer) {
+        clearTimeout(moveTimer);
+        moveTimer = null;
+      }
+      flushMouseMove();
+    } else if (!moveTimer) {
+      moveTimer = setTimeout(flushMouseMove, 33 - (now - lastMoveTime));
     }
   };
 
@@ -118,7 +136,7 @@ function setupWallpaperInteractions(targetWin: Window): void {
   document.addEventListener("visibilitychange", onVisibilityChange);
 
   currentInteractionCleanup = () => {
-    if (rafId !== null) cancelAnimationFrame(rafId);
+    if (moveTimer) clearTimeout(moveTimer);
     window.removeEventListener("pointermove", onPointerMove);
     window.removeEventListener("mousedown", onPointerDown);
     window.removeEventListener("mouseup", onPointerUp);
@@ -450,6 +468,31 @@ function isSameWallpaper(a: any, b: any): boolean {
 }
 
 export const WallpaperService = {
+  pauseWallpaper(paused: boolean): void {
+    if (typeof document === "undefined") return;
+    const video = document.querySelector<HTMLVideoElement>("#hero-background-media video");
+    if (video) {
+      if (paused) {
+        if (!video.paused) video.pause();
+      } else {
+        if (video.paused) void video.play().catch(() => {});
+      }
+    }
+    const iframe = document.querySelector<HTMLIFrameElement>("#hero-background-media iframe");
+    if (iframe?.contentWindow) {
+      try {
+        iframe.contentWindow.postMessage({
+          type: "WE_SET_PAUSED",
+          isPaused: paused,
+          paused: paused
+        }, "*");
+      } catch (_) {}
+    }
+    if (paused) {
+      stopAudioSpectrumStream();
+    }
+  },
+
   async loadHistory(): Promise<{ history: WallpaperHistoryItem[]; currentValue: any }> {
     const stored = await storageGet([BACKGROUND_HISTORY_KEY, "heroBackground"]);
     let history: WallpaperHistoryItem[] = Array.isArray(stored[BACKGROUND_HISTORY_KEY]) ? stored[BACKGROUND_HISTORY_KEY] : [];

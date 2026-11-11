@@ -1,4 +1,4 @@
-(function(){"use strict";function U(e,n,o={}){const a=JSON.stringify(e),r=JSON.stringify(n),f=JSON.stringify(o);return`
+(function(){"use strict";function R(e,r,a={}){const o=JSON.stringify(e),n=JSON.stringify(r),f=JSON.stringify(a);return`
 (function() {
   if (window.__WE_SHIM_INITIALIZED__) return;
   window.__WE_SHIM_INITIALIZED__ = true;
@@ -34,36 +34,78 @@
     }
   })();
 
-  // 0.1 工业级高刷屏降温守护：将 Retina 屏 DPR 封顶为 1.25，避免 3K/4K 像素点几何级过载发烫
+  // 0.1 工业级高刷屏降温守护：将 Retina 屏 DPR 强制锁定为 1，直接消除 4K/5K 超大物理 Canvas 像素计算 (直降 75% 像素负荷)
   try {
-    var rawDpr = Number(window.devicePixelRatio) || 1;
-    if (rawDpr > 1.25) {
-      Object.defineProperty(window, 'devicePixelRatio', {
-        value: 1.25,
-        configurable: true,
-        writable: true
-      });
-    }
+    Object.defineProperty(window, 'devicePixelRatio', {
+      get: function() { return 1; },
+      configurable: true
+    });
   } catch (_) {}
 
-  // 0.2 帧率自适应节流：动态壁纸锁定最高 60FPS，杜绝 120Hz ProMotion 屏幕双倍空转能耗
+  // 0.2 帧率自适应节流：动态壁纸锁定在 40 FPS (每帧 ~24ms)，支持暂停队列挂起，消除 120Hz 高刷空转
+  var _wePaused = false;
+  var _wePendingRafs = [];
   try {
     var _origRaf = window.requestAnimationFrame;
+    var _origCancelRaf = window.cancelAnimationFrame;
     var _lastFrameTime = 0;
+    var _rafIdCounter = 1;
+    var _activeRafMap = new Map();
+
     if (typeof _origRaf === 'function') {
       window.requestAnimationFrame = function(callback) {
-        return _origRaf.call(window, function(timestamp) {
+        var id = _rafIdCounter++;
+        if (_wePaused) {
+          _wePendingRafs.push({ id: id, cb: callback });
+          return id;
+        }
+        var nativeId = _origRaf.call(window, function(timestamp) {
+          _activeRafMap.delete(id);
+          if (_wePaused) {
+            _wePendingRafs.push({ id: id, cb: callback });
+            return;
+          }
           var elapsed = timestamp - _lastFrameTime;
-          if (elapsed < 15.5) {
+          if (elapsed < 23) {
             setTimeout(function() {
-              callback(performance.now());
-            }, 16 - elapsed);
+              if (!_wePaused) callback(performance.now());
+            }, 24 - elapsed);
             return;
           }
           _lastFrameTime = timestamp;
           callback(timestamp);
         });
+        _activeRafMap.set(id, nativeId);
+        return id;
       };
+
+      if (typeof _origCancelRaf === 'function') {
+        window.cancelAnimationFrame = function(id) {
+          var nativeId = _activeRafMap.get(id);
+          if (nativeId !== undefined) {
+            _activeRafMap.delete(id);
+            _origCancelRaf.call(window, nativeId);
+          }
+          _wePendingRafs = _wePendingRafs.filter(function(item) { return item.id !== id; });
+        };
+      }
+    }
+  } catch (_) {}
+
+  // 0.3 钳制 Canvas 2D 的 shadowBlur 最大值为 12，防止重度全屏高斯模糊拖垮 macOS GPU
+  try {
+    if (typeof CanvasRenderingContext2D !== 'undefined' && CanvasRenderingContext2D.prototype) {
+      var shadowDesc = Object.getOwnPropertyDescriptor(CanvasRenderingContext2D.prototype, 'shadowBlur');
+      if (shadowDesc && shadowDesc.set) {
+        Object.defineProperty(CanvasRenderingContext2D.prototype, 'shadowBlur', {
+          get: function() { return shadowDesc.get.call(this); },
+          set: function(val) {
+            var clamped = Math.min(Math.max(Number(val) || 0, 0), 12);
+            return shadowDesc.set.call(this, clamped);
+          },
+          configurable: true
+        });
+      }
     }
   } catch (_) {}
 
@@ -88,8 +130,8 @@
   }
 
   // 1. 资产映射表与路径解析器 (拦截相对路径 404)
-  var __WE_ASSET_MAP__ = ${a};
-  var __WE_ENTRY_DIR__ = ${r};
+  var __WE_ASSET_MAP__ = ${o};
+  var __WE_ENTRY_DIR__ = ${n};
 
   function resolveAssetUrl(rawUrl) {
     if (!rawUrl || typeof rawUrl !== 'string') return rawUrl;
@@ -262,15 +304,29 @@
   }
 
   // 6. 消息总线：接收父页面传入的鼠标、音频与配置，并合成原生事件
+  var _cachedEventTarget = null;
+  function getEventTarget() {
+    if (_cachedEventTarget && _cachedEventTarget.isConnected) return _cachedEventTarget;
+    var target = null;
+    if (typeof document !== 'undefined') {
+      if (typeof document.querySelector === 'function') {
+        try { target = document.querySelector('canvas') || document.body; } catch (_) {}
+      }
+      if (!target) target = document.body || document;
+    }
+    _cachedEventTarget = target || window;
+    return _cachedEventTarget;
+  }
+
   window.addEventListener('message', function(event) {
     var data = event.data;
     if (!data || typeof data !== 'object') return;
 
-    // A. 鼠标移动合成事件
+    // A. 鼠标移动合成事件 (直接复用主画布/Body目标，彻底移除 elementFromPoint 消除强制同步回流 Forced Reflow)
     if (data.type === 'WE_MOUSE_MOVE') {
       var x = Number(data.x) || 0;
       var y = Number(data.y) || 0;
-      var target = document.elementFromPoint(x, y) || document.body || window;
+      var target = getEventTarget();
       var init = {
         clientX: x,
         clientY: y,
@@ -294,7 +350,7 @@
     if (data.type === 'WE_MOUSE_DOWN' || data.type === 'WE_MOUSE_UP' || data.type === 'WE_CLICK') {
       var x = Number(data.x) || 0;
       var y = Number(data.y) || 0;
-      var target = document.elementFromPoint(x, y) || document.body || window;
+      var target = getEventTarget();
       var evtName = data.type === 'WE_MOUSE_DOWN' ? 'mousedown' : (data.type === 'WE_MOUSE_UP' ? 'mouseup' : 'click');
       var init = {
         clientX: x,
@@ -353,15 +409,24 @@
     }
 
     // F. 页面挂起/恢复省电控制
-    if (data.type === 'WE_SET_PAUSED') {
+    if (data.type === 'WE_SET_PAUSED' || data.type === 'WE_PAUSE') {
+      var shouldPause = Boolean(data.isPaused || data.paused);
+      _wePaused = shouldPause;
+      if (!_wePaused && _wePendingRafs.length > 0) {
+        var toResume = _wePendingRafs.slice();
+        _wePendingRafs = [];
+        for (var k = 0; k < toResume.length; k++) {
+          window.requestAnimationFrame(toResume[k].cb);
+        }
+      }
       if (window.wallpaperPropertyListener && typeof window.wallpaperPropertyListener.setPaused === 'function') {
         try {
-          window.wallpaperPropertyListener.setPaused(Boolean(data.isPaused));
+          window.wallpaperPropertyListener.setPaused(shouldPause);
         } catch (e) {}
       }
       return;
     }
   });
 })();
-`}let g=[];function b(e){return g.push(e),e}function _(){for(const e of g)URL.revokeObjectURL(e);g=[]}function y(e){return String(e||"").replace(/\\/g,"/").replace(/^\.\//,"").replace(/^\/+/,"").toLowerCase()}function h(e,n){const o=String(n||"").trim().replace(/^['"]|['"]$/g,"");if(!o||/^(?:[a-z][a-z0-9+.-]*:|#|data:|blob:)/i.test(o))return"";const[a]=o.split(/[?#]/);if(!a)return"";const r=o.startsWith("/")?"":y(e).split("/").slice(0,-1).join("/"),f=`${r?`${r}/`:""}${a.replace(/^\/+/,"")}`.split("/"),c=[];for(const p of f)!p||p==="."||(p===".."?c.pop():c.push(p));return c.join("/").toLowerCase()}let m=null,E=!1;async function k(e){_();const n=document.getElementById("wallpaper-root");if(!n)return;n.replaceChildren();const o=Array.isArray(e.files)?e.files:[];let a=o.find(c=>{const p=y(c.path);return p.endsWith(".mp4")||p.endsWith(".webm")||p.endsWith(".mkv")});if(!a&&e.entry&&(a=o.find(c=>y(c.path)===y(e.entry))),!a?.file)return;const r=document.createElement("video");r.id="we-active-video",r.autoplay=!0,r.loop=!0,r.muted=!0,r.playsInline=!0,r.setAttribute("webkit-playsinline","true"),r.style.width="100%",r.style.height="100%",r.style.objectFit="cover",r.style.display="block",r.style.pointerEvents="none";const f=b(URL.createObjectURL(a.file));r.src=f,n.appendChild(r);try{await r.play()}catch(c){console.warn("[Video Wallpaper] Autoplay warning:",c)}}async function L(e){_();const n=document.getElementById("wallpaper-root");if(!n||(n.replaceChildren(),typeof e.entry!="string"))return;const o=e.entry,a=Array.isArray(e.files)?e.files:[],r=new Map,f={};for(const t of a){const l=y(t.path);if(r.set(l,t),t.file instanceof Blob){const i=b(URL.createObjectURL(new Blob([t.file],{type:t.mime||t.file.type||"application/octet-stream"})));f[l]=i}}function c(t,l){const i=h(t,l);return f[i]||l}function p(t,l){let i=String(t||"");for(const w of[...i.matchAll(/url\(([^)]+)\)/gi)]){const u=w[1].trim().replace(/^['"]|['"]$/g,""),v=c(l,u);i=i.replace(w[0],`url(${JSON.stringify(v)})`)}return i}function P(t,l,i,w){for(const u of t.querySelectorAll(l)){const v=u.getAttribute(i);v&&u.setAttribute(i,c(w,v))}}const S=r.get(y(o));if(!S?.file||!(S.file instanceof Blob))return;const d=new DOMParser().parseFromString(await S.file.text(),"text/html"),M=y(o).split("/").slice(0,-1).join("/"),A=d.createElement("script");A.textContent=U(f,M,e.properties||{}),d.head.prepend(A);for(const t of d.querySelectorAll('link[rel~="stylesheet"][href]')){const l=t.getAttribute("href")||"",i=r.get(h(o,l));if(i?.file instanceof Blob){const w=p(await i.file.text(),i.path),u=d.createElement("style");u.textContent=w,t.parentNode?.replaceChild(u,t)}}for(const t of Array.from(d.querySelectorAll("script[src]"))){const l=t.getAttribute("src")||"",i=r.get(h(o,l));if(i?.file instanceof Blob){const w=await i.file.text(),u=d.createElement("script");u.textContent=w,t.parentNode?.replaceChild(u,t)}}P(d,"img[src],source[src],video[src],audio[src]","src",o),P(d,"audio[data-src],video[data-src],img[data-src]","data-src",o),P(d,"link[href]","href",o);for(const t of d.querySelectorAll("[style]"))t.setAttribute("style",p(t.getAttribute("style")||"",o));for(const t of d.querySelectorAll("style"))t.textContent=p(t.textContent||"",o);const s=document.createElement("iframe");s.id="we-wallpaper-iframe",s.title=e.name||"Web Wallpaper",s.sandbox.add("allow-scripts","allow-pointer-lock","allow-same-origin"),s.setAttribute("allow","autoplay *"),s.allow="autoplay",s.style.width="100%",s.style.height="100%",s.style.border="none",s.style.display="block",s.src=b(URL.createObjectURL(new Blob([`<!doctype html>
-${d.documentElement.outerHTML}`],{type:"text/html"}))),m=e.properties||null,s.addEventListener("load",()=>{m&&s.contentWindow?.postMessage({type:"WE_USER_PROPERTIES",properties:m},"*"),E&&s.contentWindow?.postMessage({type:"WE_SET_PAUSED",isPaused:!0},"*")},{once:!0}),n.appendChild(s)}window.addEventListener("message",e=>{if(e.source!==window.parent)return;const n=e.data;if(!n)return;if(n.type==="web"){try{window.parent.postMessage({type:"WE_SANDBOX_ACK"},"*")}catch{}L(n).catch(console.error);return}if(n.type==="video"){try{window.parent.postMessage({type:"WE_SANDBOX_ACK"},"*")}catch{}k(n).catch(console.error);return}if(n.type==="WE_USER_PROPERTIES"&&(m=n.properties),n.type==="WE_SET_PAUSED"){E=!!n.isPaused;const a=document.querySelector("#we-active-video");a&&(E?a.pause():a.play().catch(()=>{}))}const o=document.querySelector("#we-wallpaper-iframe");o?.contentWindow&&o.contentWindow.postMessage(n,"*")}),window.addEventListener("pagehide",_);try{window.parent.postMessage({type:"WE_SANDBOX_READY"},"*")}catch{}})();
+`}let g=[];function _(e){return g.push(e),e}function h(){for(const e of g)URL.revokeObjectURL(e);g=[]}function y(e){return String(e||"").replace(/\\/g,"/").replace(/^\.\//,"").replace(/^\/+/,"").toLowerCase()}function b(e,r){const a=String(r||"").trim().replace(/^['"]|['"]$/g,"");if(!a||/^(?:[a-z][a-z0-9+.-]*:|#|data:|blob:)/i.test(a))return"";const[o]=a.split(/[?#]/);if(!o)return"";const n=a.startsWith("/")?"":y(e).split("/").slice(0,-1).join("/"),f=`${n?`${n}/`:""}${o.replace(/^\/+/,"")}`.split("/"),l=[];for(const d of f)!d||d==="."||(d===".."?l.pop():l.push(d));return l.join("/").toLowerCase()}let m=null,E=!1;async function U(e){h();const r=document.getElementById("wallpaper-root");if(!r)return;r.replaceChildren();const a=Array.isArray(e.files)?e.files:[];let o=a.find(l=>{const d=y(l.path);return d.endsWith(".mp4")||d.endsWith(".webm")||d.endsWith(".mkv")});if(!o&&e.entry&&(o=a.find(l=>y(l.path)===y(e.entry))),!o?.file)return;const n=document.createElement("video");n.id="we-active-video",n.autoplay=!0,n.loop=!0,n.muted=!0,n.playsInline=!0,n.setAttribute("webkit-playsinline","true"),n.style.width="100%",n.style.height="100%",n.style.objectFit="cover",n.style.display="block",n.style.pointerEvents="none";const f=_(URL.createObjectURL(o.file));n.src=f,r.appendChild(n);try{await n.play()}catch(l){console.warn("[Video Wallpaper] Autoplay warning:",l)}}async function k(e){h();const r=document.getElementById("wallpaper-root");if(!r||(r.replaceChildren(),typeof e.entry!="string"))return;const a=e.entry,o=Array.isArray(e.files)?e.files:[],n=new Map,f={};for(const t of o){const c=y(t.path);if(n.set(c,t),t.file instanceof Blob){const i=_(URL.createObjectURL(new Blob([t.file],{type:t.mime||t.file.type||"application/octet-stream"})));f[c]=i}}function l(t,c){const i=b(t,c);return f[i]||c}function d(t,c){let i=String(t||"");for(const w of[...i.matchAll(/url\(([^)]+)\)/gi)]){const p=w[1].trim().replace(/^['"]|['"]$/g,""),v=l(c,p);i=i.replace(w[0],`url(${JSON.stringify(v)})`)}return i}function P(t,c,i,w){for(const p of t.querySelectorAll(c)){const v=p.getAttribute(i);v&&p.setAttribute(i,l(w,v))}}const S=n.get(y(a));if(!S?.file||!(S.file instanceof Blob))return;const u=new DOMParser().parseFromString(await S.file.text(),"text/html"),M=y(a).split("/").slice(0,-1).join("/"),A=u.createElement("script");A.textContent=R(f,M,e.properties||{}),u.head.prepend(A);for(const t of u.querySelectorAll('link[rel~="stylesheet"][href]')){const c=t.getAttribute("href")||"",i=n.get(b(a,c));if(i?.file instanceof Blob){const w=d(await i.file.text(),i.path),p=u.createElement("style");p.textContent=w,t.parentNode?.replaceChild(p,t)}}for(const t of Array.from(u.querySelectorAll("script[src]"))){const c=t.getAttribute("src")||"",i=n.get(b(a,c));if(i?.file instanceof Blob){const w=await i.file.text(),p=u.createElement("script");p.textContent=w,t.parentNode?.replaceChild(p,t)}}P(u,"img[src],source[src],video[src],audio[src]","src",a),P(u,"audio[data-src],video[data-src],img[data-src]","data-src",a),P(u,"link[href]","href",a);for(const t of u.querySelectorAll("[style]"))t.setAttribute("style",d(t.getAttribute("style")||"",a));for(const t of u.querySelectorAll("style"))t.textContent=d(t.textContent||"",a);const s=document.createElement("iframe");s.id="we-wallpaper-iframe",s.title=e.name||"Web Wallpaper",s.sandbox.add("allow-scripts","allow-pointer-lock","allow-same-origin"),s.setAttribute("allow","autoplay *"),s.allow="autoplay",s.style.width="100%",s.style.height="100%",s.style.border="none",s.style.display="block",s.src=_(URL.createObjectURL(new Blob([`<!doctype html>
+${u.documentElement.outerHTML}`],{type:"text/html"}))),m=e.properties||null,s.addEventListener("load",()=>{m&&s.contentWindow?.postMessage({type:"WE_USER_PROPERTIES",properties:m},"*"),E&&s.contentWindow?.postMessage({type:"WE_SET_PAUSED",isPaused:!0},"*")},{once:!0}),r.appendChild(s)}window.addEventListener("message",e=>{if(e.source!==window.parent)return;const r=e.data;if(!r)return;if(r.type==="web"){try{window.parent.postMessage({type:"WE_SANDBOX_ACK"},"*")}catch{}k(r).catch(console.error);return}if(r.type==="video"){try{window.parent.postMessage({type:"WE_SANDBOX_ACK"},"*")}catch{}U(r).catch(console.error);return}if(r.type==="WE_USER_PROPERTIES"&&(m=r.properties),r.type==="WE_SET_PAUSED"||r.type==="WE_PAUSE"){E=!!(r.isPaused||r.paused);const o=document.querySelector("#we-active-video");o&&(E?o.pause():o.play().catch(()=>{}))}const a=document.querySelector("#we-wallpaper-iframe");a?.contentWindow&&a.contentWindow.postMessage(r,"*")}),window.addEventListener("pagehide",h);try{window.parent.postMessage({type:"WE_SANDBOX_READY"},"*")}catch{}})();

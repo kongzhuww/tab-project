@@ -232,8 +232,8 @@ window.addEventListener("message", (event: MessageEvent<any>) => {
   if (data.type === "WE_USER_PROPERTIES") {
     latestProperties = data.properties;
   }
-  if (data.type === "WE_SET_PAUSED") {
-    latestIsPaused = Boolean(data.isPaused);
+  if (data.type === "WE_SET_PAUSED" || data.type === "WE_PAUSE") {
+    latestIsPaused = Boolean(data.isPaused || data.paused);
     const video = document.querySelector("#we-active-video") as HTMLVideoElement | null;
     if (video) {
       if (latestIsPaused) video.pause();
