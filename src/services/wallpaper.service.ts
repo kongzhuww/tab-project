@@ -29,6 +29,8 @@ const WALLPAPER_MAX_BYTES = 180 * 1024 * 1024;
 let activeObjectUrls: string[] = [];
 let applyVersion = 0;
 let currentInteractionCleanup: (() => void) | null = null;
+let activeWebPackCache: any = null;
+let currentAppliedWallpaperValue: any = null;
 
 function trackUrl(url: string): string {
   activeObjectUrls.push(url);
@@ -73,6 +75,7 @@ function setupWallpaperInteractions(targetWin: Window): void {
         x: e.clientX,
         y: e.clientY,
       }, "*");
+      targetWin.postMessage({ type: "WE_USER_GESTURE_UNLOCK" }, "*");
     } catch (_) {}
   };
 
@@ -83,6 +86,12 @@ function setupWallpaperInteractions(targetWin: Window): void {
         x: e.clientX,
         y: e.clientY,
       }, "*");
+    } catch (_) {}
+  };
+
+  const onUserGesture = () => {
+    try {
+      targetWin.postMessage({ type: "WE_USER_GESTURE_UNLOCK" }, "*");
     } catch (_) {}
   };
 
@@ -104,6 +113,8 @@ function setupWallpaperInteractions(targetWin: Window): void {
   window.addEventListener("pointermove", onPointerMove, { passive: true });
   window.addEventListener("mousedown", onPointerDown, { passive: true });
   window.addEventListener("mouseup", onPointerUp, { passive: true });
+  window.addEventListener("click", onUserGesture, { passive: true });
+  window.addEventListener("keydown", onUserGesture, { passive: true });
   document.addEventListener("visibilitychange", onVisibilityChange);
 
   currentInteractionCleanup = () => {
@@ -111,6 +122,8 @@ function setupWallpaperInteractions(targetWin: Window): void {
     window.removeEventListener("pointermove", onPointerMove);
     window.removeEventListener("mousedown", onPointerDown);
     window.removeEventListener("mouseup", onPointerUp);
+    window.removeEventListener("click", onUserGesture);
+    window.removeEventListener("keydown", onUserGesture);
     document.removeEventListener("visibilitychange", onVisibilityChange);
   };
 }
@@ -515,6 +528,10 @@ export const WallpaperService = {
   },
 
   async setWallpaper(value: any, instantPayload: any = null): Promise<void> {
+    if (instantPayload) {
+      activeWebPackCache = instantPayload;
+    }
+    currentAppliedWallpaperValue = value;
     await storageSet({ heroBackground: value });
     try {
       localStorage.setItem("lw-current-wallpaper", JSON.stringify(value));
@@ -640,14 +657,18 @@ export const WallpaperService = {
       }
     }
 
+    currentAppliedWallpaperValue = value;
     if (value.type === "web") {
-      // 若提供了即时包 (例如刚点击工坊壁纸)，直接零延迟秒开
-      let pack = instantPayload;
+      // 若提供了即时包 (例如刚点击工坊壁纸) 或内存中有缓存，直接零延迟秒开
+      let pack = instantPayload || activeWebPackCache;
       if (!pack || pack.type !== "web") {
         pack = await loadActiveWallpaperFromOpfs();
-        if (!pack || pack.type !== "web") {
+        if (pack && pack.type === "web") {
+          activeWebPackCache = pack;
+        } else {
           pack = await backgroundDbGet(value.storageKey || BACKGROUND_CURRENT_KEY);
           if (pack && pack.type === "web") {
+            activeWebPackCache = pack;
             void saveActiveWallpaperToOpfs(pack);
           }
         }
@@ -655,6 +676,7 @@ export const WallpaperService = {
 
       if (version !== applyVersion) return;
       if (pack?.type === "web") {
+        activeWebPackCache = pack;
         const iframe = document.createElement("iframe");
         iframe.title = pack.name || "Web Wallpaper";
         iframe.setAttribute("allow", "autoplay *");
@@ -662,8 +684,36 @@ export const WallpaperService = {
         const chromeApi = typeof chrome !== "undefined" ? chrome : null;
         iframe.src = chromeApi?.runtime?.getURL ? chromeApi.runtime.getURL("wallpaper-sandbox.html") : "wallpaper-sandbox.html";
 
-        iframe.onload = () => {
+        let ackReceived = false;
+        const deliverPack = () => {
+          if (ackReceived) return;
           iframe.contentWindow?.postMessage(pack, "*");
+        };
+
+        const onSandboxMsg = (event: MessageEvent) => {
+          if (event.source === iframe.contentWindow) {
+            if (event.data?.type === "WE_SANDBOX_READY") {
+              deliverPack();
+            } else if (event.data?.type === "WE_SANDBOX_ACK") {
+              ackReceived = true;
+            }
+          }
+        };
+        window.addEventListener("message", onSandboxMsg);
+
+        iframe.onload = () => {
+          deliverPack();
+          // 短轮询重试 3 次，防止首包未被沙盒 messageListener 捕获
+          let retry = 0;
+          const retryTimer = setInterval(() => {
+            retry++;
+            if (ackReceived || retry > 5 || version !== applyVersion) {
+              clearInterval(retryTimer);
+              return;
+            }
+            deliverPack();
+          }, 80);
+
           if (iframe.contentWindow) {
             setupWallpaperInteractions(iframe.contentWindow);
             startAudioSpectrumStream(iframe.contentWindow);
@@ -671,7 +721,8 @@ export const WallpaperService = {
         };
         host.appendChild(iframe);
       } else {
-        void WallpaperService.setMountain();
+        // 找不到 pack 时仅记录日志，绝不擅自篡改用户设置退回山景
+        console.warn("[WallpaperService] Web wallpaper pack not found yet, keeping state without fallback");
       }
       return;
     }
@@ -792,7 +843,16 @@ export const WallpaperService = {
 if (typeof chrome !== "undefined" && chrome?.storage?.onChanged) {
   chrome.storage.onChanged.addListener((changes: any, area: string) => {
     if (area === "local" && changes.heroBackground) {
-      void WallpaperService.applyWallpaper(changes.heroBackground.newValue);
+      const newVal = changes.heroBackground.newValue;
+      // 若当前页面刚刚已经应用了同一壁纸，避免二次无意义重载与竞态
+      if (
+        currentAppliedWallpaperValue &&
+        newVal &&
+        JSON.stringify(currentAppliedWallpaperValue) === JSON.stringify(newVal)
+      ) {
+        return;
+      }
+      void WallpaperService.applyWallpaper(newVal);
     }
   });
 }

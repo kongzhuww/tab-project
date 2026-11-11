@@ -92,14 +92,18 @@ export async function applyWorkshopWallpaper(item: WorkshopItemInfo): Promise<bo
       isWorkshop: true
     };
 
-    // 1. 0 毫秒即刻上屏并持久化 heroBackground (保证页面刷新不失效)
+    // 1. 率先完整写入 OPFS 私有文件系统 (确保后续任何并发或存储事件读取 OPFS 时 100% 命中)
+    try {
+      await saveActiveWallpaperToOpfs(pack);
+    } catch (e) {
+      console.warn("[Workshop Applier] OPFS save warning:", e);
+    }
+
+    // 2. 0 毫秒即刻上屏并持久化 heroBackground (保证页面刷新不失效)
     await WallpaperService.setWallpaper(wallpaperVal, pack);
 
-    // 2. 存入轻量历史记录元数据 (附带封面图，绝不重复生成卡片)
+    // 3. 存入轻量历史记录元数据 (附带封面图，绝不重复生成卡片)
     await WallpaperService.addHistory(wallpaperVal, null, previewImage);
-
-    // 3. 完整写入 OPFS 私有文件系统 (冷启动保证 0 弹窗秒播)
-    await saveActiveWallpaperToOpfs(pack);
 
     return true;
   } catch (err) {

@@ -176,7 +176,7 @@ async function renderWebWallpaper(pack: WallpaperPack): Promise<void> {
   const frame = document.createElement("iframe");
   frame.id = "we-wallpaper-iframe";
   frame.title = pack.name || "Web Wallpaper";
-  frame.sandbox.add("allow-scripts", "allow-pointer-lock");
+  frame.sandbox.add("allow-scripts", "allow-pointer-lock", "allow-same-origin");
   frame.setAttribute("allow", "autoplay *");
   (frame as any).allow = "autoplay";
   frame.style.width = "100%";
@@ -214,10 +214,16 @@ window.addEventListener("message", (event: MessageEvent<any>) => {
 
   // 1. 壁纸加载指令
   if (data.type === "web") {
+    try {
+      window.parent.postMessage({ type: "WE_SANDBOX_ACK" }, "*");
+    } catch (_) {}
     void renderWebWallpaper(data).catch(console.error);
     return;
   }
   if (data.type === "video") {
+    try {
+      window.parent.postMessage({ type: "WE_SANDBOX_ACK" }, "*");
+    } catch (_) {}
     void renderVideoWallpaper(data).catch(console.error);
     return;
   }
@@ -242,3 +248,8 @@ window.addEventListener("message", (event: MessageEvent<any>) => {
 });
 
 window.addEventListener("pagehide", clearUrls);
+
+// 主动向父窗口通知沙盒已就绪
+try {
+  window.parent.postMessage({ type: "WE_SANDBOX_READY" }, "*");
+} catch (_) {}
