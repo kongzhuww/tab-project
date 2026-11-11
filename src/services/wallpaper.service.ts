@@ -420,14 +420,48 @@ function backgroundHistoryType(value: any): string {
   return "背景";
 }
 
+function isSameWallpaper(a: any, b: any): boolean {
+  if (!a || !b) return false;
+  const valA = a.value || a;
+  const valB = b.value || b;
+  // 1. 如果带有 workshopId，只要工坊 ID 相同即为同一款壁纸
+  if (valA.workshopId && valB.workshopId && String(valA.workshopId) === String(valB.workshopId)) return true;
+  // 2. 标题和类型完全相同
+  const titleA = a.title || valA.name || valA.title;
+  const titleB = b.title || valB.name || valB.title;
+  if (titleA && titleB && titleA === titleB && valA.type === valB.type) return true;
+  // 3. 剥离随机 storageKey 后的配置相同
+  const cleanA = { ...valA, storageKey: undefined };
+  const cleanB = { ...valB, storageKey: undefined };
+  return JSON.stringify(cleanA) === JSON.stringify(cleanB);
+}
+
 export const WallpaperService = {
   async loadHistory(): Promise<{ history: WallpaperHistoryItem[]; currentValue: any }> {
     const stored = await storageGet([BACKGROUND_HISTORY_KEY, "heroBackground"]);
-    const history: WallpaperHistoryItem[] = Array.isArray(stored[BACKGROUND_HISTORY_KEY]) ? stored[BACKGROUND_HISTORY_KEY] : [];
+    let history: WallpaperHistoryItem[] = Array.isArray(stored[BACKGROUND_HISTORY_KEY]) ? stored[BACKGROUND_HISTORY_KEY] : [];
+
+    // 智能去重清洗历史记录：同一款壁纸只保留最新的一份，自动合并历史残留重复项
+    const seen = new Set<string>();
+    const deduped: WallpaperHistoryItem[] = [];
+    for (const item of history) {
+      const key = item.value?.workshopId
+        ? `ws-${item.value.workshopId}`
+        : (item.title ? `${item.kind || ''}-${item.title}` : JSON.stringify({ ...item.value, storageKey: undefined }));
+      if (!seen.has(key)) {
+        seen.add(key);
+        deduped.push(item);
+      }
+    }
+    if (deduped.length !== history.length) {
+      history = deduped;
+      void storageSet({ [BACKGROUND_HISTORY_KEY]: deduped });
+    }
+
     return { history, currentValue: stored.heroBackground || null };
   },
 
-  async addHistory(value: any, payload: any = null): Promise<any> {
+  async addHistory(value: any, payload: any = null, previewUrl?: string): Promise<any> {
     const id = `bg-${Date.now()}-${Math.random().toString(16).slice(2)}`;
     let itemValue = value;
     if (value && typeof value === "object") itemValue = { ...value, storageKey: id };
@@ -439,9 +473,11 @@ export const WallpaperService = {
       title: backgroundHistoryTitle(itemValue),
       kind: backgroundHistoryType(itemValue),
       createdAt: Date.now(),
+      previewUrl: previewUrl || itemValue.previewUrl || itemValue.previewBase64,
       value: itemValue
     };
-    const next = [item, ...history.filter((old) => JSON.stringify(old.value) !== JSON.stringify(itemValue))].slice(
+    // 严格去重：如果已有该壁纸，先剔除旧位置，只在最前展示一次
+    const next = [item, ...history.filter((old) => !isSameWallpaper(old, item))].slice(
       0,
       BACKGROUND_HISTORY_LIMIT
     );

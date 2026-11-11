@@ -82,19 +82,21 @@ export async function applyWorkshopWallpaper(item: WorkshopItemInfo): Promise<bo
       files,
     };
 
+    const previewImage = item.previewUrl || item.previewBase64;
     const wallpaperVal = {
       type: pack.type,
       name: item.title,
       workshopId: item.id,
       entry: pack.entry,
+      previewUrl: previewImage,
       isWorkshop: true
     };
 
     // 1. 0 毫秒即刻上屏并持久化 heroBackground (保证页面刷新不失效)
     await WallpaperService.setWallpaper(wallpaperVal, pack);
 
-    // 2. 存入轻量历史记录元数据
-    await WallpaperService.addHistory(wallpaperVal, null);
+    // 2. 存入轻量历史记录元数据 (附带封面图，绝不重复生成卡片)
+    await WallpaperService.addHistory(wallpaperVal, null, previewImage);
 
     // 3. 完整写入 OPFS 私有文件系统 (冷启动保证 0 弹窗秒播)
     await saveActiveWallpaperToOpfs(pack);

@@ -13,7 +13,7 @@ const arrayKeys = new Set([
   "searchIgnoredBookmarkFolders", "wereadSortIds",
   "foGroups", "launcherGroups", "quickLinks", "launcherPages",
   "foCollapsedGroupsV1", "biliFollowingGroupsV1", "biliSubCustomChannelsV1", "biliRadioSeriesV1",
-  "gh_my_repo_groups_v2"
+  "gh_my_repo_groups_v2", "heroBackgroundHistory"
 ]);
 const objectKeys = new Set([
   "customShortcuts", "launcherFolders", "quickLinkGroupSizes",
@@ -63,7 +63,9 @@ function validateJson(value: unknown, depth = 0): void {
 
 function validateSetting(key: string, value: unknown): void {
   const fail = (detail?: string) => { throw new SyncBackupError(`配置项 ${key} 格式无效${detail ? ` (${detail})` : ""}，操作已取消`); };
-  if (["foGroups", "launcherGroups"].includes(key)) {
+  if (key === "heroBackground") {
+    if (typeof value !== "string" && !isRecord(value)) fail("非字符串或对象");
+  } else if (["foGroups", "launcherGroups"].includes(key)) {
     // Historical versions used both keyed maps and arrays for these collections.
     if (!Array.isArray(value) && !isRecord(value)) fail("非数组或字典");
   } else if (booleanKeys.has(key)) {
