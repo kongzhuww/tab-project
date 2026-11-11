@@ -10,6 +10,8 @@ export interface WindowRect {
   height: number;
 }
 
+export type WindowInteractionMode = "idle" | "dragging" | "resizing" | "maximized";
+
 export interface UseWindowDraggableOptions {
   windowId: string;
   storageKey?: string;
@@ -38,10 +40,14 @@ export function useWindowDraggable(options: UseWindowDraggableOptions) {
     const cleanup = cleanupInteraction;
     cleanupInteraction = undefined;
     cleanup?.();
+    if (interactionMode.value === "dragging" || interactionMode.value === "resizing") {
+      interactionMode.value = "idle";
+    }
   }
-  const isDragging = ref(false);
-  const isResizing = ref(false);
-  const isMaximized = ref(false);
+  const interactionMode = ref<WindowInteractionMode>("idle");
+  const isDragging = computed(() => interactionMode.value === "dragging");
+  const isResizing = computed(() => interactionMode.value === "resizing");
+  const isMaximized = computed(() => interactionMode.value === "maximized");
   const preMaxRect = ref<WindowRect | null>(null);
 
   const storageKey = options.storageKey || `lw_win_pos_${options.windowId}`;
@@ -195,7 +201,7 @@ export function useWindowDraggable(options: UseWindowDraggableOptions) {
   }
 
   function onHeaderPointerDown(event: PointerEvent) {
-    if (disposed || options.active?.() === false || isDragging.value || isResizing.value) return;
+    if (disposed || options.active?.() === false || interactionMode.value !== "idle") return;
     suppressHeaderClick = false;
     stopInteractions();
     if (event.button !== 0 || isMaximized.value) return;
@@ -227,7 +233,7 @@ export function useWindowDraggable(options: UseWindowDraggableOptions) {
     panel.style.transform = "none";
     panel.style.margin = "0";
 
-    isDragging.value = true;
+    interactionMode.value = "dragging";
     panel.classList.add("dragging");
     panel.style.willChange = "left, top";
 
@@ -281,8 +287,9 @@ export function useWindowDraggable(options: UseWindowDraggableOptions) {
       try { headerEl?.releasePointerCapture(event.pointerId); } catch {}
       const finalRect = panel.getBoundingClientRect();
       currentRect.value = { left: finalRect.left, top: finalRect.top, width: finalRect.width, height: finalRect.height };
-      isDragging.value = false;
-      isResizing.value = false;
+      if (interactionMode.value === "dragging" || interactionMode.value === "resizing") {
+        interactionMode.value = "idle";
+      }
       panel.classList.remove("dragging", "resizing");
       panel.style.willChange = "auto";
     };
@@ -295,7 +302,7 @@ export function useWindowDraggable(options: UseWindowDraggableOptions) {
   }
 
   function onResizePointerDown(event: PointerEvent, edge: string) {
-    if (disposed || options.active?.() === false || isDragging.value || isResizing.value) return;
+    if (disposed || options.active?.() === false || interactionMode.value !== "idle") return;
     stopInteractions();
     if (event.button !== 0 || isMaximized.value) return;
     const panel = panelRef.value;
@@ -317,7 +324,7 @@ export function useWindowDraggable(options: UseWindowDraggableOptions) {
     panel.style.transform = "none";
     panel.style.margin = "0";
 
-    isResizing.value = true;
+    interactionMode.value = "resizing";
     panel.classList.add("resizing");
     panel.style.willChange = "width, height, left, top";
 
@@ -388,8 +395,9 @@ export function useWindowDraggable(options: UseWindowDraggableOptions) {
       try { handleEl?.releasePointerCapture(event.pointerId); } catch {}
       const finalRect = panel.getBoundingClientRect();
       currentRect.value = { left: finalRect.left, top: finalRect.top, width: finalRect.width, height: finalRect.height };
-      isDragging.value = false;
-      isResizing.value = false;
+      if (interactionMode.value === "dragging" || interactionMode.value === "resizing") {
+        interactionMode.value = "idle";
+      }
       panel.classList.remove("dragging", "resizing");
       panel.style.willChange = "auto";
     };
@@ -407,9 +415,9 @@ export function useWindowDraggable(options: UseWindowDraggableOptions) {
     stopInteractions();
     bringToFront();
 
-    if (isMaximized.value) {
+    if (interactionMode.value === "maximized") {
       // 还原
-      isMaximized.value = false;
+      interactionMode.value = "idle";
       panel.classList.remove("is-maximized");
       if (preMaxRect.value) {
         panel.style.left = `${preMaxRect.value.left}px`;
@@ -419,7 +427,7 @@ export function useWindowDraggable(options: UseWindowDraggableOptions) {
       } else {
         restoreSavedPosition();
       }
-    } else {
+    } else if (interactionMode.value === "idle") {
       // 最大化
       const rect = panel.getBoundingClientRect();
       preMaxRect.value = {
@@ -428,7 +436,7 @@ export function useWindowDraggable(options: UseWindowDraggableOptions) {
         width: rect.width,
         height: rect.height
       };
-      isMaximized.value = true;
+      interactionMode.value = "maximized";
       panel.classList.add("is-maximized");
       panel.style.left = "0px";
       panel.style.top = "0px";
@@ -471,6 +479,7 @@ export function useWindowDraggable(options: UseWindowDraggableOptions) {
     panelRef,
     headerRef,
     initialStyle,
+    interactionMode,
     isDragging,
     isResizing,
     isMaximized,

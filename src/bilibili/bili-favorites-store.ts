@@ -454,11 +454,11 @@ export async function loadFolderVideos(
   const order = orderMap[sort] || "mtime";
 
   try {
-    const res = await bilibiliService.getFolderVideos(folderId, page, 24, order, query);
+    const res = await bilibiliService.getFolderVideos(folderId, page, 21, order, query);
     org.videos = res.medias.map(mapBiliVideoToView);
     org.page = page;
     org.totalItems = res.total;
-    org.totalPages = Math.max(1, Math.ceil(res.total / 24));
+    org.totalPages = Math.max(1, Math.ceil(res.total / 21));
     org.sort = sort;
     org.query = query;
 

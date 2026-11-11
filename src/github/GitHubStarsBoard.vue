@@ -7,6 +7,7 @@ import { githubRepoDetailController } from "./repo-detail-store";
 import { githubTaskModalController } from "./github-task-modal-store";
 import { REPOSITORY_DRAG_TYPE, readRepositoryDrag } from "./repository-drag";
 import { t } from "../i18n";
+import { BoardInteractionMachine } from "./stars-board-machine";
 
 const props = defineProps<{
   active?: boolean;
@@ -114,10 +115,13 @@ function handleCreateFolderInBoard(): void {
   void gitHubService.promptCreateFolder(activeDrilldownParent.value || undefined);
 }
 
+// 看板拖拽与上下文菜单显式状态机
+const boardMachine = new BoardInteractionMachine();
+
 // 拖拽状态
-const activeDragRepo = ref<GitHubRawRepo | null>(null);
-const activeDragFromList = ref<string | null>(null);
-const hoverTargetColumn = ref<string | null>(null);
+const activeDragRepo = ref<GitHubRawRepo | null>(boardMachine.activeDragRepo);
+const activeDragFromList = ref<string | null>(boardMachine.activeDragFromList);
+const hoverTargetColumn = ref<string | null>(boardMachine.hoverTargetColumn);
 
 // 边缘自动滚动状态
 let autoScrollTimer: number | null = null;
@@ -152,23 +156,61 @@ const listMenuState = reactive<{
   list: null
 });
 
+// 右键上下文菜单
+const contextMenuState = reactive<{
+  visible: boolean;
+  x: number;
+  y: number;
+  repo: GitHubRawRepo | null;
+  fromList: string | null;
+}>({
+  visible: false,
+  x: 0,
+  y: 0,
+  repo: null,
+  fromList: null
+});
+
+const activeSubMenu = ref<string | null>(null);
+const isFlyoutLeft = ref(false);
+
+// 分组列拖拽换位
+const draggingColumnId = ref<string | null>(boardMachine.draggingColumnId);
+const hoverColumnId = ref<string | null>(boardMachine.hoverColumnId);
+
+const unsubBoardMachine = boardMachine.subscribe(s => {
+  activeDragRepo.value = s.activeDragRepo;
+  activeDragFromList.value = s.activeDragFromList;
+  hoverTargetColumn.value = s.hoverTargetColumn;
+  draggingColumnId.value = s.draggingColumnId;
+  hoverColumnId.value = s.hoverColumnId;
+
+  listMenuState.visible = s.mode === "column_menu" && s.columnMenu !== null;
+  listMenuState.x = s.columnMenu?.x ?? 0;
+  listMenuState.y = s.columnMenu?.y ?? 0;
+  listMenuState.list = s.columnMenu?.list ?? null;
+
+  contextMenuState.visible = s.mode === "repo_context_menu" && s.repoMenu !== null;
+  contextMenuState.x = s.repoMenu?.x ?? 0;
+  contextMenuState.y = s.repoMenu?.y ?? 0;
+  contextMenuState.repo = s.repoMenu?.repo ?? null;
+  contextMenuState.fromList = s.repoMenu?.fromList ?? null;
+  activeSubMenu.value = s.repoMenu?.activeSubMenu ?? null;
+  isFlyoutLeft.value = s.repoMenu?.isFlyoutLeft ?? false;
+});
+
 function closeListMenu(): void {
-  listMenuState.visible = false;
-  listMenuState.list = null;
+  boardMachine.send({ type: "CLOSE_COLUMN_MENU" });
 }
 
 function handleOpenListMenu(e: MouseEvent, list: any) {
   e.preventDefault();
   e.stopPropagation();
-  closeContextMenu();
   const menuWidth = 150;
   const menuHeight = 130;
   const x = Math.min(e.clientX, window.innerWidth - menuWidth - 10);
   const y = Math.min(e.clientY, window.innerHeight - menuHeight - 10);
-  listMenuState.x = x;
-  listMenuState.y = y;
-  listMenuState.list = list;
-  listMenuState.visible = true;
+  boardMachine.send({ type: "OPEN_COLUMN_MENU", payload: { x, y, list } });
 }
 
 async function handleRenameList() {
@@ -192,14 +234,8 @@ async function handleDeleteList() {
   await gitHubService.deleteFolder(l.name);
 }
 
-// 分组列拖拽换位
-const draggingColumnId = ref<string | null>(null);
-const hoverColumnId = ref<string | null>(null);
-
 function onColDragStart(event: DragEvent, list: any) {
-  closeListMenu();
-  closeContextMenu();
-  draggingColumnId.value = list.id;
+  boardMachine.send({ type: "START_DRAG_COLUMN", columnId: list.id });
   if (event.dataTransfer) {
     event.dataTransfer.effectAllowed = "move";
     event.dataTransfer.setData("application/x-gh-col-id", list.id);
@@ -207,20 +243,19 @@ function onColDragStart(event: DragEvent, list: any) {
 }
 
 function onColDragEnd() {
-  draggingColumnId.value = null;
-  hoverColumnId.value = null;
+  boardMachine.send({ type: "END_DRAG_COLUMN" });
 }
 
 function onColDragOver(event: DragEvent, targetListId: string) {
   if (!draggingColumnId.value || draggingColumnId.value === targetListId) return;
   event.preventDefault();
   if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
-  hoverColumnId.value = targetListId;
+  boardMachine.send({ type: "HOVER_COLUMN_REORDER", columnId: targetListId });
 }
 
 function onColDragLeave(event: DragEvent, targetListId: string) {
   if (hoverColumnId.value === targetListId) {
-    hoverColumnId.value = null;
+    boardMachine.send({ type: "HOVER_COLUMN_REORDER", columnId: null });
   }
 }
 
@@ -232,29 +267,8 @@ async function onColDrop(event: DragEvent, targetListId: string) {
   await gitHubService.reorderFolders(fromId, targetListId);
 }
 
-// 右键上下文菜单
-const contextMenuState = reactive<{
-  visible: boolean;
-  x: number;
-  y: number;
-  repo: GitHubRawRepo | null;
-  fromList: string | null;
-}>({
-  visible: false,
-  x: 0,
-  y: 0,
-  repo: null,
-  fromList: null
-});
-
-const activeSubMenu = ref<string | null>(null);
-const isFlyoutLeft = ref(false);
-
 function closeContextMenu(): void {
-  contextMenuState.visible = false;
-  contextMenuState.repo = null;
-  contextMenuState.fromList = null;
-  activeSubMenu.value = null;
+  boardMachine.send({ type: "CLOSE_REPO_MENU" });
 }
 
 function handleOpenContextMenu(e: MouseEvent, repo: GitHubRawRepo, fromList: string | null) {
@@ -266,13 +280,17 @@ function handleOpenContextMenu(e: MouseEvent, repo: GitHubRawRepo, fromList: str
   const x = Math.min(e.clientX, window.innerWidth - menuWidth - 10);
   const y = Math.min(e.clientY, window.innerHeight - menuHeight - 10);
 
-  contextMenuState.x = x;
-  contextMenuState.y = y;
-  contextMenuState.repo = repo;
-  contextMenuState.fromList = fromList;
-  contextMenuState.visible = true;
-  activeSubMenu.value = "folder";
-  isFlyoutLeft.value = x > window.innerWidth - 380;
+  boardMachine.send({
+    type: "OPEN_REPO_MENU",
+    payload: {
+      x,
+      y,
+      repo,
+      fromList,
+      activeSubMenu: "folder",
+      isFlyoutLeft: x > window.innerWidth - 380
+    }
+  });
 }
 
 async function handleMoveToDefault() {
@@ -330,8 +348,7 @@ function handleOpenInGitHub() {
 function onGlobalPointerDown(event: PointerEvent): void {
   const target = event.target as HTMLElement | null;
   if (!target?.closest(".fo-cover-context-menu") && !target?.closest(".col-popover-menu") && !target?.closest(".gh-list-col-menu")) {
-    closeContextMenu();
-    closeListMenu();
+    boardMachine.send({ type: "RESET_IDLE" });
   }
 }
 
@@ -341,8 +358,7 @@ function onGlobalKeyDown(event: KeyboardEvent): void {
       activeDrilldownParent.value = null;
       return;
     }
-    closeContextMenu();
-    closeListMenu();
+    boardMachine.send({ type: "RESET_IDLE" });
   }
 }
 
@@ -403,9 +419,7 @@ function onViewportDragOver(event: DragEvent) {
 }
 
 function onDragStart(event: DragEvent, repo: GitHubRawRepo, fromList: string | null) {
-  closeContextMenu();
-  activeDragRepo.value = repo;
-  activeDragFromList.value = fromList;
+  boardMachine.send({ type: "START_DRAG_REPO", repo, fromList });
   if (event.dataTransfer) {
     event.dataTransfer.effectAllowed = "move";
     event.dataTransfer.setData(REPOSITORY_DRAG_TYPE, repo.full_name);
@@ -415,9 +429,7 @@ function onDragStart(event: DragEvent, repo: GitHubRawRepo, fromList: string | n
 }
 
 function onDragEnd() {
-  activeDragRepo.value = null;
-  activeDragFromList.value = null;
-  hoverTargetColumn.value = null;
+  boardMachine.send({ type: "END_DRAG_REPO" });
   stopAutoScroll();
   window.removeEventListener("wheel", onWindowWheelWhileDragging);
 }
@@ -428,7 +440,7 @@ function onDragOver(event: DragEvent, columnId: string) {
   if (event.dataTransfer) {
     event.dataTransfer.dropEffect = "move";
   }
-  hoverTargetColumn.value = columnId;
+  boardMachine.send({ type: "HOVER_TARGET_COLUMN", columnId });
 }
 
 function onDragLeave(event: DragEvent, columnId: string) {
@@ -437,7 +449,7 @@ function onDragLeave(event: DragEvent, columnId: string) {
     return;
   }
   if (hoverTargetColumn.value === columnId) {
-    hoverTargetColumn.value = null;
+    boardMachine.send({ type: "HOVER_TARGET_COLUMN", columnId: null });
   }
 }
 
@@ -473,6 +485,8 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
+  unsubBoardMachine();
+  boardMachine.send({ type: "RESET_IDLE" });
   stopAutoScroll();
   window.removeEventListener("wheel", onWindowWheelWhileDragging);
   window.removeEventListener("pointerdown", onGlobalPointerDown);

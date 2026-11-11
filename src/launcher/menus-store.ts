@@ -1,6 +1,9 @@
 import { reactive, readonly, type DeepReadonly } from "vue";
 import { runLauncherMenuAction } from "./menu-actions";
 import { appDialog } from "../core/app-dialog.store";
+import { LauncherMenuMachine } from "./launcher-menu-machine";
+
+export const launcherMenuMachine = new LauncherMenuMachine();
 
 export interface LauncherMenuItem {
   id: string;
@@ -93,6 +96,10 @@ export const launcherMenusController = {
     return menusState;
   },
 
+  get machine() {
+    return launcherMenuMachine;
+  },
+
   getSnapshot(): DeepReadonly<LauncherMenusState> {
     return readonly(menusState);
   },
@@ -102,6 +109,7 @@ export const launcherMenusController = {
   },
 
   closeAll() {
+    launcherMenuMachine.send({ type: "CLOSE_ALL" });
     this.closeFolderMenu();
     this.closeLinkMenu();
     this.closePageMenu();
@@ -110,6 +118,7 @@ export const launcherMenusController = {
 
   openFolderMenu(groupName: string, sizeText: string, pages: PageSubmenuItem[], x: number, y: number) {
     this.closeAll();
+    launcherMenuMachine.send({ type: "OPEN_FOLDER_MENU" });
     menusState.folderMenu = {
       isOpen: true,
       groupName,
@@ -128,11 +137,13 @@ export const launcherMenusController = {
   },
 
   setFolderFlyoutOpen(open: boolean) {
+    launcherMenuMachine.send({ type: "SET_FLYOUT", open });
     menusState.folderMenu.flyoutOpen = open;
   },
 
   openLinkMenu(link: LauncherMenuItem, pages: PageSubmenuItem[], x: number, y: number) {
     this.closeAll();
+    launcherMenuMachine.send({ type: "OPEN_LINK_MENU" });
     menusState.linkMenu = {
       isOpen: true,
       link: { ...link },
@@ -150,11 +161,13 @@ export const launcherMenusController = {
   },
 
   setLinkFlyoutOpen(open: boolean) {
+    launcherMenuMachine.send({ type: "SET_FLYOUT", open });
     menusState.linkMenu.flyoutOpen = open;
   },
 
   openPageMenu(pageName: string, pageLabel: string, canDelete: boolean, x: number, y: number) {
     this.closeAll();
+    launcherMenuMachine.send({ type: "OPEN_PAGE_MENU" });
     menusState.pageMenu = {
       isOpen: true,
       pageName,
@@ -171,6 +184,7 @@ export const launcherMenusController = {
 
   openBlankMenu(page: string, x: number, y: number) {
     this.closeAll();
+    launcherMenuMachine.send({ type: "OPEN_BLANK_MENU" });
     menusState.blankMenu = {
       isOpen: true,
       page,

@@ -27,7 +27,7 @@
 
 > **Now available on Microsoft Edge Add-ons**: [Install tab-project](https://microsoftedge.microsoft.com/addons/detail/tabproject-%E6%96%B0%E6%A0%87%E7%AD%BE%E9%A1%B5/dbkaiojfbolnkpaegflocfbdgpmhjcco) without Developer mode. Edge manages automatic updates for store installations. Each new version still requires a separate store submission and review; GitHub commits and releases do not immediately update the store version.
 
-> **Repository Version**: **1.0.20**, featuring pure browser Wallpaper Engine runtime, native Steam Workshop (431960) scanning, 5 hardware cooling safeguards for Mac Retina and 120Hz ProMotion displays, clock customization with 3D shadows, and Bilibili timeline subtitle navigation with 156 regression tests. The store listing and installed version are authoritative for store users and may lag behind GitHub Releases. See the [Changelog](CHANGELOG.md).
+> **Repository Version**: **1.0.21**, featuring unified explicit finite state machine (FSM) architecture, Vue 3 state machine reactivity bridge (`useMachine`), AX runtime diagnostics bridge (`__TAB_MACHINES__`), and decoupled deterministic workflows across 10 core workspaces with 195 automated regression tests. The store listing and installed version are authoritative for store users and may lag behind GitHub Releases. See the [Changelog](CHANGELOG.md).
 
 ---
 

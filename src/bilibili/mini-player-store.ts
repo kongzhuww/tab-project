@@ -6,6 +6,19 @@ import {
   type BiliVideoPage,
   type BiliDanmakuItem
 } from "../services/bilibili.service";
+import {
+  MiniPlayerMachine,
+  type MiniPlayerPhase,
+  type MiniPlayerDrawer,
+  type MiniPlayerMachineState
+} from "./mini-player-machine";
+
+export {
+  MiniPlayerMachine,
+  type MiniPlayerPhase,
+  type MiniPlayerDrawer,
+  type MiniPlayerMachineState
+};
 
 const playbackSession = new PlaybackSession();
 
@@ -153,6 +166,21 @@ const defaultState: BiliMiniPlayerState = {
 
 export const biliMiniPlayerState = reactive<BiliMiniPlayerState>({ ...defaultState });
 
+export const miniPlayerMachine = new MiniPlayerMachine();
+
+miniPlayerMachine.subscribe(s => {
+  biliMiniPlayerState.isOpen = s.phase !== "closed";
+  biliMiniPlayerState.isLoading = s.phase === "loading";
+  biliMiniPlayerState.isPlaying = s.phase === "playing";
+  biliMiniPlayerState.errorMsg = s.error;
+  biliMiniPlayerState.collapsed = s.isCollapsed;
+  biliMiniPlayerState.episodesOpen = s.openDrawers.has("episodes");
+  biliMiniPlayerState.descOpen = s.openDrawers.has("desc");
+  biliMiniPlayerState.commentsOpen = s.openDrawers.has("comments");
+  biliMiniPlayerState.qualityMenuOpen = s.qualityMenuOpen;
+  biliMiniPlayerState.speedMenuOpen = s.speedMenuOpen;
+});
+
 let globalZIndex = 10000;
 
 function notifyToast(text: string, isError = false) {
@@ -182,6 +210,18 @@ function releaseCachedObjectUrl(): void {
 export const biliMiniPlayerController = {
   get state() {
     return biliMiniPlayerState;
+  },
+
+  get machine() {
+    return miniPlayerMachine;
+  },
+
+  play() {
+    miniPlayerMachine.send({ type: "PLAY" });
+  },
+
+  pause() {
+    miniPlayerMachine.send({ type: "PAUSE" });
   },
 
   bringToFront() {
@@ -215,18 +255,15 @@ export const biliMiniPlayerController = {
     // 如果当前正在播放同一个视频且播放源正常，只需取消折叠并唤醒
     const isSameVideo = (Boolean(bvid) && biliMiniPlayerState.bvid === bvid) || (Boolean(aid) && biliMiniPlayerState.aid === aid);
     if (biliMiniPlayerState.isOpen && isSameVideo && !videoPayload.cachedSourceUrl && (biliMiniPlayerState.videoSrc || biliMiniPlayerState.iframeSrc) && !biliMiniPlayerState.errorMsg) {
-      biliMiniPlayerState.collapsed = false;
+      miniPlayerMachine.send({ type: "TOGGLE_COLLAPSE", collapsed: false });
       return;
     }
 
     const signal = playbackSession.start();
     // 先释放上一个本地文件的 Object URL，再切换视频源。
     releaseCachedObjectUrl();
-    // 重置状态
-    biliMiniPlayerState.isOpen = true;
-    biliMiniPlayerState.collapsed = false;
-    biliMiniPlayerState.isLoading = true;
-    biliMiniPlayerState.errorMsg = "";
+    // 派发状态机显式进入 loading 阶段
+    miniPlayerMachine.send({ type: "OPEN_START" });
     biliMiniPlayerState.bvid = bvid;
     biliMiniPlayerState.aid = aid;
     biliMiniPlayerState.cid = videoPayload.cid || "";
@@ -259,7 +296,7 @@ export const biliMiniPlayerController = {
     if (videoPayload.cachedSourceUrl) {
       cachedObjectUrl = videoPayload.cachedSourceUrl;
       biliMiniPlayerState.videoSrc = cachedObjectUrl;
-      biliMiniPlayerState.isLoading = false;
+      miniPlayerMachine.send({ type: "STREAM_RESOLVED", isPlaying: true });
       return;
     }
 
@@ -306,7 +343,7 @@ export const biliMiniPlayerController = {
       if (streamResult.sources && streamResult.sources.length) {
         biliMiniPlayerState.sourceUrls = streamResult.sources;
         biliMiniPlayerState.videoSrc = streamResult.sources[0];
-        biliMiniPlayerState.isPlaying = true;
+        miniPlayerMachine.send({ type: "STREAM_RESOLVED", isPlaying: true });
         // 若弹幕开关已开启，自动静默预加载弹幕
         if (biliMiniPlayerState.danmakuEnabled) {
           void this.loadDanmaku();
@@ -316,10 +353,13 @@ export const biliMiniPlayerController = {
       }
     } catch (err: any) {
       if (signal.aborted) return;
-      biliMiniPlayerState.errorMsg = err?.message || "未能获取到视频播放流";
-      notifyToast(`视频加载未完成：${biliMiniPlayerState.errorMsg}`, true);
+      const errMsg = err?.message || "未能获取到视频播放流";
+      miniPlayerMachine.send({ type: "ERROR", message: errMsg });
+      notifyToast(`视频加载未完成：${errMsg}`, true);
     } finally {
-      if (!signal.aborted) biliMiniPlayerState.isLoading = false;
+      if (!signal.aborted && miniPlayerMachine.isLoading) {
+        miniPlayerMachine.send({ type: "STREAM_RESOLVED", isPlaying: false });
+      }
     }
   },
 
@@ -367,8 +407,7 @@ export const biliMiniPlayerController = {
     biliMiniPlayerState.cid = targetPage.cid;
     biliMiniPlayerState.videoSrc = "";
     biliMiniPlayerState.sourceUrls = [];
-    biliMiniPlayerState.isLoading = true;
-    biliMiniPlayerState.errorMsg = "";
+    miniPlayerMachine.send({ type: "RELOAD_START" });
     biliMiniPlayerState.danmakuList = [];
     biliMiniPlayerState.danmakuLoading = false;
 
@@ -385,7 +424,7 @@ export const biliMiniPlayerController = {
         biliMiniPlayerState.sourceUrls = streamInfo.sources;
         biliMiniPlayerState.videoSrc = streamInfo.sources[0];
         biliMiniPlayerState.currentTime = 0;
-        biliMiniPlayerState.isPlaying = true;
+        miniPlayerMachine.send({ type: "STREAM_RESOLVED", isPlaying: true });
         if (biliMiniPlayerState.danmakuEnabled) {
           void this.loadDanmaku();
         }
@@ -394,10 +433,13 @@ export const biliMiniPlayerController = {
       }
     } catch (err: any) {
       if (signal.aborted) return;
-      biliMiniPlayerState.errorMsg = err?.message || "切换选集失败";
-      notifyToast(`分P切换失败：${biliMiniPlayerState.errorMsg}`, true);
+      const errMsg = err?.message || "切换选集失败";
+      miniPlayerMachine.send({ type: "ERROR", message: errMsg });
+      notifyToast(`分P切换失败：${errMsg}`, true);
     } finally {
-      if (!signal.aborted) biliMiniPlayerState.isLoading = false;
+      if (!signal.aborted && miniPlayerMachine.isLoading) {
+        miniPlayerMachine.send({ type: "STREAM_RESOLVED", isPlaying: false });
+      }
     }
   },
 
@@ -405,10 +447,10 @@ export const biliMiniPlayerController = {
    * 切换清晰度
    */
   async switchQuality(qn: number) {
-    biliMiniPlayerState.qualityMenuOpen = false;
+    miniPlayerMachine.send({ type: "SET_QUALITY_MENU", open: false });
     if (qn === biliMiniPlayerState.currentQuality) return;
 
-    biliMiniPlayerState.isLoading = true;
+    miniPlayerMachine.send({ type: "RELOAD_START" });
     const curTime = biliMiniPlayerState.currentTime;
 
     const signal = playbackSession.start();
@@ -425,14 +467,16 @@ export const biliMiniPlayerController = {
         biliMiniPlayerState.videoSrc = streamInfo.sources[0];
         biliMiniPlayerState.currentQuality = streamInfo.quality;
         biliMiniPlayerState.currentTime = curTime;
-        biliMiniPlayerState.isPlaying = true;
+        miniPlayerMachine.send({ type: "STREAM_RESOLVED", isPlaying: true });
         notifyToast(`已切换清晰度为 ${getBiliQualityShortLabel(qn)}`);
       }
     } catch (err: any) {
       if (signal.aborted) return;
       notifyToast(`清晰度切换失败：${err?.message || "网络异常"}`, true);
     } finally {
-      if (!signal.aborted) biliMiniPlayerState.isLoading = false;
+      if (!signal.aborted && miniPlayerMachine.isLoading) {
+        miniPlayerMachine.send({ type: "STREAM_RESOLVED", isPlaying: false });
+      }
     }
   },
 
@@ -441,19 +485,14 @@ export const biliMiniPlayerController = {
    */
   setPlaybackRate(rate: number) {
     biliMiniPlayerState.playbackRate = rate;
-    biliMiniPlayerState.speedMenuOpen = false;
+    miniPlayerMachine.send({ type: "SET_SPEED_MENU", open: false });
   },
 
   /**
    * 折叠 / 展开
    */
-  toggleCollapse() {
-    biliMiniPlayerState.collapsed = !biliMiniPlayerState.collapsed;
-    if (biliMiniPlayerState.collapsed) {
-      biliMiniPlayerState.episodesOpen = false;
-      biliMiniPlayerState.descOpen = false;
-      biliMiniPlayerState.commentsOpen = false;
-    }
+  toggleCollapse(collapsed?: boolean) {
+    miniPlayerMachine.send({ type: "TOGGLE_COLLAPSE", collapsed });
   },
 
   /**
@@ -461,37 +500,32 @@ export const biliMiniPlayerController = {
    */
   close() {
     playbackSession.cancel();
-    biliMiniPlayerState.isLoading = false;
-    biliMiniPlayerState.sourceUrls = [];
     releaseCachedObjectUrl();
-    biliMiniPlayerState.isOpen = false;
-    biliMiniPlayerState.isPlaying = false;
+    biliMiniPlayerState.sourceUrls = [];
     biliMiniPlayerState.videoSrc = "";
-    biliMiniPlayerState.episodesOpen = false;
-    biliMiniPlayerState.descOpen = false;
-    biliMiniPlayerState.commentsOpen = false;
+    miniPlayerMachine.send({ type: "CLOSE" });
   },
 
   /**
    * 切换选集抽屉
    */
   toggleEpisodes(open?: boolean) {
-    biliMiniPlayerState.episodesOpen = open !== undefined ? open : !biliMiniPlayerState.episodesOpen;
+    miniPlayerMachine.send({ type: "TOGGLE_DRAWER", drawer: "episodes", open });
   },
 
   /**
    * 切换简介抽屉
    */
   toggleDesc(open?: boolean) {
-    biliMiniPlayerState.descOpen = open !== undefined ? open : !biliMiniPlayerState.descOpen;
+    miniPlayerMachine.send({ type: "TOGGLE_DRAWER", drawer: "desc", open });
   },
 
   /**
    * 切换评论抽屉
    */
   toggleComments(open?: boolean) {
-    const next = open !== undefined ? open : !biliMiniPlayerState.commentsOpen;
-    biliMiniPlayerState.commentsOpen = next;
+    const next = open !== undefined ? open : !miniPlayerMachine.isDrawerOpen("comments");
+    miniPlayerMachine.send({ type: "TOGGLE_DRAWER", drawer: "comments", open: next });
     if (next && (!biliMiniPlayerState.comments.length || biliMiniPlayerState.commentsLoading)) {
       void this.loadComments(true);
     }

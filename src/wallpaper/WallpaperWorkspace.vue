@@ -14,6 +14,14 @@ import {
   type WorkshopItemInfo,
 } from "./workshop-scanner";
 import { applyWorkshopWallpaper } from "./workshop-applier";
+import { useMachine } from "../core/useMachine";
+import { WorkshopMachine } from "./workshop-machine";
+
+const workshopMachine = new WorkshopMachine();
+const workshopState = useMachine(workshopMachine);
+const isScanningWorkshop = computed(() => workshopState.value.phase === "scanning");
+const applyingWorkshopId = computed(() => workshopState.value.applyingId);
+const isDraggingOver = computed(() => workshopState.value.phase === "dragging_file");
 
 const pageVisible = ref(!document.hidden);
 const active = computed(() => wallpaperModuleState.visible && pageVisible.value);
@@ -21,7 +29,7 @@ const state = reactive({ history: [] as WallpaperHistoryItem[], currentValue: nu
 const ready = ref(false), loading = ref(false);
 let disposed = false, historyVersion = 0, previewVersion = 0, firstRequested = false;
 let previewAbort: AbortController | undefined;
-const isDraggingOver = ref(false), currentPage = ref(1), PAGE_SIZE = 8;
+const currentPage = ref(1), PAGE_SIZE = 8;
 const editingId = ref<string | null>(null), editingTitle = ref(""), confirmingDelete = ref<string | null>(null);
 const previewMap = reactive<Record<string, string>>({});
 
@@ -45,9 +53,7 @@ watch(active, (isActive) => {
 // Steam 创意工坊本地关联状态
 const activeTab = ref<"library" | "workshop">("library");
 const workshopItems = ref<WorkshopItemInfo[]>([]);
-const isScanningWorkshop = ref(false);
 const workshopSearchQuery = ref("");
-const applyingWorkshopId = ref<string | null>(null);
 const connectedFolderName = ref<string>("");
 
 const filteredWorkshopItems = computed(() => {
@@ -59,19 +65,22 @@ const filteredWorkshopItems = computed(() => {
 });
 
 async function handleConnectWorkshop() {
+  if (!workshopMachine.send({ type: "START_SCAN" })) return;
   try {
-    isScanningWorkshop.value = true;
     state.statusText = "正在选择并读取本地 Steam 工坊目录...";
     const handle = await pickWorkshopDirectory();
-    if (!handle) return;
+    if (!handle) {
+      workshopMachine.send({ type: "SCAN_COMPLETE" });
+      return;
+    }
     connectedFolderName.value = handle.name;
     const items = await scanWorkshopDirectory(handle);
     workshopItems.value = items;
+    workshopMachine.send({ type: "SCAN_COMPLETE", count: items.length });
     state.statusText = `成功加载 ${items.length} 款本地 Steam 壁纸！`;
   } catch (err: any) {
+    workshopMachine.send({ type: "ERROR", message: err?.message || "关联工坊失败" });
     state.statusText = err?.message || "关联工坊目录被取消或失败";
-  } finally {
-    isScanningWorkshop.value = false;
   }
 }
 
@@ -86,31 +95,30 @@ async function handleRescanWorkshop() {
     void handleConnectWorkshop();
     return;
   }
+  if (!workshopMachine.send({ type: "START_SCAN" })) return;
   try {
-    isScanningWorkshop.value = true;
     connectedFolderName.value = handle.name;
     const items = await scanWorkshopDirectory(handle);
     workshopItems.value = items;
+    workshopMachine.send({ type: "SCAN_COMPLETE", count: items.length });
     state.statusText = `重新扫描完成，共 ${items.length} 款工坊壁纸`;
   } catch (err: any) {
+    workshopMachine.send({ type: "ERROR", message: err?.message || "扫描工坊失败" });
     state.statusText = err?.message || "扫描工坊目录失败";
-  } finally {
-    isScanningWorkshop.value = false;
   }
 }
 
 async function handleApplyWorkshop(item: WorkshopItemInfo) {
-  if (applyingWorkshopId.value) return;
-  applyingWorkshopId.value = item.id;
+  if (!workshopMachine.send({ type: "START_APPLY", itemId: item.id })) return;
   state.statusText = `正在将「${item.title}」克隆写入 OPFS 活跃壁纸...`;
   try {
     await applyWorkshopWallpaper(item);
     await loadHistory(true);
+    workshopMachine.send({ type: "APPLY_COMPLETE" });
     state.statusText = `已成功应用「${item.title}」！已写入 OPFS 永不掉授权。`;
   } catch (err: any) {
+    workshopMachine.send({ type: "ERROR", message: err?.message || "应用工坊壁纸失败" });
     state.statusText = `应用工坊壁纸失败: ${err?.message || err}`;
-  } finally {
-    applyingWorkshopId.value = null;
   }
 }
 const { panelRef, headerRef, initialStyle, onHeaderPointerDown, bringToFront, stopInteractions } = useWindowDraggable({
@@ -176,7 +184,7 @@ function revokePreviews() {
 }
 function pause() {
   historyVersion++; loading.value = false; cancelPreviews(true); stopInteractions();
-  isDraggingOver.value = false; confirmingDelete.value = null;
+  workshopMachine.send({ type: "DRAG_LEAVE" }); confirmingDelete.value = null;
   window.removeEventListener("keydown", onKeydown);
 }
 const detachPause = onWallpaperPause(pause);
@@ -316,10 +324,16 @@ async function importFiles(files: File[]) {
 function handlePickImage() { void mutate(async () => { await importFiles(await WallpaperService.chooseBackgroundFile("image")); }); }
 function handlePickVideo() { void mutate(async () => { await importFiles(await WallpaperService.chooseBackgroundFile("video")); }); }
 function handlePickFolder() { void mutate(async () => { await WallpaperService.importWallpaperDirectory(); }); }
-function handleDragOver(event: DragEvent) { if (active.value && event.dataTransfer?.types.includes("Files")) isDraggingOver.value = true; }
-function handleDragLeave() { isDraggingOver.value = false; }
+function handleDragOver(event: DragEvent) {
+  if (active.value && event.dataTransfer?.types.includes("Files")) {
+    workshopMachine.send({ type: "DRAG_ENTER" });
+  }
+}
+function handleDragLeave() {
+  workshopMachine.send({ type: "DRAG_LEAVE" });
+}
 function handleDrop(event: DragEvent) {
-  isDraggingOver.value = false;
+  workshopMachine.send({ type: "DRAG_LEAVE" });
   const files = Array.from(event.dataTransfer?.files || []);
   if (files.length) void mutate(() => importFiles(files));
 }

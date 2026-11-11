@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref, computed } from "vue";
+import { useMachine } from "../core/useMachine";
 import { radioTapeState, radioTapeController } from "./radio-tape-store";
 import { biliFavoritesState } from "./bili-favorites-store";
 import { biliRadioController } from "./radio-store";
+import { BiliRadioTapeMachine } from "./bili-radio-tape-machine";
 
 const props = withDefaults(defineProps<{
   dockSide?: boolean;
@@ -19,22 +21,24 @@ const waveformHeights = [
 const isDragging = ref(false);
 const progressLineRef = ref<HTMLElement | null>(null);
 
-const isDragOver = ref(false);
-const isInserting = ref(false);
-const insertedTitle = ref("");
-const isCollapsed = ref(false);
-const isSeriesPickerOpen = ref(false);
+const tapeMachine = new BiliRadioTapeMachine();
+const tapeState = useMachine(tapeMachine);
+const isDragOver = computed(() => tapeState.value.phase === "drag_over");
+const isInserting = computed(() => tapeState.value.phase === "inserting");
+const insertedTitle = computed(() => tapeState.value.insertedTitle);
+const isCollapsed = computed(() => tapeState.value.phase === "collapsed");
+const isSeriesPickerOpen = computed(() => tapeState.value.isSeriesPickerOpen);
 
 function toggleSeriesPicker(e: Event) {
   e.stopPropagation();
-  isSeriesPickerOpen.value = !isSeriesPickerOpen.value;
-  if (isSeriesPickerOpen.value) {
+  tapeMachine.send({ type: "TOGGLE_SERIES_PICKER" });
+  if (tapeMachine.isSeriesPickerOpen) {
     void biliRadioController.init();
   }
 }
 
 async function selectAndPlaySeries(id: string) {
-  isSeriesPickerOpen.value = false;
+  tapeMachine.send({ type: "TOGGLE_SERIES_PICKER", open: false });
   await biliRadioController.playSeries(id, 0);
 }
 
@@ -42,13 +46,13 @@ function onGlobalPointerDown(e: PointerEvent) {
   if (!isSeriesPickerOpen.value) return;
   const target = e.target as HTMLElement | null;
   if (!target?.closest(".tape-series-popover") && !target?.closest(".tape-cassette-wrap")) {
-    isSeriesPickerOpen.value = false;
+    tapeMachine.send({ type: "TOGGLE_SERIES_PICKER", open: false });
   }
 }
 
 function onGlobalKeyDown(e: KeyboardEvent) {
   if (e.key === "Escape" && isSeriesPickerOpen.value) {
-    isSeriesPickerOpen.value = false;
+    tapeMachine.send({ type: "TOGGLE_SERIES_PICKER", open: false });
   }
 }
 
@@ -121,7 +125,7 @@ onUnmounted(() => {
 
 function handleDragEnter(e: DragEvent) {
   e.preventDefault();
-  isDragOver.value = true;
+  tapeMachine.send({ type: "DRAG_ENTER" });
 }
 
 function handleDragOver(e: DragEvent) {
@@ -129,20 +133,20 @@ function handleDragOver(e: DragEvent) {
   if (e.dataTransfer) {
     e.dataTransfer.dropEffect = "copy";
   }
-  isDragOver.value = true;
+  tapeMachine.send({ type: "DRAG_ENTER" });
 }
 
 function handleDragLeave(e: DragEvent) {
   const currentTarget = e.currentTarget as HTMLElement;
   const relatedTarget = e.relatedTarget as HTMLElement | null;
   if (!relatedTarget || !currentTarget.contains(relatedTarget)) {
-    isDragOver.value = false;
+    tapeMachine.send({ type: "DRAG_LEAVE" });
   }
 }
 
 function handleDrop(e: DragEvent) {
   e.preventDefault();
-  isDragOver.value = false;
+  tapeMachine.send({ type: "DRAG_LEAVE" });
 
   const dataTransfer = e.dataTransfer;
   if (!dataTransfer) return;
@@ -177,15 +181,14 @@ function handleDrop(e: DragEvent) {
   }
 
   if (videoData?.bvid) {
-    isInserting.value = true;
-    insertedTitle.value = videoData.title || videoData.bvid;
+    tapeMachine.send({ type: "START_INSERT", title: videoData.title || videoData.bvid });
 
     setTimeout(() => {
       radioTapeController.insertAndPlay(videoData);
     }, 280);
 
     setTimeout(() => {
-      isInserting.value = false;
+      tapeMachine.send({ type: "FINISH_INSERT" });
     }, 1500);
   }
 }
@@ -265,7 +268,7 @@ function updateSeekFromPointer(e: PointerEvent) {
         type="button"
         class="tape-capsule-expand-btn"
         title="展开完整磁带播放条"
-        @click.stop="isCollapsed = false"
+        @click.stop="tapeMachine.send({ type: 'TOGGLE_COLLAPSE', collapsed: false })"
       >
         ↗
       </button>
@@ -551,7 +554,7 @@ function updateSeekFromPointer(e: PointerEvent) {
         class="tape-dock-collapse-btn"
         title="收起至左下角小胶囊"
         aria-label="收起磁带机"
-        @click.stop="isCollapsed = true"
+        @click.stop="tapeMachine.send({ type: 'TOGGLE_COLLAPSE', collapsed: true })"
       >
         <svg viewBox="0 0 24 24" width="11" height="11" fill="currentColor">
           <path d="M19 13H5v-2h14v2z" />

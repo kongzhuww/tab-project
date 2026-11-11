@@ -196,7 +196,7 @@
           type="button"
           class="side-item-row click-row"
           :class="{ active: isStartDatePickerOpen, filled: !!editStartDate }"
-          @click="isStartDatePickerOpen = !isStartDatePickerOpen"
+          @click="machine.send({ type: 'TOGGLE_POPOVER', popover: 'start_date' })"
         >
           <span class="row-icon">📅</span>
           <span class="row-text">{{ formatDisplayDate(editStartDate, editStartTime) || '安排日期' }}</span>
@@ -216,7 +216,7 @@
           @update:model-value="emit('update:editStartDate', $event)"
           @update:time-value="emit('update:editStartTime', $event)"
           @change="emit('startChange')"
-          @close="isStartDatePickerOpen = false"
+          @close="machine.send({ type: 'CLOSE_POPOVER' })"
         />
       </div>
 
@@ -230,7 +230,7 @@
           type="button"
           class="side-item-row click-row"
           :class="{ active: isDueDatePickerOpen, filled: !!editDueDate }"
-          @click="isDueDatePickerOpen = !isDueDatePickerOpen"
+          @click="machine.send({ type: 'TOGGLE_POPOVER', popover: 'due_date' })"
         >
           <span class="row-icon">▣</span>
           <span class="row-text">{{ formatDisplayDate(editDueDate, editDueTime) || t('todoist.prop.setDueDate') }}</span>
@@ -250,21 +250,21 @@
           @update:model-value="emit('update:editDueDate', $event)"
           @update:time-value="emit('update:editDueTime', $event)"
           @change="emit('dueChange')"
-          @close="isDueDatePickerOpen = false"
+          @close="machine.send({ type: 'CLOSE_POPOVER' })"
         />
       </div>
 
       <div class="side-prop-group">
         <span class="side-prop-label">{{ t('todoist.prop.priority') }}</span>
-        <button ref="priorityBtnRef" type="button" class="side-item-row" @click="isPriorityMenuOpen = true"><span :style="{ color: priorityColor(state.priority) }">⚑</span><span class="row-text">P{{ 5 - state.priority }}</span><span>⌄</span></button>
-        <InspectorPopover v-if="isPriorityMenuOpen" :anchor="priorityBtnRef" @close="isPriorityMenuOpen = false">
+        <button ref="priorityBtnRef" type="button" class="side-item-row" @click="machine.send({ type: 'TOGGLE_POPOVER', popover: 'priority' })"><span :style="{ color: priorityColor(state.priority) }">⚑</span><span class="row-text">P{{ 5 - state.priority }}</span><span>⌄</span></button>
+        <InspectorPopover v-if="isPriorityMenuOpen" :anchor="priorityBtnRef" @close="machine.send({ type: 'CLOSE_POPOVER' })">
           <div class="inspector-menu"><button v-for="p in priorityOptions" :key="p.level" type="button" :disabled="!!todoistModuleState.pendingWrites" @click="selectPriority(p.level)"><span :style="{ color: p.color }">⚑</span> {{ p.name }} <span v-if="state.priority === p.level">✓</span></button></div>
         </InspectorPopover>
       </div>
       <div class="side-prop-group">
         <span class="side-prop-label">{{ t('todoist.prop.labels') }}</span>
-        <button ref="labelsBtnRef" type="button" class="side-item-row" @click="isLabelsMenuOpen = true"><span class="row-text">{{ state.labels.join('、') || t('todoist.prop.addLabels') }}</span><span>＋</span></button>
-        <InspectorPopover v-if="isLabelsMenuOpen" :anchor="labelsBtnRef" @close="isLabelsMenuOpen = false">
+        <button ref="labelsBtnRef" type="button" class="side-item-row" @click="machine.send({ type: 'TOGGLE_POPOVER', popover: 'labels' })"><span class="row-text">{{ state.labels.join('、') || t('todoist.prop.addLabels') }}</span><span>＋</span></button>
+        <InspectorPopover v-if="isLabelsMenuOpen" :anchor="labelsBtnRef" @close="machine.send({ type: 'CLOSE_POPOVER' })">
           <div class="inspector-menu">
             <input v-model="labelSearchText" :placeholder="t('todoist.prop.searchOrCreateLabel')" :aria-label="t('todoist.prop.searchLabelAria')" @keydown.enter.prevent="createOrSelectLabel" />
             <small v-if="labelsLoading">{{ t('todoist.prop.readingLabels') }}</small><p v-if="labelsError" role="alert">{{ labelsError }}</p>
@@ -279,7 +279,7 @@
         <button ref="reminderBtnRef" type="button" class="side-item-row" @click="openReminder"><span class="row-text">{{ formatReminderDisplay(state.reminderTime) || t('todoist.prop.addReminder') }}</span><span>＋</span></button>
         <ReminderPicker v-if="isReminderPickerOpen" :anchor="reminderBtnRef" :task-id="state.taskId"
           :value="state.reminderTime" :task-date="editStartDate || editDueDate" :task-time="editStartTime || editDueTime"
-          @close="isReminderPickerOpen = false" />
+          @close="machine.send({ type: 'CLOSE_POPOVER' })" />
       </div>
     </aside>
   </div>
@@ -288,6 +288,8 @@
 <script setup lang="ts">
 import { ref, computed, nextTick, watch, onMounted, onUnmounted } from "vue";
 import { t } from "../i18n";
+import { useMachine } from "../core/useMachine";
+import { TodoistInspectorMachine } from "./inspector-machine";
 import InspectorPopover from "./InspectorPopover.vue";
 import TaskRepositoryLinks from "./TaskRepositoryLinks.vue";
 import ReminderPicker from "./ReminderPicker.vue";
@@ -357,8 +359,16 @@ const emit = defineEmits<{
   'createLabel': [name: string];
 }>();
 
-// 控制描述展示态与编辑态
-const isDescEditing = ref(false);
+// 任务详情弹层与内联编辑显式状态机
+const machine = new TodoistInspectorMachine();
+const machineState = useMachine(machine);
+const isDescEditing = computed(() => machineState.value.isDescEditing);
+const isStartDatePickerOpen = computed(() => machineState.value.activePopover === "start_date");
+const isDueDatePickerOpen = computed(() => machineState.value.activePopover === "due_date");
+const isPriorityMenuOpen = computed(() => machineState.value.activePopover === "priority");
+const isLabelsMenuOpen = computed(() => machineState.value.activePopover === "labels");
+const isReminderPickerOpen = computed(() => machineState.value.activePopover === "reminder");
+
 const descTextareaRef = ref<HTMLTextAreaElement | null>(null);
 const titleTextareaRef = ref<HTMLTextAreaElement | null>(null);
 let textResize: ResizeObserver | undefined;
@@ -373,7 +383,10 @@ onMounted(() => {
   });
   if (titleTextareaRef.value?.parentElement) textResize.observe(titleTextareaRef.value.parentElement);
 });
-onUnmounted(() => textResize?.disconnect());
+onUnmounted(() => {
+  textResize?.disconnect();
+  machine.send({ type: "RESET_ALL" });
+});
 
 const renderedDescriptionHtml = computed(() => {
   if (!props.editDescription) return "";
@@ -394,7 +407,7 @@ const renderedDescriptionHtml = computed(() => {
 });
 
 function startDescEdit() {
-  isDescEditing.value = true;
+  machine.send({ type: "START_DESC_EDIT" });
   nextTick(() => {
     resizeText(descTextareaRef.value); descTextareaRef.value?.focus();
   });
@@ -410,16 +423,14 @@ function onDescInput(event: Event) {
   resizeText(el);
   emit('update:editDescription', el.value); emit('scheduleDraftSave', event);
 }
-function finishDescEdit() { emit('saveTitleAndDesc'); isDescEditing.value = false; }
+function finishDescEdit() {
+  emit('saveTitleAndDesc');
+  machine.send({ type: "FINISH_DESC_EDIT" });
+}
 
-// 弹出浮层开关
-const isStartDatePickerOpen = ref(false);
-const isDueDatePickerOpen = ref(false);
+// 弹出浮层按钮锚点引用
 const startDateBtnRef = ref<HTMLElement | null>(null);
 const dueDateBtnRef = ref<HTMLElement | null>(null);
-const isPriorityMenuOpen = ref(false);
-const isLabelsMenuOpen = ref(false);
-const isReminderPickerOpen = ref(false);
 const labelSearchText = ref("");
 const labelsBtnRef = ref<HTMLElement | null>(null), reminderBtnRef = ref<HTMLElement | null>(null), priorityBtnRef = ref<HTMLElement | null>(null);
 const cloudLabels = ref<string[]>([]), labelsLoading = ref(false), labelsError = ref("");
@@ -435,7 +446,7 @@ watch(() => [props.state.taskId, isLabelsMenuOpen.value], async (_value, _old, c
   } catch { if (!request.signal.aborted) labelsError.value = "标签库读取失败，仍可查看本页标签。"; }
   finally { if (!request.signal.aborted) labelsLoading.value = false; }
 });
-function openReminder() { isReminderPickerOpen.value = true; }
+function openReminder() { machine.send({ type: "OPEN_POPOVER", popover: "reminder" }); }
 
 const priorityOptions = [
   { level: 4, name: "优先级 1", color: "#d1453b" },
@@ -454,7 +465,7 @@ function priorityColor(level: number): string {
 }
 
 function selectPriority(level: number) {
-  isPriorityMenuOpen.value = false;
+  machine.send({ type: "CLOSE_POPOVER" });
   emit('selectPriority', level);
 }
 

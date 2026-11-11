@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { ref, computed, watch } from "vue";
+import { useMachine } from "../core/useMachine";
 import { useInlineTitleEdit } from "../sdk/interactions";
 import { notifications } from "../sdk/notifications";
 import { cleanFolderTitle } from "./title-storage";
-import { menusState, launcherMenusController } from "./menus-store";
+import { menusState, launcherMenusController, launcherMenuMachine } from "./menus-store";
 import { launcherService } from "../services/launcher.service";
 import LauncherMenuTitle from "./LauncherMenuTitle.vue";
 import LauncherMenuUrl from "./LauncherMenuUrl.vue";
@@ -61,14 +62,13 @@ const { editing: isEditingLinkTitle, draft: editingLinkTitleText, busy: linkTitl
 const { editing: isEditingFolderTitle, draft: editingFolderTitleText, busy: folderTitleBusy,
   message: folderTitleMessage, failed: folderTitleFailed, revision: folderTitleRevision } = folderEdit;
 
-const isConfirmingLinkDelete = ref(false);
-const isConfirmingFolderDelete = ref(false);
-const isConfirmingPageDelete = ref(false);
+const launcherMenuState = useMachine(launcherMenuMachine);
+const isConfirmingLinkDelete = computed(() => launcherMenuState.value.confirmingDelete === "link");
+const isConfirmingFolderDelete = computed(() => launcherMenuState.value.confirmingDelete === "folder");
+const isConfirmingPageDelete = computed(() => launcherMenuState.value.confirmingDelete === "page");
 
 function resetConfirmStates() {
-  isConfirmingLinkDelete.value = false;
-  isConfirmingFolderDelete.value = false;
-  isConfirmingPageDelete.value = false;
+  launcherMenuMachine.send({ type: "CANCEL_DELETE" });
 }
 
 function startEditFolderTitle() {
@@ -219,10 +219,10 @@ function handleFolderMove(page: string) {
 function handleFolderDelete(event?: MouseEvent) {
   event?.stopPropagation();
   if (!isConfirmingFolderDelete.value) {
-    isConfirmingFolderDelete.value = true;
+    launcherMenuMachine.send({ type: "REQUEST_DELETE", target: "folder" });
     return;
   }
-  isConfirmingFolderDelete.value = false;
+  resetConfirmStates();
   const group = state.folderMenu.groupName;
   launcherMenusController.closeFolderMenu();
   launcherMenusController.dispatch("folder:delete", { group });
@@ -273,10 +273,10 @@ function handleLinkMove(page: string) {
 function handleLinkDelete(event?: MouseEvent) {
   event?.stopPropagation();
   if (!isConfirmingLinkDelete.value) {
-    isConfirmingLinkDelete.value = true;
+    launcherMenuMachine.send({ type: "REQUEST_DELETE", target: "link" });
     return;
   }
-  isConfirmingLinkDelete.value = false;
+  resetConfirmStates();
   const link = state.linkMenu.link;
   launcherMenusController.closeLinkMenu();
   launcherMenusController.dispatch("link:delete", { link });
@@ -291,10 +291,10 @@ function handlePageRename() {
 function handlePageDelete(event?: MouseEvent) {
   event?.stopPropagation();
   if (!isConfirmingPageDelete.value) {
-    isConfirmingPageDelete.value = true;
+    launcherMenuMachine.send({ type: "REQUEST_DELETE", target: "page" });
     return;
   }
-  isConfirmingPageDelete.value = false;
+  resetConfirmStates();
   const page = state.pageMenu.pageName;
   launcherMenusController.closePageMenu();
   launcherMenusController.dispatch("page:delete", { page });
@@ -315,16 +315,16 @@ function handleBlankCreateMediumFolder() {
 // A new right-click target must never inherit the previous target's edit/delete mode.
 watch(() => [state.folderMenu, state.folderMenu.isOpen], () => {
   folderEdit.reset();
-  isConfirmingFolderDelete.value = false;
+  resetConfirmStates();
 }, { flush: "sync" });
 watch(() => [state.linkMenu, state.linkMenu.isOpen], () => {
   linkEdit.reset();
   urlEdit.reset();
   noteEdit.reset();
-  isConfirmingLinkDelete.value = false;
+  resetConfirmStates();
 }, { flush: "sync" });
 watch(() => [state.pageMenu, state.pageMenu.isOpen], () => {
-  isConfirmingPageDelete.value = false;
+  resetConfirmStates();
 }, { flush: "sync" });
 </script>
 

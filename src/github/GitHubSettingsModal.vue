@@ -1,20 +1,24 @@
 <script setup lang="ts">
-import { ref, reactive, watch, onBeforeUnmount } from "vue";
+import { ref, computed, reactive, watch, onBeforeUnmount } from "vue";
+import { useMachine } from "../core/useMachine";
 import ModuleSettingsPanel from "../components/ModuleSettingsPanel.vue";
 import { gitHubService, DEFAULT_GH_AI_CONFIG } from "../services/github.service";
 import { loadGitHubSettings, saveGitHubSettings, type GitHubModuleSettings } from "./settings";
 import { createGitHubReadHeaders, readGitHubJson, GitHubReadError } from "./api-client";
 import { ArchifyWebhookConfigError } from "./workflow-settings";
+import { GitHubSettingsMachine } from "./github-settings-machine";
 const props = withDefaults(defineProps<{ anchor: HTMLElement | null; visible?: boolean; aiRequest?: number }>(), { visible: true, aiRequest: 0 });
 const emit = defineEmits<{ close: []; "account-reload": [] }>();
 const activeTab = ref<"account" | "ai" | "workflow" | "cache">("account");
 watch(() => props.aiRequest, request => { if (request && props.visible) activeTab.value = "ai"; }, { immediate: true });
 const showToken = ref(false);
-const isTesting = ref(false);
-const isSaving = ref(false);
-const ready = ref(false);
+const machine = new GitHubSettingsMachine();
+const machineState = useMachine(machine);
+const isTesting = computed(() => machineState.value.phase === "testing");
+const isSaving = computed(() => machineState.value.phase === "saving");
+const ready = computed(() => machineState.value.phase !== "uninitialized" && machineState.value.phase !== "failed_load");
 const message = ref("");
-const testResult = ref<{ success: boolean; message: string; rateLimit?: { remaining: number; limit: number } } | null>(null);
+const testResult = computed(() => machineState.value.testResult);
 const form = reactive<GitHubModuleSettings>({ ghUser: "", ghToken: "", ai: { ...DEFAULT_GH_AI_CONFIG }, archifyWebhookUrl: "" });
 let initial: GitHubModuleSettings | undefined;
 let disposed = false;
@@ -31,15 +35,19 @@ async function readSettings() {
     if (disposed || !props.visible || version !== readVersion) return;
     Object.assign(form, settings);
     initial = JSON.parse(JSON.stringify(settings));
-    ready.value = true;
+    machine.send({ type: "LOAD_SUCCESS" });
     message.value = "";
   } catch {
-    if (!disposed && props.visible && version === readVersion) message.value = "读取设置失败，已禁止保存；请重试读取。";
+    if (!disposed && props.visible && version === readVersion) {
+      machine.send({ type: "LOAD_FAILURE", message: "读取设置失败，已禁止保存；请重试读取。" });
+      message.value = machine.message;
+    }
   } finally { if (version === readVersion) loading.value = false; }
 }
 function pauseTests() {
   clearTimeout(testTimeout); testTimeout = undefined;
-  testRequest?.abort(); testRequest = undefined; isTesting.value = false;
+  testRequest?.abort(); testRequest = undefined;
+  if (machine.isTesting) machine.send({ type: "TEST_FAILURE", message: "已取消验证。" });
 }
 watch(() => props.visible, visible => {
   if (visible) void readSettings();
@@ -51,8 +59,7 @@ async function testConnection() {
   const user = form.ghUser.trim();
   const token = form.ghToken.trim();
   if (!user && !token) { message.value = "请填写用户名或 Token。"; return; }
-  isTesting.value = true;
-  testResult.value = null;
+  if (!machine.send({ type: "START_TEST" })) return;
   const request = new AbortController();
   testRequest = request;
   const timeout = window.setTimeout(() => request.abort(), 10000);
@@ -64,23 +71,32 @@ async function testConnection() {
     if (!data || typeof data.login !== "string" || !data.login || data.login.length > 100 || typeof data.id !== "number") throw new GitHubReadError("format", "GitHub 身份响应格式无效。");
     if (disposed || !props.visible || testRequest !== request) return;
     request.signal.throwIfAborted();
-    testResult.value = {
-      success: true, message: `连接成功：@${data.login}`,
-      rateLimit: { remaining: rateLimit.remaining ?? 0, limit: rateLimit.limit ?? 0 }
-    };
+    machine.send({
+      type: "TEST_SUCCESS",
+      result: {
+        success: true,
+        message: `连接成功：@${data.login}`,
+        rateLimit: { remaining: rateLimit.remaining ?? 0, limit: rateLimit.limit ?? 0 }
+      }
+    });
     if (!user && !form.ghUser.trim() && form.ghToken.trim() === token && data.login) form.ghUser = data.login;
   } catch (error) {
-    if (!disposed && props.visible && testRequest === request) testResult.value = { success: false, message: error instanceof GitHubReadError ? error.message : "连接已取消或超时，请重试。" };
+    if (!disposed && props.visible && testRequest === request) {
+      machine.send({
+        type: "TEST_FAILURE",
+        message: error instanceof GitHubReadError ? error.message : "连接已取消或超时，请重试。"
+      });
+    }
   } finally {
     clearTimeout(timeout);
-    if (testRequest === request) { testRequest = undefined; testTimeout = undefined; isTesting.value = false; }
+    if (testRequest === request) { testRequest = undefined; testTimeout = undefined; }
   }
 }
 async function saveSettings() {
   if (disposed || !props.visible || !ready.value || !initial || isSaving.value || isTesting.value) return;
   const accountEdited = form.ghUser !== initial.ghUser || form.ghToken !== initial.ghToken;
   if (accountEdited && !form.ghUser.trim() && !form.ghToken.trim()) { message.value = "请至少填写用户名或 Token；本面板不执行账号解除绑定。"; return; }
-  isSaving.value = true;
+  if (!machine.send({ type: "START_SAVE" })) return;
   let saved = false;
   try {
     const result = await saveGitHubSettings(JSON.parse(JSON.stringify(form)), JSON.parse(JSON.stringify(initial)));
@@ -89,14 +105,18 @@ async function saveSettings() {
     initial = JSON.parse(JSON.stringify(result.settings));
     Object.assign(form, result.settings);
     gitHubService.aiConfig = { ...result.settings.ai };
-    message.value = "设置已保存。";
+    machine.send({ type: "SAVE_COMPLETE", message: "设置已保存。" });
+    message.value = machine.message;
     if (result.accountChanged) {
       emit("account-reload");
       await gitHubService.loadGitHub(result.settings.ghUser, result.settings.ghToken);
       message.value = "设置已保存；仓库读取可能暂停或等待 Star 操作，请查看主页面状态，必要时点击刷新。";
     }
-  } catch (error) { message.value = error instanceof ArchifyWebhookConfigError ? error.message : saved ? "设置已保存，但同步失败，请重试。" : "保存失败或其他页面已修改配置，请重新打开面板核对；原配置未确认更新。"; }
-  finally { isSaving.value = false; }
+  } catch (error) {
+    const errMsg = error instanceof ArchifyWebhookConfigError ? error.message : saved ? "设置已保存，但同步失败，请重试。" : "保存失败或其他页面已修改配置，请重新打开面板核对；原配置未确认更新。";
+    machine.send({ type: "SAVE_FAILURE", message: errMsg });
+    message.value = errMsg;
+  }
 }
 </script>
 
