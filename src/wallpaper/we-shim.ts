@@ -52,36 +52,78 @@ export function buildWeShimScript(
     }
   })();
 
-  // 0.1 工业级高刷屏降温守护：将 Retina 屏 DPR 封顶为 1.25，避免 3K/4K 像素点几何级过载发烫
+  // 0.1 工业级高刷屏降温守护：将 Retina 屏 DPR 强制锁定为 1，直接消除 4K/5K 超大物理 Canvas 像素计算 (直降 75% 像素负荷)
   try {
-    var rawDpr = Number(window.devicePixelRatio) || 1;
-    if (rawDpr > 1.25) {
-      Object.defineProperty(window, 'devicePixelRatio', {
-        value: 1.25,
-        configurable: true,
-        writable: true
-      });
-    }
+    Object.defineProperty(window, 'devicePixelRatio', {
+      get: function() { return 1; },
+      configurable: true
+    });
   } catch (_) {}
 
-  // 0.2 帧率自适应节流：动态壁纸锁定最高 60FPS，杜绝 120Hz ProMotion 屏幕双倍空转能耗
+  // 0.2 帧率自适应节流：动态壁纸锁定在 40 FPS (每帧 ~24ms)，支持暂停队列挂起，消除 120Hz 高刷空转
+  var _wePaused = false;
+  var _wePendingRafs = [];
   try {
     var _origRaf = window.requestAnimationFrame;
+    var _origCancelRaf = window.cancelAnimationFrame;
     var _lastFrameTime = 0;
+    var _rafIdCounter = 1;
+    var _activeRafMap = new Map();
+
     if (typeof _origRaf === 'function') {
       window.requestAnimationFrame = function(callback) {
-        return _origRaf.call(window, function(timestamp) {
+        var id = _rafIdCounter++;
+        if (_wePaused) {
+          _wePendingRafs.push({ id: id, cb: callback });
+          return id;
+        }
+        var nativeId = _origRaf.call(window, function(timestamp) {
+          _activeRafMap.delete(id);
+          if (_wePaused) {
+            _wePendingRafs.push({ id: id, cb: callback });
+            return;
+          }
           var elapsed = timestamp - _lastFrameTime;
-          if (elapsed < 15.5) {
+          if (elapsed < 23) {
             setTimeout(function() {
-              callback(performance.now());
-            }, 16 - elapsed);
+              if (!_wePaused) callback(performance.now());
+            }, 24 - elapsed);
             return;
           }
           _lastFrameTime = timestamp;
           callback(timestamp);
         });
+        _activeRafMap.set(id, nativeId);
+        return id;
       };
+
+      if (typeof _origCancelRaf === 'function') {
+        window.cancelAnimationFrame = function(id) {
+          var nativeId = _activeRafMap.get(id);
+          if (nativeId !== undefined) {
+            _activeRafMap.delete(id);
+            _origCancelRaf.call(window, nativeId);
+          }
+          _wePendingRafs = _wePendingRafs.filter(function(item) { return item.id !== id; });
+        };
+      }
+    }
+  } catch (_) {}
+
+  // 0.3 钳制 Canvas 2D 的 shadowBlur 最大值为 12，防止重度全屏高斯模糊拖垮 macOS GPU
+  try {
+    if (typeof CanvasRenderingContext2D !== 'undefined' && CanvasRenderingContext2D.prototype) {
+      var shadowDesc = Object.getOwnPropertyDescriptor(CanvasRenderingContext2D.prototype, 'shadowBlur');
+      if (shadowDesc && shadowDesc.set) {
+        Object.defineProperty(CanvasRenderingContext2D.prototype, 'shadowBlur', {
+          get: function() { return shadowDesc.get.call(this); },
+          set: function(val) {
+            var clamped = Math.min(Math.max(Number(val) || 0, 0), 12);
+            return shadowDesc.set.call(this, clamped);
+          },
+          configurable: true
+        });
+      }
     }
   } catch (_) {}
 
@@ -280,15 +322,29 @@ export function buildWeShimScript(
   }
 
   // 6. 消息总线：接收父页面传入的鼠标、音频与配置，并合成原生事件
+  var _cachedEventTarget = null;
+  function getEventTarget() {
+    if (_cachedEventTarget && _cachedEventTarget.isConnected) return _cachedEventTarget;
+    var target = null;
+    if (typeof document !== 'undefined') {
+      if (typeof document.querySelector === 'function') {
+        try { target = document.querySelector('canvas') || document.body; } catch (_) {}
+      }
+      if (!target) target = document.body || document;
+    }
+    _cachedEventTarget = target || window;
+    return _cachedEventTarget;
+  }
+
   window.addEventListener('message', function(event) {
     var data = event.data;
     if (!data || typeof data !== 'object') return;
 
-    // A. 鼠标移动合成事件
+    // A. 鼠标移动合成事件 (直接复用主画布/Body目标，彻底移除 elementFromPoint 消除强制同步回流 Forced Reflow)
     if (data.type === 'WE_MOUSE_MOVE') {
       var x = Number(data.x) || 0;
       var y = Number(data.y) || 0;
-      var target = document.elementFromPoint(x, y) || document.body || window;
+      var target = getEventTarget();
       var init = {
         clientX: x,
         clientY: y,
@@ -312,7 +368,7 @@ export function buildWeShimScript(
     if (data.type === 'WE_MOUSE_DOWN' || data.type === 'WE_MOUSE_UP' || data.type === 'WE_CLICK') {
       var x = Number(data.x) || 0;
       var y = Number(data.y) || 0;
-      var target = document.elementFromPoint(x, y) || document.body || window;
+      var target = getEventTarget();
       var evtName = data.type === 'WE_MOUSE_DOWN' ? 'mousedown' : (data.type === 'WE_MOUSE_UP' ? 'mouseup' : 'click');
       var init = {
         clientX: x,
@@ -371,10 +427,19 @@ export function buildWeShimScript(
     }
 
     // F. 页面挂起/恢复省电控制
-    if (data.type === 'WE_SET_PAUSED') {
+    if (data.type === 'WE_SET_PAUSED' || data.type === 'WE_PAUSE') {
+      var shouldPause = Boolean(data.isPaused || data.paused);
+      _wePaused = shouldPause;
+      if (!_wePaused && _wePendingRafs.length > 0) {
+        var toResume = _wePendingRafs.slice();
+        _wePendingRafs = [];
+        for (var k = 0; k < toResume.length; k++) {
+          window.requestAnimationFrame(toResume[k].cb);
+        }
+      }
       if (window.wallpaperPropertyListener && typeof window.wallpaperPropertyListener.setPaused === 'function') {
         try {
-          window.wallpaperPropertyListener.setPaused(Boolean(data.isPaused));
+          window.wallpaperPropertyListener.setPaused(shouldPause);
         } catch (e) {}
       }
       return;

@@ -25,6 +25,23 @@ const isDraggingOver = ref(false), currentPage = ref(1), PAGE_SIZE = 8;
 const editingId = ref<string | null>(null), editingTitle = ref(""), confirmingDelete = ref<string | null>(null);
 const previewMap = reactive<Record<string, string>>({});
 
+function playCardVideo(e: MouseEvent) {
+  const video = (e.currentTarget as HTMLElement)?.querySelector("video");
+  if (video) video.play().catch(() => {});
+}
+function pauseCardVideo(e: MouseEvent) {
+  const video = (e.currentTarget as HTMLElement)?.querySelector("video");
+  if (video) {
+    video.pause();
+    video.currentTime = 0;
+  }
+}
+
+// 性能守护：壁纸库窗口打开时自动暂停底层壁纸渲染，关闭时恢复，彻底消灭毛玻璃合成风暴
+watch(active, (isActive) => {
+  WallpaperService.pauseWallpaper(isActive);
+});
+
 // Steam 创意工坊本地关联状态
 const activeTab = ref<"library" | "workshop">("library");
 const workshopItems = ref<WorkshopItemInfo[]>([]);
@@ -402,16 +419,17 @@ function handleDrop(event: DragEvent) {
           class="wallpaper-card"
           :class="{ active: isCurrentActive(item) }"
           @click="handleSelect(item)"
+          @mouseenter="playCardVideo($event)"
+          @mouseleave="pauseCardVideo($event)"
         >
           <div
             class="wallpaper-thumb"
             :style="item.style ? item.style : (item.thumb ? { backgroundImage: `url(${item.thumb})` } : {})"
           >
-            <!-- 视频壁纸专属微缩播放预览 -->
+            <!-- 视频壁纸专属微缩播放预览 (仅 hover 悬停时播放解码，杜绝并发解码) -->
             <video
               v-if="active && item.kind === '视频' && getPreview(item)"
               :src="getPreview(item)!"
-              autoplay
               loop
               muted
               playsinline
