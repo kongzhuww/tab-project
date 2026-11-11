@@ -27,7 +27,7 @@
 
 > **Now available on Microsoft Edge Add-ons**: [Install tab-project](https://microsoftedge.microsoft.com/addons/detail/tabproject-%E6%96%B0%E6%A0%87%E7%AD%BE%E9%A1%B5/dbkaiojfbolnkpaegflocfbdgpmhjcco) without Developer mode. Edge manages automatic updates for store installations. Each new version still requires a separate store submission and review; GitHub commits and releases do not immediately update the store version.
 
-> **Repository Version**: **1.0.9**, featuring Manifest permission minimization, immutable release safety, 51 offline regression tests, and full cleanup of legacy styles and residues. The store listing and installed version are authoritative for store users and may lag behind GitHub Releases. See the [Changelog](CHANGELOG.md) and [Release Notes](docs/RELEASE_1.0.9.md).
+> **Repository Version**: **1.0.20**, featuring pure browser Wallpaper Engine runtime, native Steam Workshop (431960) scanning, 5 hardware cooling safeguards for Mac Retina and 120Hz ProMotion displays, clock customization with 3D shadows, and Bilibili timeline subtitle navigation with 156 regression tests. The store listing and installed version are authoritative for store users and may lag behind GitHub Releases. See the [Changelog](CHANGELOG.md).
 
 ---
 
@@ -41,6 +41,7 @@ Include your installed extension version, browser version, and reproduction step
 
 | Capability / Module | Core Functionality | Status Level | Conditions & Requirements |
 | :--- | :--- | :--- | :--- |
+| **Live Wallpapers & Steam Workshop** | Pure browser Wallpaper Engine runtime, OPFS private caching for zero-dialog cold boot, Steam Workshop (431960) scanning, 4K video / Web interactive / Scene wallpapers, 128-band logarithmic audio visualizer, 5 hardware cooling safeguards for Mac Retina & 120Hz displays | **Available by default** | Browser local OPFS storage; supports direct link to Steam Workshop or custom directories |
 | **Favorite Sites & Large Folders** | Multi-group workspaces, 2x2 large folders, drag-and-drop reordering, inline quick title & URL editing | **Available by default** | Stored in local browser storage; basic features are completely offline |
 | **Bookmark Kanban & Search** | Grid/tile layout for browser bookmarks, folder tree navigation, drag-and-drop organization, offline Pinyin/fuzzy search via Web Worker | **Available by default** | Requires browser bookmark read permission; never mutates untouched items |
 | **Multi-Engine Unified Search** | Blended keyword matching across history, bookmarks, and shortcuts; `/bm` and `/sites` filters; instant redirect to GitHub, Bilibili, NetEase Music, and Qichacha | **Available by default** | Offline-first suggestions; Enter submits query directly to the selected search engine |

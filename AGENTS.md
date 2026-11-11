@@ -1,6 +1,6 @@
 # AGENTS.md — tab-project 协作准则与系统架构规范
 
-> **现行产品与发布入口**：产品名为 **tab-project 新标签页**，正式仓库为 `kongzhuww/tab-project`；`tab-project-next` 和 `LogicWeaver` 是历史名称，现存内部标识不据此批量重命名。仓库当前版本以 `manifest.json` 与 `package.json` 为准，不使用下文历史版本号推断现行发布状态。产品已上架 Microsoft Edge 加载项商店，正式安装入口：https://microsoftedge.microsoft.com/addons/detail/tabproject-%E6%96%B0%E6%A0%87%E7%AD%BE%E9%A1%B5/dbkaiojfbolnkpaegflocfbdgpmhjcco 。自动提交规则见第 6.1 节及 `docs/EDGE_STORE_PUBLISH.md`。
+> **现行产品与发布入口**：产品名为 **tab-project 新标签页**，正式仓库为 `kongzhuww/tab-project`；`tab-project-next` 和 `LogicWeaver` 是历史名称，现存内部标识不据此批量重命名。仓库现行版本为 **v1.0.20**（以 `manifest.json` 与 `package.json` 为准）。产品已上架 Microsoft Edge 加载项商店，正式安装入口：https://microsoftedge.microsoft.com/addons/detail/tabproject-%E6%96%B0%E6%A0%87%E7%AD%BE%E9%A1%B5/dbkaiojfbolnkpaegflocfbdgpmhjcco 。自动提交规则见第 6.1 节及 `docs/EDGE_STORE_PUBLISH.md`。
 
 > **当前范围优先**：本仓库源自旧 2.3.0 代码的全新历史迁移副本，旧版本号仅说明来源，不是当前产品版本。按用户要求已彻底移除 ArkPets、Neuro / Evil、Web Mascot、Spine、角色素材、桌宠快捷栏、独立设置页和控制命令。下文历史台账中的桌宠描述不代表当前能力，禁止据此恢复代码、素材或依赖。旧仓库与本地个人预览图不迁移；公开前检查参见 `docs/PUBLICATION_REVIEW.md`。
 
@@ -456,3 +456,38 @@
 - 预览URL只由preview-resources.ts拥有：每实例最多120个，原图读取/预览生成含尚未结束旧任务最多2个；失效队列不发布迟到结果。原生文件读取/bitmap解码不一定能物理取消，禁止承诺隐藏即撤回。
 - 分类事务不能调用原图删除；磁盘删除成功后才清理索引，失败不自动重试或伪装回滚。根句柄仓储保留原库/版本/键，连接阻塞或失败不能清库重建。
 - 图库目录/内置库读取现已接入 src/core/read-session.ts：current检查迟到结果，finish仅由当前owner释放loading；60秒停止等待不代表底层事务回滚。根检测移交内置库时开始新的owned读取，旧finally不能关掉新读取的转圈。跨模块首批接入与未迁移范围见 docs/READ_SESSIONS.md，不宣称全应用异步治理已完成。
+
+---
+
+## 10. Wallpaper Engine 核心运行时与性能降温规范 (v1.0.20)
+
+### 10.1 核心架构与运行机制
+1. **OPFS (Origin Private File System) 私有存储管道**：
+   - 解决浏览器重启后 `showDirectoryPicker` 句柄断连需二次授权问题；
+   - 当前正在使用的活跃壁纸整包完整镜像保存在浏览器的 OPFS 私有文件系统中，关机重启、重开浏览器 100% 零弹窗、零授权、冷启动瞬时秒读；
+   - 任何持久化存储变更前，必须确保 OPFS 写入完全就绪，杜绝由于存储事件异步触发导致的空包抹杀。
+2. **沙盒 iframe 与安全同源策略**：
+   - 外层沙盒 `wallpaper-sandbox.html` 注册于 Manifest 的 `sandbox.pages`；
+   - 内层 iframe 必须严格配置 `allow-scripts allow-pointer-lock allow-same-origin`，确保内层 Canvas、Web Audio API 能够无缝读取外层生成的媒体与贴图 Blob URL，杜绝跨 Opaque Origin 安全拦截；
+   - Web 壁纸的外部脚本（如 `wp.js`）和外部样式表必须由 `sandbox.ts` 读取文本后**纯内联注入**为 `<script>` 与 `<style>` 标签，彻底绕过沙盒 iframe 对外部 `blob:` 脚本的 CSP 限制；
+   - 对 `audio[data-src]` 等自定义媒体属性执行深度映射重写，保证运行时赋值绝对命中。
+3. **双向就绪握手通信**：
+   - 沙盒脚本加载完成后主动向宿主派发 `WE_SANDBOX_READY`；
+   - 宿主持有待投递包并确认回复 `WE_SANDBOX_ACK`，并辅以短轮询补偿重试，100% 杜绝时序竞争导致的包丢失与大白屏。
+
+### 10.2 工业级硬件降温与能耗守护铁律
+针对 Mac 视网膜（Retina）高分屏与 120Hz ProMotion 屏幕，必须严格遵守以下 5 项能耗红线：
+1. **DPR 强制锁 1**：在 `we-shim.ts` 中通过 `Object.defineProperty` 将沙盒内 `window.devicePixelRatio` 强制固定为 `1`，杜绝 Canvas 2D 在 Retina 视网膜屏上生成 4K/5K 物理分辨率，像素计算量降低 75%；
+2. **40 FPS 帧率上限**：包装沙盒内的 `requestAnimationFrame` 实施节流，锁定在约 40 FPS（~24ms 间隔），挡住 120Hz 高刷屏的双倍空转能耗；
+3. **钳制 GPU 模糊**：拦截 `CanvasRenderingContext2D.prototype.shadowBlur` 将其最大值钳制在 12，防止全屏重度高斯模糊拖垮显卡；
+4. **音频分析器纯事件驱动与 suspend()**：
+   - 严禁在无音乐播放时运行 rAF 发送频谱；
+   - 仅在音乐播放时唤醒，推流严格节流在 30 FPS（每 33ms 一次）；
+   - 音乐暂停或连续 30 帧能量为 0 时，发送一帧全 0 复位后立即 `cancelAnimationFrame` 并执行 `audioCtx.suspend()`，**无音乐时 CPU 绝对 0%**；
+5. **消除强制同步回流 (Forced Reflow)**：
+   - 宿主鼠标移动事件采用 33ms 节流且坐标未变不发送；
+   - 沙盒内直接复用主画布/Body目标，**严禁在每一帧调用 `document.elementFromPoint(x, y)`**，彻底消灭强制回流；
+6. **弹窗毛玻璃自动休眠**：
+   - 当设置弹窗或壁纸库打开时，自动向沙盒派发 `WE_PAUSE: true` 暂停底层渲染，关闭时恢复，彻底消灭多层毛玻璃 `backdrop-filter` 导致的 WindowServer 合成风暴；
+7. **卡片视频预览悬停解码**：
+   - 壁纸卡片中的 `<video>` 移除 `autoplay`，仅在鼠标 hover 悬停时播放，移开立刻暂停复位，杜绝几十个卡片并发解码。
