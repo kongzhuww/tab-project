@@ -283,6 +283,7 @@ import {
   gitHubNotificationDetailController as controller,
 } from "./github-notification-detail-store";
 import { markdownAstEngine } from "../utils/markdown-ast";
+import { initFastSearch } from "../search/wasm-fast-search";
 
 const windowRef = ref<HTMLElement | null>(null);
 const scrollContainerRef = ref<HTMLElement | null>(null);
@@ -477,6 +478,7 @@ function onGlobalKeyDown(e: KeyboardEvent) {
 }
 
 onMounted(() => {
+  void initFastSearch();
   window.addEventListener("keydown", onGlobalKeyDown);
 });
 

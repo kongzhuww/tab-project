@@ -556,6 +556,12 @@ var MarkdownAstEngine = class _MarkdownAstEngine {
     return text;
   }
   renderMarkdown(source, options = {}) {
+    if (options.renderMode !== "md" && customFastRenderer) {
+      const fastResult = customFastRenderer(source);
+      if (typeof fastResult === "string") {
+        return fastResult;
+      }
+    }
     const { frontmatter, body } = this.splitFrontmatter(source);
     const footnoteDoc = this.extractFootnotes(this.normalizeMarkdownHtml(body));
     const lines = footnoteDoc.body.replace(/\u00a0/g, " ").replace(/\r\n?/g, "\n").split("\n");
@@ -719,6 +725,10 @@ var MarkdownAstEngine = class _MarkdownAstEngine {
   }
 };
 var markdownAstEngine = MarkdownAstEngine.getInstance();
+var customFastRenderer = null;
+function registerFastMarkdownRenderer(renderer) {
+  customFastRenderer = renderer;
+}
 export {
   ACCENTS,
   BLACKBOARD,
@@ -726,5 +736,6 @@ export {
   GREEK,
   MarkdownAstEngine,
   SYMBOLS,
-  markdownAstEngine
+  markdownAstEngine,
+  registerFastMarkdownRenderer
 };

@@ -5,6 +5,7 @@
 
 import type { SearchSuggestionItem } from './store';
 import type { WebCandidate } from './web-ranking';
+import { registerFastMarkdownRenderer } from '../utils/markdown-ast';
 
 type WasmExports = typeof import('../wasm/fast-search/fast_search');
 
@@ -37,6 +38,22 @@ export async function initFastSearch(): Promise<boolean> {
       await wasmModule.default(wasmPath);
       wasmInstance = wasmModule;
       isReady = true;
+
+      // 注册全局 Wasm 高性能 Markdown 渲染引擎通道
+      registerFastMarkdownRenderer((source) => {
+        if (!isReady || !wasmInstance || !source || !source.trim()) return null;
+        // 专有语法兜底判定：若包含 LaTeX 公式 ($$) 或 Obsidian 双链 ([[]) 则平滑降级至专有 AST 引擎
+        if (source.includes('$$') || source.includes('[[')) {
+          return null;
+        }
+        try {
+          return wasmInstance.render_markdown_fast(source);
+        } catch (e) {
+          console.warn('[FastSearch Wasm] render_markdown_fast 异常，降级至原生:', e);
+          return null;
+        }
+      });
+
       return true;
     } catch (err) {
       console.warn('[FastSearch Wasm] 暂未加载 Wasm 模块，平滑降级至内置 TypeScript 引擎:', err);
@@ -116,3 +133,17 @@ export function fastRankCandidates(query: string, candidates: WebCandidate[], li
     return null;
   }
 }
+
+/**
+ * 高性能 CommonMark / GFM Markdown 解析渲染 (Rust Wasm 实现)
+ */
+export function fastRenderMarkdown(markdown: string): string | null {
+  if (!isReady || !wasmInstance || !markdown) return null;
+  try {
+    return wasmInstance.render_markdown_fast(markdown);
+  } catch (err) {
+    console.warn('[FastSearch Wasm] Markdown 渲染异常，平滑降级:', err);
+    return null;
+  }
+}
+

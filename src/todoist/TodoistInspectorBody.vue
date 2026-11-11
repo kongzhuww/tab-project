@@ -298,6 +298,7 @@ import { todoistModuleState } from "./module-state";
 import type { TodoistInspectorState } from "./inspector-store";
 import { imageViewerController } from "../viewers/image-viewer-store";
 import { markdownAstEngine } from "../utils/markdown-ast";
+import { initFastSearch } from "../search/wasm-fast-search";
 import TodoistDatePickerPopover from "./TodoistDatePickerPopover.vue";
 
 const props = defineProps<{
@@ -362,6 +363,7 @@ const descTextareaRef = ref<HTMLTextAreaElement | null>(null);
 const titleTextareaRef = ref<HTMLTextAreaElement | null>(null);
 let textResize: ResizeObserver | undefined;
 onMounted(() => {
+  void initFastSearch();
   let width = -1;
   textResize = new ResizeObserver(entries => {
     const current = entries[0]?.contentRect.width;

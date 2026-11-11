@@ -56,3 +56,28 @@ test('Markdown AST: isolates YAML frontmatter from document body', () => {
   assert.ok(frontmatter.includes('title: Sample Note'));
   assert.strictEqual(body.trim(), '# Real Content');
 });
+
+test('Markdown AST: supports fast renderer registration with seamless fallback for LaTeX and Wikilinks', async () => {
+  const { registerFastMarkdownRenderer } = await loadTsModule('src/utils/markdown-ast.ts');
+  
+  // 模拟注册 Fast Renderer
+  registerFastMarkdownRenderer((source) => {
+    if (source.includes('$$') || source.includes('[[')) return null; // 触发降级
+    return `<div class="fast-rendered">${source}</div>`;
+  });
+
+  // 普通文本走快速通道
+  const normal = markdownAstEngine.renderMarkdown('Hello World');
+  assert.strictEqual(normal, '<div class="fast-rendered">Hello World</div>');
+
+  // 包含 LaTeX 公式或双链自动降级至内置递归下降引擎
+  const withMath = markdownAstEngine.renderMarkdown('$$ \\alpha $$');
+  assert.ok(withMath.includes('class="obs-math-block"'));
+  assert.ok(withMath.includes('<mi>α</mi>'));
+
+  // 清除注册，恢复原生
+  registerFastMarkdownRenderer(null);
+  const reverted = markdownAstEngine.renderMarkdown('Hello World');
+  assert.ok(reverted.includes('<p>Hello World</p>'));
+});
+

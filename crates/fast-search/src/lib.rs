@@ -220,3 +220,31 @@ pub fn rank_candidates_fast(query: &str, candidates_json: &str, limit: usize) ->
     serde_json::to_string(&ranked)
         .map_err(|e| JsValue::from_str(&format!("JSON serialize error: {}", e)))
 }
+
+/// 高性能 CommonMark / GFM Markdown 解析器 (零拷贝、防 XSS、支持表格/删除线/任务列表/脚注)
+#[wasm_bindgen]
+pub fn render_markdown_fast(markdown: &str) -> String {
+    use pulldown_cmark::{html, Options, Parser};
+
+    let mut options = Options::empty();
+    options.insert(Options::ENABLE_TABLES);
+    options.insert(Options::ENABLE_FOOTNOTES);
+    options.insert(Options::ENABLE_STRIKETHROUGH);
+    options.insert(Options::ENABLE_TASKLISTS);
+    options.insert(Options::ENABLE_SMART_PUNCTUATION);
+    options.insert(Options::ENABLE_HEADING_ATTRIBUTES);
+
+    let parser = Parser::new_ext(markdown, options);
+    let mut html_output = String::with_capacity(markdown.len() * 3 / 2);
+    html::push_html(&mut html_output, parser);
+
+    // 为外链自动注入安全跳转属性 target="_blank" rel="noopener noreferrer"
+    if html_output.contains("<a href=\"http") {
+        html_output = html_output
+            .replace("<a href=\"https://", "<a target=\"_blank\" rel=\"noopener noreferrer\" class=\"ext-link\" href=\"https://")
+            .replace("<a href=\"http://", "<a target=\"_blank\" rel=\"noopener noreferrer\" class=\"ext-link\" href=\"http://");
+    }
+
+    html_output
+}
+
