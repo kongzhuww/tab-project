@@ -15,6 +15,7 @@ diff_obsidian.txt
 # 依赖与编译产物
 node_modules/
 dist-mobile/
+crates/**/target/
 
 # Android 构建与密钥
 android/.gradle/

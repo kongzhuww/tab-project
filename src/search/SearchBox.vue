@@ -9,6 +9,7 @@ import { launcherGroupsController } from "../launchers/store";
 import { requestLocateBookmark } from "../bookmarks/bookmark-locate";
 import { useContextMenu } from "../sdk/interactions";
 import { t } from "../i18n";
+import { initFastSearch } from "./wasm-fast-search";
 
 const searchPlaceholder = computed(() => {
   if (searchState.mode === "web") return t("search.web.placeholder");
@@ -282,6 +283,8 @@ onMounted(() => {
     inputRef.value?.focus();
     searchService.handleFocus();
   });
+  // 🌟 预热加载 Rust Wasm 离线极速模糊搜索引擎
+  void initFastSearch();
 });
 
 onUnmounted(() => {
