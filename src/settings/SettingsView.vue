@@ -1762,6 +1762,16 @@ async function handleSelectWallpaper(item: any) {
     } else if (item.isPure) {
       await WallpaperService.clearWallpaper();
       currentWallpaperValue.value = null;
+    } else if (item.value?.isWorkshop || item.value?.workshopId) {
+      // 若该历史记录来自工坊壁纸，优先尝试联动工坊应用器恢复整包
+      const workshopId = item.value.workshopId || item.id;
+      const cachedItem = settingsWorkshopItems.value.find(w => w.id === workshopId);
+      if (cachedItem) {
+        await handleApplyWorkshopFromSettings(cachedItem);
+        return;
+      }
+      await WallpaperService.setWallpaper(item.value);
+      currentWallpaperValue.value = item.value;
     } else {
       await WallpaperService.setWallpaper(item.value);
       currentWallpaperValue.value = item.value;
