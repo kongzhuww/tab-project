@@ -1,7 +1,7 @@
 // A reviewed ceiling, not a claim that all retained permissions are least-privilege.
 // Removing a permission is allowed; additions require reviewing this policy and the audit.
 export const reviewedApiPermissions = Object.freeze([
-  'storage', 'unlimitedStorage', 'topSites', 'bookmarks', 'favicon', 'alarms',
+  'storage', 'unlimitedStorage', 'bookmarks', 'favicon', 'alarms',
   'activeTab', 'tabs', 'cookies', 'declarativeNetRequest', 'identity', 'scripting',
   'notifications', 'downloads', 'contextMenus', 'clipboardWrite',
 ]);

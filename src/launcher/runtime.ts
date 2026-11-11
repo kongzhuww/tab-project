@@ -157,15 +157,8 @@ export const launcherRuntime = {
       if (!started) return;
       const stored = await chrome?.storage?.local?.get("quickLinksReady") || {};
       if (!started) return;
-      if (!launcherService.getState().links.length && !stored.quickLinksReady && chrome?.topSites) {
-        const sites = await new Promise<Array<{ title: string; url: string }>>((resolve) => chrome.topSites.get((items: any) => resolve(items || [])));
-        if (!started) return;
-        if (!launcherService.getState().links.length) {
-          launcherService.updateState({ links: sites.slice(0, 14).map((site) => ({
-            id: crypto.randomUUID(), title: site.title || launcherService.hostOf(site.url), url: site.url, group: "常用网站"
-          })) });
-          await launcherService.save();
-        }
+      if (!stored.quickLinksReady) {
+        await chrome?.storage?.local?.set({ quickLinksReady: true });
       }
       if (started) this.render();
     })().catch((error) => { initialization = undefined; throw error; });

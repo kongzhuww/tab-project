@@ -22,7 +22,7 @@ test('every reviewed API permission still has a source usage', async () => {
   // Coarse evidence guard: catches stale entries, not proof that every call path is necessary.
   const { execFileSync } = await import('node:child_process');
   const evidence = {
-    storage: 'chrome.storage', unlimitedStorage: 'indexedDB', topSites: 'chrome.topSites',
+    storage: 'chrome.storage', unlimitedStorage: 'indexedDB',
     bookmarks: 'chrome.bookmarks', favicon: '_favicon', alarms: 'chrome.alarms',
     activeTab: 'chrome.tabs.query', tabs: 'chrome.tabs', cookies: 'cookies',
     declarativeNetRequest: 'declarativeNetRequest', identity: 'chrome.identity',
@@ -60,7 +60,7 @@ for (const [name, change, message] of [
 
 test('removing a reviewed permission is allowed', () => {
   const candidate = clone();
-  candidate.permissions = candidate.permissions.filter(value => value !== 'topSites');
+  candidate.permissions = candidate.permissions.filter(value => value !== 'alarms');
   assert.deepEqual(auditManifestPermissions(candidate), []);
 });
 
