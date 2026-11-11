@@ -1,14 +1,109 @@
-(function(){"use strict";const P=`
+(function(){"use strict";function S(e,t){const i=JSON.stringify(e),a=JSON.stringify(t);return`
 (function() {
   if (window.__WE_SHIM_INITIALIZED__) return;
   window.__WE_SHIM_INITIALIZED__ = true;
 
-  // 1. 全局监听器注册表
+  // 1. 资产映射表与路径解析器 (拦截相对路径 404)
+  var __WE_ASSET_MAP__ = ${i};
+  var __WE_ENTRY_DIR__ = ${a};
+
+  function normalizePath(p) {
+    return String(p || "").replace(/\\\\/g, "/").replace(/^\\.\\//, "").replace(/^\\/+/, "").toLowerCase();
+  }
+
+  function resolveAssetUrl(rawUrl) {
+    if (!rawUrl || typeof rawUrl !== 'string') return rawUrl;
+    var trimmed = rawUrl.trim();
+    if (/^(?:[a-z][a-z0-9+.-]*:|#|data:|blob:)/i.test(trimmed)) return trimmed;
+
+    var clean = trimmed.split(/[?#]/)[0];
+    if (!clean) return trimmed;
+
+    var base = clean.startsWith('/') ? '' : __WE_ENTRY_DIR__;
+    var parts = (base ? base + '/' : '') + clean.replace(/^\\/+/, '');
+    var segments = parts.split('/');
+    var stack = [];
+    for (var i = 0; i < segments.length; i++) {
+      var s = segments[i];
+      if (!s || s === '.') continue;
+      if (s === '..') stack.pop();
+      else stack.push(s);
+    }
+    var key = stack.join('/').toLowerCase();
+    return __WE_ASSET_MAP__[key] || trimmed;
+  }
+
+  // 2. 运行时网络请求拦截 (fetch & XHR)
+  if (typeof window.fetch === 'function') {
+    var _origFetch = window.fetch;
+    window.fetch = function(input, init) {
+      if (typeof input === 'string') {
+        input = resolveAssetUrl(input);
+      } else if (input && typeof input.url === 'string') {
+        var resolved = resolveAssetUrl(input.url);
+        if (resolved !== input.url && typeof Request === 'function') {
+          input = new Request(resolved, input);
+        }
+      }
+      return _origFetch.call(this, input, init);
+    };
+  }
+
+  if (typeof XMLHttpRequest !== 'undefined' && XMLHttpRequest.prototype) {
+    var _origXhrOpen = XMLHttpRequest.prototype.open;
+    XMLHttpRequest.prototype.open = function(method, url, async, user, password) {
+      var resolved = resolveAssetUrl(url);
+      return _origXhrOpen.call(this, method, resolved, async, user, password);
+    };
+  }
+
+  // 3. 动态图片与媒体标签拦截 (new Image().src, HTMLMediaElement.src)
+  try {
+    var imgProto = HTMLImageElement.prototype;
+    var desc = Object.getOwnPropertyDescriptor(imgProto, 'src');
+    if (desc && desc.set) {
+      Object.defineProperty(imgProto, 'src', {
+        set: function(val) {
+          return desc.set.call(this, resolveAssetUrl(val));
+        },
+        get: function() {
+          return desc.get.call(this);
+        },
+        configurable: true
+      });
+    }
+
+    var mediaProto = HTMLMediaElement.prototype;
+    var mediaDesc = Object.getOwnPropertyDescriptor(mediaProto, 'src');
+    if (mediaDesc && mediaDesc.set) {
+      Object.defineProperty(mediaProto, 'src', {
+        set: function(val) {
+          return mediaDesc.set.call(this, resolveAssetUrl(val));
+        },
+        get: function() {
+          return mediaDesc.get.call(this);
+        },
+        configurable: true
+      });
+    }
+
+    var origSetAttr = Element.prototype.setAttribute;
+    Element.prototype.setAttribute = function(name, val) {
+      if (typeof name === 'string' && name.toLowerCase() === 'src') {
+        val = resolveAssetUrl(val);
+      }
+      return origSetAttr.call(this, name, val);
+    };
+  } catch (e) {
+    console.warn('[WE Shim] Asset interception descriptor warning:', e);
+  }
+
+  // 4. 全局监听器注册表
   window._weAudioCallbacks = [];
   window._weMediaCallbacks = [];
   window._weUserProperties = {};
 
-  // 2. Wallpaper Engine 标准核心接口
+  // 5. Wallpaper Engine 标准核心接口
   window.wallpaperPropertyListener = window.wallpaperPropertyListener || {};
 
   window.wallpaperRegisterAudioListener = function(callback) {
@@ -38,7 +133,7 @@
     }
   };
 
-  // 3. 消息总线：接收父页面传入的鼠标、音频与配置，并合成原生事件
+  // 6. 消息总线：接收父页面传入的鼠标、音频与配置，并合成原生事件
   window.addEventListener('message', function(event) {
     var data = event.data;
     if (!data || typeof data !== 'object') return;
@@ -90,7 +185,7 @@
       return;
     }
 
-    // C. 128 位双声道音频频谱数据推流 (0~63 左声道，64~127 右声道，Float32 归一化)
+    // C. 128 位双声道音频频谱数据推流
     if (data.type === 'WE_AUDIO_DATA') {
       var audio = data.audio;
       if (Array.isArray(audio) || (audio && audio.length === 128)) {
@@ -140,5 +235,5 @@
     }
   });
 })();
-`;let m=[];function y(e){return m.push(e),e}function h(){for(const e of m)URL.revokeObjectURL(e);m=[]}function u(e){return String(e||"").replace(/\\/g,"/").replace(/^\.\//,"").replace(/^\/+/,"")}function v(e,r){const a=String(r||"").trim().replace(/^['"]|['"]$/g,"");if(!a||/^(?:[a-z][a-z0-9+.-]*:|#|data:|blob:)/i.test(a))return"";const[o]=a.split(/[?#]/);if(!o)return"";const t=a.startsWith("/")?"":u(e).split("/").slice(0,-1).join("/"),f=`${t?`${t}/`:""}${o.replace(/^\/+/,"")}`.split("/"),l=[];for(const c of f)!c||c==="."||(c===".."?l.pop():l.push(c));return l.join("/").toLowerCase()}async function L(e){h();const r=document.getElementById("wallpaper-root");if(!r)return;r.replaceChildren();const a=Array.isArray(e.files)?e.files:[];let o=a.find(l=>{const c=u(l.path).toLowerCase();return c.endsWith(".mp4")||c.endsWith(".webm")||c.endsWith(".mkv")});if(!o&&e.entry&&(o=a.find(l=>u(l.path).toLowerCase()===u(e.entry).toLowerCase())),!o?.file)return;const t=document.createElement("video");t.id="we-active-video",t.autoplay=!0,t.loop=!0,t.muted=!0,t.playsInline=!0,t.setAttribute("webkit-playsinline","true"),t.style.width="100%",t.style.height="100%",t.style.objectFit="cover",t.style.display="block",t.style.pointerEvents="none";const f=y(URL.createObjectURL(o.file));t.src=f,r.appendChild(t);try{await t.play()}catch(l){console.warn("[Video Wallpaper] Autoplay warning:",l)}}async function A(e){h();const r=document.getElementById("wallpaper-root");if(!r||(r.replaceChildren(),typeof e.entry!="string"))return;const a=e.entry,o=new Map((Array.isArray(e.files)?e.files:[]).map(n=>[u(n.path).toLowerCase(),n])),t=new Map;async function f(n,w){const i=v(n,w),s=o.get(i);return!s?.file||!(s.file instanceof Blob)?w:(t.has(i)||t.set(i,y(URL.createObjectURL(new Blob([s.file],{type:s.mime||s.file.type||"application/octet-stream"})))),t.get(i))}async function l(n,w){let i=String(n||"");for(const s of[...i.matchAll(/url\(([^)]+)\)/gi)]){const b=await f(w,s[1].trim());i=i.replace(s[0],`url(${JSON.stringify(b)})`)}return i}async function c(n,w,i,s){for(const b of n.querySelectorAll(w)){const g=b.getAttribute(i);g&&b.setAttribute(i,await f(s,g))}}const E=o.get(u(a).toLowerCase());if(!E?.file||!(E.file instanceof Blob))return;const d=new DOMParser().parseFromString(await E.file.text(),"text/html"),_=d.createElement("script");_.textContent=P,d.head.prepend(_);for(const n of d.querySelectorAll('link[rel~="stylesheet"][href]')){const w=n.getAttribute("href")||"",i=o.get(v(a,w));if(i?.file instanceof Blob){const s=await l(await i.file.text(),i.path);n.setAttribute("href",y(URL.createObjectURL(new Blob([s],{type:"text/css"}))))}}await c(d,"img[src],script[src],source[src],video[src],audio[src]","src",a),await c(d,"link[href]","href",a);for(const n of d.querySelectorAll("[style]"))n.setAttribute("style",await l(n.getAttribute("style")||"",a));for(const n of d.querySelectorAll("style"))n.textContent=await l(n.textContent||"",a);const p=document.createElement("iframe");p.id="we-wallpaper-iframe",p.title=e.name||"Web Wallpaper",p.sandbox.add("allow-scripts","allow-pointer-lock"),p.style.width="100%",p.style.height="100%",p.style.border="none",p.style.display="block",p.src=y(URL.createObjectURL(new Blob([`<!doctype html>
-${d.documentElement.outerHTML}`],{type:"text/html"}))),r.appendChild(p),e.properties&&p.addEventListener("load",()=>{p.contentWindow?.postMessage({type:"WE_USER_PROPERTIES",properties:e.properties},"*")},{once:!0})}window.addEventListener("message",e=>{if(e.source!==window.parent)return;const r=e.data;if(!r)return;if(r.type==="web"){A(r).catch(console.error);return}if(r.type==="video"){L(r).catch(console.error);return}const a=document.querySelector("#we-wallpaper-iframe");a?.contentWindow&&a.contentWindow.postMessage(r,"*");const o=document.querySelector("#we-active-video");o&&r.type==="WE_SET_PAUSED"&&(r.isPaused?o.pause():o.play().catch(()=>{}))}),window.addEventListener("pagehide",h)})();
+`}let h=[];function y(e){return h.push(e),e}function g(){for(const e of h)URL.revokeObjectURL(e);h=[]}function u(e){return String(e||"").replace(/\\/g,"/").replace(/^\.\//,"").replace(/^\/+/,"").toLowerCase()}function P(e,t){const i=String(t||"").trim().replace(/^['"]|['"]$/g,"");if(!i||/^(?:[a-z][a-z0-9+.-]*:|#|data:|blob:)/i.test(i))return"";const[a]=i.split(/[?#]/);if(!a)return"";const r=i.startsWith("/")?"":u(e).split("/").slice(0,-1).join("/"),f=`${r?`${r}/`:""}${a.replace(/^\/+/,"")}`.split("/"),s=[];for(const l of f)!l||l==="."||(l===".."?s.pop():s.push(l));return s.join("/").toLowerCase()}let m=null,E=!1;async function L(e){g();const t=document.getElementById("wallpaper-root");if(!t)return;t.replaceChildren();const i=Array.isArray(e.files)?e.files:[];let a=i.find(s=>{const l=u(s.path);return l.endsWith(".mp4")||l.endsWith(".webm")||l.endsWith(".mkv")});if(!a&&e.entry&&(a=i.find(s=>u(s.path)===u(e.entry))),!a?.file)return;const r=document.createElement("video");r.id="we-active-video",r.autoplay=!0,r.loop=!0,r.muted=!0,r.playsInline=!0,r.setAttribute("webkit-playsinline","true"),r.style.width="100%",r.style.height="100%",r.style.objectFit="cover",r.style.display="block",r.style.pointerEvents="none";const f=y(URL.createObjectURL(a.file));r.src=f,t.appendChild(r);try{await r.play()}catch(s){console.warn("[Video Wallpaper] Autoplay warning:",s)}}async function W(e){g();const t=document.getElementById("wallpaper-root");if(!t||(t.replaceChildren(),typeof e.entry!="string"))return;const i=e.entry,a=Array.isArray(e.files)?e.files:[],r=new Map,f={};for(const n of a){const p=u(n.path);if(r.set(p,n),n.file instanceof Blob){const o=y(URL.createObjectURL(new Blob([n.file],{type:n.mime||n.file.type||"application/octet-stream"})));f[p]=o}}function s(n,p){const o=P(n,p);return f[o]||p}function l(n,p){let o=String(n||"");for(const w of[...o.matchAll(/url\(([^)]+)\)/gi)]){const v=w[1].trim().replace(/^['"]|['"]$/g,""),b=s(p,v);o=o.replace(w[0],`url(${JSON.stringify(b)})`)}return o}function A(n,p,o,w){for(const v of n.querySelectorAll(p)){const b=v.getAttribute(o);b&&v.setAttribute(o,s(w,b))}}const _=r.get(u(i));if(!_?.file||!(_.file instanceof Blob))return;const d=new DOMParser().parseFromString(await _.file.text(),"text/html"),M=u(i).split("/").slice(0,-1).join("/"),U=d.createElement("script");U.textContent=S(f,M),d.head.prepend(U);for(const n of d.querySelectorAll('link[rel~="stylesheet"][href]')){const p=n.getAttribute("href")||"",o=r.get(P(i,p));if(o?.file instanceof Blob){const w=l(await o.file.text(),o.path);n.setAttribute("href",y(URL.createObjectURL(new Blob([w],{type:"text/css"}))))}}A(d,"img[src],script[src],source[src],video[src],audio[src]","src",i),A(d,"link[href]","href",i);for(const n of d.querySelectorAll("[style]"))n.setAttribute("style",l(n.getAttribute("style")||"",i));for(const n of d.querySelectorAll("style"))n.textContent=l(n.textContent||"",i);const c=document.createElement("iframe");c.id="we-wallpaper-iframe",c.title=e.name||"Web Wallpaper",c.sandbox.add("allow-scripts","allow-pointer-lock"),c.style.width="100%",c.style.height="100%",c.style.border="none",c.style.display="block",c.src=y(URL.createObjectURL(new Blob([`<!doctype html>
+${d.documentElement.outerHTML}`],{type:"text/html"}))),m=e.properties||null,c.addEventListener("load",()=>{m&&c.contentWindow?.postMessage({type:"WE_USER_PROPERTIES",properties:m},"*"),E&&c.contentWindow?.postMessage({type:"WE_SET_PAUSED",isPaused:!0},"*")},{once:!0}),t.appendChild(c)}window.addEventListener("message",e=>{if(e.source!==window.parent)return;const t=e.data;if(!t)return;if(t.type==="web"){W(t).catch(console.error);return}if(t.type==="video"){L(t).catch(console.error);return}if(t.type==="WE_USER_PROPERTIES"&&(m=t.properties),t.type==="WE_SET_PAUSED"){E=!!t.isPaused;const a=document.querySelector("#we-active-video");a&&(E?a.pause():a.play().catch(()=>{}))}const i=document.querySelector("#we-wallpaper-iframe");i?.contentWindow&&i.contentWindow.postMessage(t,"*")}),window.addEventListener("pagehide",g)})();

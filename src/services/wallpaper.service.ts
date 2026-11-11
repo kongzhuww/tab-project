@@ -536,7 +536,7 @@ export const WallpaperService = {
     return this.importBackgroundFile(file);
   },
 
-  async applyWallpaper(value: any): Promise<void> {
+  async applyWallpaper(value: any, instantPayload: any = null): Promise<void> {
     const version = ++applyVersion;
     if (typeof document === "undefined") return;
     const launcher = document.getElementById("launcher");
@@ -567,13 +567,53 @@ export const WallpaperService = {
       surface.style.position = "absolute"; surface.style.inset = "0";
       host.appendChild(surface); return;
     }
+
+    // 原生 4K 视频壁纸即时硬解流式播放
+    if (value.type === "video") {
+      let videoBlob: Blob | null = null;
+      if (instantPayload?.files) {
+        const f = instantPayload.files.find((item: any) => item.path === instantPayload.entry) || instantPayload.files[0];
+        videoBlob = f?.file || null;
+      } else if (instantPayload instanceof Blob) {
+        videoBlob = instantPayload;
+      }
+      if (!videoBlob) {
+        const opfsPack = await loadActiveWallpaperFromOpfs();
+        if (opfsPack?.files?.length) {
+          const f = opfsPack.files.find(item => item.path === opfsPack.entry) || opfsPack.files[0];
+          videoBlob = f?.file || null;
+        }
+      }
+      if (videoBlob instanceof Blob && version === applyVersion) {
+        const url = trackUrl(URL.createObjectURL(videoBlob));
+        const video = document.createElement("video");
+        video.src = url;
+        video.autoplay = true;
+        video.preload = "metadata";
+        video.loop = true;
+        video.muted = true;
+        video.defaultMuted = true;
+        video.volume = 0;
+        video.setAttribute("muted", "");
+        video.playsInline = true;
+        video.disablePictureInPicture = true;
+        video.setAttribute("disablepictureinpicture", "");
+        video.setAttribute("disableremoteplayback", "");
+        host.appendChild(video);
+        return;
+      }
+    }
+
     if (value.type === "web") {
-      // 优先从 OPFS 静默冷启动读取当前活跃壁纸 (0 弹窗、0 毫秒权限等待)
-      let pack = await loadActiveWallpaperFromOpfs();
+      // 若提供了即时包 (例如刚点击工坊壁纸)，直接零延迟秒开
+      let pack = instantPayload;
       if (!pack || pack.type !== "web") {
-        pack = await backgroundDbGet(value.storageKey || BACKGROUND_CURRENT_KEY);
-        if (pack && pack.type === "web") {
-          void saveActiveWallpaperToOpfs(pack);
+        pack = await loadActiveWallpaperFromOpfs();
+        if (!pack || pack.type !== "web") {
+          pack = await backgroundDbGet(value.storageKey || BACKGROUND_CURRENT_KEY);
+          if (pack && pack.type === "web") {
+            void saveActiveWallpaperToOpfs(pack);
+          }
         }
       }
 
