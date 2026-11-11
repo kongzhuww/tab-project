@@ -234,7 +234,7 @@ onUnmounted(() => {
       @copy="onCubeCopy"
       @selectstart="onCubeSelectStart"
     >
-      <button v-if="!activeFaces.length" type="button" class="ms-cube-cm-action" @click="openConfigFromMenu">＋ 添加面（右键管理）</button>
+      <button v-if="!activeFaces.length" type="button" class="ms-cube-cm-action" @click="resetDefaultsFromMenu">↺ 恢复默认音乐播放条</button>
       <div
         class="ms-top-cube"
         :style="{ transform: `translateZ(-22px) rotateX(${cubeRotation}deg)` }"
@@ -365,21 +365,21 @@ onUnmounted(() => {
           </button>
         </div>
 
-        <div class="ms-cube-cm-divider"></div>
-
-        <button type="button" class="ms-cube-cm-action" @click="openConfigFromMenu">
-          <span>＋ 添加面 / 管理面</span>
-        </button>
-        <button type="button" class="ms-cube-cm-action" @click="stepTopCubeFace(-1); contextMenuVisible = false">
-          <span>⏮ 上一个面板</span>
-        </button>
-        <button type="button" class="ms-cube-cm-action" @click="stepTopCubeFace(1); contextMenuVisible = false">
-          <span>⏭ 下一个面板</span>
-        </button>
-        <button v-if="activeFaceId" type="button" class="ms-cube-cm-action danger" @click="runCubeAction(() => cubeRegistryStore.removeCustomFace(activeFaceId))">删除当前面</button>
-        <button type="button" class="ms-cube-cm-action danger" @click="resetDefaultsFromMenu">
-          <span>↺ 恢复默认（仅音乐）</span>
-        </button>
+        <template v-if="activeFaces.length > 1">
+          <div class="ms-cube-cm-divider"></div>
+          <button type="button" class="ms-cube-cm-action" @click="stepTopCubeFace(-1); contextMenuVisible = false">
+            <span>⏮ 上一个面板</span>
+          </button>
+          <button type="button" class="ms-cube-cm-action" @click="stepTopCubeFace(1); contextMenuVisible = false">
+            <span>⏭ 下一个面板</span>
+          </button>
+          <button v-if="activeFaceId && activeFaceId !== 'music'" type="button" class="ms-cube-cm-action danger" @click="runCubeAction(() => cubeRegistryStore.removeCustomFace(activeFaceId))">
+            删除当前面
+          </button>
+          <button type="button" class="ms-cube-cm-action danger" @click="resetDefaultsFromMenu">
+            <span>↺ 恢复默认（仅音乐）</span>
+          </button>
+        </template>
       </div>
 
       </Teleport>
