@@ -6,6 +6,11 @@ test('WebDAV sync payload whitelist includes and preserves ghLocalStarGroupsV1',
   const syncServiceRaw = await readFile(new URL('../src/services/sync.service.ts', import.meta.url), 'utf8');
   const syncPayloadRaw = await readFile(new URL('../src/services/sync-payload.ts', import.meta.url), 'utf8');
 
+  // 1. 静态契约：白名单必须包含 heroBackground 和 heroBackgroundHistory
+  assert.match(syncServiceRaw, /"heroBackground"/);
+  assert.match(syncServiceRaw, /"heroBackgroundHistory"/);
+  assert.match(syncPayloadRaw, /"heroBackgroundHistory"/);
+
   // 1. 静态契约：白名单与对象属性集必须明确包含本地 Star 分组
   assert.match(syncServiceRaw, /"ghLocalStarGroupsV1"/);
   assert.match(syncPayloadRaw, /"ghLocalStarGroupsV1"/);
@@ -45,3 +50,29 @@ test('selectSyncSettings validates and accepts gh_my_repo_groups_v2 array and gh
     'kongzhu/agent': ['AI与模型']
   });
 });
+
+test('selectSyncSettings validates and accepts heroBackground and heroBackgroundHistory', async () => {
+  const { selectSyncSettings } = await import('../src/services/sync-payload.ts');
+  const payload = {
+    heroBackground: {
+      type: 'video',
+      name: '阿米娅-相变临界4k',
+      workshopId: '3720340946',
+      isWorkshop: true
+    },
+    heroBackgroundHistory: [
+      {
+        id: 'bg-1',
+        title: '阿米娅-相变临界4k',
+        kind: '视频',
+        previewUrl: 'data:image/jpeg;base64,mock',
+        value: { type: 'video', workshopId: '3720340946' }
+      }
+    ]
+  };
+  const result = selectSyncSettings(payload, ['heroBackground', 'heroBackgroundHistory']);
+  assert.equal(result.count, 2);
+  assert.equal(result.sanitized.heroBackground.name, '阿米娅-相变临界4k');
+  assert.equal(result.sanitized.heroBackgroundHistory.length, 1);
+});
+
