@@ -1,20 +1,121 @@
 /**
- * Wallpaper Engine Web API Shim (标准垫片脚本与原生事件合成器)
- * 注入至壁纸沙盒 iframe 的 <head> 顶部，完美伪造 10 个 Wallpaper Engine 全局接口
- * 并将父页面转发的鼠标坐标与音频频谱精准合成为原生 DOM 事件派发给壁纸内部元素
+ * Wallpaper Engine Web API Shim (标准垫片脚本、运行时资源拦截器与原生事件合成器)
+ * 注入至壁纸沙盒 iframe 的 <head> 顶部
+ * 1. 拦截 fetch, XHR, Image.src, Media.src 动态请求，解决 PixiJS/Three.js 相对路径 404 问题
+ * 2. 伪造 Wallpaper Engine 核心全局接口
+ * 3. 将父页面转发的鼠标坐标与音频频谱精准合成为原生 DOM 事件派发
  */
 
-export const WE_SHIM_SCRIPT_CONTENT = `
+export function buildWeShimScript(assetMap: Record<string, string>, entryDir: string): string {
+  const jsonAssetMap = JSON.stringify(assetMap);
+  const jsonEntryDir = JSON.stringify(entryDir);
+
+  return `
 (function() {
   if (window.__WE_SHIM_INITIALIZED__) return;
   window.__WE_SHIM_INITIALIZED__ = true;
 
-  // 1. 全局监听器注册表
+  // 1. 资产映射表与路径解析器 (拦截相对路径 404)
+  var __WE_ASSET_MAP__ = ${jsonAssetMap};
+  var __WE_ENTRY_DIR__ = ${jsonEntryDir};
+
+  function normalizePath(p) {
+    return String(p || "").replace(/\\\\/g, "/").replace(/^\\.\\//, "").replace(/^\\/+/, "").toLowerCase();
+  }
+
+  function resolveAssetUrl(rawUrl) {
+    if (!rawUrl || typeof rawUrl !== 'string') return rawUrl;
+    var trimmed = rawUrl.trim();
+    if (/^(?:[a-z][a-z0-9+.-]*:|#|data:|blob:)/i.test(trimmed)) return trimmed;
+
+    var clean = trimmed.split(/[?#]/)[0];
+    if (!clean) return trimmed;
+
+    var base = clean.startsWith('/') ? '' : __WE_ENTRY_DIR__;
+    var parts = (base ? base + '/' : '') + clean.replace(/^\\/+/, '');
+    var segments = parts.split('/');
+    var stack = [];
+    for (var i = 0; i < segments.length; i++) {
+      var s = segments[i];
+      if (!s || s === '.') continue;
+      if (s === '..') stack.pop();
+      else stack.push(s);
+    }
+    var key = stack.join('/').toLowerCase();
+    return __WE_ASSET_MAP__[key] || trimmed;
+  }
+
+  // 2. 运行时网络请求拦截 (fetch & XHR)
+  if (typeof window.fetch === 'function') {
+    var _origFetch = window.fetch;
+    window.fetch = function(input, init) {
+      if (typeof input === 'string') {
+        input = resolveAssetUrl(input);
+      } else if (input && typeof input.url === 'string') {
+        var resolved = resolveAssetUrl(input.url);
+        if (resolved !== input.url && typeof Request === 'function') {
+          input = new Request(resolved, input);
+        }
+      }
+      return _origFetch.call(this, input, init);
+    };
+  }
+
+  if (typeof XMLHttpRequest !== 'undefined' && XMLHttpRequest.prototype) {
+    var _origXhrOpen = XMLHttpRequest.prototype.open;
+    XMLHttpRequest.prototype.open = function(method, url, async, user, password) {
+      var resolved = resolveAssetUrl(url);
+      return _origXhrOpen.call(this, method, resolved, async, user, password);
+    };
+  }
+
+  // 3. 动态图片与媒体标签拦截 (new Image().src, HTMLMediaElement.src)
+  try {
+    var imgProto = HTMLImageElement.prototype;
+    var desc = Object.getOwnPropertyDescriptor(imgProto, 'src');
+    if (desc && desc.set) {
+      Object.defineProperty(imgProto, 'src', {
+        set: function(val) {
+          return desc.set.call(this, resolveAssetUrl(val));
+        },
+        get: function() {
+          return desc.get.call(this);
+        },
+        configurable: true
+      });
+    }
+
+    var mediaProto = HTMLMediaElement.prototype;
+    var mediaDesc = Object.getOwnPropertyDescriptor(mediaProto, 'src');
+    if (mediaDesc && mediaDesc.set) {
+      Object.defineProperty(mediaProto, 'src', {
+        set: function(val) {
+          return mediaDesc.set.call(this, resolveAssetUrl(val));
+        },
+        get: function() {
+          return mediaDesc.get.call(this);
+        },
+        configurable: true
+      });
+    }
+
+    var origSetAttr = Element.prototype.setAttribute;
+    Element.prototype.setAttribute = function(name, val) {
+      if (typeof name === 'string' && name.toLowerCase() === 'src') {
+        val = resolveAssetUrl(val);
+      }
+      return origSetAttr.call(this, name, val);
+    };
+  } catch (e) {
+    console.warn('[WE Shim] Asset interception descriptor warning:', e);
+  }
+
+  // 4. 全局监听器注册表
   window._weAudioCallbacks = [];
   window._weMediaCallbacks = [];
   window._weUserProperties = {};
 
-  // 2. Wallpaper Engine 标准核心接口
+  // 5. Wallpaper Engine 标准核心接口
   window.wallpaperPropertyListener = window.wallpaperPropertyListener || {};
 
   window.wallpaperRegisterAudioListener = function(callback) {
@@ -44,7 +145,7 @@ export const WE_SHIM_SCRIPT_CONTENT = `
     }
   };
 
-  // 3. 消息总线：接收父页面传入的鼠标、音频与配置，并合成原生事件
+  // 6. 消息总线：接收父页面传入的鼠标、音频与配置，并合成原生事件
   window.addEventListener('message', function(event) {
     var data = event.data;
     if (!data || typeof data !== 'object') return;
@@ -96,7 +197,7 @@ export const WE_SHIM_SCRIPT_CONTENT = `
       return;
     }
 
-    // C. 128 位双声道音频频谱数据推流 (0~63 左声道，64~127 右声道，Float32 归一化)
+    // C. 128 位双声道音频频谱数据推流
     if (data.type === 'WE_AUDIO_DATA') {
       var audio = data.audio;
       if (Array.isArray(audio) || (audio && audio.length === 128)) {
@@ -147,3 +248,4 @@ export const WE_SHIM_SCRIPT_CONTENT = `
   });
 })();
 `;
+}

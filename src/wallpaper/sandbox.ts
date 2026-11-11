@@ -1,4 +1,4 @@
-import { WE_SHIM_SCRIPT_CONTENT } from "./we-shim";
+import { buildWeShimScript } from "./we-shim";
 
 type WallpaperFile = { path: string; file: Blob; mime?: string };
 type WallpaperPack = {
@@ -16,7 +16,7 @@ function clearUrls(): void {
   activeUrls = [];
 }
 function normalizePath(path: string): string {
-  return String(path || "").replace(/\\/g, "/").replace(/^\.\//, "").replace(/^\/+/, "");
+  return String(path || "").replace(/\\/g, "/").replace(/^\.\//, "").replace(/^\/+/, "").toLowerCase();
 }
 function resolvePath(fromPath: string, target: string): string {
   const raw = String(target || "").trim().replace(/^['"]|['"]$/g, "");
@@ -34,6 +34,9 @@ function resolvePath(fromPath: string, target: string): string {
   return stack.join("/").toLowerCase();
 }
 
+let latestProperties: Record<string, any> | null = null;
+let latestIsPaused = false;
+
 /**
  * 渲染视频类型壁纸 (原生 4K 硬解、零内存流式播放)
  */
@@ -44,14 +47,13 @@ async function renderVideoWallpaper(pack: WallpaperPack): Promise<void> {
   root.replaceChildren();
 
   const files = Array.isArray(pack.files) ? pack.files : [];
-  // 查找视频文件
   let videoEntry = files.find(f => {
-    const p = normalizePath(f.path).toLowerCase();
+    const p = normalizePath(f.path);
     return p.endsWith(".mp4") || p.endsWith(".webm") || p.endsWith(".mkv");
   });
 
   if (!videoEntry && pack.entry) {
-    videoEntry = files.find(f => normalizePath(f.path).toLowerCase() === normalizePath(pack.entry!).toLowerCase());
+    videoEntry = files.find(f => normalizePath(f.path) === normalizePath(pack.entry!));
   }
 
   if (!videoEntry?.file) return;
@@ -81,7 +83,7 @@ async function renderVideoWallpaper(pack: WallpaperPack): Promise<void> {
 }
 
 /**
- * 渲染 Web 网页类型壁纸 (注入标准 WE 垫片与事件派发器)
+ * 渲染 Web 网页类型壁纸 (注入运行时资源拦截器与标准 WE 垫片)
  */
 async function renderWebWallpaper(pack: WallpaperPack): Promise<void> {
   clearUrls();
@@ -91,56 +93,68 @@ async function renderWebWallpaper(pack: WallpaperPack): Promise<void> {
   if (typeof pack.entry !== "string") return;
 
   const entryPath = pack.entry;
-  const byPath = new Map((Array.isArray(pack.files) ? pack.files : []).map((entry) => [normalizePath(entry.path).toLowerCase(), entry]));
-  const urls = new Map<string, string>();
+  const files = Array.isArray(pack.files) ? pack.files : [];
+  const byPath = new Map<string, WallpaperFile>();
+  const assetMap: Record<string, string> = {};
 
-  async function getUrl(fromPath: string, target: string): Promise<string> {
-    const key = resolvePath(fromPath, target);
-    const entry = byPath.get(key);
-    if (!entry?.file || !(entry.file instanceof Blob)) return target;
-    if (!urls.has(key)) urls.set(key, trackUrl(URL.createObjectURL(new Blob([entry.file], { type: entry.mime || entry.file.type || "application/octet-stream" }))));
-    return urls.get(key)!;
+  // 为每个资产文件生成全局 Blob URL 映射表，彻底解决 JS 运行时相对路径 404
+  for (const f of files) {
+    const norm = normalizePath(f.path);
+    byPath.set(norm, f);
+    if (f.file instanceof Blob) {
+      const blobUrl = trackUrl(URL.createObjectURL(new Blob([f.file], { type: f.mime || f.file.type || "application/octet-stream" })));
+      assetMap[norm] = blobUrl;
+    }
   }
 
-  async function rewriteCss(input: string, fromPath: string): Promise<string> {
+  function getUrl(fromPath: string, target: string): string {
+    const key = resolvePath(fromPath, target);
+    return assetMap[key] || target;
+  }
+
+  function rewriteCss(input: string, fromPath: string): string {
     let css = String(input || "");
     for (const match of [...css.matchAll(/url\(([^)]+)\)/gi)]) {
-      const url = await getUrl(fromPath, match[1].trim());
-      css = css.replace(match[0], `url(${JSON.stringify(url)})`);
+      const rawUrl = match[1].trim().replace(/^['"]|['"]$/g, "");
+      const resolved = getUrl(fromPath, rawUrl);
+      css = css.replace(match[0], `url(${JSON.stringify(resolved)})`);
     }
     return css;
   }
 
-  async function rewriteAttr(doc: Document, selector: string, attr: string, fromPath: string): Promise<void> {
+  function rewriteAttr(doc: Document, selector: string, attr: string, fromPath: string): void {
     for (const node of doc.querySelectorAll(selector)) {
       const value = node.getAttribute(attr);
-      if (value) node.setAttribute(attr, await getUrl(fromPath, value));
+      if (value) node.setAttribute(attr, getUrl(fromPath, value));
     }
   }
 
-  const entry = byPath.get(normalizePath(entryPath).toLowerCase());
+  const entry = byPath.get(normalizePath(entryPath));
   if (!entry?.file || !(entry.file instanceof Blob)) return;
 
   const doc = new DOMParser().parseFromString(await entry.file.text(), "text/html");
 
-  // 注入完整工业级 Wallpaper Engine Web API Shim
+  // 计算入口文件所在目录作为 base
+  const entryDir = normalizePath(entryPath).split("/").slice(0, -1).join("/");
+
+  // 注入全功能 Wallpaper Engine Web API Shim 与动态请求拦截器
   const shimScript = doc.createElement("script");
-  shimScript.textContent = WE_SHIM_SCRIPT_CONTENT;
+  shimScript.textContent = buildWeShimScript(assetMap, entryDir);
   doc.head.prepend(shimScript);
 
   for (const node of doc.querySelectorAll('link[rel~="stylesheet"][href]')) {
     const href = node.getAttribute("href") || "";
     const cssEntry = byPath.get(resolvePath(entryPath, href));
     if (cssEntry?.file instanceof Blob) {
-      const css = await rewriteCss(await cssEntry.file.text(), cssEntry.path);
+      const css = rewriteCss(await cssEntry.file.text(), cssEntry.path);
       node.setAttribute("href", trackUrl(URL.createObjectURL(new Blob([css], { type: "text/css" }))));
     }
   }
 
-  await rewriteAttr(doc, "img[src],script[src],source[src],video[src],audio[src]", "src", entryPath);
-  await rewriteAttr(doc, "link[href]", "href", entryPath);
-  for (const node of doc.querySelectorAll("[style]")) node.setAttribute("style", await rewriteCss(node.getAttribute("style") || "", entryPath));
-  for (const node of doc.querySelectorAll("style")) node.textContent = await rewriteCss(node.textContent || "", entryPath);
+  rewriteAttr(doc, "img[src],script[src],source[src],video[src],audio[src]", "src", entryPath);
+  rewriteAttr(doc, "link[href]", "href", entryPath);
+  for (const node of doc.querySelectorAll("[style]")) node.setAttribute("style", rewriteCss(node.getAttribute("style") || "", entryPath));
+  for (const node of doc.querySelectorAll("style")) node.textContent = rewriteCss(node.textContent || "", entryPath);
 
   const frame = document.createElement("iframe");
   frame.id = "we-wallpaper-iframe";
@@ -151,19 +165,29 @@ async function renderWebWallpaper(pack: WallpaperPack): Promise<void> {
   frame.style.border = "none";
   frame.style.display = "block";
   frame.src = trackUrl(URL.createObjectURL(new Blob([`<!doctype html>\n${doc.documentElement.outerHTML}`], { type: "text/html" })));
-  root.appendChild(frame);
 
-  // 若随包带有默认属性，等 iframe 挂载完毕后下发初始化配置
-  if (pack.properties) {
-    frame.addEventListener("load", () => {
+  latestProperties = pack.properties || null;
+
+  // 内层 iframe 挂载完成后立即补齐配置与状态，防止消息断路
+  frame.addEventListener("load", () => {
+    if (latestProperties) {
       frame.contentWindow?.postMessage({
         type: "WE_USER_PROPERTIES",
-        properties: pack.properties,
+        properties: latestProperties,
       }, "*");
-    }, { once: true });
-  }
+    }
+    if (latestIsPaused) {
+      frame.contentWindow?.postMessage({
+        type: "WE_SET_PAUSED",
+        isPaused: true,
+      }, "*");
+    }
+  }, { once: true });
+
+  root.appendChild(frame);
 }
 
+// 消息转发总线：将来自父页面的所有控制、鼠标事件与音频频谱零延迟透传给内层 iframe
 window.addEventListener("message", (event: MessageEvent<any>) => {
   if (event.source !== window.parent) return;
   const data = event.data;
@@ -179,19 +203,22 @@ window.addEventListener("message", (event: MessageEvent<any>) => {
     return;
   }
 
-  // 2. 状态透传指令 (转发至内部 iframe 或直接控制视频)
+  // 2. 状态透传与直达桥接
+  if (data.type === "WE_USER_PROPERTIES") {
+    latestProperties = data.properties;
+  }
+  if (data.type === "WE_SET_PAUSED") {
+    latestIsPaused = Boolean(data.isPaused);
+    const video = document.querySelector("#we-active-video") as HTMLVideoElement | null;
+    if (video) {
+      if (latestIsPaused) video.pause();
+      else video.play().catch(() => {});
+    }
+  }
+
   const iframe = document.querySelector("#we-wallpaper-iframe") as HTMLIFrameElement | null;
   if (iframe?.contentWindow) {
     iframe.contentWindow.postMessage(data, "*");
-  }
-
-  const video = document.querySelector("#we-active-video") as HTMLVideoElement | null;
-  if (video && data.type === "WE_SET_PAUSED") {
-    if (data.isPaused) {
-      video.pause();
-    } else {
-      video.play().catch(() => {});
-    }
   }
 });
 

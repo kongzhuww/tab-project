@@ -561,7 +561,12 @@
               >
                 <div style="font-size: 24px; margin-bottom: 6px;">🎮</div>
                 <div style="color: var(--text); font-weight: 600; margin-bottom: 4px;">未关联 Steam 创意工坊目录</div>
-                <div>点击上方「⚡ 关联 Steam 工坊 (431960)」选择电脑中的 <code>Steam/steamapps/workshop/content/431960</code> 目录，一键展示所有 Web 网页与 4K 视频动态壁纸！</div>
+                <div style="line-height: 1.6; max-width: 580px; margin: 0 auto 10px;">
+                  点击上方「⚡ 关联 Steam 工坊 (431960)」选择电脑中的工坊目录或任意壁纸文件夹：<br>
+                  <span style="color: var(--text);">• Windows 默认:</span> <code>Steam/steamapps/workshop/content/431960</code><br>
+                  <span style="color: var(--text);">• macOS 默认:</span> <code>~/Library/Application Support/Steam/steamapps/workshop/content/431960</code>（Finder 中按 <code>Cmd+Shift+G</code> 粘贴直达）<br>
+                  <span style="color: var(--text);">• 独立壁纸包:</span> 也可直接选择你存放壁纸的任意文件夹或单个壁纸目录。
+                </div>
               </div>
 
               <div v-else class="wallpaper-library-grid">

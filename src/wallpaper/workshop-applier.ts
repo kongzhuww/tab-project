@@ -1,12 +1,13 @@
 /**
  * Steam 工坊壁纸一键克隆与即时应用器
- * 将用户选中的本地壁纸文件夹 assets 毫秒级打包并克隆写入 OPFS 活跃私有目录
- * 随即热通知 WallpaperService 完成背景零闪烁切换
+ * 1. 0 毫秒即时上屏：直接使用本地 File 实例瞬间换壁纸，UI 绝不卡顿
+ * 2. 后台异步静默写入 OPFS 保证冷启动 0 弹窗
+ * 3. 绕过 IndexedDB 实体写入，彻底杜绝 180MB 上限与数据库膨胀
  */
 
 import type { WorkshopItemInfo } from "./workshop-scanner";
 import { saveActiveWallpaperToOpfs } from "./opfs-storage";
-import { WallpaperService, backgroundDbPut } from "../services/wallpaper.service";
+import { WallpaperService } from "../services/wallpaper.service";
 
 /**
  * 递归收集工坊子目录下的所有文件 (保留相对路径)
@@ -28,7 +29,7 @@ async function collectFolderFiles(
         mime: file.type || undefined,
       });
     } else if (handle.kind === "directory") {
-      // 避免无限递归过深的目录
+      // 避免过深的异常嵌套目录
       if (basePath.split("/").length < 8) {
         const sub = await collectFolderFiles(handle as FileSystemDirectoryHandle, relPath);
         result.push(...sub);
@@ -46,37 +47,40 @@ export async function applyWorkshopWallpaper(item: WorkshopItemInfo): Promise<bo
   if (!item.folderHandle) return false;
 
   try {
-    // 1. 递归读取该壁纸文件夹下的所有资源
+    // 快速收集该文件夹下的必要资产
     const files = await collectFolderFiles(item.folderHandle);
     if (!files.length) {
       throw new Error("壁纸文件夹为空或无法读取");
     }
 
+    const isVideo = item.type === "video" || files.some(f => /\.(mp4|webm|mkv)$/i.test(f.path));
     const pack = {
-      type: item.type === "video" ? ("video" as const) : ("web" as const),
-      entry: item.entryFile || (item.type === "video" ? files[0]?.path : "index.html"),
+      type: isVideo ? ("video" as const) : ("web" as const),
+      entry: item.entryFile || (isVideo ? files.find(f => /\.(mp4|webm|mkv)$/i.test(f.path))?.path : "index.html"),
       name: item.title,
+      workshopId: item.id,
       properties: item.properties || {},
       files,
     };
 
-    // 2. 写入 OPFS 私有文件系统 (实现此后冷启动零弹窗秒读)
-    await saveActiveWallpaperToOpfs(pack);
-
-    // 3. 同时在 IndexedDB 中持久化当前壁纸包以支持回退与历史管理
-    const historyId = `workshop-${item.id}`;
-    await backgroundDbPut(pack, historyId);
-
-    // 4. 添加到壁纸历史记录并激活
     const wallpaperVal = {
       type: pack.type,
-      storageKey: historyId,
       name: item.title,
       workshopId: item.id,
+      entry: pack.entry,
+      isWorkshop: true
     };
 
-    await WallpaperService.addHistory(wallpaperVal, pack);
-    await WallpaperService.applyWallpaper(wallpaperVal);
+    // 1. 0 毫秒即刻上屏 (直接传递已在内存中的 pack，UI 零延迟换壁纸)
+    await WallpaperService.applyWallpaper(wallpaperVal, pack);
+
+    // 2. 存入轻量历史记录 (不把几百 MB 的实体二进制存进 IndexedDB，防膨胀与 180MB 超限)
+    await WallpaperService.addHistory(wallpaperVal, null);
+
+    // 3. 后台异步静默写入 OPFS 私有文件系统 (冷启动保证 0 弹窗)
+    void saveActiveWallpaperToOpfs(pack).catch(err => {
+      console.warn("[Workshop Applier] Background OPFS sync warning:", err);
+    });
 
     return true;
   } catch (err) {
