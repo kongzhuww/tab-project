@@ -239,6 +239,7 @@ export class GitHubService {
 
   private constructor() {
     this.bindControllerActions();
+    this.bindStorageChangeListener();
   }
 
   public static getInstance(): GitHubService {
@@ -246,6 +247,22 @@ export class GitHubService {
       GitHubService.instance = new GitHubService();
     }
     return GitHubService.instance;
+  }
+
+  private bindStorageChangeListener(): void {
+    if (typeof chrome !== "undefined" && chrome.storage?.onChanged) {
+      chrome.storage.onChanged.addListener((changes: Record<string, { newValue?: any }>, areaName: string) => {
+        if (areaName !== "local") return;
+        const owner = this.cacheKey;
+        if (!owner) return;
+        const key = `ghLocalStarGroupsV1:${owner}`;
+        if (changes[key] && changes[key].newValue) {
+          try {
+            void this.loadLists();
+          } catch (_) {}
+        }
+      });
+    }
   }
 
   /**
@@ -796,10 +813,15 @@ export class GitHubService {
   }
 
   public async setRepoFolder(fullName: string, folder: string): Promise<boolean> {
-    if (!folder) {
+    if (!folder || folder === this.UNCAT) {
       return this.clearRepoLists(fullName);
     }
-    return this.toggleRepoList(fullName, folder);
+    const target = this.lists.find(list => list.name === folder);
+    if (!target) return false;
+    return this.mutateLocalGroups(data => {
+      const key = fullName.toLowerCase();
+      data.memberships[key] = [target.id];
+    }, `已移动到本地分组「${folder}」。`);
   }
 
   public selectFolder(title: string): void {
