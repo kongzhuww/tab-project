@@ -4,6 +4,16 @@ import { WallpaperService, DEFAULT_MOUNTAIN_VALUE, type WallpaperHistoryItem } f
 import { windowManagerController } from "../core/window-manager.store";
 import { useWindowDraggable } from "../core/useWindowDraggable";
 import { wallpaperModuleState, onWallpaperPause, withWallpaperWrite } from "./module-state";
+import {
+  pickWorkshopDirectory,
+  scanWorkshopDirectory,
+  getSavedWorkshopDirectoryHandle,
+  verifyDirectoryPermission,
+  revokeWorkshopPreviews,
+  type WorkshopItemInfo,
+} from "./workshop-scanner";
+import { applyWorkshopWallpaper } from "./workshop-applier";
+
 const pageVisible = ref(!document.hidden);
 const active = computed(() => wallpaperModuleState.visible && pageVisible.value);
 const state = reactive({ history: [] as WallpaperHistoryItem[], currentValue: null as any, statusText: "隐藏暂停库内预览；退出窗口保留当前壁纸。" });
@@ -13,6 +23,78 @@ let previewAbort: AbortController | undefined;
 const isDraggingOver = ref(false), currentPage = ref(1), PAGE_SIZE = 8;
 const editingId = ref<string | null>(null), editingTitle = ref(""), confirmingDelete = ref<string | null>(null);
 const previewMap = reactive<Record<string, string>>({});
+
+// Steam 创意工坊本地关联状态
+const activeTab = ref<"library" | "workshop">("library");
+const workshopItems = ref<WorkshopItemInfo[]>([]);
+const isScanningWorkshop = ref(false);
+const workshopSearchQuery = ref("");
+const applyingWorkshopId = ref<string | null>(null);
+const connectedFolderName = ref<string>("");
+
+const filteredWorkshopItems = computed(() => {
+  const query = workshopSearchQuery.value.trim().toLowerCase();
+  if (!query) return workshopItems.value;
+  return workshopItems.value.filter(
+    (item) => item.title.toLowerCase().includes(query) || (item.tags && item.tags.some(t => t.toLowerCase().includes(query)))
+  );
+});
+
+async function handleConnectWorkshop() {
+  try {
+    isScanningWorkshop.value = true;
+    state.statusText = "正在选择并读取本地 Steam 工坊目录...";
+    const handle = await pickWorkshopDirectory();
+    if (!handle) return;
+    connectedFolderName.value = handle.name;
+    const items = await scanWorkshopDirectory(handle);
+    workshopItems.value = items;
+    state.statusText = `成功加载 ${items.length} 款本地 Steam 壁纸！`;
+  } catch (err: any) {
+    state.statusText = err?.message || "关联工坊目录被取消或失败";
+  } finally {
+    isScanningWorkshop.value = false;
+  }
+}
+
+async function handleRescanWorkshop() {
+  const handle = await getSavedWorkshopDirectoryHandle();
+  if (!handle) {
+    void handleConnectWorkshop();
+    return;
+  }
+  const hasPerm = await verifyDirectoryPermission(handle, true);
+  if (!hasPerm) {
+    void handleConnectWorkshop();
+    return;
+  }
+  try {
+    isScanningWorkshop.value = true;
+    connectedFolderName.value = handle.name;
+    const items = await scanWorkshopDirectory(handle);
+    workshopItems.value = items;
+    state.statusText = `重新扫描完成，共 ${items.length} 款工坊壁纸`;
+  } catch (err: any) {
+    state.statusText = err?.message || "扫描工坊目录失败";
+  } finally {
+    isScanningWorkshop.value = false;
+  }
+}
+
+async function handleApplyWorkshop(item: WorkshopItemInfo) {
+  if (applyingWorkshopId.value) return;
+  applyingWorkshopId.value = item.id;
+  state.statusText = `正在将「${item.title}」克隆写入 OPFS 活跃壁纸...`;
+  try {
+    await applyWorkshopWallpaper(item);
+    await loadHistory(true);
+    state.statusText = `已成功应用「${item.title}」！已写入 OPFS 永不掉授权。`;
+  } catch (err: any) {
+    state.statusText = `应用工坊壁纸失败: ${err?.message || err}`;
+  } finally {
+    applyingWorkshopId.value = null;
+  }
+}
 const { panelRef, headerRef, initialStyle, onHeaderPointerDown, bringToFront, stopInteractions } = useWindowDraggable({
   windowId: "wallpaper", storageKey: "lw_wallpaper_workspace_pos", defaultWidth: 620,
   defaultHeight: 520, minWidth: 480, minHeight: 380, resizable: false, active: () => active.value
@@ -141,9 +223,21 @@ onMounted(() => {
   document.addEventListener("visibilitychange", visibility);
   if (typeof chrome !== "undefined") chrome.storage?.onChanged?.addListener(storageChanged);
   if (active.value) { window.addEventListener("keydown", onKeydown); initialRead(); }
+
+  // 尝试静默探测已保存的本地工坊目录
+  void getSavedWorkshopDirectoryHandle().then(async (handle) => {
+    if (handle) {
+      connectedFolderName.value = handle.name;
+      const hasPerm = await verifyDirectoryPermission(handle, false);
+      if (hasPerm) {
+        const items = await scanWorkshopDirectory(handle);
+        workshopItems.value = items;
+      }
+    }
+  });
 });
 onBeforeUnmount(() => {
-  disposed = true; pause(); detachPause(); revokePreviews();
+  disposed = true; pause(); detachPause(); revokePreviews(); revokeWorkshopPreviews();
   document.removeEventListener("visibilitychange", visibility);
   if (typeof chrome !== "undefined") chrome.storage?.onChanged?.removeListener(storageChanged);
   windowManagerController.unregister("wallpaper", getWindowElement);
@@ -263,9 +357,34 @@ function handleDrop(event: DragEvent) {
       </div>
     </header>
 
+    <!-- 视图模式切换 -->
+    <nav class="wallpaper-ws-tabs no-drag">
+      <button
+        type="button"
+        class="wallpaper-tab-btn"
+        :class="{ active: activeTab === 'library' }"
+        @click="activeTab = 'library'"
+      >
+        📂 我的收藏与历史
+      </button>
+      <button
+        type="button"
+        class="wallpaper-tab-btn"
+        :class="{ active: activeTab === 'workshop' }"
+        @click="activeTab = 'workshop'"
+      >
+        ⚡ Steam 创意工坊
+        <span v-if="workshopItems.length" class="tab-badge">{{ workshopItems.length }}</span>
+      </button>
+    </nav>
+
     <p class="wallpaper-library-status" role="status">{{ state.statusText }}</p>
-    <p class="wallpaper-library-status">隐藏暂停库内预览，保留页码/重命名草稿；退出保留首页壁纸。导入/修改/应用时只可隐藏，不能退出或重载。</p>
-    <button type="button" :disabled="wallpaperModuleState.pendingWrites > 0 || loading" @click="loadHistory()">刷新壁纸库</button>
+
+    <!-- 1. 我的收藏与历史列表视图 -->
+    <template v-if="activeTab === 'library'">
+      <div class="wallpaper-ws-subactions">
+        <button type="button" class="wallpaper-refresh-btn" :disabled="wallpaperModuleState.pendingWrites > 0 || loading" @click="loadHistory()">↻ 刷新壁纸库</button>
+      </div>
     <!-- 一行刚好两个壁纸的纵向卡片流 -->
     <div class="wallpaper-ws-body">
       <div class="wallpaper-ws-grid">
@@ -386,6 +505,99 @@ function handleDrop(event: DragEvent) {
       </div>
       <small class="wallpaper-ws-total">共 {{ allWallpapers.length }} 款壁纸</small>
     </footer>
+    </template>
+
+    <!-- 2. Steam 创意工坊联动视图 -->
+    <template v-else>
+      <div v-if="!workshopItems.length && !isScanningWorkshop" class="workshop-empty-panel">
+        <div class="workshop-empty-icon">🎮</div>
+        <h4>关联本地 Steam 创意工坊壁纸库</h4>
+        <p>
+          选择你电脑上的 <code>Steam/steamapps/workshop/content/431960</code> 目录，一秒加载已订阅的全部 Web 与 4K 视频动态壁纸，零内存占用直接流式播放。
+        </p>
+        <div class="workshop-empty-actions">
+          <button type="button" class="workshop-connect-btn" @click="handleConnectWorkshop">
+            ⚡ 关联 Steam 工坊目录 (431960)
+          </button>
+          <a
+            class="workshop-discover-link"
+            href="https://steamcommunity.com/app/431960/workshop/"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            🔍 浏览 Steam 创意工坊
+          </a>
+        </div>
+      </div>
+
+      <template v-else>
+        <div class="workshop-toolbar">
+          <div class="workshop-info-badge">
+            <span class="folder-name">📁 {{ connectedFolderName || '431960' }}</span>
+            <span class="count-pill">{{ filteredWorkshopItems.length }} 款壁纸</span>
+          </div>
+          <div class="workshop-actions">
+            <input
+              v-model="workshopSearchQuery"
+              type="text"
+              class="workshop-search-input"
+              placeholder="搜索本地工坊壁纸..."
+            />
+            <button
+              type="button"
+              class="workshop-rescan-btn"
+              :disabled="isScanningWorkshop"
+              title="重新扫描目录"
+              @click="handleRescanWorkshop"
+            >
+              {{ isScanningWorkshop ? '⏳ 扫描中...' : '↻ 刷新' }}
+            </button>
+          </div>
+        </div>
+
+        <div class="wallpaper-ws-body">
+          <div class="wallpaper-ws-grid">
+            <article
+              v-for="item in filteredWorkshopItems"
+              :key="item.id"
+              class="wallpaper-card workshop-card"
+              :class="{ active: state.currentValue?.workshopId === item.id }"
+              @click="handleApplyWorkshop(item)"
+            >
+              <div class="wallpaper-thumb">
+                <img
+                  v-if="item.previewUrl"
+                  :src="item.previewUrl"
+                  alt=""
+                  loading="lazy"
+                  decoding="async"
+                />
+                <div v-else class="wallpaper-thumb-fallback">
+                  <span>{{ item.type === 'video' ? '▶' : (item.type === 'web' ? '🌐' : '🎨') }}</span>
+                </div>
+
+                <span class="wallpaper-badge" :class="item.type">
+                  {{ item.type === 'video' ? '4K 视频' : (item.type === 'web' ? 'Web 交互' : 'Scene 场景') }}
+                </span>
+                <span class="wallpaper-status-pill">
+                  {{ applyingWorkshopId === item.id ? '⏳ 写入中...' : (state.currentValue?.workshopId === item.id ? '✓ 使用中' : '使用') }}
+                </span>
+              </div>
+
+              <div class="wallpaper-meta">
+                <div class="wallpaper-title-row">
+                  <strong :title="item.title">{{ item.title }}</strong>
+                </div>
+                <p v-if="item.description" class="wallpaper-desc" :title="item.description">
+                  {{ item.description }}
+                </p>
+                <small v-else>{{ item.type }} · 点击即刻换上</small>
+              </div>
+            </article>
+          </div>
+        </div>
+      </template>
+    </template>
   </section>
 </template>
 
@@ -800,5 +1012,238 @@ html[data-theme="light"] .wallpaper-ws-title h3,
 html[data-theme="light"] .wallpaper-meta strong,
 :root:not([data-theme="dark"]) .wallpaper-meta strong {
   color: #0f172a;
+}
+
+/* Tab 切换栏 */
+.wallpaper-ws-tabs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: var(--surface-subtle, rgba(255, 255, 255, 0.03));
+  border-bottom: 1px solid var(--border, rgba(255, 255, 255, 0.08));
+}
+
+.wallpaper-tab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted, #94a3b8);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.wallpaper-tab-btn:hover {
+  color: var(--fg, #f1f5f9);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.wallpaper-tab-btn.active {
+  color: #38bdf8;
+  background: rgba(56, 189, 248, 0.12);
+  border-color: rgba(56, 189, 248, 0.3);
+}
+
+.tab-badge {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 10px;
+  background: #38bdf8;
+  color: #0f172a;
+  font-weight: 700;
+}
+
+/* 历史库子动作条 */
+.wallpaper-ws-subactions {
+  display: flex;
+  justify-content: flex-end;
+  padding: 4px 16px;
+}
+
+.wallpaper-refresh-btn {
+  font-size: 11px;
+  color: var(--muted, #94a3b8);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.wallpaper-refresh-btn:hover {
+  color: #38bdf8;
+  background: rgba(56, 189, 248, 0.1);
+}
+
+/* 工坊空状态面板 */
+.workshop-empty-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 24px;
+  text-align: center;
+  flex: 1;
+}
+
+.workshop-empty-icon {
+  font-size: 48px;
+  margin-bottom: 12px;
+  animation: pulse-slow 3s infinite ease-in-out;
+}
+
+@keyframes pulse-slow {
+  0%, 100% { transform: scale(1); opacity: 0.9; }
+  50% { transform: scale(1.06); opacity: 1; }
+}
+
+.workshop-empty-panel h4 {
+  margin: 0 0 8px;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--fg, #f1f5f9);
+}
+
+.workshop-empty-panel p {
+  max-width: 440px;
+  margin: 0 0 20px;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--muted, #94a3b8);
+}
+
+.workshop-empty-panel code {
+  background: rgba(0, 0, 0, 0.3);
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: #38bdf8;
+  font-size: 11.5px;
+}
+
+.workshop-empty-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.workshop-connect-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 18px;
+  font-size: 13px;
+  font-weight: 650;
+  color: #0f172a;
+  background: #38bdf8;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(56, 189, 248, 0.35);
+  transition: all 0.2s;
+}
+
+.workshop-connect-btn:hover {
+  background: #7dd3fc;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(56, 189, 248, 0.45);
+}
+
+.workshop-discover-link {
+  font-size: 12.5px;
+  color: #94a3b8;
+  text-decoration: none;
+  padding: 7px 12px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: all 0.15s;
+}
+
+.workshop-discover-link:hover {
+  color: #38bdf8;
+  border-color: rgba(56, 189, 248, 0.4);
+}
+
+/* 工坊工具栏 */
+.workshop-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 16px;
+  background: var(--surface-subtle, rgba(255, 255, 255, 0.02));
+  border-bottom: 1px solid var(--border, rgba(255, 255, 255, 0.06));
+}
+
+.workshop-info-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.workshop-info-badge .folder-name {
+  font-weight: 600;
+  color: var(--fg, #f1f5f9);
+}
+
+.workshop-info-badge .count-pill {
+  font-size: 10.5px;
+  padding: 1px 7px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--muted, #94a3b8);
+}
+
+.workshop-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.workshop-search-input {
+  width: 170px;
+  padding: 4px 10px;
+  font-size: 11.5px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: var(--fg, #f1f5f9);
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.workshop-search-input:focus {
+  border-color: #38bdf8;
+}
+
+.workshop-rescan-btn {
+  padding: 4px 10px;
+  font-size: 11.5px;
+  color: var(--muted, #94a3b8);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.workshop-rescan-btn:hover:not(:disabled) {
+  color: #38bdf8;
+  border-color: rgba(56, 189, 248, 0.35);
+}
+
+.workshop-card .wallpaper-desc {
+  margin: 2px 0 0;
+  font-size: 11px;
+  color: var(--muted, #94a3b8);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 </style>
