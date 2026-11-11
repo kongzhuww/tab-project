@@ -225,7 +225,11 @@ export class BookmarksService {
     out: FlattenedBookmarkItem[] = [],
     pathIds: string[] = []
   ): FlattenedBookmarkItem[] {
-    const nextPath = node.title ? [...path, node.title] : path;
+    let title = node.title || "";
+    if (!title && (node.id === "1" || node.id === "2" || node.id === "3")) {
+      title = node.id === "1" ? "书签栏" : node.id === "2" ? "其他书签" : "移动设备书签";
+    }
+    const nextPath = title ? [...path, title] : path;
     const nextPathIds = node.id && node.id !== "0" ? [...pathIds, String(node.id)] : pathIds;
     for (const child of node.children || []) {
       if (child.url) {
@@ -275,15 +279,33 @@ export class BookmarksService {
     if (!ignoredFolders || !ignoredFolders.length) return false;
 
     const ignoredIdSet = new Set<string>();
-    const ignoredPathList: string[] = [];
+    const rawPathList: string[] = [];
+    const normalizedPathList: string[] = [];
+
+    // 辅助路径归一化函数：消除“收藏夹栏”、“书签栏”、“Bookmarks Bar”等根目录命名差异与空格斜杠差异
+    const normalizePath = (p: string): string => {
+      if (!p) return "";
+      return p
+        .toLowerCase()
+        .trim()
+        .replace(/\s*[/／]\s*/g, "/")
+        .replace(/^(书签栏|收藏夹栏|bookmarks bar|favorites bar|书签|bookmarks|其他书签|other bookmarks|移动设备书签|mobile bookmarks)\//i, "")
+        .trim();
+    };
 
     for (const item of ignoredFolders) {
       if (typeof item === "string") {
         ignoredIdSet.add(item);
-        ignoredPathList.push(item.toLowerCase());
+        const lower = item.toLowerCase().trim();
+        rawPathList.push(lower);
+        normalizedPathList.push(normalizePath(lower));
       } else if (item && typeof item === "object") {
         if (item.id) ignoredIdSet.add(String(item.id));
-        if (item.path) ignoredPathList.push(item.path.trim().toLowerCase());
+        if (item.path) {
+          const lower = item.path.trim().toLowerCase();
+          rawPathList.push(lower);
+          normalizedPathList.push(normalizePath(lower));
+        }
       }
     }
 
@@ -299,6 +321,31 @@ export class BookmarksService {
       return true;
     }
 
+    // 辅助路径匹配检查函数
+    const checkPathMatch = (folderStr: string): boolean => {
+      if (!folderStr) return false;
+      const fLower = folderStr.toLowerCase().trim();
+      const fNorm = normalizePath(fLower);
+
+      // a. 原始路径完全相等或作为前缀
+      if (rawPathList.some((p) => fLower === p || fLower.startsWith(p + " /") || fLower.startsWith(p + "/"))) {
+        return true;
+      }
+      // b. 归一化路径（消除“书签栏/”、“收藏夹栏/”等环境差异）匹配或前缀匹配
+      if (normalizedPathList.some((p) => p && (fNorm === p || fNorm.startsWith(p + "/")))) {
+        return true;
+      }
+      // c. 包含匹配容错 (例如忽略了 acg 文件夹，只要路径段中包含 /acg/ 或结尾是 /acg)
+      for (const p of normalizedPathList) {
+        if (!p) continue;
+        const lastPart = p.split("/").pop();
+        if (lastPart && (fNorm === lastPart || fNorm.endsWith("/" + lastPart) || fNorm.includes("/" + lastPart + "/"))) {
+          return true;
+        }
+      }
+      return false;
+    };
+
     // 3. 检查从 folderMap 中查到的祖先
     const fMap = folderMap || (this.folderMapCache ?? undefined);
     if (fMap && bId && fMap.has(bId)) {
@@ -306,20 +353,14 @@ export class BookmarksService {
       if (info.folderIds && info.folderIds.some((id) => ignoredIdSet.has(String(id)))) {
         return true;
       }
-      if (info.folder) {
-        const fLower = info.folder.toLowerCase();
-        if (ignoredPathList.some((p) => fLower === p || fLower.startsWith(p + " /") || fLower.includes(p))) {
-          return true;
-        }
+      if (info.folder && checkPathMatch(info.folder)) {
+        return true;
       }
     }
 
-    // 4. 检查路径文本匹配
-    if (b.folder) {
-      const fLower = b.folder.toLowerCase();
-      if (ignoredPathList.some((p) => fLower === p || fLower.startsWith(p + " /") || fLower.includes(p))) {
-        return true;
-      }
+    // 4. 检查自身 folder 字段
+    if (b.folder && checkPathMatch(b.folder)) {
+      return true;
     }
 
     return false;

@@ -224,13 +224,18 @@
     return 0;
   }
   var indexedBookmarks = [];
-  function flattenBookmarkTree(nodes, path = [], out = []) {
+  function flattenBookmarkTree(nodes, path = [], out = [], parentId = "") {
     for (const node of nodes || []) {
-      const curPath = node.title ? [...path, node.title] : path;
+      let title = node.title || "";
+      if (!title && (node.id === "1" || node.id === "2" || node.id === "3")) {
+        title = node.id === "1" ? "\u4E66\u7B7E\u680F" : node.id === "2" ? "\u5176\u4ED6\u4E66\u7B7E" : "\u79FB\u52A8\u8BBE\u5907\u4E66\u7B7E";
+      }
+      const curPath = title ? [...path, title] : path;
       if (node.url && !node.url.startsWith("javascript:")) {
         const { lower, pinyinAcronym, pinyinFull } = buildSearchIndex(node.title || "");
         out.push({
           id: String(node.id),
+          parentId: String(node.parentId || parentId || ""),
           title: String(node.title || node.url),
           url: String(node.url),
           folder: curPath.slice(0, -1).join(" / ") || "\u4E66\u7B7E",
@@ -240,7 +245,7 @@
         });
       }
       if (node.children) {
-        flattenBookmarkTree(node.children, curPath, out);
+        flattenBookmarkTree(node.children, curPath, out, String(node.id));
       }
     }
     return out;
@@ -316,6 +321,7 @@
           scored.sort((a, b) => b.score - a.score);
           const result = scored.slice(0, max).map((s) => ({
             id: s.item.id,
+            parentId: s.item.parentId,
             title: s.item.title,
             url: s.item.url,
             folder: s.item.folder
