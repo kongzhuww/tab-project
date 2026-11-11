@@ -13,15 +13,81 @@ export interface WorkshopItemInfo {
   type: "web" | "video" | "scene" | "unknown";
   entryFile?: string;
   previewUrl?: string;
+  previewBase64?: string;
   properties?: Record<string, any>;
   tags?: string[];
-  folderHandle: FileSystemDirectoryHandle;
+  folderHandle?: FileSystemDirectoryHandle;
 }
 
 const DB_STORE_NAME = "files";
 const DB_WORKSHOP_HANDLE_KEY = "we-workshop-dir-handle";
+const DB_CACHED_WORKSHOP_ITEMS_KEY = "we-cached-workshop-items-meta";
 
 let previewUrls: string[] = [];
+
+/**
+ * 将 Blob 图片极速转为 Base64 便于离线永久缓存
+ */
+async function blobToBase64(blob: Blob): Promise<string> {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(typeof reader.result === "string" ? reader.result : "");
+    reader.onerror = () => resolve("");
+    reader.readAsDataURL(blob);
+  });
+}
+
+/**
+ * 持久化缓存已扫描的工坊壁纸元数据与封面图 (刷新页面秒级呈现，无需重复加载)
+ */
+export async function saveCachedWorkshopItems(items: WorkshopItemInfo[]): Promise<void> {
+  try {
+    const db = await openBackgroundDb();
+    const storable = items.map((item) => ({
+      id: item.id,
+      title: item.title,
+      description: item.description,
+      type: item.type,
+      entryFile: item.entryFile,
+      previewBase64: item.previewBase64 || (item.previewUrl?.startsWith("data:") ? item.previewUrl : undefined),
+      properties: item.properties,
+      tags: item.tags,
+    }));
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction(DB_STORE_NAME, "readwrite");
+      tx.objectStore(DB_STORE_NAME).put(storable, DB_CACHED_WORKSHOP_ITEMS_KEY);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  } catch (err) {
+    console.warn("[Workshop Scanner] Failed to cache workshop items:", err);
+  }
+}
+
+/**
+ * 从本地存储中秒级读取已缓存的工坊壁纸 (0 弹窗、0 毫秒等待)
+ */
+export async function loadCachedWorkshopItems(): Promise<WorkshopItemInfo[]> {
+  try {
+    const db = await openBackgroundDb();
+    return new Promise((resolve) => {
+      const tx = db.transaction(DB_STORE_NAME, "readonly");
+      const req = tx.objectStore(DB_STORE_NAME).get(DB_CACHED_WORKSHOP_ITEMS_KEY);
+      req.onsuccess = () => {
+        const raw = req.result;
+        if (!Array.isArray(raw)) return resolve([]);
+        const list: WorkshopItemInfo[] = raw.map((r: any) => ({
+          ...r,
+          previewUrl: r.previewBase64 || undefined,
+        }));
+        resolve(list);
+      };
+      req.onerror = () => resolve([]);
+    });
+  } catch {
+    return [];
+  }
+}
 
 /**
  * 释放扫描生成的预览封面图 ObjectURL
@@ -233,6 +299,9 @@ export async function scanWorkshopDirectory(
     if (!a.previewUrl && b.previewUrl) return 1;
     return a.title.localeCompare(b.title, "zh-CN");
   });
+
+  // 异步自动持久化缓存壁纸卡片，保证页面刷新秒开不闪退
+  void saveCachedWorkshopItems(results);
 
   return results;
 }

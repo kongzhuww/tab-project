@@ -478,12 +478,12 @@ export const WallpaperService = {
     await this.applyWallpaper(DEFAULT_MOUNTAIN_VALUE);
   },
 
-  async setWallpaper(value: any): Promise<void> {
+  async setWallpaper(value: any, instantPayload: any = null): Promise<void> {
     await storageSet({ heroBackground: value });
     try {
       localStorage.setItem("lw-current-wallpaper", JSON.stringify(value));
     } catch {}
-    await this.applyWallpaper(value);
+    await this.applyWallpaper(value, instantPayload);
   },
 
   async chooseBackgroundFile(kind: "all" | "image" | "video" = "all"): Promise<File[]> {
