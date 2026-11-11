@@ -196,7 +196,7 @@ export function computeConfigDiff(
  * 现场双向比对：比对当前本地状态与云端状态的客观真实差异
  * 统一站在【当前这台设备（本地）】的角度：
  * - 🟩 绿色 [+N 云端新增项]：云端独有，拉取后本地将补入这些新内容
- * - 🟥 红色 [待上传 N 项]：本地独有，云端还没有，点击“提交本地改动合并到云端”后将同步上去
+ * - 🟥 红色 [待上传 N 项]：本地独有，云端还没有，点击“上传到云端”后将同步上去
  */
 export function compareLocalAndRemote(
   local: Record<string, any> | null | undefined,

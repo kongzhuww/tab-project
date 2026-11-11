@@ -691,8 +691,8 @@
                   <button type="button" class="btn-secondary" :disabled="webdavBusy" @click="handleTestWebDav">
                     测试连接
                   </button>
-                  <button type="button" class="btn-save-green" :disabled="webdavBusy" title="双向无损融合：将本地与云端两边的网站全部合并，并同步到云端" @click="() => handlePushWebDav(true)">
-                    ⬆️ 提交合并到云端
+                  <button type="button" class="btn-save-green" :disabled="webdavBusy" title="将本地配置同步上传至云端" @click="() => handlePushWebDav(true)">
+                    ⬆️ 上传到云端
                   </button>
                   <button type="button" class="btn-secondary" :disabled="webdavBusy" style="color: #0284c7;" title="单向下载融合：把云端独有的内容合并到当前这台电脑" @click="() => handlePullWebDav(true)">
                     ⬇️ 合并云端到本地
@@ -752,8 +752,8 @@
 
                   <!-- 核心同步操作栏：只保留 2 个核心按钮 + 1 个折叠次要高级覆盖选项 -->
                   <div style="display: flex; gap: 10px; margin-top: 2px; align-items: center; flex-wrap: wrap;">
-                    <button type="button" class="btn-save-green" :disabled="webdavBusy" style="font-size: 11px; padding: 6px 14px;" title="双向无损融合：将本地与云端两边的网站全部合并，并同步到云端" @click="() => handlePushWebDav(true)">
-                      ⬆️ 提交本地改动合并到云端
+                    <button type="button" class="btn-save-green" :disabled="webdavBusy" style="font-size: 11px; padding: 6px 14px;" title="将本地配置同步上传至云端" @click="() => handlePushWebDav(true)">
+                      ⬆️ 上传到云端
                     </button>
                     <button type="button" class="btn-primary" :disabled="webdavBusy" style="font-size: 11px; padding: 6px 14px;" title="单向下载融合：把云端独有的内容合并到当前这台电脑" @click="() => handlePullWebDav(true)">
                       ⬇️ 合并云端到本地
@@ -1118,9 +1118,9 @@ async function handlePushWebDav(mergeMode = true) {
     const res = await webDavService.pushCurrentConfig(config, { mergeRemote: mergeMode });
     if (res.ok) {
       webdavStatusMsg.value = mergeMode
-        ? `✓ 合并上传成功！已将本地与云端无损融合并同步 (${res.byteLength || 0} 字节)`
+        ? `✓ 上传成功！已将本地最新配置同步至云端 (${res.byteLength || 0} 字节)`
         : `✓ 全量覆盖上传成功！已用本地设置覆盖云端 (${res.byteLength || 0} 字节)`;
-      notify(mergeMode ? "已成功合并并同步至云端！" : "已成功全量覆盖云端备份！");
+      notify(mergeMode ? "已成功上传同步至云端！" : "已成功全量覆盖云端备份！");
       // 自动静默刷新一次对比动态
       void handleInspectRemoteSync(true);
     } else {
