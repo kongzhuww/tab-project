@@ -1,0 +1,120 @@
+import { A as I } from "./AppWindowFrame-7RspgAYO.js";
+/* empty css                                                                             */
+import "./window-manager.store-BdI_8a-H.js";
+import { t as f, c as E } from "./main-Cb_Nq_M5.js";
+import { t as a, _ as M } from "./_plugin-vue_export-helper-BxikU0LD.js";
+import { d as O, w as T, x as B, o as r, j as N, H as v, i as c, t as l, u as o, e as u, f as w, F as _, g as y, m as z, A, b as h, s as F } from "./vendor-vue-9b0eS4bW.js";
+const P = ["disabled"], V = { class: "tabs-body" }, q = { class: "tabs-note" }, L = {
+  key: 0,
+  role: "alert"
+}, S = { key: 1 }, U = { key: 2 }, W = ["title", "onClick"], $ = ["aria-label", "onClick"], j = /* @__PURE__ */ O({
+  __name: "TabManagerPanel",
+  setup(D) {
+    const n = h([]), b = h(!1), d = h("");
+    let m = 0;
+    const g = F(() => {
+      const t = /* @__PURE__ */ new Map();
+      for (const i of n.value) {
+        let e = a("tabs.otherTabs");
+        try {
+          const s = new URL(i.url);
+          e = s.protocol.includes("extension") ? a("tabs.extensionPage") : s.hostname || s.protocol;
+        } catch {
+        }
+        t.has(e) || t.set(e, []), t.get(e).push(i);
+      }
+      return [...t].map(([i, e]) => ({ domain: i, tabs: e }));
+    });
+    async function p() {
+      if (!f.isOpen) return;
+      const t = ++m;
+      b.value = !0, d.value = "";
+      try {
+        if (typeof chrome > "u" || !chrome.tabs?.query) throw new Error();
+        const i = await chrome.tabs.query({ currentWindow: !0 });
+        if (t !== m || !f.isOpen) return;
+        n.value = i.filter((e) => Number.isInteger(e.id)).map((e) => ({ id: e.id, windowId: e.windowId, title: e.title || "", url: e.url || "", active: !!e.active }));
+      } catch {
+        t === m && f.isOpen && (d.value = a("tabs.readError"));
+      } finally {
+        t === m && (b.value = !1);
+      }
+    }
+    async function k(t) {
+      try {
+        await chrome.tabs.update(t.id, { active: !0 }), t.windowId != null && await chrome.windows.update(t.windowId, { focused: !0 });
+      } catch {
+        d.value = a("tabs.switchError");
+      }
+    }
+    async function C(t) {
+      try {
+        await chrome.tabs.remove(t.id), n.value = n.value.filter((i) => i.id !== t.id);
+      } catch {
+        d.value = a("tabs.closeError");
+      }
+    }
+    return T(() => f.isOpen, (t) => {
+      t ? p() : (++m, n.value = [], b.value = !1);
+    }, { immediate: !0 }), B(() => {
+      ++m, n.value = [];
+    }), (t, i) => (r(), N(o(I), {
+      "window-id": "browser-tabs",
+      title: o(a)("tabs.title"),
+      icon: "▤",
+      visible: o(f).isOpen,
+      "default-width": 430,
+      "default-height": 500,
+      "min-width": 300,
+      "show-minimize": !1,
+      "show-maximize": !1,
+      onClose: o(E).close
+    }, {
+      "header-actions": v(() => [
+        c("button", {
+          type: "button",
+          class: "tabs-refresh",
+          disabled: b.value,
+          onClick: p
+        }, l(o(a)("tabs.refresh")), 9, P)
+      ]),
+      default: v(() => [
+        c("div", V, [
+          c("p", q, l(o(a)("tabs.note")), 1),
+          d.value ? (r(), u("p", L, l(d.value), 1)) : w("", !0),
+          b.value && !n.value.length ? (r(), u("p", S, l(o(a)("tabs.reading")), 1)) : n.value.length ? w("", !0) : (r(), u("p", U, l(o(a)("tabs.empty")), 1)),
+          (r(!0), u(_, null, y(g.value, (e) => (r(), u("section", {
+            key: e.domain,
+            class: "tabs-group"
+          }, [
+            c("h3", null, [
+              z(l(e.domain) + " ", 1),
+              c("small", null, l(e.tabs.length), 1)
+            ]),
+            (r(!0), u(_, null, y(e.tabs, (s) => (r(), u("div", {
+              key: s.id,
+              class: A(["tab-row", { active: s.active }])
+            }, [
+              c("button", {
+                type: "button",
+                class: "tab-open",
+                title: s.title || o(a)("tabs.untitled"),
+                onClick: (x) => k(s)
+              }, l(s.title || o(a)("tabs.untitled")), 9, W),
+              c("button", {
+                type: "button",
+                class: "tab-close",
+                "aria-label": o(a)("tabs.closeTab", { title: s.title || "" }),
+                onClick: (x) => C(s)
+              }, "×", 8, $)
+            ], 2))), 128))
+          ]))), 128))
+        ])
+      ]),
+      _: 1
+    }, 8, ["title", "visible", "onClose"]));
+  }
+}), X = /* @__PURE__ */ M(j, [["__scopeId", "data-v-5cb9d7ab"]]);
+export {
+  X as default
+};
