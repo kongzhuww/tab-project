@@ -481,6 +481,14 @@
             <div class="field full-width">
               <label>{{ t('settings.wallpaper.actions') }} <em>IMPORT & ACTIONS</em></label>
               <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
+                <button
+                  type="button"
+                  class="btn-primary"
+                  style="background: linear-gradient(135deg, #0284c7, #38bdf8); border: none; font-weight: 600;"
+                  @click="handleConnectSteamWorkshop"
+                >
+                  ⚡ 关联 Steam 工坊 (431960)
+                </button>
                 <button type="button" class="btn-primary" @click="handleImportWallpaperImage">
                   {{ t('settings.wallpaper.importImage') }}
                 </button>
@@ -519,6 +527,77 @@
                   </div>
                   <div class="wallpaper-card-meta">
                     <span class="wallpaper-card-title">{{ item.title }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 2. Steam 创意工坊本地壁纸库 -->
+            <div class="field full-width">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                <label style="margin-bottom: 0;">⚡ Steam 创意工坊壁纸 <em>STEAM WORKSHOP ({{ settingsWorkshopItems.length }})</em></label>
+                <div v-if="settingsWorkshopItems.length" style="display: flex; gap: 8px; align-items: center;">
+                  <input
+                    v-model="settingsWorkshopSearchQuery"
+                    type="text"
+                    placeholder="搜索工坊壁纸..."
+                    style="font-size: 11px; padding: 3px 8px; border-radius: 4px; background: var(--panel); border: 1px solid var(--border); color: var(--text);"
+                  />
+                  <button
+                    type="button"
+                    class="btn-secondary"
+                    style="padding: 2px 8px; font-size: 11px;"
+                    :disabled="isScanningWorkshopSettings"
+                    @click="handleRescanSteamWorkshop"
+                  >
+                    {{ isScanningWorkshopSettings ? '扫描中...' : '↻ 重新扫描' }}
+                  </button>
+                </div>
+              </div>
+
+              <div
+                v-if="!settingsWorkshopItems.length"
+                style="padding: 24px; text-align: center; border: 1px dashed var(--border); border-radius: 10px; margin-top: 6px; color: var(--muted); font-size: 12px; background: rgba(56, 189, 248, 0.03);"
+              >
+                <div style="font-size: 24px; margin-bottom: 6px;">🎮</div>
+                <div style="color: var(--text); font-weight: 600; margin-bottom: 4px;">未关联 Steam 创意工坊目录</div>
+                <div>点击上方「⚡ 关联 Steam 工坊 (431960)」选择电脑中的 <code>Steam/steamapps/workshop/content/431960</code> 目录，一键展示所有 Web 网页与 4K 视频动态壁纸！</div>
+              </div>
+
+              <div v-else class="wallpaper-library-grid">
+                <div
+                  v-for="item in filteredSettingsWorkshopItems"
+                  :key="item.id"
+                  class="wallpaper-item-card"
+                  :class="{ 'is-active': currentWallpaperValue?.workshopId === item.id }"
+                  @click="handleApplyWorkshopFromSettings(item)"
+                >
+                  <div class="wallpaper-card-preview">
+                    <img
+                      v-if="item.previewUrl"
+                      :src="item.previewUrl"
+                      alt=""
+                      loading="lazy"
+                      decoding="async"
+                      style="width: 100%; height: 100%; object-fit: cover;"
+                    />
+                    <div v-else class="wallpaper-card-fallback" style="display: grid; place-items: center; width: 100%; height: 100%; font-size: 22px;">
+                      <span>{{ item.type === 'video' ? '▶' : (item.type === 'web' ? '🌐' : '🎨') }}</span>
+                    </div>
+
+                    <span class="wallpaper-card-badge" :style="{ background: item.type === 'video' ? '#8b5cf6' : '#0284c7' }">
+                      {{ item.type === 'video' ? '4K 视频' : (item.type === 'web' ? 'Web 交互' : 'Scene 场景') }}
+                    </span>
+                    <span v-if="currentWallpaperValue?.workshopId === item.id" class="wallpaper-card-active-pill">
+                      ✓ {{ t('common.inUse') }}
+                    </span>
+                    <span v-else-if="applyingWorkshopSettingsId === item.id" class="wallpaper-card-active-pill" style="background: #eab308;">
+                      ⏳ 写入中...
+                    </span>
+                  </div>
+
+                  <div class="wallpaper-card-meta">
+                    <span class="wallpaper-card-title" :title="item.title">{{ item.title }}</span>
                   </div>
                 </div>
               </div>
@@ -916,6 +995,14 @@ import { sameSettingValue, cloneSettingValue, SettingsSaveUnconfirmedError } fro
 import { ignoredFolderId } from "./entry-preferences";
 import { effectiveShortcut, isShortcutToolAvailable, parseShortcutEvent, shortcutCaptureState } from "../services/shortcut-catalog";
 import { WallpaperService, DEFAULT_MOUNTAIN_VALUE, type WallpaperHistoryItem } from "../services/wallpaper.service";
+import {
+  pickWorkshopDirectory,
+  scanWorkshopDirectory,
+  getSavedWorkshopDirectoryHandle,
+  verifyDirectoryPermission,
+  type WorkshopItemInfo
+} from "../wallpaper/workshop-scanner";
+import { applyWorkshopWallpaper } from "../wallpaper/workshop-applier";
 import { macDockController, macDockState, isValidDockPosition, type DockPosition } from "../dock/store";
 import { appDialog } from "../core/app-dialog.store";
 import {
@@ -1527,6 +1614,75 @@ const paginatedUserWallpapers = computed(() => {
   return wallpaperHistory.value.slice(start, start + WALLPAPER_PAGE_SIZE);
 });
 
+// Steam 创意工坊设置页数据与状态
+const settingsWorkshopItems = ref<WorkshopItemInfo[]>([]);
+const isScanningWorkshopSettings = ref(false);
+const settingsWorkshopSearchQuery = ref("");
+const applyingWorkshopSettingsId = ref<string | null>(null);
+const connectedWorkshopFolder = ref("");
+
+const filteredSettingsWorkshopItems = computed(() => {
+  const q = settingsWorkshopSearchQuery.value.trim().toLowerCase();
+  if (!q) return settingsWorkshopItems.value;
+  return settingsWorkshopItems.value.filter(
+    (item) => item.title.toLowerCase().includes(q) || (item.tags && item.tags.some(t => t.toLowerCase().includes(q)))
+  );
+});
+
+async function handleConnectSteamWorkshop() {
+  try {
+    isScanningWorkshopSettings.value = true;
+    const handle = await pickWorkshopDirectory();
+    if (!handle) return;
+    connectedWorkshopFolder.value = handle.name;
+    const items = await scanWorkshopDirectory(handle);
+    settingsWorkshopItems.value = items;
+    notify(`成功连接并加载 ${items.length} 款本地 Steam 壁纸！`);
+  } catch (e: any) {
+    if (e?.name !== "AbortError") notify(`关联工坊失败: ${e.message}`, true);
+  } finally {
+    isScanningWorkshopSettings.value = false;
+  }
+}
+
+async function handleRescanSteamWorkshop() {
+  const handle = await getSavedWorkshopDirectoryHandle();
+  if (!handle) {
+    void handleConnectSteamWorkshop();
+    return;
+  }
+  const hasPerm = await verifyDirectoryPermission(handle, true);
+  if (!hasPerm) {
+    void handleConnectSteamWorkshop();
+    return;
+  }
+  try {
+    isScanningWorkshopSettings.value = true;
+    connectedWorkshopFolder.value = handle.name;
+    const items = await scanWorkshopDirectory(handle);
+    settingsWorkshopItems.value = items;
+    notify(`重新扫描完成，共 ${items.length} 款工坊壁纸`);
+  } catch (e: any) {
+    notify(`扫描工坊失败: ${e.message}`, true);
+  } finally {
+    isScanningWorkshopSettings.value = false;
+  }
+}
+
+async function handleApplyWorkshopFromSettings(item: WorkshopItemInfo) {
+  if (applyingWorkshopSettingsId.value) return;
+  applyingWorkshopSettingsId.value = item.id;
+  try {
+    await applyWorkshopWallpaper(item);
+    await loadWallpaperData();
+    notify(`已应用壁纸「${item.title}」！已存入 OPFS。`);
+  } catch (e: any) {
+    notify(`应用工坊壁纸失败: ${e.message}`, true);
+  } finally {
+    applyingWorkshopSettingsId.value = null;
+  }
+}
+
 function isWallpaperActive(item: any): boolean {
   if (item.id === "builtin-mountain") {
     return currentWallpaperValue.value === DEFAULT_MOUNTAIN_VALUE;
@@ -1547,6 +1703,18 @@ async function loadWallpaperData() {
     wallpaperHistory.value = data.history || [];
     currentWallpaperValue.value = data.currentValue;
     void preloadWallpaperPreviews();
+
+    // 静默尝试探测本地工坊
+    void getSavedWorkshopDirectoryHandle().then(async (handle) => {
+      if (handle) {
+        connectedWorkshopFolder.value = handle.name;
+        const hasPerm = await verifyDirectoryPermission(handle, false);
+        if (hasPerm) {
+          const items = await scanWorkshopDirectory(handle);
+          settingsWorkshopItems.value = items;
+        }
+      }
+    });
   } catch (e: any) {
     wallpaperStatusMsg.value = `壁纸库读取失败: ${e.message || "未知错误"}`;
   } finally {
