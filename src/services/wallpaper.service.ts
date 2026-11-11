@@ -2,6 +2,9 @@
  * WallpaperService — 现代化壁纸管理与存储服务 (纯数据逻辑，无侵入式 DOM 操作)
  */
 
+import { loadActiveWallpaperFromOpfs, saveActiveWallpaperToOpfs } from "../wallpaper/opfs-storage";
+import { startAudioSpectrumStream, stopAudioSpectrumStream } from "../wallpaper/audio-visualizer";
+
 declare const chrome: any;
 
 export interface WallpaperHistoryItem {
@@ -25,13 +28,96 @@ const WALLPAPER_MAX_BYTES = 180 * 1024 * 1024;
 
 let activeObjectUrls: string[] = [];
 let applyVersion = 0;
+let currentInteractionCleanup: (() => void) | null = null;
 
 function trackUrl(url: string): string {
   activeObjectUrls.push(url);
   return url;
 }
 
+export function teardownWallpaperInteractions(): void {
+  if (currentInteractionCleanup) {
+    try { currentInteractionCleanup(); } catch (_) {}
+    currentInteractionCleanup = null;
+  }
+}
+
+function setupWallpaperInteractions(targetWin: Window): void {
+  teardownWallpaperInteractions();
+
+  let rafId: number | null = null;
+  let lastX = 0;
+  let lastY = 0;
+
+  const onPointerMove = (e: PointerEvent | MouseEvent) => {
+    lastX = e.clientX;
+    lastY = e.clientY;
+    if (rafId === null) {
+      rafId = requestAnimationFrame(() => {
+        rafId = null;
+        try {
+          targetWin.postMessage({
+            type: "WE_MOUSE_MOVE",
+            x: lastX,
+            y: lastY,
+          }, "*");
+        } catch (_) {}
+      });
+    }
+  };
+
+  const onPointerDown = (e: MouseEvent) => {
+    try {
+      targetWin.postMessage({
+        type: "WE_MOUSE_DOWN",
+        x: e.clientX,
+        y: e.clientY,
+      }, "*");
+    } catch (_) {}
+  };
+
+  const onPointerUp = (e: MouseEvent) => {
+    try {
+      targetWin.postMessage({
+        type: "WE_MOUSE_UP",
+        x: e.clientX,
+        y: e.clientY,
+      }, "*");
+    } catch (_) {}
+  };
+
+  const onVisibilityChange = () => {
+    const isPaused = document.hidden;
+    try {
+      targetWin.postMessage({
+        type: "WE_SET_PAUSED",
+        isPaused,
+      }, "*");
+    } catch (_) {}
+    if (isPaused) {
+      stopAudioSpectrumStream();
+    } else {
+      startAudioSpectrumStream(targetWin);
+    }
+  };
+
+  window.addEventListener("pointermove", onPointerMove, { passive: true });
+  window.addEventListener("mousedown", onPointerDown, { passive: true });
+  window.addEventListener("mouseup", onPointerUp, { passive: true });
+  document.addEventListener("visibilitychange", onVisibilityChange);
+
+  currentInteractionCleanup = () => {
+    if (rafId !== null) cancelAnimationFrame(rafId);
+    window.removeEventListener("pointermove", onPointerMove);
+    window.removeEventListener("mousedown", onPointerDown);
+    window.removeEventListener("mouseup", onPointerUp);
+    document.removeEventListener("visibilitychange", onVisibilityChange);
+  };
+}
+
 export function clearActiveWallpaperUrls(): void {
+  stopAudioSpectrumStream();
+  teardownWallpaperInteractions();
   activeObjectUrls.forEach((url) => {
     try {
       URL.revokeObjectURL(url);
@@ -482,7 +568,15 @@ export const WallpaperService = {
       host.appendChild(surface); return;
     }
     if (value.type === "web") {
-      const pack = await backgroundDbGet(value.storageKey || BACKGROUND_CURRENT_KEY);
+      // 优先从 OPFS 静默冷启动读取当前活跃壁纸 (0 弹窗、0 毫秒权限等待)
+      let pack = await loadActiveWallpaperFromOpfs();
+      if (!pack || pack.type !== "web") {
+        pack = await backgroundDbGet(value.storageKey || BACKGROUND_CURRENT_KEY);
+        if (pack && pack.type === "web") {
+          void saveActiveWallpaperToOpfs(pack);
+        }
+      }
+
       if (version !== applyVersion) return;
       if (pack?.type === "web") {
         const iframe = document.createElement("iframe");
@@ -499,6 +593,10 @@ export const WallpaperService = {
         iframe.onload = () => {
           clearTimeout(fallbackTimer);
           iframe.contentWindow?.postMessage(pack, "*");
+          if (iframe.contentWindow) {
+            setupWallpaperInteractions(iframe.contentWindow);
+            startAudioSpectrumStream(iframe.contentWindow);
+          }
         };
         host.appendChild(iframe);
       } else {
