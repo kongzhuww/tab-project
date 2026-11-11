@@ -83,14 +83,18 @@ export function mergeSyncSettings(
           }
         });
 
-        // 仓库归属 memberships 合并并集
+        // 仓库归属 memberships 合并：本地已分类优先保留本地，避免两端无脑并集导致仓库跨多文件夹漂移
         const lMemberships = (lAcc.memberships && typeof lAcc.memberships === "object" && !Array.isArray(lAcc.memberships)) ? lAcc.memberships : {};
         const rMemberships = (rAcc.memberships && typeof rAcc.memberships === "object" && !Array.isArray(rAcc.memberships)) ? rAcc.memberships : {};
         const memberships: Record<string, string[]> = { ...lMemberships };
         for (const [repoName, rList] of Object.entries(rMemberships)) {
           const lList = Array.isArray(memberships[repoName]) ? memberships[repoName] : [];
           const rListArr = Array.isArray(rList) ? rList : [];
-          memberships[repoName] = Array.from(new Set([...lList, ...rListArr]));
+          if (lList.length > 0) {
+            memberships[repoName] = lList;
+          } else {
+            memberships[repoName] = rListArr;
+          }
         }
 
         const lSections = Array.isArray(lAcc.sections) ? lAcc.sections : [];
