@@ -123,7 +123,10 @@ onUnmounted(() => {
       v-else
       id="greeting"
       class="hero-motto-text"
-      :style="{ color: clockState.greetColor }"
+      :style="{
+        color: clockState.greetColor,
+        textShadow: clockState.greetColor === '#0f172a' ? 'none' : '0 1px 8px rgba(0, 0, 0, 0.35)'
+      }"
       @click="startEditMotto"
     >
       <span class="motto-content">{{ currentGreetingText }}</span>
