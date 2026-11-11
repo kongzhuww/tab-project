@@ -13,12 +13,12 @@
 | :--- | :--- | :--- |
 | **新标签页主页 (SPA)** | `newtab.html` → `generated/vue-ui.js`<br>（由 `src/intro/main.ts` / `src/App.vue` 驱动） | 单根 Vue 3 SPA。集成首屏时钟、标语、天气、搜索、常用网站、底栏 Dock、全屏卡片与弹窗。 |
 | **首绘主题引导** | `newtab.html` (内联) / `src/theme/theme-init.ts` | 极速同步执行，首帧确定主题变量（Light / Lonetrail / Dark），彻底杜绝白屏/黑屏闪烁。 |
-| **后台服务 (Service Worker)** | `manifest.json` → `generated/background.js`<br>（源自 `src/background/index.ts`） | MV3 规范后台。负责扩展快捷键监听、侧边栏呼出、B站/YouTube/QQ图片代理、防盗链 DNR 规则注入、受限下载流管理。 |
+| **后台服务 (Service Worker)** | `manifest.json` → `generated/background.js`<br>（源自 `src/background/index.ts`） | MV3 规范后台。负责扩展快捷键监听、侧边栏呼出、B站/YouTube 媒体跨域与防盗链代理、DNR 规则注入、受限下载流管理。 |
 | **覆盖式侧边栏 (In-Page Overlay Sidebar)** | 动态注入 / `sidepanel.html` → `generated/sidepanel-ui.js`<br>（源自 `src/sidepanel/SidePanelApp.vue` / `src/sidepanel/in-page-drawer.ts`） | 覆盖式浮层侧边栏（不挤压网页宽度，不使用原生 `sidePanel` API），支持快捷键呼出（建议绑定 Alt+W），提供独立书签、小窗及便签导航。 |
 | **极速搜索独立页** | `newtab-search.html` → `generated/search-ui.js`<br>（源自 `src/search/SearchLauncher.vue`） | 轻量零干扰搜索页，支持多引擎秒切与本地优先联想。 |
 | **全屏卡片独立标签页** | `bilibili.html`、`github.html`、`aihot.html`、`youtube.html` | 均为产品的正式既有入口，由 Vue 构建 bundle 独立装配运行，不强行与主页合并。 |
 | **独立设置页** | `options.html` → `src/settings/SettingsView.vue` | 独立全功能选项页，复用主页设置组件。 |
-| **壁纸沙箱** | `wallpaper-sandbox.html` → `src/wallpaper/sandbox.ts` | 具有沙箱权限的隔离页面，用于运行用户自定义动态壁纸。 |
+| **壁纸沙箱** | `wallpaper-sandbox.html` → `src/wallpaper/sandbox.ts` | 隔离沙盒页面。运行纯前端 Wallpaper Engine 运行时（OPFS 私有缓存、Steam 创意工坊加载、128 位对数音频频谱律动与 5 项硬件降温守护）。 |
 | **汉化浮层 (Content Script)** | `src/localizer/main.ts` → `generated/page-localizer-ui.js` | 注入外部网页的 Shadow DOM 单词翻译与编辑浮层。 |
 
 ---
@@ -84,3 +84,4 @@
 * **`webdav.service.ts` / `sync.service.ts`**：WebDAV 协议客户端、备份白名单与本地数据快照序列化。
 * **`launcher.service.ts`**：常用网站与大文件夹本地持久化存储（带内存镜像与快速检索）。
 * **`bookmarks.service.ts`**：Chrome 原生书签树遍历与 Web Worker 拼音/模糊全文分流搜索。
+* **`wallpaper.service.ts`**：壁纸运行时驱动服务、OPFS 活跃包持久化、多设备 WebDAV 同步，以及双向握手与硬件休眠控制。
