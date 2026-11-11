@@ -1,0 +1,16 @@
+{
+  "name": "fast-search",
+  "type": "module",
+  "description": "High-performance offline fuzzy search engine for tab-project",
+  "version": "0.1.0",
+  "files": [
+    "fast_search_bg.wasm",
+    "fast_search.js",
+    "fast_search.d.ts"
+  ],
+  "main": "fast_search.js",
+  "types": "fast_search.d.ts",
+  "sideEffects": [
+    "./snippets/*"
+  ]
+}
