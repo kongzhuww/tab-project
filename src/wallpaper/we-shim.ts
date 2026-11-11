@@ -1,27 +1,60 @@
 /**
  * Wallpaper Engine Web API Shim (标准垫片脚本、运行时资源拦截器与原生事件合成器)
  * 注入至壁纸沙盒 iframe 的 <head> 顶部
- * 1. 拦截 fetch, XHR, Image.src, Media.src 动态请求，解决 PixiJS/Three.js 相对路径 404 问题
- * 2. 伪造 Wallpaper Engine 核心全局接口
- * 3. 将父页面转发的鼠标坐标与音频频谱精准合成为原生 DOM 事件派发
+ * 1. 内存级 localStorage 垫片，防止沙盒 iframe 报 SecurityError
+ * 2. 拦截 fetch, XHR, Image.src, Media.src 动态请求，解决 PixiJS/Three.js/Live2D 相对路径 404 问题
+ * 3. 属性监听器 (wallpaperPropertyListener) 的 setter 拦截与默认属性自动回放
+ * 4. 自动派发合成点击事件，解锁浏览器 AudioContext/MediaElement 的自动播放
  */
 
-export function buildWeShimScript(assetMap: Record<string, string>, entryDir: string): string {
+export function buildWeShimScript(
+  assetMap: Record<string, string>,
+  entryDir: string,
+  initialProperties: Record<string, any> = {}
+): string {
   const jsonAssetMap = JSON.stringify(assetMap);
   const jsonEntryDir = JSON.stringify(entryDir);
+  const jsonInitialProps = JSON.stringify(initialProperties);
 
   return `
 (function() {
   if (window.__WE_SHIM_INITIALIZED__) return;
   window.__WE_SHIM_INITIALIZED__ = true;
 
+  // 0. 内存级 Storage 垫片 (防止沙盒无 allow-same-origin 时读取 localStorage 抛 SecurityError)
+  (function initStoragePolyfill() {
+    function createMemoryStorage() {
+      var store = new Map();
+      return {
+        getItem: function(k) { return store.has(String(k)) ? store.get(String(k)) : null; },
+        setItem: function(k, v) { store.set(String(k), String(v)); },
+        removeItem: function(k) { store.delete(String(k)); },
+        clear: function() { store.clear(); },
+        key: function(i) { var keys = Array.from(store.keys()); return keys[i] !== undefined ? keys[i] : null; },
+        get length() { return store.size; }
+      };
+    }
+    var needsPolyfill = false;
+    try {
+      var testKey = '__we_storage_test__';
+      window.localStorage.setItem(testKey, '1');
+      window.localStorage.removeItem(testKey);
+    } catch (e) {
+      needsPolyfill = true;
+    }
+    if (needsPolyfill) {
+      try {
+        var memLocal = createMemoryStorage();
+        var memSession = createMemoryStorage();
+        Object.defineProperty(window, 'localStorage', { value: memLocal, configurable: true, writable: true });
+        Object.defineProperty(window, 'sessionStorage', { value: memSession, configurable: true, writable: true });
+      } catch (_) {}
+    }
+  })();
+
   // 1. 资产映射表与路径解析器 (拦截相对路径 404)
   var __WE_ASSET_MAP__ = ${jsonAssetMap};
   var __WE_ENTRY_DIR__ = ${jsonEntryDir};
-
-  function normalizePath(p) {
-    return String(p || "").replace(/\\\\/g, "/").replace(/^\\.\\//, "").replace(/^\\/+/, "").toLowerCase();
-  }
 
   function resolveAssetUrl(rawUrl) {
     if (!rawUrl || typeof rawUrl !== 'string') return rawUrl;
@@ -101,7 +134,7 @@ export function buildWeShimScript(assetMap: Record<string, string>, entryDir: st
 
     var origSetAttr = Element.prototype.setAttribute;
     Element.prototype.setAttribute = function(name, val) {
-      if (typeof name === 'string' && name.toLowerCase() === 'src') {
+      if (typeof name === 'string' && (name.toLowerCase() === 'src' || name.toLowerCase() === 'data-src')) {
         val = resolveAssetUrl(val);
       }
       return origSetAttr.call(this, name, val);
@@ -110,13 +143,31 @@ export function buildWeShimScript(assetMap: Record<string, string>, entryDir: st
     console.warn('[WE Shim] Asset interception descriptor warning:', e);
   }
 
-  // 4. 全局监听器注册表
+  // 4. 全局监听器注册表与属性存储
   window._weAudioCallbacks = [];
   window._weMediaCallbacks = [];
-  window._weUserProperties = {};
+  window._weUserProperties = ${jsonInitialProps};
 
-  // 5. Wallpaper Engine 标准核心接口
-  window.wallpaperPropertyListener = window.wallpaperPropertyListener || {};
+  var _rawPropertyListener = {};
+
+  // 拦截 wallpaperPropertyListener 的 set 赋值 (针对 wp.js 覆盖全局变量的场景)
+  Object.defineProperty(window, 'wallpaperPropertyListener', {
+    get: function() {
+      return _rawPropertyListener;
+    },
+    set: function(newVal) {
+      _rawPropertyListener = newVal || {};
+      // 一旦壁纸脚本覆盖赋值并注册了 applyUserProperties，立刻主动注入初始属性
+      if (typeof _rawPropertyListener.applyUserProperties === 'function' && window._weUserProperties) {
+        try {
+          _rawPropertyListener.applyUserProperties(window._weUserProperties);
+        } catch (e) {
+          console.error('[WE Shim] applyUserProperties on setter error:', e);
+        }
+      }
+    },
+    configurable: true
+  });
 
   window.wallpaperRegisterAudioListener = function(callback) {
     if (typeof callback === 'function') {
@@ -144,6 +195,36 @@ export function buildWeShimScript(assetMap: Record<string, string>, entryDir: st
       callback(propertyName, '');
     }
   };
+
+  // 5. 自动唤醒音频状态机 (解决 HALOFLUX 等等待首次用户手势点击解锁 Audio 的逻辑)
+  function triggerAudioUnlockGesture() {
+    try {
+      var evtInit = { bubbles: true, cancelable: true, clientX: 10, clientY: 10 };
+      var targets = [document.body, document.documentElement, window].filter(Boolean);
+      targets.forEach(function(t) {
+        try {
+          if (typeof PointerEvent === 'function') t.dispatchEvent(new PointerEvent('pointerdown', evtInit));
+          t.dispatchEvent(new MouseEvent('click', evtInit));
+        } catch (_) {}
+      });
+    } catch (_) {}
+  }
+
+  if (typeof setTimeout === 'function') {
+    if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
+      if (document.readyState === 'complete' || document.readyState === 'interactive') {
+        setTimeout(triggerAudioUnlockGesture, 100);
+        setTimeout(triggerAudioUnlockGesture, 600);
+      } else {
+        document.addEventListener('DOMContentLoaded', function() {
+          setTimeout(triggerAudioUnlockGesture, 100);
+          setTimeout(triggerAudioUnlockGesture, 600);
+        });
+      }
+    } else {
+      setTimeout(triggerAudioUnlockGesture, 100);
+    }
+  }
 
   // 6. 消息总线：接收父页面传入的鼠标、音频与配置，并合成原生事件
   window.addEventListener('message', function(event) {
@@ -215,7 +296,7 @@ export function buildWeShimScript(assetMap: Record<string, string>, entryDir: st
     // D. 属性调节热更新 (applyUserProperties)
     if (data.type === 'WE_USER_PROPERTIES') {
       var props = data.properties || {};
-      window._weUserProperties = Object.assign(window._weUserProperties, props);
+      window._weUserProperties = Object.assign(window._weUserProperties || {}, props);
       if (window.wallpaperPropertyListener && typeof window.wallpaperPropertyListener.applyUserProperties === 'function') {
         try {
           window.wallpaperPropertyListener.applyUserProperties(props);

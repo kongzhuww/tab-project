@@ -83,7 +83,7 @@ async function renderVideoWallpaper(pack: WallpaperPack): Promise<void> {
 }
 
 /**
- * 渲染 Web 网页类型壁纸 (注入运行时资源拦截器与标准 WE 垫片)
+ * 渲染 Web 网页类型壁纸 (脚本样式全内联、data-src 重写、支持 autoplay)
  */
 async function renderWebWallpaper(pack: WallpaperPack): Promise<void> {
   clearUrls();
@@ -137,21 +137,38 @@ async function renderWebWallpaper(pack: WallpaperPack): Promise<void> {
   // 计算入口文件所在目录作为 base
   const entryDir = normalizePath(entryPath).split("/").slice(0, -1).join("/");
 
-  // 注入全功能 Wallpaper Engine Web API Shim 与动态请求拦截器
+  // 1. 注入全功能 Wallpaper Engine Web API Shim (带默认属性与内存 Storage)
   const shimScript = doc.createElement("script");
-  shimScript.textContent = buildWeShimScript(assetMap, entryDir);
+  shimScript.textContent = buildWeShimScript(assetMap, entryDir, pack.properties || {});
   doc.head.prepend(shimScript);
 
+  // 2. 将外部样式表纯内联注入，绕过沙盒 CSP 外部网络限制
   for (const node of doc.querySelectorAll('link[rel~="stylesheet"][href]')) {
     const href = node.getAttribute("href") || "";
     const cssEntry = byPath.get(resolvePath(entryPath, href));
     if (cssEntry?.file instanceof Blob) {
       const css = rewriteCss(await cssEntry.file.text(), cssEntry.path);
-      node.setAttribute("href", trackUrl(URL.createObjectURL(new Blob([css], { type: "text/css" }))));
+      const styleEl = doc.createElement("style");
+      styleEl.textContent = css;
+      node.parentNode?.replaceChild(styleEl, node);
     }
   }
 
-  rewriteAttr(doc, "img[src],script[src],source[src],video[src],audio[src]", "src", entryPath);
+  // 3. 将外部脚本 (如 wp.js 等) 纯内联注入，彻底杜绝 blob: 外部脚本 CSP 拦截
+  for (const node of Array.from(doc.querySelectorAll('script[src]'))) {
+    const src = node.getAttribute("src") || "";
+    const scriptEntry = byPath.get(resolvePath(entryPath, src));
+    if (scriptEntry?.file instanceof Blob) {
+      const scriptContent = await scriptEntry.file.text();
+      const inlineScript = doc.createElement("script");
+      inlineScript.textContent = scriptContent;
+      node.parentNode?.replaceChild(inlineScript, node);
+    }
+  }
+
+  // 4. 重写常用媒体属性 src 与 data-src (解决 HALOFLUX 中 audio[data-src] 映射问题)
+  rewriteAttr(doc, "img[src],source[src],video[src],audio[src]", "src", entryPath);
+  rewriteAttr(doc, "audio[data-src],video[data-src],img[data-src]", "data-src", entryPath);
   rewriteAttr(doc, "link[href]", "href", entryPath);
   for (const node of doc.querySelectorAll("[style]")) node.setAttribute("style", rewriteCss(node.getAttribute("style") || "", entryPath));
   for (const node of doc.querySelectorAll("style")) node.textContent = rewriteCss(node.textContent || "", entryPath);
@@ -160,6 +177,8 @@ async function renderWebWallpaper(pack: WallpaperPack): Promise<void> {
   frame.id = "we-wallpaper-iframe";
   frame.title = pack.name || "Web Wallpaper";
   frame.sandbox.add("allow-scripts", "allow-pointer-lock");
+  frame.setAttribute("allow", "autoplay *");
+  (frame as any).allow = "autoplay";
   frame.style.width = "100%";
   frame.style.height = "100%";
   frame.style.border = "none";
