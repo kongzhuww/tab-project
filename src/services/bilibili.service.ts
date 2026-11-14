@@ -1130,8 +1130,8 @@ export class BilibiliService {
   /**
    * 获取视频详情与分P信息
    */
-  public async getVideoView(bvid: string): Promise<any> {
-    return this.api<any>(`https://api.bilibili.com/x/web-interface/view?bvid=${encodeURIComponent(bvid)}`);
+  public async getVideoView(bvid: string, signal?: AbortSignal): Promise<any> {
+    return this.api<any>(`https://api.bilibili.com/x/web-interface/view?bvid=${encodeURIComponent(bvid)}`, { signal });
   }
 
   /**

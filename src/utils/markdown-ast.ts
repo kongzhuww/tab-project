@@ -73,6 +73,8 @@ export interface MarkdownRenderOptions {
   renderMode?: "rendered" | "md" | string;
   /** Web README links are not Obsidian note links; caller sanitizes HTML. */
   linkMode?: "web";
+  /** Bypass optional global renderer when deterministic MathML output is required. */
+  useFastRenderer?: boolean;
 }
 
 export interface FootnoteDefinition {
@@ -492,7 +494,7 @@ export class MarkdownAstEngine {
 
   public renderMarkdown(source: string, options: MarkdownRenderOptions = {}): string {
     // 高性能 Wasm 渲染引擎快速通道 (优先尝试 CommonMark / GFM 零拷贝渲染)
-    if (options.renderMode !== "md" && customFastRenderer) {
+    if (options.renderMode !== "md" && options.useFastRenderer !== false && customFastRenderer) {
       const fastResult = customFastRenderer(source);
       if (typeof fastResult === "string") {
         return fastResult;

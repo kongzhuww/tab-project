@@ -9,6 +9,7 @@
  */
 
 import { reactive } from "vue";
+import { inferGroupsForRepo } from "./repo-group-inference";
 import { loadGitHubAccountSettings } from "./account-settings";
 import { createGitHubReadHeaders } from "./api-client";
 import { storageCache } from "../services/storage-cache.service";
@@ -244,7 +245,7 @@ export class MyReposController {
       const existingLocal = repo.localGroups && repo.localGroups.length ? repo.localGroups : null;
 
       // 优先级 3: 智能规则对齐（若尚未分类，根据 topics/name/isFork 自动对齐到已有分组中）
-      const inferred = this.inferGroupsForRepo(repo, myReposState.customGroups);
+      const inferred = inferGroupsForRepo(repo, myReposState.customGroups);
 
       const assigned = (mapped && mapped.length ? mapped : null) || existingLocal || inferred;
 
@@ -265,64 +266,6 @@ export class MyReposController {
     if (mappingChanged) {
       void this.persistGroupsMap();
     }
-  }
-
-  /**
-   * 智能推断仓库最匹配的分组归属（仅在无手动归类时作为平滑桥接）
-   */
-  private inferGroupsForRepo(repo: MyRepoItem, groups: string[]): string[] {
-    if (!groups || !groups.length) return [];
-    const matched: string[] = [];
-
-    const repoNameLower = repo.name.toLowerCase();
-    const topicsLower = (repo.topics || []).map(t => t.toLowerCase());
-
-    for (const g of groups) {
-      const gLower = g.toLowerCase();
-
-      // 1. fork 相关列
-      if ((gLower.includes("fork") || g.includes("分支")) && (repo.isFork || topicsLower.includes("fork"))) {
-        matched.push(g);
-        continue;
-      }
-
-      // 2. 浏览器插件相关列
-      if ((gLower.includes("浏览器") || gLower.includes("browser") || gLower.includes("chrome") || gLower.includes("edge")) &&
-          (topicsLower.some(t => t.includes("extension") || t.includes("browser") || t.includes("newtab")) || repoNameLower.includes("tab-project"))) {
-        matched.push(g);
-        continue;
-      }
-
-      // 3. PI插件相关列
-      if ((gLower.includes("pi") || g.includes("PI")) &&
-          (topicsLower.some(t => t.includes("pi") || t.includes("grounding-pi")) || repoNameLower.includes("pi-") || repoNameLower.includes("-pi"))) {
-        matched.push(g);
-        continue;
-      }
-
-      // 4. Herdr插件相关列
-      if (gLower.includes("herdr") && (topicsLower.some(t => t.includes("herdr")) || repoNameLower.includes("herdr"))) {
-        matched.push(g);
-        continue;
-      }
-
-      // 5. 嵌入式相关列
-      if ((gLower.includes("嵌入式") || gLower.includes("embedded") || gLower.includes("单片机")) &&
-          (topicsLower.some(t => t.includes("embedded") || t.includes("zephyr") || t.includes("stm32") || t.includes("k230")) ||
-           repoNameLower.includes("k230") || repoNameLower.includes("mspm0") || repoNameLower.includes("pid-") || repoNameLower.includes("zephyr"))) {
-        matched.push(g);
-        continue;
-      }
-
-      // 6. 美化相关列
-      if ((gLower.includes("美化") || gLower.includes("theme") || gLower.includes("style")) &&
-          (topicsLower.some(t => t.includes("theme") || t.includes("beauty") || t.includes("ui")) || repoNameLower.includes("theme") || repoNameLower.includes("style"))) {
-        matched.push(g);
-        continue;
-      }
-    }
-
-    return matched;
   }
 
   /**

@@ -14,6 +14,7 @@ import { aiHotService } from "../services/aihot.service";
 import { fullscreenCardState } from "../core/fullscreen-card-state";
 import { chatService } from "../chat/chat.service";
 import ChatShareMenu from "../chat/ChatShareMenu.vue";
+import MulticaSendDialog from "./MulticaSendDialog.vue";
 import type { ChatShareTarget } from "../chat/private-chat-client";
 import { windowManagerController } from "../core/window-manager.store";
 import { useContextMenu } from "../sdk/interactions";
@@ -52,6 +53,11 @@ function handleShareToRoom(target: ChatShareTarget) {
   aihotContextMenu.value.visible = false;
 }
 
+const multicaArticle = ref<AiHotFeedArticle | null>(null);
+function openMulticaSend() {
+  multicaArticle.value = aihotContextMenu.value.item;
+  closeArticleMenu();
+}
 function closeArticleMenu() {
   aihotContextMenu.value.visible = false;
 }
@@ -235,46 +241,24 @@ function handleSelectDailyDate(date: string) {
 <template>
   <div class="vue-aihot-wrapper" :inert="!active">
     <section id="daily-aihot" class="card wide" :class="{ 'card-fullscreen': fullscreenCardState.activeId === 'daily-aihot' }">
-      <header class="card-head">
-        <span class="bar" style="background: linear-gradient(180deg,#34d399,#38bdf8)"></span>
-        <h2 id="aihot-title">{{ viewTitle }}</h2>
-        <div id="aihot-tabs" class="aihot-tabs" role="group" aria-label="资讯来源">
-          <button
-            type="button"
-            data-view="leaderboard"
-            :class="{ active: state.currentView === 'leaderboard' }"
-            @click="handleSwitchView('leaderboard')"
-          >
-            {{ t('aihot.tab.leaderboard') }}
-          </button>
-          <button
-            type="button"
-            data-view="feed"
-            :class="{ active: state.currentView === 'feed' }"
-            @click="handleSwitchView('feed')"
-          >
-            {{ t('aihot.tab.feed') }}
-          </button>
-          <button
-            type="button"
-            data-view="daily"
-            :class="{ active: state.currentView === 'daily' }"
-            @click="handleSwitchView('daily')"
-          >
-            {{ t('aihot.tab.daily') }}
-          </button>
-        </div>
-        <button
-          id="aihot-refresh"
-          class="icon-btn"
-          :title="t('aihot.refreshTip')"
-          :disabled="!active || state.isLoading"
-          type="button"
-          @click="handleRefresh"
-        >
-          ↻
-        </button>
-      </header>
+      <div class="aihot-workspace">
+      <nav id="aihot-tabs" class="aihot-tabs" :aria-label="t('aihot.nav.label')">
+        <div class="aihot-nav-wrap"><button type="button" data-view="leaderboard" class="aihot-nav-card rank" :class="{ active: state.currentView === 'leaderboard' }" :aria-pressed="state.currentView === 'leaderboard'" @click="handleSwitchView('leaderboard')">
+          <span class="aihot-nav-main"><span class="aihot-nav-icon" aria-hidden="true">🏆</span><span class="aihot-nav-copy"><strong>{{ t('aihot.nav.rank') }}</strong><small>{{ t('aihot.nav.rankDesc') }}</small></span></span><span class="aihot-nav-badge">RANK</span>
+        </button></div>
+        <div class="aihot-nav-wrap"><button type="button" data-view="feed" class="aihot-nav-card feed" :class="{ active: state.currentView === 'feed' }" :aria-pressed="state.currentView === 'feed'" @click="handleSwitchView('feed')">
+          <span class="aihot-nav-main"><span class="aihot-nav-icon" aria-hidden="true">✦</span><span class="aihot-nav-copy"><strong>{{ t('aihot.nav.feed') }}</strong><small>{{ t('aihot.nav.feedDesc') }}</small></span></span><span class="aihot-nav-badge">NEWS</span>
+        </button></div>
+        <div class="aihot-nav-wrap"><button type="button" data-view="daily" class="aihot-nav-card daily" :class="{ active: state.currentView === 'daily' }" :aria-pressed="state.currentView === 'daily'" @click="handleSwitchView('daily')">
+          <span class="aihot-nav-main"><span class="aihot-nav-icon" aria-hidden="true">📰</span><span class="aihot-nav-copy"><strong>{{ t('aihot.nav.daily') }}</strong><small>{{ t('aihot.nav.dailyDesc') }}</small></span></span><span class="aihot-nav-badge">DAILY</span>
+        </button></div>
+      </nav>
+      <main class="aihot-main">
+        <header class="card-head">
+          <span class="bar" style="background: linear-gradient(180deg,#34d399,#38bdf8)"></span>
+          <h2 id="aihot-title">{{ viewTitle }}</h2>
+          <button id="aihot-refresh" class="icon-btn" :title="t('aihot.refreshTip')" :disabled="!active || state.isLoading" type="button" @click="handleRefresh">↻</button>
+        </header>
 
       <!-- 辅助筛选工具栏 Subbar -->
       <div
@@ -592,6 +576,8 @@ function handleSelectDailyDate(date: string) {
           </p>
         </div>
       </div>
+      </main>
+      </div>
     </section>
   </div>
 
@@ -606,6 +592,7 @@ function handleSelectDailyDate(date: string) {
       @click.stop
     >
       <div class="menu-head">{{ aihotContextMenu.item?.title }}</div>
+      <button type="button" class="menu-item" role="menuitem" @click="openMulticaSend">🤖 交给 Multica 智能体</button>
       <ChatShareMenu
         label="💬 发送到聊天室"
         match-menu-item
@@ -614,6 +601,7 @@ function handleSelectDailyDate(date: string) {
       />
     </div>
   </Teleport>
+  <MulticaSendDialog v-if="multicaArticle" :article="multicaArticle" @close="multicaArticle = null" />
 </template>
 
 <style scoped>

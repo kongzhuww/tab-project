@@ -716,43 +716,4 @@ onUnmounted(() => {
   color: #f8fafc !important;
   border-color: rgba(255, 255, 255, 0.15) !important;
 }
-
-:global(html[data-theme="endfield"]) .launcher-book-case,
-:global(html[data-theme="endfield"]) .launcher-book-page,
-:global(html[data-theme="endfield"]) .launcher-book-spread {
-  background: #182234 !important;
-  border-color: rgba(255, 255, 255, 0.15) !important;
-}
-:global(html[data-theme="endfield"]) .page-left {
-  background: linear-gradient(to right, #182234 96%, rgba(0, 0, 0, 0.25) 100%) !important;
-}
-:global(html[data-theme="endfield"]) .page-right {
-  background: linear-gradient(to left, #182234 96%, rgba(0, 0, 0, 0.25) 100%) !important;
-}
-:global(html[data-theme="endfield"]) .launcher-book-spine,
-:global(html[data-theme="endfield"]) .launcher-book-footer {
-  background: #0f1622 !important;
-  border-color: rgba(255, 255, 255, 0.1) !important;
-}
-:global(html[data-theme="endfield"]) .step-card {
-  background: #202d42 !important;
-  border-color: rgba(255, 255, 255, 0.1) !important;
-}
-:global(html[data-theme="endfield"]) .step-card:hover {
-  background: #2a3a54 !important;
-}
-:global(html[data-theme="endfield"]) .page-title,
-:global(html[data-theme="endfield"]) .step-title,
-:global(html[data-theme="endfield"]) .page-number {
-  color: #f8fafc !important;
-}
-:global(html[data-theme="endfield"]) .step-desc {
-  color: #cbd5e1 !important;
-}
-:global(html[data-theme="endfield"]) .chapter-tab:not(.active),
-:global(html[data-theme="endfield"]) .book-flip-btn {
-  background: #202d42 !important;
-  color: #f8fafc !important;
-  border-color: rgba(255, 255, 255, 0.15) !important;
-}
 </style>

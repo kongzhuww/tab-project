@@ -23,7 +23,7 @@
 | `favicon` | `_favicon/?pageUrl=` 图标 | 保留 |
 | `alarms` | Todoist 同步、本地提醒、退役闹钟清理 | 保留 |
 | `activeTab` / `tabs` | 标签页管理、侧栏、单页主页复用、导出当前标签 | 保留；`tabs` 可读取所有标签的 URL/标题，属高敏感权限 |
-| `cookies` | B站 `bili_jct` CSRF；后台仍保留 YouTube SAPISID 鉴权与 YouTube/Google Cookie 名称诊断消息 | 保留；YouTube 封藏但代码未删，需专项收口 |
+| `cookies` | B站 `bili_jct` CSRF；YouTube 工作台的后台鉴权和 Cookie 诊断已移除 | 为其他模块保留 |
 | `declarativeNetRequest` | B站 Referer/Origin 动态规则；旧全站规则与 YouTube Cookie 规则清理 | 保留 |
 | `identity` | Google 日历 OAuth | 保留；日历模块当前未注册 Dock，需决定是否保留功能 |
 | `scripting` | 覆盖式侧栏按需注入；表情包独立页的页面图片收集 | 保留；仅用户动作触发 |
@@ -34,9 +34,9 @@
 
 ## 主机访问说明
 
-- 剩余具体域名对应 B站、Todoist、Google API、YouTube、GitHub、OpenRouter/DeepSeek/Gemini、Open-Meteo、AI HOT、塞壬唱片、Jina 正文提取、iTunes/Bing/百度图标搜索、网易云、坚果云 WebDAV 与本机回环。由于仍有 HTTP(S) 通配，它们目前也属于审计记录，而非实际隔离边界。
+- 剩余具体域名对应 B站、Todoist、Google API、GitHub、OpenRouter/DeepSeek/Gemini、Open-Meteo、AI HOT、塞壬唱片、Jina 正文提取、iTunes/Bing/百度图标搜索、网易云、坚果云 WebDAV 与本机回环。YouTube 专用主机声明已移除；但仍有 HTTP(S) 通配，具体域名并非实际隔离边界。
 - 必须保留的广域场景：用户在任意普通网页打开覆盖侧栏、用户自定义 AI/OpenAI 兼容节点、自托管聊天室、图片/网页提取等。迁移按需授权前不能简单删除通配，否则会破坏这些功能。
-- WebDAV 当前同步实现调用已退役的 Native 存根，坚果云域名不能作为“同步正在使用”的证据；WebDAV 功能现状需单独修复或下线。
+- WebDAV 当前使用扩展内的请求与加密实现；需要用户配置服务器和独立备份口令。
 
 ## 自动检查
 
@@ -51,6 +51,6 @@
 
 1. 将用户自定义 AI 节点、聊天室服务器、网页提取等改为运行时请求精确 origin 的 `optional_host_permissions`，拒绝后给出明确提示。
 2. 侧栏改为仅依赖 `activeTab` 用户手势注入的可行性验证，再评估移除 HTTP(S) 通配。
-3. 收口已封藏 YouTube 的后台 Cookie 鉴权和诊断消息，或明确恢复其产品范围。
-4. 评估 `topSites`、`identity`、`tabs` 是否可改为可选权限；处理 WebDAV 退役存根。
+3. 持续检查已移除模块的权限及旧动态规则。
+4. 评估 `identity`、`tabs` 是否可改为可选权限。
 5. 权限变化会影响已安装用户的授权提示，变更需随新版本发布并在商店说明中同步。

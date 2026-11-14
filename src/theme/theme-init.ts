@@ -2,10 +2,14 @@
  * LogicWeaver · Theme Instant Init (TypeScript 重构版)
  * 在 <head> 中最先同步执行，确保主题变量首帧即刻生效，消灭白屏/闪黑
  */
+import { normalizeSystemTheme } from './system-theme';
+
 (() => {
   try {
-    const t = localStorage.getItem("theme") || "light";
+    const saved = localStorage.getItem("theme");
+    const t = normalizeSystemTheme(saved);
     document.documentElement.dataset.theme = t;
+    if (saved && saved !== t) localStorage.setItem("theme", t);
 
     const animSetting = localStorage.getItem("showStartupAnimation");
     const loaderSetting = localStorage.getItem("logicweaverEndfieldLoader");

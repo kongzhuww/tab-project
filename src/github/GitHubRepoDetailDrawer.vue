@@ -1006,7 +1006,9 @@ onUnmounted(() => {
   border-color: #38bdf8;
 }
 
-/* 🌟 孤星（米色）主题专属高质感适配 */
+
+
+/* 暖纸色主题 */
 html[data-theme="lonetrail"] .gh-modal-window {
   background: #f4efe4 !important;
   border-color: rgba(38, 34, 26, 0.16) !important;

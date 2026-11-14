@@ -50,8 +50,6 @@ const BiliMessagePanel = defineAsyncComponent(() => import("../bilibili/BiliMess
 import { biliMessagePanelController } from "../bilibili/message-panel-store";
 const BilibiliWorkspace = defineAsyncComponent(() => import("../bilibili/BilibiliWorkspace.vue"));
 import { biliFavoritesController } from "../bilibili/bili-favorites-store";
-const YouTubeCard = defineAsyncComponent(() => import("../youtube/YouTubeCard.vue"));
-import { youTubeController } from "../youtube/youtube-store";
 const AihotFeed = defineAsyncComponent(() => import("../aihot/AihotFeed.vue"));
 import { aihotFeedController } from "../aihot/aihot-feed-store";
 const GitHubTrending = defineAsyncComponent(() => import("../github/GitHubTrending.vue"));
@@ -200,7 +198,6 @@ export function registerUiFeatures(features: FeatureRegistry): void {
   registerIsland(features, { id: "nav-wheel", title: "辐射状快捷动作轮盘与悬浮球", order: 95, root: "vue-nav-wheel-root", capabilities: ["ui:nav-wheel", "nav:radial-menu"] }, NavWheelOverlay, navWheelController as any);
   registerIsland(features, { id: "bili-message-panel", spaOwned: true, title: "Bilibili 消息与互动通知中心", order: 102, root: "vue-bili-message-panel-root", capabilities: ["ui:bili-message-panel", "bili:messages"] }, BiliMessagePanel, biliMessagePanelController as any);
   registerIsland(features, { id: "bili-favorites", spaOwned: true, title: "b站插件 Vue 外壳", order: 110, root: "vue-bili-favorites-root", capabilities: ["ui:bili-favorites-shell", "bilibili:favorites"] }, BilibiliWorkspace, biliFavoritesController as any);
-  registerIsland(features, { id: "youtube-card", spaOwned: true, title: "YouTube 订阅与探索工作台", order: 111, root: "vue-youtube-root", capabilities: ["ui:youtube-card", "youtube:updates"] }, YouTubeCard, youTubeController as any);
   registerIsland(features, { id: "aihot-feed", spaOwned: true, title: "AI HOT 资讯流全功能聚合看板", order: 112, root: "vue-aihot-root", capabilities: ["ui:aihot-feed", "aihot:aggregate"] }, AihotFeed, aihotFeedController as any);
   registerIsland(features, { id: "github-trending", spaOwned: true, title: "GitHub 趋势榜与热门流", order: 114, root: "vue-github-trending-root", capabilities: ["ui:github-trending", "github:trending"] }, GitHubTrending, gitHubTrendingController as any);
 }

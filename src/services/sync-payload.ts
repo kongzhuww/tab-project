@@ -5,7 +5,7 @@ export const MAX_SAFE_SYNC_PAYLOAD_BYTES = 58 * 1024;
 export class SyncBackupError extends Error {}
 
 const booleanKeys = new Set([
-  "showWeather", "showSites", "showBili", "showYouTube", "showTodo",
+  "showWeather", "showSites", "showBili", "showTodo",
   "showLeftNavigation", "showNavBall", "showBookmarkPanel", "showBookmarkFoldersTop",
   "showStartupAnimation", "singleNewTab", "showHomeMusicVisualizer"
 ]);
@@ -13,7 +13,9 @@ const arrayKeys = new Set([
   "searchIgnoredBookmarkFolders", "wereadSortIds",
   "foGroups", "launcherGroups", "quickLinks", "launcherPages",
   "foCollapsedGroupsV1", "biliFollowingGroupsV1", "biliSubCustomChannelsV1", "biliRadioSeriesV1",
-  "gh_my_repo_groups_v2", "heroBackgroundHistory"
+  "gh_my_repo_groups_v2", "heroBackgroundHistory",
+  "logicweaver_prompt_backpack_v1", "logicweaver_prompt_backpack_categories_v1",
+  "logicweaver_saved_articles_v1", "logicweaver_saved_article_categories_v1"
 ]);
 const objectKeys = new Set([
   "customShortcuts", "launcherFolders", "quickLinkGroupSizes",
@@ -114,6 +116,9 @@ export function selectSyncSettings(data: unknown, keys: readonly string[]): Sync
       selected[key] = value;
     } catch (err) {
       // 如果本地或远端某单个历史配置项格式不合规（如残留的旧版本缓存或空字符串），跳过该脏字段，绝不因单个脏字段导致整个备份崩溃！
+      if (["logicweaver_prompt_backpack_v1", "logicweaver_prompt_backpack_categories_v1", "logicweaver_saved_articles_v1", "logicweaver_saved_article_categories_v1"].includes(key)) {
+        throw new SyncBackupError(`收藏或背包数据 ${key} 格式无效；未生成不完整的备份`);
+      }
       console.warn(`[SyncPayload] 跳过格式不匹配的配置项 "${key}":`, err);
     }
   }
@@ -126,7 +131,7 @@ export function selectSyncSettings(data: unknown, keys: readonly string[]): Sync
   };
 }
 
-export function parseSyncBackup(data: unknown, keys: readonly string[]) {
+export function parseSyncBackup(data: unknown, keys: readonly string[], options: { allowCredentials?: boolean } = {}) {
   if (typeof data === "string") {
     try { data = JSON.parse(data); } catch {}
   }
@@ -134,10 +139,10 @@ export function parseSyncBackup(data: unknown, keys: readonly string[]) {
   if (Object.hasOwn(data, "formatVersion") && data.formatVersion !== 1 && data.formatVersion !== SYNC_FORMAT_VERSION) {
     throw new SyncBackupError("不支持此备份版本，请先更新插件；未写入本地数据");
   }
-  if ((data as any).credentialsIncluded === true) {
+  if ((data as any).credentialsIncluded === true && !options.allowCredentials) {
     throw new SyncBackupError("备份中包含凭据信息，拒绝恢复到普通配置；未写入本地数据");
   }
-  // Legacy backups use the SAME ordinary-data whitelist; credentials/connections are never restored.
+  // Legacy backups use the same whitelist; encrypted WebDAV restores explicitly opt in above.
   const rawSettings = (Object.hasOwn(data, "settings") && isRecord(data.settings)) ? data.settings : data;
   const result = selectSyncSettings(rawSettings, keys);
   if (!result.count) throw new SyncBackupError("云端备份中未包含有效的设置数据");

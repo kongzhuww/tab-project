@@ -67,6 +67,17 @@ test("manifest validation rejects overlong localized descriptions and missing de
   assert.throws(() => validateManifestLocales(manifest, {}), /default locale/);
 });
 
+test("every plugin catalog entry has localized display fields", async () => {
+  const source = await read('src/modules/market-store.ts');
+  const catalog = source.split('export const PLUGIN_CATALOG')[1].split('];')[0];
+  const ids = [...catalog.matchAll(/^\s*id:\s*"([^"]+)"/gm)].map(match => match[1]);
+  assert.ok(ids.includes('multica'));
+  for (const id of ids) for (const field of ['title', 'category', 'author', 'desc', 'tags']) {
+    const key = `market.item.${id}.${field}`;
+    assert.ok(zh[key] && en[key], `missing ${key}`);
+  }
+});
+
 test("translation keys and placeholder sets agree", () => {
   assert.deepEqual(Object.keys(en).sort(), Object.keys(zh).sort());
   const placeholders = value => [...new Set([...value.matchAll(/\{([^{}]+)\}/g)].map(match => match[1]))].sort();

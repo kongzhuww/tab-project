@@ -120,12 +120,10 @@ function handleVideoClick(event: MouseEvent, video: BiliUpPreviewVideo) {
 .fo-up-preview-thumb:hover img {
   transform: scale(1.05);
 }
-:global(html[data-theme="dark"]) .fo-up-preview-name,
-:global(html[data-theme="endfield"]) .fo-up-preview-name {
+:global(html[data-theme="dark"]) .fo-up-preview-name {
   color: #f8fafc !important;
 }
-:global(html[data-theme="dark"]) .fo-up-preview-video-title,
-:global(html[data-theme="endfield"]) .fo-up-preview-video-title {
+:global(html[data-theme="dark"]) .fo-up-preview-video-title {
   color: #e2e8f0 !important;
 }
 </style>

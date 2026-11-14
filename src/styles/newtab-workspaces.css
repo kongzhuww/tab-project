@@ -732,5 +732,9 @@ html[data-theme="light"] math[display="inline"] {
 .calcom-booking-note.error { color:#ef4444!important; }
 .calcom-booking-frame { min-height:440px;flex:1;border:1px solid var(--border);border-radius:11px;background:#fff; }
 .calcom-booking-frame[hidden] { display:none; }
-html[data-theme="light"] .utility-workspace-calcom,html[data-theme="lonetrail"] .utility-workspace-calcom { background:#fff; }
+html[data-theme="light"] .utility-workspace-calcom { background:#fff; }
 @media(max-width:760px){.calcom-quick-grid{grid-template-columns:1fr}.calcom-booking-row{flex-wrap:wrap}.calcom-booking-row input{width:100%;min-height:36px}.calcom-booking-frame{min-height:500px}}
+
+
+/* 暖纸色主题 */
+html[data-theme="lonetrail"] .utility-workspace-calcom { background:#fff; }

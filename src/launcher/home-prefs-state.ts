@@ -5,7 +5,6 @@ export const homePrefsState = reactive({
   showWeather: true,
   showSites: true,
   showBili: true,
-  showYouTube: true,
   showTodo: true,
   showBookmarkPanel: true
 });

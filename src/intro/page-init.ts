@@ -8,7 +8,7 @@
     html.classList.toggle("skip-endfield-loader", !enabled);
     document.body.classList.toggle("is-starting", enabled);
     const card = location.hash.slice(1) || sessionStorage.getItem("lw_active_card");
-    if (["todoist", "card-github", "daily-aihot", "daily-bilibili", "daily-youtube"].includes(card || "")) {
+    if (["todoist", "card-github", "daily-aihot", "daily-bilibili", "multica"].includes(card || "")) {
       // The body exists here; use the same CSS owner as runtime navigation.
       document.body.classList.add("has-card-fullscreen");
     }

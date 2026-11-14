@@ -11,6 +11,7 @@ import { bookmarkFolderStripState } from "../bookmarks/folder-strip-store";
 import { bookmarksService } from "../services/bookmarks.service";
 import { sideDrawerState, sideDrawerController } from "../sidepanel/drawer-store";
 import { t } from "../i18n";
+import { normalizeSystemTheme } from "../theme/system-theme";
 
 const WorkspaceLaunchers = defineAsyncComponent(() => import("../workspaces/WorkspaceLaunchers.vue"));
 
@@ -68,7 +69,7 @@ function handleTopBarSelectStart(e: Event) {
 
 onMounted(() => {
   notificationHistoryController.start();
-  const saved = localStorage.getItem("theme") || "light";
+  const saved = normalizeSystemTheme(localStorage.getItem("theme"));
   document.documentElement.dataset.theme = saved;
   document.documentElement.setAttribute("data-theme", saved);
 });

@@ -369,8 +369,7 @@
   flex-shrink: 0;
 }
 
-html[data-theme="dark"] .settings-view-root .switch,
-html[data-theme="endfield"] .settings-view-root .switch {
+html[data-theme="dark"] .settings-view-root .switch {
   background: rgba(255, 255, 255, 0.2);
   border-color: rgba(255, 255, 255, 0.16);
 }
@@ -551,6 +550,27 @@ html[data-theme="endfield"] .settings-view-root .switch {
   border-color: rgba(255, 255, 255, 0.25);
   background: var(--surface-hover);
 }
+
+.settings-view-root .webdav-more[open] { flex-basis: 100%; }
+.settings-view-root .webdav-more summary {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  box-sizing: border-box;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  list-style: none;
+}
+.settings-view-root .webdav-more summary::-webkit-details-marker { display: none; }
+.settings-view-root .webdav-more summary::after { content: '⌄'; margin-left: 6px; }
+.settings-view-root .webdav-more[open] summary::after { content: '⌃'; }
+.settings-view-root .webdav-more-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
 
 .settings-view-root .btn-secondary:disabled,
 .settings-view-root .btn-primary:disabled {
@@ -1441,40 +1461,6 @@ html[data-theme="endfield"] .settings-view-root .switch {
   border-radius: 4px;
 }
 
-.settings-view-root .preview-endfield {
-  background: #18181b;
-  border-color: #facc15;
-}
-.settings-view-root .preview-endfield .preview-mini-topbar {
-  height: 6px;
-  background: #facc15;
-  border-radius: 3px;
-  width: 40%;
-}
-.settings-view-root .preview-endfield .preview-mini-card {
-  height: 14px;
-  background: #27272a;
-  border: 1px solid #52525b;
-  border-radius: 4px;
-}
-
-.settings-view-root .preview-lonetrail {
-  background: #0b192c;
-  border-color: #38bdf8;
-}
-.settings-view-root .preview-lonetrail .preview-mini-topbar {
-  height: 6px;
-  background: #38bdf8;
-  border-radius: 3px;
-  width: 45%;
-}
-.settings-view-root .preview-lonetrail .preview-mini-card {
-  height: 14px;
-  background: #1e3e62;
-  border: 1px solid #476b94;
-  border-radius: 4px;
-}
-
 .settings-view-root .preview-mini-body {
   display: flex;
   gap: 5px;
@@ -1637,4 +1623,22 @@ html[data-theme="endfield"] .settings-view-root .switch {
 .settings-view-root .wallpaper-card-edit-btn:hover {
   opacity: 1;
   color: #38bdf8;
+}
+
+/* 暖纸色主题 */
+.settings-view-root .preview-lonetrail {
+  background: #0b192c;
+  border-color: #38bdf8;
+}
+.settings-view-root .preview-lonetrail .preview-mini-topbar {
+  height: 6px;
+  background: #38bdf8;
+  border-radius: 3px;
+  width: 45%;
+}
+.settings-view-root .preview-lonetrail .preview-mini-card {
+  height: 14px;
+  background: #1e3e62;
+  border: 1px solid #476b94;
+  border-radius: 4px;
 }

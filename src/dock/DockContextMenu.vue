@@ -99,8 +99,7 @@ function handleExternalOpen() {
   const urls: Record<string, string> = {
     "daily-bilibili": "https://www.bilibili.com",
     "card-github": "https://github.com",
-    "daily-aihot": "https://news.ycombinator.com",
-    "daily-youtube": "https://www.youtube.com"
+    "daily-aihot": "https://news.ycombinator.com"
   };
   const url = urls[props.target.id] || "https://www.bilibili.com";
   window.open(url, "_blank");

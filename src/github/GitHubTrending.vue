@@ -322,11 +322,17 @@ function formatStars(count?: number): string {
   font-size: 13px;
 }
 
-/* 亮色与孤星米色主题自适应（完美匹配 Star 列表风格） */
+/* 亮色主题适配 Star 列表风格 */
 .vue-github-trending-wrapper {
   background: transparent !important;
 }
 
+html[data-theme="light"] .gh-trend-title-block h3,
+:root:not([data-theme="dark"]) .gh-trend-title-block h3 {
+  color: #0f172a;
+}
+
+/* 暖纸色主题 */
 html[data-theme="lonetrail"] .gh-trend-title-block h3 {
   color: #26221a !important;
 }
@@ -348,10 +354,5 @@ html[data-theme="lonetrail"] .gh-trend-card .desc {
 
 html[data-theme="lonetrail"] .gh-trend-rank-tag {
   color: rgba(38, 34, 26, 0.45) !important;
-}
-
-html[data-theme="light"] .gh-trend-title-block h3,
-:root:not([data-theme="dark"]) .gh-trend-title-block h3 {
-  color: #0f172a;
 }
 </style>

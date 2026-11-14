@@ -41,6 +41,8 @@ import { homePrefsRuntime } from "./launcher/home-prefs.store";
 import { homeMusicState } from "./music/store";
 import { radioTapeState } from "./bilibili/radio-tape-store";
 import { scheduleDockModulesPrefetch } from "./modules/prefetch";
+import { notifications } from './sdk/notifications';
+import { settingsController } from './settings/store';
 
 interface ViewMeta {
   title: string;
@@ -65,14 +67,14 @@ const VIEW_METAS: Record<string, ViewMeta> = {
     icon: "assets/nav-github.svg",
     iconType: "image/svg+xml"
   },
+  "multica": {
+    title: "Agent 工作台 · Multica",
+    icon: "assets/nav-multica.png",
+    iconType: "image/png"
+  },
   "daily-aihot": {
     title: "AI Hot · 今日热榜",
     icon: "assets/nav-aihot.svg",
-    iconType: "image/svg+xml"
-  },
-  "daily-youtube": {
-    title: "YouTube",
-    icon: "assets/nav-youtube.svg",
     iconType: "image/svg+xml"
   },
   "todoist": {
@@ -93,6 +95,7 @@ const VIEW_METAS: Record<string, ViewMeta> = {
 };
 
 let currentFaviconHref = "";
+let autoSyncTimer: ReturnType<typeof setTimeout> | undefined;
 
 function updateFavicon(iconPath: string, type = "image/svg+xml"): void {
   if (typeof document === "undefined") return;
@@ -172,6 +175,17 @@ onMounted(() => {
     homePrefsRuntime.start();
     void launcherRuntime.init().catch((error) => console.warn("[Launcher] 初始化失败", error));
     scheduleDockModulesPrefetch();
+    // Let the launcher paint first; the encrypted sync service runs only when enabled.
+    autoSyncTimer = setTimeout(() => {
+      void import('./services/webdav-auto-sync').then(async module => {
+        const result = await module.runWebDavAutoSync();
+        if (result.status === 'error' || result.status === 'conflict') {
+          notifications.show({ appType:'sync', appName:'WebDAV 同步', title:'自动同步已暂停', message:result.message || '请检查同步设置。', level:'warning', history:true, target:{type:'module',moduleId:'sync'}, actionLabel:'查看设置', showActions:true, duration:12000, onClick:() => settingsController.open('sync') });
+        } else if (result.status === 'downloaded') {
+          notifications.show({ appType:'sync', appName:'WebDAV 同步', title:'已恢复云端更新', message:'请刷新已打开的页面以查看同步后的配置。', level:'info', showActions:false, duration:6000 });
+        }
+      }).catch(() => {});
+    }, 8000);
     if (typeof chrome !== "undefined" && chrome?.runtime?.sendMessage) {
       setTimeout(() => {
         try {
@@ -187,6 +201,7 @@ onMounted(() => {
   }
 });
 onUnmounted(() => {
+  if (autoSyncTimer) clearTimeout(autoSyncTimer);
   navWheelRuntime.stop();
   launcherRuntime.stop();
   homePrefsRuntime.stop();

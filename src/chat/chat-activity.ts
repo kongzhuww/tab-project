@@ -34,9 +34,6 @@ export function detectCurrentActivity(): UserActivity | undefined {
   if (activeCard === "daily-aihot") {
     return { type: "aihot", title: "AI HOT 热门前沿资讯", updatedAt: Date.now() };
   }
-  if (activeCard === "daily-youtube") {
-    return { type: "youtube", title: "YouTube 精选视频流", updatedAt: Date.now() };
-  }
   if (activeCard === "todoist") {
     return { type: "idle", title: "Todoist 待办任务清单", updatedAt: Date.now() };
   }

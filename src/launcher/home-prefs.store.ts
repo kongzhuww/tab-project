@@ -22,7 +22,6 @@ function syncView(): void {
   document.body.classList.toggle("hide-weather", !prefs.showWeather);
   document.body.classList.toggle("hide-sites", !prefs.showSites);
   document.body.classList.toggle("hide-bili", !prefs.showBili);
-  document.body.classList.toggle("hide-youtube", !prefs.showYouTube);
   document.body.classList.toggle("hide-todo", !prefs.showTodo);
   document.body.classList.toggle("hide-bookmarks", !prefs.showBookmarkPanel);
   if (!prefs.showBookmarkPanel) bookmarkPanelController.close();

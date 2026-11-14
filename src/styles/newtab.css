@@ -150,7 +150,7 @@ textarea,
   --daily-card-pad-x: 20px;
 }
 
-html[data-theme="light"],html[data-theme="lonetrail"] {
+html[data-theme="light"] {
   --background: #eef2f8;
   --heading: #0f172a;
   --text: #334155;
@@ -170,50 +170,6 @@ html[data-theme="light"],html[data-theme="lonetrail"] {
   --aurora3: rgba(139, 92, 246, 0.10);
 }
 
-/* 终末地风格：塔卫二拓荒协议——工业机能主义 + 新世代废土拓荒。
-   中性岩灰基底，工程亮黄(警戒贴)/警戒橙(警示)/荧光青蓝(交互指示)三色分工，
-   硬朗直角 + 微切角面板，工程图纸网格与序列号微排版。系统见文件末尾。 */
-html[data-theme="endfield"] {
-  --background: #131417;
-  --heading: #f2f3f5;
-  --text: #d8d9dc;
-  --muted: #93959c;
-  --dim: #6b6e76;
-  --border: rgba(255, 255, 255, 0.11);
-  --border-strong: rgba(56, 225, 255, 0.5);
-  --surface: rgba(255, 255, 255, 0.05);
-  --surface-hover: rgba(255, 255, 255, 0.09);
-  --glass: rgba(27, 29, 33, 0.92);
-  --panel: #1b1d21;
-  --grad-a: #ffd84d;
-  --grad-b: #ff7d29;
-  --grad-c: #38e1ff;
-  --aurora1: rgba(255, 205, 46, 0.08);
-  --aurora2: rgba(255, 125, 41, 0.08);
-  --aurora3: rgba(56, 225, 255, 0.06);
-}
-
-/* 孤星风格：莱茵先锋档案——70-80s 黄金航天时代 NASA-punk，
-   复古三色识别带（灰蓝/赭黄/红棕）+ 胶片褪色纸面 + DIN 工业排版 */
-html[data-theme="lonetrail"] {
-  --background: #eae5d8;
-  --heading: #26221a;
-  --text: #38332a;
-  --muted: #7a7263;
-  --dim: #9a9284;
-  --border: rgba(38, 34, 26, 0.16);
-  --border-strong: rgba(163, 78, 60, 0.6);
-  --surface: rgba(38, 34, 26, 0.05);
-  --surface-hover: rgba(38, 34, 26, 0.09);
-  --glass: rgba(242, 238, 228, 0.86);
-  --panel: #f1ede2;
-  --grad-a: #26221a;
-  --grad-b: #c9993f;
-  --grad-c: #7d92a8;
-  --aurora1: rgba(201, 153, 63, 0.12);
-  --aurora2: rgba(125, 146, 168, 0.12);
-  --aurora3: rgba(163, 78, 60, 0.08);
-}
 * { box-sizing: border-box; }
 
 body {
@@ -1290,9 +1246,10 @@ html[data-theme="light"] .home-music-wave-bg {
 .background-default-item .background-history-main { padding-right:7px; }
 .background-library-empty { grid-column:1/-1;display:grid;place-items:center;gap:5px;min-height:125px;border:1px dashed rgba(255,255,255,.12);border-radius:14px;color:var(--muted);text-align:center; }
 .background-library-empty b { color:var(--text);font-size:12px; }.background-library-empty span { max-width:390px;font-size:10px;line-height:1.6; }
-html[data-theme="light"] .background-history-dialog,html[data-theme="lonetrail"] .background-history-dialog { box-shadow:0 28px 80px rgba(15,23,42,.2); }
-html[data-theme="light"] .background-history-dialog::backdrop,html[data-theme="lonetrail"] .background-history-dialog::backdrop { background:rgba(226,232,240,.45); }
-html[data-theme="light"] .background-library-import button,html[data-theme="lonetrail"] .background-library-import button,html[data-theme="light"] .background-history-main,html[data-theme="lonetrail"] .background-history-main { border-color:rgba(15,23,42,.1); }
+html[data-theme="light"] .background-history-dialog { box-shadow:0 28px 80px rgba(15,23,42,.2); }
+html[data-theme="light"] .background-history-dialog::backdrop { background:rgba(226,232,240,.45); }
+html[data-theme="light"] .background-library-import button,
+html[data-theme="light"] .background-history-main { border-color:rgba(15,23,42,.1); }
 @media(max-width:680px){.background-history-dialog{width:calc(100vw - 16px);height:calc(100vh - 24px)}.background-library-import{grid-template-columns:1fr}.background-history-list{grid-template-columns:1fr}.background-library-import small{display:none}.background-history-preview{width:96px}}
 .hero-clock {
   max-width: 720px;
@@ -1584,16 +1541,6 @@ html[data-theme="light"] .search-history-btn.active {
   color: #ffffff;
   border-color: #dc2626;
 }
-html[data-theme="lonetrail"] .search-history-btn {
-  border-color: rgba(180, 83, 9, 0.35);
-  background: rgba(180, 83, 9, 0.08);
-  color: #b45309;
-}
-html[data-theme="endfield"] .search-history-btn {
-  border-color: rgba(245, 197, 24, 0.4);
-  background: rgba(245, 197, 24, 0.12);
-  color: #d97706;
-}
 html[data-theme="light"] .search-clear-btn {
   background: rgba(0, 0, 0, 0.09);
   color: rgba(0, 0, 0, 0.6);
@@ -1601,14 +1548,6 @@ html[data-theme="light"] .search-clear-btn {
 html[data-theme="light"] .search-clear-btn:hover {
   background: rgba(0, 0, 0, 0.18);
   color: #000;
-}
-html[data-theme="lonetrail"] .search-clear-btn {
-  background: rgba(38, 34, 26, 0.12);
-  color: #26221a;
-}
-html[data-theme="endfield"] .search-clear-btn {
-  background: rgba(245, 197, 24, 0.2);
-  color: #f5c518;
 }
 .search-suggestions {
   position: absolute;
@@ -1726,8 +1665,7 @@ html[data-theme="endfield"] .search-clear-btn {
   border: 1px solid rgba(56, 189, 248, 0.32);
   font-weight: 600;
 }
-html[data-theme="dark"] .search-suggestion-badge.badge-custom,
-html[data-theme="endfield"] .search-suggestion-badge.badge-custom {
+html[data-theme="dark"] .search-suggestion-badge.badge-custom {
   color: #38bdf8;
   border-color: rgba(56, 189, 248, 0.4);
 }
@@ -1779,27 +1717,15 @@ html[data-theme="endfield"] .search-suggestion-badge.badge-custom {
   background: rgba(139, 92, 246, 0.2);
   border-color: rgba(139, 92, 246, 0.45);
 }
-html[data-theme="dark"] .search-suggestion-badge.badge-bookmark,
-html[data-theme="endfield"] .search-suggestion-badge.badge-bookmark {
+html[data-theme="dark"] .search-suggestion-badge.badge-bookmark {
   background: rgba(56, 189, 248, 0.16);
   color: #7dd3fc;
   border-color: rgba(56, 189, 248, 0.35);
 }
-html[data-theme="dark"] .search-suggestion-badge.badge-launcher,
-html[data-theme="endfield"] .search-suggestion-badge.badge-launcher {
+html[data-theme="dark"] .search-suggestion-badge.badge-launcher {
   background: rgba(192, 132, 252, 0.16);
   color: #d8b4fe;
   border-color: rgba(192, 132, 252, 0.35);
-}
-html[data-theme="lonetrail"] .search-suggestion-badge.badge-bookmark {
-  background: rgba(163, 78, 60, 0.12);
-  color: #a34e3c;
-  border-color: rgba(163, 78, 60, 0.28);
-}
-html[data-theme="lonetrail"] .search-suggestion-badge.badge-launcher {
-  background: rgba(201, 153, 63, 0.14);
-  color: #966c16;
-  border-color: rgba(201, 153, 63, 0.32);
 }
 .github-repo-suggestion img { border-radius:50%;background:#0f172a; }
 .github-repo-suggestion .search-suggestion-title { color:#047857;font-weight:750; }
@@ -4642,4 +4568,68 @@ body.has-card-fullscreen .card.card-fullscreen {
   z-index: 100 !important;
   position: relative !important;
   border-radius: 12px !important;
+}
+
+
+/* 暖纸色主题 */
+html[data-theme="lonetrail"] {
+  --background: #eef2f8;
+  --heading: #0f172a;
+  --text: #334155;
+  --muted: #64748b;
+  --dim: #94a3b8;
+  --border: rgba(15, 23, 42, 0.10);
+  --border-strong: rgba(15, 23, 42, 0.22);
+  --surface: rgba(15, 23, 42, 0.035);
+  --surface-hover: rgba(15, 23, 42, 0.07);
+  --glass: rgba(255, 255, 255, 0.88);
+  --panel: #ffffff;
+  --grad-a: #0f172a;
+  --grad-b: #059669;
+  --grad-c: #0284c7;
+  --aurora1: rgba(16, 185, 129, 0.12);
+  --aurora2: rgba(56, 189, 248, 0.12);
+  --aurora3: rgba(139, 92, 246, 0.10);
+}
+html[data-theme="lonetrail"] {
+  --background: #eae5d8;
+  --heading: #26221a;
+  --text: #38332a;
+  --muted: #7a7263;
+  --dim: #9a9284;
+  --border: rgba(38, 34, 26, 0.16);
+  --border-strong: rgba(163, 78, 60, 0.6);
+  --surface: rgba(38, 34, 26, 0.05);
+  --surface-hover: rgba(38, 34, 26, 0.09);
+  --glass: rgba(242, 238, 228, 0.86);
+  --panel: #f1ede2;
+  --grad-a: #26221a;
+  --grad-b: #c9993f;
+  --grad-c: #7d92a8;
+  --aurora1: rgba(201, 153, 63, 0.12);
+  --aurora2: rgba(125, 146, 168, 0.12);
+  --aurora3: rgba(163, 78, 60, 0.08);
+}
+html[data-theme="lonetrail"] .background-history-dialog { box-shadow:0 28px 80px rgba(15,23,42,.2); }
+html[data-theme="lonetrail"] .background-history-dialog::backdrop { background:rgba(226,232,240,.45); }
+html[data-theme="lonetrail"] .background-library-import button,
+html[data-theme="lonetrail"] .background-history-main { border-color:rgba(15,23,42,.1); }
+html[data-theme="lonetrail"] .search-history-btn {
+  border-color: rgba(180, 83, 9, 0.35);
+  background: rgba(180, 83, 9, 0.08);
+  color: #b45309;
+}
+html[data-theme="lonetrail"] .search-clear-btn {
+  background: rgba(38, 34, 26, 0.12);
+  color: #26221a;
+}
+html[data-theme="lonetrail"] .search-suggestion-badge.badge-bookmark {
+  background: rgba(163, 78, 60, 0.12);
+  color: #a34e3c;
+  border-color: rgba(163, 78, 60, 0.28);
+}
+html[data-theme="lonetrail"] .search-suggestion-badge.badge-launcher {
+  background: rgba(201, 153, 63, 0.14);
+  color: #966c16;
+  border-color: rgba(201, 153, 63, 0.32);
 }

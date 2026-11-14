@@ -451,6 +451,34 @@ onUnmounted(() => {
 }
 
 /* 适配莱茵生命等浅色主题：实体米白温暖底座 + 实体纯白文案框 + 纯黑清晰字，同样 100% 实体白底黑字！ */
+
+.bili-sub-loading,
+.bili-sub-error {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: #475569 !important;
+  font-size: 12px;
+  text-align: center;
+}
+
+.bili-sub-spinner {
+  width: 24px;
+  height: 24px;
+  border: 2px solid rgba(56, 189, 248, 0.2);
+  border-top-color: #38bdf8;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* 暖纸色主题 */
 :global(html[data-theme="lonetrail"]) .bili-sub-modal-window {
   background-color: #fcfaf7 !important;
   border-color: rgba(38, 34, 26, 0.28) !important;
@@ -479,31 +507,5 @@ onUnmounted(() => {
   background-color: rgba(201, 153, 63, 0.25) !important;
   border-color: #c9993f !important;
   color: #78520d !important;
-}
-
-.bili-sub-loading,
-.bili-sub-error {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  color: #475569 !important;
-  font-size: 12px;
-  text-align: center;
-}
-
-.bili-sub-spinner {
-  width: 24px;
-  height: 24px;
-  border: 2px solid rgba(56, 189, 248, 0.2);
-  border-top-color: #38bdf8;
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
 }
 </style>

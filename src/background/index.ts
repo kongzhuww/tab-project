@@ -10,7 +10,10 @@
  * - 本扩展为纯前端 Chromium Manifest V3 架构，已彻底移除 Native Messaging、Native Host 及伴侣进程。
  */
 
-import { initBilibiliNetRules, syncYouTubeNetRules, removeLegacyGlobalNetRule } from "./dnr";
+import { initBilibiliNetRules, removeLegacyGlobalNetRule } from "./dnr";
+import { removeRetiredYouTubeStorage } from "../core/removed-youtube";
+
+void removeRetiredYouTubeStorage().catch(error => console.warn("旧 YouTube 数据清理失败", error));
 import {
   initNotificationListeners,
   flashBadge
@@ -336,145 +339,13 @@ chrome.runtime.onMessage.addListener((message: any, sender: any, sendResponse: (
     return true;
   }
 
-  // L. YouTube 登录凭据与网络注入规则动态同步
-  if (message?.type === "syncYouTubeNetRules") {
-    syncYouTubeNetRules().then((ok) => sendResponse({ ok }));
-    return true;
-  }
 
-  // M. 核心：通过拥有完整 host_permissions 的 Background Service Worker 原生拉取 YouTube
-  if (message?.type === "fetchYouTubeHtml") {
-    (async () => {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 25000);
-      try {
-        const url = message.url || "https://www.youtube.com/";
-        const resp = await fetch(url, {
-          credentials: "include",
-          signal: controller.signal,
-          headers: {
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
-            "Accept-Language": "zh-CN,zh;q=0.9,ja;q=0.8,en;q=0.7",
-            "Cache-Control": "no-cache",
-            "Pragma": "no-cache"
-          }
-        });
-        clearTimeout(timer);
-        const html = await resp.text();
-        sendResponse({
-          ok: resp.ok,
-          status: resp.status,
-          finalUrl: resp.url,
-          html
-        });
-      } catch (err: any) {
-        clearTimeout(timer);
-        sendResponse({ ok: false, error: err?.message || String(err) });
-      }
-    })();
-    return true;
-  }
-
-  // M2. 核心 InnerTube API 代理（带 SAPISID 算法流鉴权与原生搜索）
-  if (message?.type === "fetchYouTubeInnerTube") {
-    (async () => {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 20000);
-      try {
-        const endpoint = message.endpoint || "browse";
-        const customPayload = message.payload || {};
-
-        // 提取当前浏览器已登录的 SAPISID / __Secure-3PAPISID 构造官方鉴权
-        let authHeader = "";
-        try {
-          const ytCookies = await chrome.cookies?.getAll?.({ domain: ".youtube.com" }) || [];
-          const sapisidCookie = ytCookies.find((c: any) => c.name === "SAPISID" || c.name === "__Secure-3PAPISID" || c.name === "__Secure-1PAPISID");
-          if (sapisidCookie?.value) {
-            const time = Math.floor(Date.now() / 1000);
-            const encoder = new TextEncoder();
-            const data = encoder.encode(`${time} ${sapisidCookie.value} https://www.youtube.com`);
-            const hashBuffer = await crypto.subtle.digest("SHA-1", data);
-            const hashArray = Array.from(new Uint8Array(hashBuffer));
-            const hashHex = hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
-            authHeader = `SAPISIDHASH ${time}_${hashHex}`;
-          }
-        } catch {}
-
-        const headers: Record<string, string> = {
-          "Content-Type": "application/json",
-          "X-YouTube-Client-Name": "1",
-          "X-YouTube-Client-Version": "2.20240301.00.00",
-          "Origin": "https://www.youtube.com",
-          "Referer": "https://www.youtube.com/",
-          "Accept-Language": "zh-CN,zh;q=0.9,ja;q=0.8,en;q=0.7"
-        };
-        if (authHeader) {
-          headers["Authorization"] = authHeader;
-          headers["X-Origin"] = "https://www.youtube.com";
-        }
-
-        const body = {
-          context: {
-            client: {
-              clientName: "WEB",
-              clientVersion: "2.20240301.00.00",
-              hl: "zh-CN",
-              gl: "JP",
-              utcOffsetMinutes: 480
-            }
-          },
-          ...customPayload
-        };
-
-        const resp = await fetch(`https://www.youtube.com/youtubei/v1/${endpoint}?prettyPrint=false`, {
-          method: "POST",
-          headers,
-          credentials: "include",
-          signal: controller.signal,
-          body: JSON.stringify(body)
-        });
-        clearTimeout(timer);
-        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-        const json = await resp.json();
-        sendResponse({ ok: true, data: json });
-      } catch (err: any) {
-        clearTimeout(timer);
-        sendResponse({ ok: false, error: err?.message || String(err) });
-      }
-    })();
-    return true;
-  }
-
-  // N. 诊断 YouTube Cookie 与账号状态
-  if (message?.type === "debugYouTubeCookies") {
-    (async () => {
-      try {
-        const ytCookies = await chrome.cookies?.getAll?.({ domain: ".youtube.com" }) || [];
-        const gCookies = await chrome.cookies?.getAll?.({ domain: ".google.com" }) || [];
-        const ytNames = ytCookies.map((c: any) => c.name);
-        const gNames = gCookies.map((c: any) => c.name);
-        const hasLogin = ytNames.includes("LOGIN_INFO") || ytNames.includes("SAPISID") || ytNames.includes("SID");
-        sendResponse({
-          ok: true,
-          ytCount: ytCookies.length,
-          ytNames,
-          gCount: gCookies.length,
-          gNames,
-          hasLogin
-        });
-      } catch (err: any) {
-        sendResponse({ ok: false, error: err?.message || String(err) });
-      }
-    })();
-    return true;
-  }
 });
 
 // 3. 安装与启动生命周期初始化
 
 chrome.runtime.onInstalled?.addListener?.(() => {
   initBilibiliNetRules();
-  syncYouTubeNetRules();
   setTimeout(cleanupOrReplaceBrowserDefaultNewTabs, 200);
   setTimeout(cleanupOrReplaceBrowserDefaultNewTabs, 1000);
   setTimeout(() => void syncTodoistInBackground(), 3000);
@@ -482,7 +353,6 @@ chrome.runtime.onInstalled?.addListener?.(() => {
 
 chrome.runtime.onStartup?.addListener?.(() => {
   initBilibiliNetRules();
-  syncYouTubeNetRules();
   setTimeout(cleanupOrReplaceBrowserDefaultNewTabs, 200);
   setTimeout(cleanupOrReplaceBrowserDefaultNewTabs, 1000);
   setTimeout(() => void syncTodoistInBackground(), 3000);

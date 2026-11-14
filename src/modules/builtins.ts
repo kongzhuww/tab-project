@@ -1,21 +1,26 @@
 import { registerDockModule } from "../sdk/modules";
+import { removeRetiredYouTubePageStorage } from "../core/removed-youtube";
+
+try { removeRetiredYouTubePageStorage(); } catch (error) { console.warn("旧 YouTube 数据清理失败", error); }
 import { listDockModules } from "./registry";
 import { githubDockModule } from "../github/module";
-import { youtubeDockModule } from "../youtube/module";
 import { bilibiliDockModule } from "../bilibili/module";
 import { aihotDockModule } from "../aihot/module";
 import { stickersDockModule } from "../stickers/module";
 import { musicDockModule } from "../music/module";
 import { todoistDockModule } from "../todoist/module";
 import { chatDockModule } from "../chat/module";
+import { backpackDockModule } from "../backpack/module";
+import { multicaDockModule } from "../multica/module";
 
 // Registration imports only lightweight state/settings declarations, not the Vue view.
 registerDockModule(chatDockModule);
+registerDockModule(backpackDockModule);
+registerDockModule(multicaDockModule);
 // Register card insertion targets before their dependents to preserve the original Dock order.
 registerDockModule(todoistDockModule);
 registerDockModule(stickersDockModule);
 registerDockModule(musicDockModule);
-registerDockModule(youtubeDockModule);
 registerDockModule(aihotDockModule);
 registerDockModule(githubDockModule);
 registerDockModule(bilibiliDockModule);

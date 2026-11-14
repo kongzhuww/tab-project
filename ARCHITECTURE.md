@@ -103,7 +103,7 @@ tab-project-next 是基于 **Chromium Manifest V3** 规范构建的现代化浏�
    - B站电台优先抓取 DASH 纯音频轨（M4A，~3MB），彻底省去 720P 完整视频（50~80MB）的带宽占用与 CDN 限速；
    - 接入 8 秒停滞看门狗，遇到断流或解码错误时自动切至备用 CDN 线路续播。
 4. **主题系统铁律（严禁黑色起手）**：
-   - 界面主题规范：系统支持 4 套正式界面主题：白天模式 (`light`，默认)、夜晚模式 (`dark`)、终末地风格 (`endfield`)、孤星风格 (`lonetrail`)。旧版本中曾使用 Lone Trail / Endfield 等名称，当前主题键以源码小写为准；
+   - 界面主题规范：系统支持白天模式 (`light`，默认)、夜晚模式 (`dark`) 和暖纸色 (`lonetrail`)；旧版终末地界面主题回退至夜晚模式；
    - 独立开机启动动画：由 `startupAnimationStyle` 独立控制（莱茵生命 `rhinelab` / 终末地 `endfield`），与页面界面主题互不干扰；
    - 变量继承原则：所有界面与组件必须继承 CSS 主题变量（`var(--panel)`、`var(--surface)`、`var(--text)`、`var(--heading)`、`var(--border)` 等），保证在各类明亮与暗黑主题下均自适应且对比度清晰，严禁硬编码纯黑背景。
 

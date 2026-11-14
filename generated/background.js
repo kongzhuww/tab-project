@@ -1,7 +1,7 @@
 // src/background/dnr.ts
 async function removeLegacyGlobalNetRule() {
   if (!chrome.declarativeNetRequest) throw new Error("\u7F51\u7EDC\u89C4\u5219\u63A5\u53E3\u4E0D\u53EF\u7528\uFF0C\u65E7\u89C4\u5219\u6E05\u7406\u672A\u786E\u8BA4");
-  await chrome.declarativeNetRequest.updateDynamicRules({ removeRuleIds: [88991] });
+  await chrome.declarativeNetRequest.updateDynamicRules({ removeRuleIds: [88991, 3001] });
 }
 async function initBilibiliNetRules() {
   if (!chrome.declarativeNetRequest || !chrome.runtime?.id) return;
@@ -16,11 +16,12 @@ async function initBilibiliNetRules() {
   const RULE_ID_BILI_VIDEO = 2002;
   const RULE_ID_BILI_VIDEO_CN = 2003;
   const RULE_ID_BILI_HDSLB = 2004;
+  const RULE_ID_AIHOT_IMG = 2005;
   try {
     if (chrome.declarativeNetRequest.getDynamicRules) {
       const existing = await chrome.declarativeNetRequest.getDynamicRules();
       const existingIds = new Set((existing || []).map((r) => r.id));
-      if (existingIds.has(RULE_ID_BILI_API) && existingIds.has(RULE_ID_BILI_VIDEO) && existingIds.has(RULE_ID_BILI_VIDEO_CN) && existingIds.has(RULE_ID_BILI_HDSLB)) {
+      if (existingIds.has(RULE_ID_BILI_API) && existingIds.has(RULE_ID_BILI_VIDEO) && existingIds.has(RULE_ID_BILI_VIDEO_CN) && existingIds.has(RULE_ID_BILI_HDSLB) && existingIds.has(RULE_ID_AIHOT_IMG)) {
         return;
       }
     }
@@ -93,28 +94,50 @@ async function initBilibiliNetRules() {
         initiatorDomains: [extId],
         resourceTypes: ["xmlhttprequest", "image", "other"]
       }
+    },
+    {
+      id: RULE_ID_AIHOT_IMG,
+      priority: 1,
+      action: {
+        type: "modifyHeaders",
+        requestHeaders: [
+          { header: "Referer", operation: "set", value: "https://aihot.news/" },
+          { header: "Origin", operation: "set", value: "https://aihot.news" }
+        ]
+      },
+      condition: {
+        urlFilter: "||aihot.news/api/img-proxy",
+        initiatorDomains: [extId],
+        resourceTypes: ["xmlhttprequest", "image", "other"]
+      }
     }
   ];
   try {
     await chrome.declarativeNetRequest.updateDynamicRules({
-      removeRuleIds: [RULE_ID_BILI_API, RULE_ID_BILI_VIDEO, RULE_ID_BILI_VIDEO_CN, RULE_ID_BILI_HDSLB],
+      removeRuleIds: [RULE_ID_BILI_API, RULE_ID_BILI_VIDEO, RULE_ID_BILI_VIDEO_CN, RULE_ID_BILI_HDSLB, RULE_ID_AIHOT_IMG],
       addRules: rules
     });
   } catch (err) {
     console.warn("Bilibili DNR rules update failed:", err);
   }
 }
-var RULE_ID_YOUTUBE_COOKIE = 3001;
-async function syncYouTubeNetRules() {
-  if (!chrome.declarativeNetRequest) return false;
-  try {
-    await chrome.declarativeNetRequest.updateDynamicRules({
-      removeRuleIds: [RULE_ID_YOUTUBE_COOKIE]
-    });
-    return true;
-  } catch {
-    return false;
-  }
+
+// src/core/removed-youtube.ts
+var REMOVED_YOUTUBE_KEYS = [
+  "youtubeFavoritesV1",
+  "youtubeFavGroupsV1",
+  "youtubeModuleSettingsV1",
+  "youtubeRssChannelsV1",
+  "youtubeCustomGroupsV1",
+  "youtubeRssVideosCacheV1",
+  "youtubePlaylistsV1",
+  "youtubeRecommendBatchV1",
+  "logicweaver_youtube_explore_cache",
+  "showYouTube"
+];
+async function removeRetiredYouTubeStorage() {
+  if (typeof chrome === "undefined" || !chrome.storage?.local) return;
+  await chrome.storage.local.remove([...REMOVED_YOUTUBE_KEYS]);
 }
 
 // src/notifications/history-contract.ts
@@ -719,7 +742,7 @@ async function validateImagePixels(buffer, mime) {
   }
 }
 
-// node_modules/@vue/shared/dist/shared.esm-bundler.js
+// ../../../node_modules/@vue/shared/dist/shared.esm-bundler.js
 // @__NO_SIDE_EFFECTS__
 function makeMap(str) {
   const map2 = /* @__PURE__ */ Object.create(null);
@@ -801,7 +824,7 @@ var isBooleanAttr = /* @__PURE__ */ makeMap(
   specialBooleanAttrs + `,async,autofocus,autoplay,controls,default,defer,disabled,inert,loop,open,required,reversed,scoped,seamless,checked,muted,multiple,selected`
 );
 
-// node_modules/@vue/reactivity/dist/reactivity.esm-bundler.js
+// ../../../node_modules/@vue/reactivity/dist/reactivity.esm-bundler.js
 function warn(msg, ...args) {
   console.warn(`[Vue warn] ${msg}`, ...args);
 }
@@ -2251,7 +2274,7 @@ function traverse(value, depth = Infinity, seen) {
   return value;
 }
 
-// node_modules/@vue/runtime-core/dist/runtime-core.esm-bundler.js
+// ../../../node_modules/@vue/runtime-core/dist/runtime-core.esm-bundler.js
 var stack = [];
 function pushWarningContext(vnode) {
   stack.push(vnode);
@@ -3582,7 +3605,7 @@ function initCustomFormatter() {
   }
 }
 
-// node_modules/vue/dist/vue.runtime.esm-bundler.js
+// ../../../node_modules/vue/dist/vue.runtime.esm-bundler.js
 function initDev() {
   {
     initCustomFormatter();
@@ -5230,6 +5253,7 @@ function initWebSideDrawer() {
 }
 
 // src/background/index.ts
+void removeRetiredYouTubeStorage().catch((error) => console.warn("\u65E7 YouTube \u6570\u636E\u6E05\u7406\u5931\u8D25", error));
 initBilibiliNetRules();
 initNotificationListeners();
 initTodoistBackgroundSync();
@@ -5496,138 +5520,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     })();
     return true;
   }
-  if (message?.type === "syncYouTubeNetRules") {
-    syncYouTubeNetRules().then((ok) => sendResponse({ ok }));
-    return true;
-  }
-  if (message?.type === "fetchYouTubeHtml") {
-    (async () => {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 25e3);
-      try {
-        const url = message.url || "https://www.youtube.com/";
-        const resp = await fetch(url, {
-          credentials: "include",
-          signal: controller.signal,
-          headers: {
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
-            "Accept-Language": "zh-CN,zh;q=0.9,ja;q=0.8,en;q=0.7",
-            "Cache-Control": "no-cache",
-            "Pragma": "no-cache"
-          }
-        });
-        clearTimeout(timer);
-        const html = await resp.text();
-        sendResponse({
-          ok: resp.ok,
-          status: resp.status,
-          finalUrl: resp.url,
-          html
-        });
-      } catch (err) {
-        clearTimeout(timer);
-        sendResponse({ ok: false, error: err?.message || String(err) });
-      }
-    })();
-    return true;
-  }
-  if (message?.type === "fetchYouTubeInnerTube") {
-    (async () => {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 2e4);
-      try {
-        const endpoint = message.endpoint || "browse";
-        const customPayload = message.payload || {};
-        let authHeader = "";
-        try {
-          const ytCookies = await chrome.cookies?.getAll?.({ domain: ".youtube.com" }) || [];
-          const sapisidCookie = ytCookies.find((c) => c.name === "SAPISID" || c.name === "__Secure-3PAPISID" || c.name === "__Secure-1PAPISID");
-          if (sapisidCookie?.value) {
-            const time = Math.floor(Date.now() / 1e3);
-            const encoder = new TextEncoder();
-            const data = encoder.encode(`${time} ${sapisidCookie.value} https://www.youtube.com`);
-            const hashBuffer = await crypto.subtle.digest("SHA-1", data);
-            const hashArray = Array.from(new Uint8Array(hashBuffer));
-            const hashHex = hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
-            authHeader = `SAPISIDHASH ${time}_${hashHex}`;
-          }
-        } catch {
-        }
-        const headers = {
-          "Content-Type": "application/json",
-          "X-YouTube-Client-Name": "1",
-          "X-YouTube-Client-Version": "2.20240301.00.00",
-          "Origin": "https://www.youtube.com",
-          "Referer": "https://www.youtube.com/",
-          "Accept-Language": "zh-CN,zh;q=0.9,ja;q=0.8,en;q=0.7"
-        };
-        if (authHeader) {
-          headers["Authorization"] = authHeader;
-          headers["X-Origin"] = "https://www.youtube.com";
-        }
-        const body = {
-          context: {
-            client: {
-              clientName: "WEB",
-              clientVersion: "2.20240301.00.00",
-              hl: "zh-CN",
-              gl: "JP",
-              utcOffsetMinutes: 480
-            }
-          },
-          ...customPayload
-        };
-        const resp = await fetch(`https://www.youtube.com/youtubei/v1/${endpoint}?prettyPrint=false`, {
-          method: "POST",
-          headers,
-          credentials: "include",
-          signal: controller.signal,
-          body: JSON.stringify(body)
-        });
-        clearTimeout(timer);
-        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-        const json = await resp.json();
-        sendResponse({ ok: true, data: json });
-      } catch (err) {
-        clearTimeout(timer);
-        sendResponse({ ok: false, error: err?.message || String(err) });
-      }
-    })();
-    return true;
-  }
-  if (message?.type === "debugYouTubeCookies") {
-    (async () => {
-      try {
-        const ytCookies = await chrome.cookies?.getAll?.({ domain: ".youtube.com" }) || [];
-        const gCookies = await chrome.cookies?.getAll?.({ domain: ".google.com" }) || [];
-        const ytNames = ytCookies.map((c) => c.name);
-        const gNames = gCookies.map((c) => c.name);
-        const hasLogin = ytNames.includes("LOGIN_INFO") || ytNames.includes("SAPISID") || ytNames.includes("SID");
-        sendResponse({
-          ok: true,
-          ytCount: ytCookies.length,
-          ytNames,
-          gCount: gCookies.length,
-          gNames,
-          hasLogin
-        });
-      } catch (err) {
-        sendResponse({ ok: false, error: err?.message || String(err) });
-      }
-    })();
-    return true;
-  }
 });
 chrome.runtime.onInstalled?.addListener?.(() => {
   initBilibiliNetRules();
-  syncYouTubeNetRules();
   setTimeout(cleanupOrReplaceBrowserDefaultNewTabs, 200);
   setTimeout(cleanupOrReplaceBrowserDefaultNewTabs, 1e3);
   setTimeout(() => void syncTodoistInBackground(), 3e3);
 });
 chrome.runtime.onStartup?.addListener?.(() => {
   initBilibiliNetRules();
-  syncYouTubeNetRules();
   setTimeout(cleanupOrReplaceBrowserDefaultNewTabs, 200);
   setTimeout(cleanupOrReplaceBrowserDefaultNewTabs, 1e3);
   setTimeout(() => void syncTodoistInBackground(), 3e3);

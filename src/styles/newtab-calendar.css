@@ -489,90 +489,9 @@ html:not([data-theme]) .todoist-cal-agenda-item:hover {
   border-color: rgba(37, 99, 235, 0.4);
 }
 
-/* 孤星·莱茵生命模式专属适配 (lonetrail) */
-html[data-theme="lonetrail"] .todoist-calendar-sidebar {
-  background: rgba(234, 229, 216, 0.96);
-  border-color: rgba(38, 34, 26, 0.16);
-  color: #26221a;
-}
-html[data-theme="lonetrail"] .todoist-cal-logo {
-  color: #a34e3c;
-}
-html[data-theme="lonetrail"] .todoist-cal-badge {
-  background: rgba(163, 78, 60, 0.12);
-  color: #a34e3c;
-}
-html[data-theme="lonetrail"] .todoist-cal-today-btn {
-  background: rgba(255, 255, 255, 0.65);
-  border-color: rgba(38, 34, 26, 0.18);
-  color: #26221a;
-}
-html[data-theme="lonetrail"] .todoist-cal-today-btn:hover {
-  background: #ffffff;
-  border-color: #c9993f;
-  color: #c9993f;
-}
-html[data-theme="lonetrail"] .todoist-cal-nav {
-  background: rgba(38, 34, 26, 0.05);
-  border-color: rgba(38, 34, 26, 0.12);
-}
-html[data-theme="lonetrail"] .cal-nav-label {
-  color: #26221a;
-}
-html[data-theme="lonetrail"] .cal-nav-btn {
-  color: #7a7263;
-}
-html[data-theme="lonetrail"] .cal-nav-btn:hover {
-  background: rgba(38, 34, 26, 0.09);
-  color: #26221a;
-}
-html[data-theme="lonetrail"] .todoist-cal-weekdays {
-  color: #7a7263;
-}
-html[data-theme="lonetrail"] .todoist-cal-cell {
-  background: rgba(255, 255, 255, 0.55);
-  border-color: rgba(38, 34, 26, 0.1);
-  color: #26221a;
-}
-html[data-theme="lonetrail"] .todoist-cal-cell:hover {
-  background: #ffffff;
-  border-color: #c9993f;
-  color: #c9993f;
-}
-html[data-theme="lonetrail"] .todoist-cal-cell.selected {
-  background: #c9993f !important;
-  color: #ffffff !important;
-  box-shadow: 0 4px 12px rgba(201, 153, 63, 0.4);
-}
 
-/* 终末地高能模式专属适配 (endfield) */
-html[data-theme="endfield"] .todoist-calendar-sidebar {
-  background: rgba(19, 20, 23, 0.96);
-  border-color: rgba(255, 255, 255, 0.12);
-  color: #f2f3f5;
-}
-html[data-theme="endfield"] .todoist-cal-logo {
-  color: #fff500;
-}
-html[data-theme="endfield"] .todoist-cal-badge {
-  background: rgba(255, 245, 0, 0.12);
-  color: #fff500;
-}
-html[data-theme="endfield"] .todoist-cal-cell {
-  background: rgba(255, 255, 255, 0.05);
-  border-color: rgba(255, 255, 255, 0.08);
-  color: #f2f3f5;
-}
-html[data-theme="endfield"] .todoist-cal-cell:hover {
-  background: rgba(255, 245, 0, 0.15);
-  border-color: #fff500;
-  color: #fff500;
-}
-html[data-theme="endfield"] .todoist-cal-cell.selected {
-  background: #fff500 !important;
-  color: #131417 !important;
-  box-shadow: 0 4px 12px rgba(255, 245, 0, 0.35);
-}
+
+
 
 /* Google Calendar backend for the existing DayLine UI. */
 .google-calendar-agenda-item { color:inherit;text-decoration:none; }
@@ -717,3 +636,60 @@ html[data-theme="endfield"] .todoist-cal-cell.selected {
 .google-calendar-event-foot button:disabled { opacity:.58;cursor:wait; }
 html[data-theme="dark"] .google-calendar-day-menu,html[data-theme="dark"] .google-calendar-event-card { border-color:rgba(255,255,255,.12);background:#18181b; }
 @media(max-width:520px){.google-calendar-event-body{grid-template-columns:1fr}.google-calendar-time-row{grid-template-columns:1fr 1fr}.google-calendar-event-body label.wide,.google-calendar-event-body .google-calendar-all-day,.google-calendar-time-row{grid-column:1}}
+
+
+/* 暖纸色主题 */
+html[data-theme="lonetrail"] .todoist-calendar-sidebar {
+  background: rgba(234, 229, 216, 0.96);
+  border-color: rgba(38, 34, 26, 0.16);
+  color: #26221a;
+}
+html[data-theme="lonetrail"] .todoist-cal-logo {
+  color: #a34e3c;
+}
+html[data-theme="lonetrail"] .todoist-cal-badge {
+  background: rgba(163, 78, 60, 0.12);
+  color: #a34e3c;
+}
+html[data-theme="lonetrail"] .todoist-cal-today-btn {
+  background: rgba(255, 255, 255, 0.65);
+  border-color: rgba(38, 34, 26, 0.18);
+  color: #26221a;
+}
+html[data-theme="lonetrail"] .todoist-cal-today-btn:hover {
+  background: #ffffff;
+  border-color: #c9993f;
+  color: #c9993f;
+}
+html[data-theme="lonetrail"] .todoist-cal-nav {
+  background: rgba(38, 34, 26, 0.05);
+  border-color: rgba(38, 34, 26, 0.12);
+}
+html[data-theme="lonetrail"] .cal-nav-label {
+  color: #26221a;
+}
+html[data-theme="lonetrail"] .cal-nav-btn {
+  color: #7a7263;
+}
+html[data-theme="lonetrail"] .cal-nav-btn:hover {
+  background: rgba(38, 34, 26, 0.09);
+  color: #26221a;
+}
+html[data-theme="lonetrail"] .todoist-cal-weekdays {
+  color: #7a7263;
+}
+html[data-theme="lonetrail"] .todoist-cal-cell {
+  background: rgba(255, 255, 255, 0.55);
+  border-color: rgba(38, 34, 26, 0.1);
+  color: #26221a;
+}
+html[data-theme="lonetrail"] .todoist-cal-cell:hover {
+  background: #ffffff;
+  border-color: #c9993f;
+  color: #c9993f;
+}
+html[data-theme="lonetrail"] .todoist-cal-cell.selected {
+  background: #c9993f !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 12px rgba(201, 153, 63, 0.4);
+}

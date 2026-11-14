@@ -770,23 +770,27 @@
                   </div>
                 </div>
 
+                <BackupEncryptionSettings :webdav-password="webdavDraft.webdavPassword" :disabled="webdavBusy" />
+
                 <!-- WebDAV 连接配置操作栏 -->
                 <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 4px;">
                   <button type="button" class="btn-primary" :disabled="webdavBusy" @click="handleSaveWebDav">
                     保存连接设置
                   </button>
-                  <button type="button" class="btn-secondary" :disabled="webdavBusy" @click="handleTestWebDav">
-                    测试连接
-                  </button>
                   <button type="button" class="btn-save-green" :disabled="webdavBusy" title="将当前本地配置（含添加与删除）上传至云端保存" @click="() => handlePushWebDav(false)">
                     ⬆️ 上传到云端
                   </button>
-                  <button type="button" class="btn-secondary" :disabled="webdavBusy" style="color: #0284c7;" title="单向下载融合：把云端独有的内容合并到当前这台电脑" @click="() => handlePullWebDav(true)">
-                    ⬇️ 合并云端到本地
-                  </button>
-                  <button type="button" class="btn-secondary" :disabled="webdavBusy" title="刷新云端最新设备与修改记录" @click="() => handleInspectRemoteSync(false)">
-                    🔄 刷新对比
-                  </button>
+                  <details class="webdav-more">
+                    <summary>更多操作</summary>
+                    <div class="webdav-more-actions">
+                      <button type="button" class="btn-secondary" :disabled="webdavBusy" @click="handleTestWebDav">测试连接</button>
+                      <button type="button" class="btn-secondary" :disabled="webdavBusy" @click="() => handleInspectRemoteSync(false)">刷新对比</button>
+                      <button type="button" class="btn-secondary" :disabled="webdavBusy" title="并集合并，旧设备上的已删除网站可能重新出现" @click="() => handlePullWebDav(true)">合并云端到本地</button>
+                      <button type="button" class="btn-secondary" :disabled="webdavBusy" title="将两端网站并集合并后上传" @click="() => handlePushWebDav(true)">双向合并上传</button>
+                      <button type="button" class="btn-secondary" :disabled="webdavBusy" title="用云端覆盖普通配置，保留本机已有账号连接" @click="() => handlePullWebDav(false)">用云端覆盖本地</button>
+                      <button type="button" class="btn-secondary" :disabled="webdavBusy" title="合并当前配置并替换旧版明文备份" @click="handleMigrateWebDav">迁移旧备份并加密</button>
+                    </div>
+                  </details>
                 </div>
 
                 <!-- 提示反馈 -->
@@ -837,27 +841,6 @@
                     </ul>
                   </div>
 
-                  <!-- 核心同步操作栏：只保留 2 个核心按钮 + 1 个折叠次要高级覆盖选项 -->
-                  <div style="display: flex; gap: 10px; margin-top: 2px; align-items: center; flex-wrap: wrap;">
-                    <button type="button" class="btn-save-green" :disabled="webdavBusy" style="font-size: 11px; padding: 6px 14px;" title="将当前本地配置（含添加与删除）上传至云端保存" @click="() => handlePushWebDav(false)">
-                      ⬆️ 上传到云端
-                    </button>
-                    <button type="button" class="btn-primary" :disabled="webdavBusy" style="font-size: 11px; padding: 6px 14px;" title="单向下载融合：把云端独有的内容合并到当前这台电脑" @click="() => handlePullWebDav(true)">
-                      ⬇️ 合并云端到本地
-                    </button>
-
-                    <details style="margin-left: auto; font-size: 11px; color: var(--muted); cursor: pointer;">
-                      <summary style="user-select: none;">更多选项…</summary>
-                      <div style="display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap;">
-                        <button type="button" class="btn-secondary" :disabled="webdavBusy" style="font-size: 10px; padding: 2px 8px;" title="将本地与云端两边各自的新增项做并集融合后上传" @click="() => handlePushWebDav(true)">
-                          双向合并上传
-                        </button>
-                        <button type="button" class="btn-secondary" :disabled="webdavBusy" style="font-size: 10px; padding: 2px 8px; color: #ef4444;" title="放弃本地所有修改，完全覆盖为云端版本" @click="() => handlePullWebDav(false)">
-                          强制覆盖本地
-                        </button>
-                      </div>
-                    </details>
-                  </div>
                 </div>
               </div>
             </div>
@@ -877,7 +860,7 @@
                   {{ localBackupMsg }}
                 </span>
                 <small style="flex-basis: 100%; color: var(--muted); font-size: 10.5px; margin-top: 2px;">
-                  本地快照包含常用网站、分组布局、主题、快捷键等普通配置，不含任何账户密码私密信息。
+本地 JSON 导出没有加密，可能包含提示词、文章及 GitHub、Todoist、WebDAV 等凭据；请勿上传或分享。Multica 连接不会包含在本地 JSON 中。
                 </small>
               </div>
             </div>
@@ -1025,6 +1008,7 @@ import {
   persistSlots
 } from "../search/search-slots.store";
 import { t, currentLanguage, setLanguage, SUPPORTED_LANGUAGES } from "../i18n";
+import { normalizeSystemTheme } from "../theme/system-theme";
 import CustomSelect, { type CustomSelectOption } from "../core/CustomSelect.vue";
 
 declare const chrome: any;
@@ -1112,6 +1096,7 @@ function handleMinimize() {
 }
 
 import { webDavService } from "../services/webdav.service";
+import BackupEncryptionSettings from '../sync/BackupEncryptionSettings.vue';
 import { computeConfigDiff, compareLocalAndRemote } from "../services/sync-diff";
 import { createSyncBackup, restoreSyncBackup, readSyncSettings } from "../services/sync.service";
 import { loadWebDavSettings, saveWebDavSettings, toWebDavConfig, type WebDavSettings } from "../sync/settings";
@@ -1228,6 +1213,7 @@ async function handleTestWebDav() {
 
 async function handlePushWebDav(mergeMode = false) {
   if (webdavBusy.value) return;
+  if (mergeMode && !confirm('当前合并按网站并集处理，无法识别旧设备上的删除操作，已删除的网站可能重新出现。请先备份两端数据；确定继续合并上传吗？')) return;
   webdavBusy.value = true;
   webdavStatusMsg.value = mergeMode ? "正在与云端合并并上传…" : "正在上传本地配置到云端…";
   try {
@@ -1235,9 +1221,10 @@ async function handlePushWebDav(mergeMode = false) {
     const res = await webDavService.pushCurrentConfig(config, { mergeRemote: mergeMode });
     if (res.ok) {
       webdavStatusMsg.value = mergeMode
-        ? `✓ 双向合并上传成功！已将两端内容融合并同步 (${res.byteLength || 0} 字节)`
+        ? `✓ 已合并并上传云端（${res.byteLength || 0} 字节）；本机未自动覆盖，可选择合并云端到本地。`
         : `✓ 上传成功！已将当前本地配置保存至云端 (${res.byteLength || 0} 字节)`;
-      notify(mergeMode ? "已成功双向合并并同步至云端！" : "已成功上传至云端备份！");
+      if (!res.baselineRecorded) webdavStatusMsg.value += ' 但两端未完全一致或服务器未提供 ETag，自动同步基准未建立；请手动核对。';
+      notify(mergeMode ? "已合并上传至云端，本机未自动覆盖。" : "已成功上传至云端备份！");
       // 自动静默刷新一次对比动态
       void handleInspectRemoteSync(true);
     } else {
@@ -1250,11 +1237,23 @@ async function handlePushWebDav(mergeMode = false) {
   }
 }
 
+async function handleMigrateWebDav() {
+  if (webdavBusy.value) return;
+  if (!confirm('这会读取并合并旧版明文备份，然后将同名云端文件替换为加密备份。请先在 WebDAV 保存旧文件的副本；服务器历史版本可能仍保留明文。合并无法识别旧的删除操作，已删除的网站可能重新出现。确认迁移吗？')) return;
+  webdavBusy.value = true; webdavStatusMsg.value = '正在合并旧备份并加密…';
+  try {
+    const result = await webDavService.pushCurrentConfig(toWebDavConfig(webdavDraft), { mergeRemote:true, migrateLegacy:true });
+    webdavStatusMsg.value = result.ok ? `✓ 已迁移并加密；请检查云端历史版本是否仍含明文。${result.baselineRecorded ? '' : ' 两端未完全一致，自动同步基准未建立，请手动核对。'}` : `✕ 迁移失败：${result.error || '未确认上传'}`;
+    if (result.ok) void handleInspectRemoteSync(true);
+  } catch { webdavStatusMsg.value = '✕ 迁移未确认，请先检查云端状态，不要重复上传。'; }
+  finally { webdavBusy.value = false; }
+}
+
 async function handlePullWebDav(mergeMode = true) {
   if (webdavBusy.value) return;
   const promptText = mergeMode
-    ? "确定合并云端到本地吗？云端新增的常用网站与 Star 分组将无损合并至本地，不删除本地内容。"
-    : "确定全量覆盖本地吗？警告：这将放弃本地独有的网站和改动，完全还原为云端一模一样。";
+    ? "确定合并云端到本地吗？目前按并集合并，无法识别旧的删除操作，已删除的网站可能重新出现。请先备份两端数据。"
+    : "确定用云端覆盖本地配置吗？云端包含的提示词和文章也会覆盖本地对应数据；本机已有账号连接会保留。请先备份当前数据。";
   if (!confirm(promptText)) return;
   webdavBusy.value = true;
   webdavStatusMsg.value = mergeMode ? "正在合并云端到本地…" : "正在用云端全量覆盖本地…";
@@ -1265,6 +1264,9 @@ async function handlePullWebDav(mergeMode = true) {
       webdavStatusMsg.value = mergeMode
         ? `✓ 合并成功！已无损融合云端配置。请刷新页面查看。`
         : `✓ 覆盖成功！已还原 ${res.restoredCount || 0} 项配置。请刷新页面查看。`;
+      if (res.credentialResult === 'restored') webdavStatusMsg.value += ' Multica 连接已恢复。';
+      if (res.credentialResult === 'kept') webdavStatusMsg.value += ' 已保留本机原有 Multica 连接。';
+      if (!res.baselineRecorded) webdavStatusMsg.value += ' 两端未完全一致或服务器未提供 ETag，自动同步基准未建立；请手动核对。';
       notify(mergeMode ? "已成功合并云端配置！" : `覆盖成功！已还原 ${res.restoredCount || 0} 项配置`);
       // 自动静默刷新一次对比动态
       void handleInspectRemoteSync(true);
@@ -1280,6 +1282,7 @@ async function handlePullWebDav(mergeMode = true) {
 
 // 本地快照导出与导入
 async function handleExportLocalJson() {
+  if (!confirm('本地 JSON 不加密，可能包含 GitHub、Todoist 和 WebDAV 等凭据。请只保存到可信位置，不要分享。确认导出吗？')) return;
   try {
     const rawSettings = await readSyncSettings();
     const backup = await createSyncBackup(rawSettings);
@@ -1447,7 +1450,6 @@ const defaultForm: SettingsConfig = {
   showWeather: true,
   showSites: true,
   showBili: true,
-  showYouTube: true,
   showTodo: true,
   showLeftNavigation: true,
   showNavBall: false,
@@ -1576,17 +1578,16 @@ function draftSnapshot(): Record<string, any> {
 const SYSTEM_THEMES = computed(() => [
   { id: "light", icon: "☀️", name: t("theme.light"), desc: t("theme.lightDesc") },
   { id: "dark", icon: "🌙", name: t("theme.dark"), desc: t("theme.darkDesc") },
-  { id: "endfield", icon: "⚡", name: t("theme.endfield"), desc: t("theme.endfieldDesc") },
-  { id: "lonetrail", icon: "🌌", name: t("theme.lonetrail"), desc: t("theme.lonetrailDesc") }
+  { id: "lonetrail", icon: "📄", name: t("theme.lonetrail"), desc: t("theme.lonetrailDesc") }
 ]);
 
-const activeThemeId = ref(
+const activeThemeId = ref<string>(normalizeSystemTheme(
   (typeof document !== "undefined" && document.documentElement.dataset.theme) ||
-  (typeof localStorage !== "undefined" && localStorage.getItem("theme")) ||
-  "light"
-);
+  (typeof localStorage !== "undefined" && localStorage.getItem("theme"))
+));
 
 function handleSelectTheme(themeId: string) {
+  themeId = normalizeSystemTheme(themeId);
   activeThemeId.value = themeId;
   if (typeof document !== "undefined") {
     document.documentElement.dataset.theme = themeId;
@@ -2253,7 +2254,7 @@ async function loadAll() {
 
 onMounted(() => {
   if (typeof document !== "undefined") {
-    activeThemeId.value = document.documentElement.dataset.theme || localStorage.getItem("theme") || "light";
+    activeThemeId.value = normalizeSystemTheme(document.documentElement.dataset.theme || localStorage.getItem("theme"));
   }
   loadAll();
   initWebDav();
