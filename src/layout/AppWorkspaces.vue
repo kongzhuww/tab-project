@@ -31,15 +31,13 @@ onMounted(() => {
         <DockCardModuleHost id="daily-bilibili" />
       </div>
 
-      <!-- YouTube -->
-      <div v-show="homePrefsState.showYouTube" id="vue-youtube-root">
-        <DockCardModuleHost id="daily-youtube" />
-      </div>
-
       <!-- AI HOT -->
       <div id="vue-aihot-root">
         <DockCardModuleHost id="daily-aihot" />
       </div>
+
+      <!-- Agent 全屏工作台 -->
+      <div id="vue-multica-root"><DockCardModuleHost id="multica" /></div>
 
       <!-- GitHub 综合仪表盘（纯血 Vue 3 统一卡片工作台） -->
       <DockCardModuleHost id="card-github" />

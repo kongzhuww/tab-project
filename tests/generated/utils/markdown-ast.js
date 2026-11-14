@@ -556,7 +556,7 @@ var MarkdownAstEngine = class _MarkdownAstEngine {
     return text;
   }
   renderMarkdown(source, options = {}) {
-    if (options.renderMode !== "md" && customFastRenderer) {
+    if (options.renderMode !== "md" && options.useFastRenderer !== false && customFastRenderer) {
       const fastResult = customFastRenderer(source);
       if (typeof fastResult === "string") {
         return fastResult;

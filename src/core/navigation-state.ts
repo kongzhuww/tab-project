@@ -5,8 +5,7 @@ import { windowManagerController, windowManagerState } from "./window-manager.st
 const standaloneCards: Record<string, CardId> = {
   "bilibili.html": "daily-bilibili",
   "github.html": "card-github",
-  "aihot.html": "daily-aihot",
-  "youtube.html": "daily-youtube"
+  "aihot.html": "daily-aihot"
 };
 
 export function getStandaloneCardId(): CardId | null {

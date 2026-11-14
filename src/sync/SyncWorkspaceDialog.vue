@@ -4,6 +4,7 @@ import AppWindowFrame from "../core/AppWindowFrame.vue";
 import { windowManagerController } from "../core/window-manager.store";
 import { syncModuleState } from "./module-state";
 import { webDavService } from "../services/webdav.service";
+import BackupEncryptionSettings from './BackupEncryptionSettings.vue';
 import { syncService } from "../services/sync.service";
 import { loadWebDavSettings, saveWebDavSettings, toWebDavConfig, WEBDAV_SETTINGS_KEYS, type WebDavSettings } from "./settings";
 import { SyncDialogMachine, type SyncOperation } from "./sync-dialog-machine";
@@ -123,21 +124,23 @@ async function confirmOperation() {
       : await webDavService.pullCurrentConfig(toWebDavConfig(stored!));
 
     if (!result.ok) {
-      const errorMsg = result.errorKind === "policy" ? result.error || "备份校验失败，操作已取消。" : "同步失败，请检查连接或实际写入结果。未自动重试。";
+      const errorMsg = result.error || '同步失败，请检查连接或实际写入结果。未自动重试。';
       machine.send({ type: "OPERATION_FAILED", message: errorMsg });
       return;
     }
 
+    const credentialResult = 'credentialResult' in result ? result.credentialResult : undefined;
+    const baselineWarning = 'baselineRecorded' in result && !result.baselineRecorded ? ' 两端未完全一致或服务器未提供 ETag，自动同步基准未建立。' : '';
     if (op.endsWith("pull")) {
       await load();
       machine.send({
         type: "OPERATION_COMPLETE",
-        message: `已恢复 ${result.restoredCount || 0} 项普通配置，本机账号、凭据和连接设置未被恢复覆盖。请手动刷新已打开页面；此处不会自动重载。`
+        message: `已恢复 ${result.restoredCount || 0} 项配置；已保留本机已有连接。${credentialResult === 'restored' ? 'Multica 连接已恢复。' : credentialResult === 'kept' ? '已保留本机 Multica 连接。' : ''}请手动刷新已打开页面。${baselineWarning}`
       });
     } else {
       machine.send({
         type: "OPERATION_COMPLETE",
-        message: "普通备份已上传，不包含模块账号、凭据和服务连接配置。"
+        message: `WebDAV 加密备份已上传。${baselineWarning}`
       });
     }
   } catch {
@@ -151,7 +154,7 @@ function close() { void windowManagerController.close("sync"); }
   <AppWindowFrame window-id="sync" title="同步模块" icon="☁️" :visible="syncModuleState.visible" :default-width="540" :default-height="580" :min-width="360" :min-height="360" custom-class="sync-workspace" @close="close" @minimize="close">
     <div class="sync-content">
       <p>关闭/最小化只隐藏窗口并保留草稿，不撤销已发送的任务。Dock 退出/重载会丢弃未保存草稿；保存、测试或同步进行中只能隐藏，不能退出/重载。</p>
-      <p>WebDAV 凭据只用于连接，不放入普通备份。使用 HTTPS；HTTP 会明文传输认证信息。</p>
+      <p>WebDAV 备份在本机加密，可能包含账户凭据。请使用 HTTPS；HTTP 会明文传输 WebDAV 认证信息。</p>
       <fieldset :disabled="!isReady || isBusy">
         <form @submit.prevent="save">
           <label>WebDAV 服务器地址<input v-model="draft.webdavUrl" type="url" autocomplete="off" /></label>
@@ -160,14 +163,15 @@ function close() { void windowManagerController.close("sync"); }
           <label>备份文件名<input v-model="draft.webdavFilename" type="text" /></label>
           <div class="actions"><button type="submit">保存连接设置</button><button type="button" @click="test">测试 WebDAV</button></div>
         </form>
+        <BackupEncryptionSettings :webdav-password="draft.webdavPassword" :disabled="isBusy" />
         <h3>WebDAV 备份</h3>
         <div class="actions"><button type="button" @click="request('webdav-push')">上传备份</button><button type="button" @click="request('webdav-pull')">恢复备份</button></div>
         <h3>私有云中枢 / Native Host（已停用）</h3>
         <div class="actions"><button type="button" @click="request('cloud-push')" title="Native Host 已于 v1.0.2 彻底移除，请使用 WebDAV 备份">VPS 备份（已停用）</button><button type="button" @click="request('cloud-pull')" title="Native Host 已于 v1.0.2 彻底移除，请使用 WebDAV 备份">VPS 恢复（已停用）</button></div>
       </fieldset>
-      <p>普通备份只含白名单偏好、布局、常用网站和分组等数据，不读取或导出模块存储中的账号、Token、Cookie、密码或私有服务连接配置；频道及旧 AI 整组配置也不备份。JSON 未加密，书签、备注和头像仍可能涉及隐私或用户手填秘密，不等于匿名脱敏或全部扩展数据镜像。历史 Native Host 伴侣已在 v1.0.2 彻底停用，请使用 WebDAV 完整云端备份。</p>
+      <p>WebDAV 备份包含白名单内的配置及可用的 Multica 连接，上传前会使用独立口令加密。旧版明文备份需先到「设置 → 同步」确认迁移。历史 Native Host 已停用。</p>
       <section v-if="pending" class="confirmation" aria-label="同步操作确认">
-        <p>{{ restorePending ? '恢复只覆盖白名单中的普通设置与常用网站，不是合并。旧备份中的账号、凭据、服务连接和频道/AI 整组配置将忽略，不会清空现有登录设置。请先备份当前普通数据。' : '上传普通备份会覆盖同名云端文件，不会携带模块连接配置和凭据。若该旧文件曾包含凭据，覆盖后不能从新文件找回；服务端历史版本可能仍保留。请确认目标并妥善保管旧备份。' }}</p>
+        <p>{{ restorePending ? '恢复会覆盖云端包含的普通配置、提示词和文章；本机已有账号连接会保留。若本机没有 Multica 连接，会从加密备份恢复。请先备份当前数据。' : '上传前会验证云端备份和口令，并加密本机配置与 Multica 连接。云端旧明文备份需在设置中单独确认迁移。确认目标后继续。' }}</p>
         <div class="actions"><button type="button" :disabled="isBusy" @click="confirmOperation">{{ restorePending ? '确认恢复覆盖' : '确认上传' }}</button><button type="button" @click="cancelConfirmation">取消</button></div>
       </section>
       <p v-if="message" role="status">{{ message }}</p>

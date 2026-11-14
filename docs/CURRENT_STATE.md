@@ -28,7 +28,7 @@
 | 构建 | `package.json`、`vite.ui.config.ts`、`vite.sandbox.config.ts`、`vite.localizer.config.ts`；不要从历史测试文件推导允许执行的验证方式 |
 
 `src/theme/theme-init.ts` 是首页及部分独立入口使用的首绘脚本源码，输出至 `generated/theme-init.js`，不是根目录脚本。首页开屏默认关闭；开启后先核对 chrome.storage.local 的已保存偏好，组件挂载后才开始演播，刷新恢复卡片不跳过动画。CSP 与启动时序已做源码修正及构建检查，实际扩展刷新效果仍待浏览器验收。
-- **界面主题**：由 CSS 变量 `data-theme` 驱动，支持 4 套风格：白天模式 (`light`，默认)、夜晚模式 (`dark`)、终末地风格 (`endfield`)、孤星风格 (`lonetrail`)。旧版本曾使用 Lone Trail / Endfield 等名称，当前主题键以源码为准；
+- **界面主题**：由 CSS 变量 `data-theme` 驱动，支持白天模式 (`light`，默认)、夜晚模式 (`dark`) 和暖纸色 (`lonetrail`)；旧版终末地界面主题回退至夜晚模式；
 - **启动开机动画**：由 `startupAnimationStyle` 独立控制，支持莱茵生命科技终端动效 (`rhinelab`，冷启动默认) 与终末地工业风开机动效 (`endfield`)；启动动效与页面主题相互独立，非同一配置。
 
 ## 最新默认行为与快捷键（源码已改，待人工验收）

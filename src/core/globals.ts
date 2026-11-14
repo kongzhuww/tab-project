@@ -47,9 +47,7 @@ import { biliFavoritesController } from "../bilibili/bili-favorites-store";
 import { biliOrganizerDialogController } from "../bilibili/organizer-dialog-store";
 import { biliUpGroupManagerController } from "../bilibili/up-group-manager-store";
 import { biliUpPreviewController } from "../bilibili/up-preview-store";
-import { youTubeController } from "../youtube/youtube-store";
 import { getDiagnosticsMachines, registerMachineForDiagnostics } from "./state-machine";
-import { youTubeService, YouTubeService } from "../services/youtube.service";
 import { aihotFeedController } from "../aihot/aihot-feed-store";
 import { gitHubTrendingController } from "../github/trending-store";
 import { shortcutService } from "../services/shortcut.service";
@@ -130,8 +128,6 @@ declare global {
     LogicWeaverBiliOrganizerDialogs?: typeof biliOrganizerDialogController;
     LogicWeaverBiliUpGroupManager?: typeof biliUpGroupManagerController;
     LogicWeaverBiliUpPreview?: typeof biliUpPreviewController;
-    LogicWeaverYouTube?: typeof youTubeController;
-    LogicWeaverYouTubeService?: typeof youTubeService;
     LogicWeaverAihotFeed?: typeof aihotFeedController;
     LogicWeaverGitHubTrending?: typeof gitHubTrendingController;
     LogicWeaverCalendarWorkspace?: typeof calendarWorkspaceController;
@@ -228,7 +224,6 @@ export function installGlobalControllers(commands: CommandRegistry, features: Fe
   window.LogicWeaverBiliOrganizerDialogs = biliOrganizerDialogController;
   window.LogicWeaverBiliUpGroupManager = biliUpGroupManagerController;
   window.LogicWeaverBiliUpPreview = biliUpPreviewController;
-  window.LogicWeaverYouTube = youTubeController;
   window.LogicWeaverAihotFeed = aihotFeedController;
   window.LogicWeaverGitHubTrending = gitHubTrendingController;
   window.LogicWeaverCalendarWorkspace = calendarWorkspaceController;

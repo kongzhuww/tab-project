@@ -639,11 +639,6 @@ function handleMenuDelete(event: MouseEvent) {
   box-sizing: border-box;
 }
 
-html[data-theme="lonetrail"] .sticker-explorer-nav {
-  background: rgba(238, 233, 222, 0.7);
-  border-color: rgba(138, 126, 114, 0.2);
-}
-
 .explorer-back-btn {
   display: inline-flex;
   align-items: center;
@@ -658,12 +653,6 @@ html[data-theme="lonetrail"] .sticker-explorer-nav {
   cursor: pointer;
   white-space: nowrap;
   transition: all 0.15s ease;
-}
-
-html[data-theme="lonetrail"] .explorer-back-btn {
-  background: #ffffff;
-  color: #3b332b;
-  border-color: rgba(138, 126, 114, 0.3);
 }
 
 .explorer-back-btn:hover {
@@ -701,10 +690,6 @@ html[data-theme="lonetrail"] .explorer-back-btn {
   transition: all 0.12s ease;
 }
 
-html[data-theme="lonetrail"] .crumb-link {
-  color: #786d63;
-}
-
 .crumb-link:hover {
   color: #38bdf8;
   background: var(--surface-hover, rgba(255, 255, 255, 0.08));
@@ -714,10 +699,6 @@ html[data-theme="lonetrail"] .crumb-link {
   color: var(--text, #f8fafc);
   font-weight: 700;
   cursor: default;
-}
-
-html[data-theme="lonetrail"] .crumb-link.is-active {
-  color: #2b241e;
 }
 
 /* 子文件夹卡片区 */
@@ -732,10 +713,6 @@ html[data-theme="lonetrail"] .crumb-link.is-active {
   font-size: 12px;
   font-weight: 700;
   color: var(--muted, #94a3b8);
-}
-
-html[data-theme="lonetrail"] .subfolders-section-header {
-  color: #8c7e72;
 }
 
 .subfolders-grid {
@@ -832,12 +809,6 @@ html[data-theme="lonetrail"] .subfolders-section-header {
   border-color: #38bdf8;
 }
 
-html[data-theme="lonetrail"] .subfolder-card {
-  background: #ffffff;
-  border-color: rgba(138, 126, 114, 0.2);
-  box-shadow: 0 1px 3px rgba(74, 53, 39, 0.05);
-}
-
 .subfolder-card:hover {
   background: var(--surface-hover, rgba(56, 189, 248, 0.1));
   border-color: rgba(56, 189, 248, 0.35);
@@ -910,17 +881,9 @@ html[data-theme="lonetrail"] .subfolder-card {
   text-overflow: ellipsis;
 }
 
-html[data-theme="lonetrail"] .subfolder-card-name {
-  color: #3b332b;
-}
-
 .subfolder-card-count {
   font-size: 11px;
   color: var(--muted, #64748b);
-}
-
-html[data-theme="lonetrail"] .subfolder-card-count {
-  color: #8c7e72;
 }
 
 .subfolder-card-arrow {
@@ -1315,7 +1278,53 @@ html[data-theme="light"] .sticker-num-btn.active {
   box-shadow: 0 2px 8px rgba(2, 132, 199, 0.35);
 }
 
-/* 孤星纸面主题 (Lonetrail) 特化 */
+
+
+/* 窄屏响应式折叠 */
+@media (max-width: 600px) {
+  .sticker-page-left,
+  .sticker-page-right {
+    display: none;
+  }
+}
+
+/* 暖纸色主题 */
+html[data-theme="lonetrail"] .sticker-explorer-nav {
+  background: rgba(238, 233, 222, 0.7);
+  border-color: rgba(138, 126, 114, 0.2);
+}
+
+html[data-theme="lonetrail"] .explorer-back-btn {
+  background: #ffffff;
+  color: #3b332b;
+  border-color: rgba(138, 126, 114, 0.3);
+}
+
+html[data-theme="lonetrail"] .crumb-link {
+  color: #786d63;
+}
+
+html[data-theme="lonetrail"] .crumb-link.is-active {
+  color: #2b241e;
+}
+
+html[data-theme="lonetrail"] .subfolders-section-header {
+  color: #8c7e72;
+}
+
+html[data-theme="lonetrail"] .subfolder-card {
+  background: #ffffff;
+  border-color: rgba(138, 126, 114, 0.2);
+  box-shadow: 0 1px 3px rgba(74, 53, 39, 0.05);
+}
+
+html[data-theme="lonetrail"] .subfolder-card-name {
+  color: #3b332b;
+}
+
+html[data-theme="lonetrail"] .subfolder-card-count {
+  color: #8c7e72;
+}
 html[data-theme="lonetrail"] .sticker-pagination {
   background: #f4f0e8;
   border-top-color: rgba(138, 126, 114, 0.2);
@@ -1341,13 +1350,5 @@ html[data-theme="lonetrail"] .sticker-num-btn.active {
   border-color: #a34e3c;
   color: #ffffff;
   box-shadow: 0 2px 8px rgba(163, 78, 60, 0.35);
-}
-
-/* 窄屏响应式折叠 */
-@media (max-width: 600px) {
-  .sticker-page-left,
-  .sticker-page-right {
-    display: none;
-  }
 }
 </style>

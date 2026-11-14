@@ -16,6 +16,19 @@ export function mergeSyncSettings(
   const rem = (remote && typeof remote === "object") ? remote : {};
   const merged: Record<string, any> = { ...loc, ...rem };
 
+  // Backpack arrays cannot be merged by replacing one side: this could revive
+  // deletions or discard newer prompts. Require explicit conflict handling.
+  for (const key of ['logicweaver_prompt_backpack_v1', 'logicweaver_prompt_backpack_categories_v1', 'logicweaver_saved_articles_v1', 'logicweaver_saved_article_categories_v1']) {
+    if (loc[key] !== undefined && rem[key] !== undefined && JSON.stringify(loc[key]) !== JSON.stringify(rem[key])) {
+      throw new Error('本机和云端背包内容不同；为避免覆盖或恢复已删除内容，未合并。请先分别导出备份。');
+    }
+  }
+
+  // Discard data from the removed module even when merging legacy backups.
+  delete merged.youtubeFavoritesV1;
+  delete merged.youtubeFavGroupsV1;
+  delete merged.showYouTube;
+
   // 1. 常用网站 (quickLinks) 智能合并
   type Link = { url: string; title: string; id?: string; icon?: string; page?: string; group?: string };
   const localLinks: Link[] = Array.isArray(loc.quickLinks) ? loc.quickLinks : [];

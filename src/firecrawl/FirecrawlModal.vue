@@ -276,8 +276,7 @@ onUnmounted(() => {
 }
 
 /* 暗黑模式实体纯色 */
-:root[data-theme="dark"] .fc-modal-window,
-:root[data-theme="endfield"] .fc-modal-window {
+:root[data-theme="dark"] .fc-modal-window {
   background: #1e293b !important;
   border-color: rgba(255, 255, 255, 0.15);
   color: #f1f5f9;
@@ -300,8 +299,7 @@ onUnmounted(() => {
 .fc-modal-header:active {
   cursor: grabbing;
 }
-:root[data-theme="dark"] .fc-modal-header,
-:root[data-theme="endfield"] .fc-modal-header {
+:root[data-theme="dark"] .fc-modal-header {
   background: #1e293b !important;
   border-bottom-color: rgba(255, 255, 255, 0.08);
 }
@@ -324,8 +322,7 @@ onUnmounted(() => {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-:root[data-theme="dark"] .fc-title-text,
-:root[data-theme="endfield"] .fc-title-text {
+:root[data-theme="dark"] .fc-title-text {
   color: #f8fafc;
 }
 
@@ -363,14 +360,12 @@ onUnmounted(() => {
   background: #f1f5f9;
   border-color: rgba(0, 0, 0, 0.2);
 }
-:root[data-theme="dark"] .fc-action-btn,
-:root[data-theme="endfield"] .fc-action-btn {
+:root[data-theme="dark"] .fc-action-btn {
   background: rgba(255, 255, 255, 0.08);
   border-color: rgba(255, 255, 255, 0.15);
   color: #f1f5f9;
 }
-:root[data-theme="dark"] .fc-action-btn:hover,
-:root[data-theme="endfield"] .fc-action-btn:hover {
+:root[data-theme="dark"] .fc-action-btn:hover {
   background: rgba(255, 255, 255, 0.15);
 }
 
@@ -395,8 +390,7 @@ onUnmounted(() => {
   border-bottom: 1px solid rgba(0, 0, 0, 0.08);
   flex-shrink: 0;
 }
-:root[data-theme="dark"] .fc-input-banner,
-:root[data-theme="endfield"] .fc-input-banner {
+:root[data-theme="dark"] .fc-input-banner {
   background: #0f172a;
   border-bottom-color: rgba(255, 255, 255, 0.08);
 }
@@ -411,8 +405,7 @@ onUnmounted(() => {
   padding: 3px 8px;
   transition: border-color 0.15s, box-shadow 0.15s;
 }
-:root[data-theme="dark"] .fc-input-wrapper,
-:root[data-theme="endfield"] .fc-input-wrapper {
+:root[data-theme="dark"] .fc-input-wrapper {
   background: #1e293b;
   border-color: rgba(255, 255, 255, 0.15);
 }
@@ -446,8 +439,7 @@ onUnmounted(() => {
   color: #64748b;
   cursor: pointer;
 }
-:root[data-theme="dark"] .fc-paste-quick-btn,
-:root[data-theme="endfield"] .fc-paste-quick-btn {
+:root[data-theme="dark"] .fc-paste-quick-btn {
   background: rgba(255, 255, 255, 0.06);
   border-color: rgba(255, 255, 255, 0.1);
   color: #94a3b8;
@@ -484,8 +476,7 @@ onUnmounted(() => {
   border-bottom: 1px solid rgba(0, 0, 0, 0.06);
   font-size: 11.5px;
 }
-:root[data-theme="dark"] .fc-sub-url-bar,
-:root[data-theme="endfield"] .fc-sub-url-bar {
+:root[data-theme="dark"] .fc-sub-url-bar {
   background: #141e33;
   border-bottom-color: rgba(255, 255, 255, 0.06);
 }
@@ -528,8 +519,7 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
 }
-:root[data-theme="dark"] .fc-modal-body,
-:root[data-theme="endfield"] .fc-modal-body {
+:root[data-theme="dark"] .fc-modal-body {
   background: #1e293b !important;
 }
 
@@ -552,8 +542,7 @@ onUnmounted(() => {
   font-size: 15px;
   color: #0f172a;
 }
-:root[data-theme="dark"] .fc-empty-intro-box strong,
-:root[data-theme="endfield"] .fc-empty-intro-box strong {
+:root[data-theme="dark"] .fc-empty-intro-box strong {
   color: #f8fafc;
 }
 .fc-empty-intro-box p {
@@ -603,8 +592,7 @@ onUnmounted(() => {
   font-weight: 600;
   color: #0f172a;
 }
-:root[data-theme="dark"] .fc-loading-text,
-:root[data-theme="endfield"] .fc-loading-text {
+:root[data-theme="dark"] .fc-loading-text {
   color: #f8fafc;
 }
 .fc-loading-sub {
@@ -672,8 +660,7 @@ onUnmounted(() => {
   word-break: break-all;
   overflow-y: auto;
 }
-:root[data-theme="dark"] .fc-editor-textarea,
-:root[data-theme="endfield"] .fc-editor-textarea {
+:root[data-theme="dark"] .fc-editor-textarea {
   background: #1e293b !important;
   color: #f1f5f9 !important;
 }
@@ -687,8 +674,7 @@ onUnmounted(() => {
   background: #f8fafc;
   border-top: 1px solid rgba(0, 0, 0, 0.08);
 }
-:root[data-theme="dark"] .fc-modal-footer,
-:root[data-theme="endfield"] .fc-modal-footer {
+:root[data-theme="dark"] .fc-modal-footer {
   background: #0f172a;
   border-top-color: rgba(255, 255, 255, 0.08);
 }
@@ -718,8 +704,7 @@ onUnmounted(() => {
 .fc-btn-secondary:hover {
   background: #f1f5f9;
 }
-:root[data-theme="dark"] .fc-btn-secondary,
-:root[data-theme="endfield"] .fc-btn-secondary {
+:root[data-theme="dark"] .fc-btn-secondary {
   background: rgba(255, 255, 255, 0.08);
   border-color: rgba(255, 255, 255, 0.15);
   color: #f1f5f9;

@@ -12,6 +12,7 @@ import {
   type AiHotDailyArchive
 } from "../aihot/aihot-feed-store";
 import { storageCache } from "./storage-cache.service";
+import { parseModernLeaderboard } from "../aihot/leaderboard-parser";
 
 export const DEFAULT_AIHOT_API = "https://aihot.virxact.com/api/v1";
 
@@ -188,6 +189,9 @@ export class AiHotService {
   }
 
   private parseLeaderboardHtml(html: string): AiHotLeaderboardItem[] {
+    const modern = parseModernLeaderboard(html);
+    if (modern.length) return modern;
+    if (!html.includes('lb-model-entry')) return [];
     const items: AiHotLeaderboardItem[] = [];
     if (typeof DOMParser !== "undefined") {
       try {
@@ -249,7 +253,7 @@ export class AiHotService {
     await this.read<AiHotLeaderboardItem[]>("leaderboard", "aihot_leaderboard_items", force, 30 * 60 * 1000,
       (value): value is AiHotLeaderboardItem[] => Array.isArray(value) && value.every(item => item && typeof item.model === "string" && typeof item.provider === "string"),
       async signal => {
-        const res = await fetch("https://aihot.virxact.com/leaderboard", { headers: { Accept: "text/html" }, signal });
+        const res = await fetch("https://aihot.news/leaderboard", { headers: { Accept: "text/html" }, signal });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const items = this.parseLeaderboardHtml(await res.text());
         if (!items.length) throw new Error("未识别到榜单，来源页面可能已变更");
@@ -285,7 +289,7 @@ export class AiHotService {
   public async fetchArticleContent(item: { id?: string | number; url?: string; summary?: string; title?: string }): Promise<string> {
     const itemId = item.id ? String(item.id) : "";
     // Old entries may contain a whole source-page article, including duplicate responsive controls.
-    const cacheKey = `aihot_art_v2_${itemId}`;
+    const cacheKey = `aihot_art_v3_${itemId}`;
     if (itemId && this.aihotArticleCache.has(itemId)) {
       return this.aihotArticleCache.get(itemId)!;
     }
@@ -373,32 +377,108 @@ export class AiHotService {
         }
       }
     }
-    let html = doc.body.innerHTML;
 
-    // 2. 补全并代理图片路径（防 404 与防盗链）
-    html = html.replace(/src=["'](?:\/api\/img-proxy\?([^"']+))["']/gi, (m, q) => {
-      return `src="https://aihot.news/api/img-proxy?${q}"`;
+    // 辅助：从代理链接中提取并还原真实原始图源，若不是代理则补全域名前缀
+    const restoreDirectImageUrl = (urlStr: string): string => {
+      if (!urlStr) return "";
+      try {
+        const uMatch = urlStr.match(/[?&]u=([^&]+)/);
+        if (uMatch) {
+          return decodeURIComponent(uMatch[1]);
+        }
+      } catch {}
+      if (urlStr.startsWith("/")) {
+        return `https://aihot.news${urlStr}`;
+      }
+      return urlStr;
+    };
+
+    const cleanSrcset = (srcsetValue: string): string => {
+      if (!srcsetValue) return "";
+      return srcsetValue
+        .split(",")
+        .map((part) => {
+          const trimmed = part.trim();
+          if (!trimmed) return "";
+          const tokens = trimmed.split(/\s+/);
+          const rawUrl = tokens[0];
+          const restored = restoreDirectImageUrl(rawUrl);
+          return tokens.length > 1 ? `${restored} ${tokens[1]}` : restored;
+        })
+        .filter(Boolean)
+        .join(", ");
+    };
+
+    // 2. 深度处理并还原所有图片标签（解代理直链、补齐协议、防盗链保护）
+    doc.querySelectorAll("img").forEach((img) => {
+      const src = img.getAttribute("src");
+      if (src) {
+        img.setAttribute("src", restoreDirectImageUrl(src));
+      }
+      const srcset = img.getAttribute("srcset");
+      if (srcset) {
+        img.setAttribute("srcset", cleanSrcset(srcset));
+      }
+      const dataSrc = img.getAttribute("data-src") || img.getAttribute("data-original");
+      if (dataSrc && (!src || src.startsWith("data:image/svg") || src.startsWith("data:image/gif"))) {
+        img.setAttribute("src", restoreDirectImageUrl(dataSrc));
+      }
+      img.setAttribute("referrerpolicy", "no-referrer");
+      img.setAttribute("loading", "lazy");
+      img.style.maxWidth = "100%";
+      img.style.height = "auto";
+      img.style.borderRadius = "8px";
     });
-    html = html.replace(/src=["']\/(?!api\/img-proxy)([^"']+)["']/gi, (m, path) => {
-      return `src="https://aihot.news/${path}"`;
+
+    // 3. 深度处理 <source> 标签的 srcset，防止相对路径 404
+    doc.querySelectorAll("source").forEach((source) => {
+      const srcset = source.getAttribute("srcset");
+      if (srcset) {
+        source.setAttribute("srcset", cleanSrcset(srcset));
+      }
     });
 
-    // 3. 增强图片加载与防盗链
-    html = html.replace(/<img\b(?![^>]*referrerpolicy)/gi, '<img referrerpolicy="no-referrer" loading="lazy"');
-
-    // 4. 外链修复（补全 aihot.news 域名前缀并默认新标签打开）
-    html = html.replace(/href=["']\/([^"']+)["']/gi, (m, path) => {
-      return `href="https://aihot.news/${path}"`;
+    // 4. 外链修复（补全 aihot.news 域名前缀并新标签打开）
+    doc.querySelectorAll("a").forEach((a) => {
+      const href = a.getAttribute("href");
+      if (href && href.startsWith("/")) {
+        a.setAttribute("href", `https://aihot.news${href}`);
+      }
+      a.setAttribute("target", "_blank");
+      a.setAttribute("rel", "noreferrer noopener");
     });
-    html = html.replace(/<a\b(?![^>]*target)/gi, '<a target="_blank" rel="noreferrer"');
 
-    return html.trim();
+    return doc.body.innerHTML.trim();
   }
 
   private extractArticleHtml(html: string, itemId: string): string {
     if (!html) return "";
 
-    // 1. 优先提取 Next.js 预置的纯净富文本模板 detail-rich-html-${itemId}-(zh|original|en)
+    // 1. 优先提取 React Router / Remix 流式 SSR 数据中的富文本 HTML
+    try {
+      const streamMatches = html.match(/streamController\.enqueue\(([\s\S]*?)\);<\/script>/g);
+      if (streamMatches) {
+        for (const streamBlock of streamMatches) {
+          const m = streamBlock.match(/streamController\.enqueue\(([\s\S]*?)\);<\/script>/);
+          if (!m) continue;
+          const raw = m[1].trim();
+          try {
+            const parsedOnce = JSON.parse(raw);
+            const parsedArr = typeof parsedOnce === "string" ? JSON.parse(parsedOnce) : parsedOnce;
+            if (Array.isArray(parsedArr)) {
+              for (const el of parsedArr) {
+                if (typeof el === "string" && (el.includes("<figure") || el.includes("<p>")) && el.length > 50) {
+                  const clean = this.sanitizeAndProxyArticleHtml(el);
+                  if (clean.length > 30) return clean;
+                }
+              }
+            }
+          } catch {}
+        }
+      }
+    } catch {}
+
+    // 2. 提取 Next.js 预置的纯净富文本模板 detail-rich-html-${itemId}-(zh|original|en)
     try {
       const tplMatches = [
         ...html.matchAll(/<template[^>]*id=["']detail-rich-html-([^"']+)["'][^>]*>([\s\S]*?)<\/template>/gi)

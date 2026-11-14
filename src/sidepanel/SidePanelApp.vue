@@ -7,6 +7,7 @@ import {
   saveQuickLink, tabHost, type PopupTab
 } from "../services/quick-links-export.service";
 import { t } from "../i18n";
+import { normalizeSystemTheme } from "../theme/system-theme";
 
 const props = withDefaults(defineProps<{ inDrawer?: boolean }>(), { inDrawer: false });
 const emit = defineEmits<{ (e: "close"): void }>();
@@ -461,11 +462,11 @@ function openDashboard(): void {
 
 function syncTheme(): void {
   try {
-    const t = localStorage.getItem("theme") || "light";
+    const t = normalizeSystemTheme(localStorage.getItem("theme"));
     document.documentElement.dataset.theme = t;
     if (typeof chrome !== "undefined" && chrome?.storage?.local) {
       void chrome.storage.local.get("theme").then((data: any) => {
-        if (data?.theme) document.documentElement.dataset.theme = data.theme;
+        if (data?.theme) document.documentElement.dataset.theme = normalizeSystemTheme(data.theme);
       });
     }
   } catch {}
@@ -514,7 +515,7 @@ onMounted(() => {
     chrome.storage.onChanged.addListener((changes: any, areaName: string) => {
       if (areaName !== "local") return;
       if (changes?.theme?.newValue) {
-        document.documentElement.dataset.theme = changes.theme.newValue;
+        document.documentElement.dataset.theme = normalizeSystemTheme(changes.theme.newValue);
       }
       if (changes?.launcherPages || changes?.pages || changes?.launcherPageLabels || changes?.quickLinks) {
         refreshPages();

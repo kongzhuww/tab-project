@@ -25,7 +25,6 @@ export interface GlobalSettingsConfig {
   showWeather: boolean;
   showSites: boolean;
   showBili: boolean;
-  showYouTube: boolean;
   showTodo: boolean;
   showLeftNavigation: boolean;
   showNavBall: boolean;
@@ -50,14 +49,14 @@ export interface IgnoredBookmarkFolder {
 
 // Explicit allowlist: global UI must never read or overwrite module credentials.
 export const GLOBAL_SETTINGS_KEYS: (keyof GlobalSettingsConfig)[] = [
-  "displaySize", "city", "showWeather", "showSites", "showBili", "showYouTube", "showTodo",
+  "displaySize", "city", "showWeather", "showSites", "showBili", "showTodo",
   "showLeftNavigation", "showNavBall", "showBookmarkPanel", "showBookmarkFoldersTop",
   "showStartupAnimation", "startupAnimationStyle", "searchEngine", "singleNewTab",
   "showHomeMusicVisualizer", "dockPosition"
 ];
 
 export const SETTINGS_TOGGLE_KEYS: (keyof GlobalSettingsConfig)[] = [
-  "showStartupAnimation", "showWeather", "showSites", "showBili", "showYouTube",
+  "showStartupAnimation", "showWeather", "showSites", "showBili",
   "showTodo", "showLeftNavigation", "showNavBall", "showBookmarkPanel",
   "showBookmarkFoldersTop", "singleNewTab", "showHomeMusicVisualizer"
 ];

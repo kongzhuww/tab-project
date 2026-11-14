@@ -299,13 +299,6 @@ onUnmounted(() => {
   }
 }
 
-:root[data-theme="lonetrail"] .floating-img-window {
-  background: rgba(246, 243, 238, 0.98);
-  border-color: rgba(138, 126, 114, 0.3);
-  color: #2b231d;
-  box-shadow: 0 18px 48px rgba(78, 62, 46, 0.22);
-}
-
 /* 顶部紧凑标题栏 */
 .floating-img-header {
   height: 40px;
@@ -323,11 +316,6 @@ onUnmounted(() => {
 
 .floating-img-header:active {
   cursor: grabbing;
-}
-
-:root[data-theme="lonetrail"] .floating-img-header {
-  background: rgba(238, 233, 226, 0.9);
-  border-bottom-color: rgba(138, 126, 114, 0.2);
 }
 
 .floating-img-title {
@@ -350,10 +338,6 @@ onUnmounted(() => {
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 140px;
-}
-
-:root[data-theme="lonetrail"] .floating-img-name {
-  color: #2b231d;
 }
 
 .floating-img-dimen {
@@ -467,10 +451,6 @@ onUnmounted(() => {
   cursor: grabbing;
 }
 
-:root[data-theme="lonetrail"] .floating-img-viewport {
-  background: rgba(246, 243, 238, 0.98);
-}
-
 .floating-img-canvas {
   width: 100%;
   height: 100%;
@@ -489,5 +469,26 @@ onUnmounted(() => {
   user-select: none;
   -webkit-user-drag: none;
   pointer-events: auto;
+}
+
+/* 暖纸色主题 */
+:root[data-theme="lonetrail"] .floating-img-window {
+  background: rgba(246, 243, 238, 0.98);
+  border-color: rgba(138, 126, 114, 0.3);
+  color: #2b231d;
+  box-shadow: 0 18px 48px rgba(78, 62, 46, 0.22);
+}
+
+:root[data-theme="lonetrail"] .floating-img-header {
+  background: rgba(238, 233, 226, 0.9);
+  border-bottom-color: rgba(138, 126, 114, 0.2);
+}
+
+:root[data-theme="lonetrail"] .floating-img-name {
+  color: #2b231d;
+}
+
+:root[data-theme="lonetrail"] .floating-img-viewport {
+  background: rgba(246, 243, 238, 0.98);
 }
 </style>

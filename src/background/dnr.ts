@@ -7,7 +7,7 @@ declare const chrome: any;
 /** Old download code installed a persistent all-site UA/Referer override. Remove only our known rule. */
 export async function removeLegacyGlobalNetRule(): Promise<void> {
   if (!chrome.declarativeNetRequest) throw new Error("网络规则接口不可用，旧规则清理未确认");
-  await chrome.declarativeNetRequest.updateDynamicRules({ removeRuleIds: [88991] });
+  await chrome.declarativeNetRequest.updateDynamicRules({ removeRuleIds: [88991, 3001] });
 }
 
 export async function initBilibiliNetRules(): Promise<void> {
@@ -20,6 +20,7 @@ export async function initBilibiliNetRules(): Promise<void> {
   const RULE_ID_BILI_VIDEO = 2002;
   const RULE_ID_BILI_VIDEO_CN = 2003;
   const RULE_ID_BILI_HDSLB = 2004;
+  const RULE_ID_AIHOT_IMG = 2005;
 
   // 幂等防御：若规则已存在且有效，直接跳过写盘，避免 SW 每次冷启动重复写入
   try {
@@ -30,7 +31,8 @@ export async function initBilibiliNetRules(): Promise<void> {
         existingIds.has(RULE_ID_BILI_API) &&
         existingIds.has(RULE_ID_BILI_VIDEO) &&
         existingIds.has(RULE_ID_BILI_VIDEO_CN) &&
-        existingIds.has(RULE_ID_BILI_HDSLB)
+        existingIds.has(RULE_ID_BILI_HDSLB) &&
+        existingIds.has(RULE_ID_AIHOT_IMG)
       ) {
         return;
       }
@@ -104,30 +106,31 @@ export async function initBilibiliNetRules(): Promise<void> {
         initiatorDomains: [extId],
         resourceTypes: ["xmlhttprequest", "image", "other"]
       }
+    },
+    {
+      id: RULE_ID_AIHOT_IMG,
+      priority: 1,
+      action: {
+        type: "modifyHeaders",
+        requestHeaders: [
+          { header: "Referer", operation: "set", value: "https://aihot.news/" },
+          { header: "Origin", operation: "set", value: "https://aihot.news" }
+        ]
+      },
+      condition: {
+        urlFilter: "||aihot.news/api/img-proxy",
+        initiatorDomains: [extId],
+        resourceTypes: ["xmlhttprequest", "image", "other"]
+      }
     }
   ];
 
   try {
     await chrome.declarativeNetRequest.updateDynamicRules({
-      removeRuleIds: [RULE_ID_BILI_API, RULE_ID_BILI_VIDEO, RULE_ID_BILI_VIDEO_CN, RULE_ID_BILI_HDSLB],
+      removeRuleIds: [RULE_ID_BILI_API, RULE_ID_BILI_VIDEO, RULE_ID_BILI_VIDEO_CN, RULE_ID_BILI_HDSLB, RULE_ID_AIHOT_IMG],
       addRules: rules
     });
   } catch (err) {
     console.warn("Bilibili DNR rules update failed:", err);
-  }
-}
-
-const RULE_ID_YOUTUBE_COOKIE = 3001;
-
-export async function syncYouTubeNetRules(): Promise<boolean> {
-  if (!chrome.declarativeNetRequest) return false;
-  try {
-    // 移除手动注入 Cookie 规则，避免因拼接残缺 Cookie 导致 Google 登录校验失效重定向
-    await chrome.declarativeNetRequest.updateDynamicRules({
-      removeRuleIds: [RULE_ID_YOUTUBE_COOKIE]
-    });
-    return true;
-  } catch {
-    return false;
   }
 }

@@ -351,11 +351,34 @@ function handleOpenUrl(url: string) {
   font-size: 13px;
 }
 
-/* 亮色与孤星米色主题自适应（完美匹配 Star 列表风格） */
+/* 亮色主题适配 Star 列表风格 */
 .gh-awesome-wrapper {
   background: transparent !important;
 }
 
+html[data-theme="light"] .gh-awesome-card-name strong,
+:root:not([data-theme="dark"]) .gh-awesome-card-name strong {
+  color: #0f172a;
+}
+
+html[data-theme="light"] .gh-awesome-desc,
+:root:not([data-theme="dark"]) .gh-awesome-desc {
+  color: #475569;
+}
+
+html[data-theme="light"] .gh-awesome-tag,
+:root:not([data-theme="dark"]) .gh-awesome-tag {
+  background: rgba(0, 0, 0, 0.05);
+  color: #64748b;
+}
+
+html[data-theme="light"] .gh-awesome-search-box input,
+:root:not([data-theme="dark"]) .gh-awesome-search-box input {
+  background: #ffffff;
+  color: #0f172a;
+}
+
+/* 暖纸色主题 */
 html[data-theme="lonetrail"] .gh-awesome-title h3 {
   color: #26221a !important;
 }
@@ -384,27 +407,5 @@ html[data-theme="lonetrail"] .gh-awesome-pill.active {
   background: linear-gradient(135deg, rgba(201, 153, 63, 0.35), rgba(163, 78, 60, 0.25)) !important;
   border-color: #c9993f !important;
   color: #a34e3c !important;
-}
-
-html[data-theme="light"] .gh-awesome-card-name strong,
-:root:not([data-theme="dark"]) .gh-awesome-card-name strong {
-  color: #0f172a;
-}
-
-html[data-theme="light"] .gh-awesome-desc,
-:root:not([data-theme="dark"]) .gh-awesome-desc {
-  color: #475569;
-}
-
-html[data-theme="light"] .gh-awesome-tag,
-:root:not([data-theme="dark"]) .gh-awesome-tag {
-  background: rgba(0, 0, 0, 0.05);
-  color: #64748b;
-}
-
-html[data-theme="light"] .gh-awesome-search-box input,
-:root:not([data-theme="dark"]) .gh-awesome-search-box input {
-  background: #ffffff;
-  color: #0f172a;
 }
 </style>

@@ -9,7 +9,7 @@ import { getDockModule, touchDockModuleTransition } from "../modules/registry";
 import { windowManagerController } from "./window-manager.store";
 import { syncFullscreenPresentation } from "./fullscreen-presentation";
 
-const cards: CardId[] = ["todoist", "card-github", "daily-aihot", "daily-bilibili", "daily-youtube"];
+const cards: CardId[] = ["todoist", "card-github", "daily-aihot", "daily-bilibili", "multica"];
 
 let pausedBackgroundVideo: HTMLVideoElement | null = null;
 
@@ -46,7 +46,7 @@ export const fullscreenCardsController = {
       win.LogicWeaverBiliFavorites?.loadOrganizer?.();
       requestAnimationFrame(() => win.ensureDailyDataLoaded?.());
     }
-    // Pricing, AI HOT, YouTube and GitHub own first activation; the host selects their cards.
+    // Pricing, AI HOT and GitHub own first activation; the host selects their cards.
   },
   exit(): void {
     if (!fullscreenCardState.activeId) { syncFullscreenPresentation(null); return; }
@@ -63,7 +63,12 @@ export const fullscreenCardsController = {
   },
   cycle(): void {
     const current = fullscreenCardState.activeId;
-    this.enter(cards[(cards.indexOf(current as CardId) + 1) % cards.length]);
+    const start = cards.indexOf(current as CardId);
+    for (let offset = 1; offset <= cards.length; offset++) {
+      const next = cards[(start + offset) % cards.length];
+      const module = getDockModule(next);
+      if (!module?.lifecycle.canOpen || module.lifecycle.canOpen()) { this.enter(next); return; }
+    }
   }
 };
 bindFullscreenCardActions({ enter: id => fullscreenCardsController.enter(id), exit: () => fullscreenCardsController.exit() });

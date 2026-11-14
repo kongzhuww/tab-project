@@ -33,6 +33,33 @@ export interface PluginMarketItem {
 export const PLUGIN_CATALOG: readonly PluginMarketItem[] = [
   // ==================== 1. 独立模块区 (Modules) ====================
   {
+    id: "multica",
+    title: "Agent 工作台",
+    version: "v1.0.0",
+    kind: "plugin",
+    category: "productivity",
+    categoryLabel: "全屏插件 · AI 任务",
+    icon: "assets/nav-multica.png",
+    emoji: "🤖",
+    desc: "连接 Multica，查看任务、智能体及运行时，确认后派发新任务。",
+    author: "tab-project Lab",
+    tags: ["Multica", "Agent", "任务管理"],
+    builtIn: true
+  },
+  {
+    id: "backpack",
+    title: "提示词背包",
+    version: "v1.0.0",
+    kind: "module",
+    category: "productivity",
+    categoryLabel: "独立模块 · 提示词",
+    emoji: "🎒",
+    desc: "提示词收纳与快速填充背包，支持 Prompt 收藏、分类标签管理、一键带参数变量复制与全量导入导出备份。",
+    author: "tab-project Lab",
+    tags: ["Prompt管理", "变量填充", "一键复制", "独立小窗"],
+    builtIn: true
+  },
+  {
     id: "todoist",
     title: "todoist",
     version: "v3.0.0",
@@ -118,25 +145,11 @@ export const PLUGIN_CATALOG: readonly PluginMarketItem[] = [
     author: "tab-project Lab",
     tags: ["核心常驻", "AI资讯", "前沿技术"],
     builtIn: true
-  },
-  {
-    id: "daily-youtube",
-    title: "youtube插件",
-    version: "v1.0.0",
-    kind: "plugin",
-    category: "media",
-    categoryLabel: "全屏插件 · 视听",
-    icon: "assets/nav-youtube.svg",
-    emoji: "▶️",
-    desc: "YouTube 官方流媒体插件。原生打通当前 Edge 登录账号，双栏 B 站收藏夹架构，18 个精准专属推荐换一批与点赞/收藏同步。",
-    author: "tab-project Lab",
-    tags: ["核心常驻", "全屏插件", "算法推荐", "视频收藏"],
-    builtIn: true
   }
 ];
 
 export const CORE_PLUGIN_IDS: readonly string[] = [
-  "todoist", "daily-bilibili", "card-github", "daily-youtube", "daily-aihot"
+  "todoist", "daily-bilibili", "card-github", "daily-aihot"
 ];
 
 const STORAGE_KEY = "logicweaver_installed_dock_modules";
@@ -171,12 +184,12 @@ function loadInstalledIds(): string[] {
       if (!Array.isArray(parsed) || !parsed.every(id => typeof id === "string")) {
         throw new Error("Invalid enabled module preference");
       }
-      return Array.from(new Set(parsed as string[]));
+      return Array.from(new Set(parsed as string[])).filter(id => id !== "daily-youtube");
     }
   } catch {
     installedReadFailed = true;
   }
-  return [];
+  return ["backpack"];
 }
 
 function persistInstalledIds(ids: string[]): boolean {

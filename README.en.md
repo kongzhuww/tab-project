@@ -27,7 +27,7 @@
 
 > **Now available on Microsoft Edge Add-ons**: [Install tab-project](https://microsoftedge.microsoft.com/addons/detail/tabproject-%E6%96%B0%E6%A0%87%E7%AD%BE%E9%A1%B5/dbkaiojfbolnkpaegflocfbdgpmhjcco) without Developer mode. Edge manages automatic updates for store installations. Each new version still requires a separate store submission and review; GitHub commits and releases do not immediately update the store version.
 
-> **Repository Version**: **1.0.21**, featuring unified explicit finite state machine (FSM) architecture, Vue 3 state machine reactivity bridge (`useMachine`), AX runtime diagnostics bridge (`__TAB_MACHINES__`), and decoupled deterministic workflows across 10 core workspaces with 195 automated regression tests. The store listing and installed version are authoritative for store users and may lag behind GitHub Releases. See the [Changelog](CHANGELOG.md).
+> **Repository Version**: **1.0.22**, adding a prompt backpack, AI workspace, and encrypted WebDAV backup safeguards, plus AI Hot and theme updates. Store versions may lag behind GitHub Releases. See the [Changelog](CHANGELOG.md).
 
 ---
 
@@ -51,6 +51,8 @@ Include your installed extension version, browser version, and reproduction step
 | **Todoist Task Kanban** | 0ms offline instant rendering, auto-hierarchical layout mapped from linked GitHub repos, task calendar, and real-time cross-tab cache invalidation | **Optional Module** | Requires a Todoist API Token entered in settings |
 | **Music Workspace** | NetEase Cloud Music direct web session login, Monster Siren Records album library, 3D rotating vinyl turntable with synced lyrics display | **Optional Module** | Monster Siren is available out-of-the-box; NetEase requires logging in on the official site in the same browser |
 | **AI HOT Intelligence** | Curated daily AI news headlines with an immersive reader; technical trends and papers | **Optional Module** | Ships with curated news feeds and article view |
+| **Prompt Backpack** | Organize prompts and saved articles, fill variables and copy prompts | **Optional Module** | Stored locally; encrypted WebDAV backup is available |
+| **Multica Agent Workspace** | View tasks, projects and agents; dispatch tasks after confirmation | **Optional Module** | Requires a configured Multica connection |
 
 ### Optional Components & Extended Services
 
@@ -58,22 +60,17 @@ Include your installed extension version, browser version, and reproduction step
 | :--- | :--- | :--- | :--- |
 | **Beaver Chatroom** | Private secure chatroom, shared rooms, activity sensing, interactive card sharing, and restricted image messages | **Optional Service (Experimental)** | Disabled by default; toggle in Store; requires self-hosted HTTPS server and dedicated invite |
 | **My Memes & Sticker Library** | Sticker picker inside chatroom, local directory mounting via File System Access API, and categorized sticker management | **Auxiliary Module** | Invoked inside the chatroom without a standalone dock icon; mounting local disk requires explicit browser grant |
-| **WebDAV Cloud Roaming** | Backup to Nutstore (坚果云) or private WebDAV; one-click restore for site shortcuts, preferences, and custom radio stations | **Optional Service** | Requires a personal WebDAV server address, account, and application-specific password |
+| **WebDAV Cloud Roaming** | Encrypted backup for shortcuts, settings, backpack and radio; optional startup sync with conflict prompts | **Optional Service** | Requires a WebDAV server, account, app password and separate backup passphrase |
 
 ---
 
 ## 🎨 Theme & Design Philosophy
 
-- **Unified CSS Variable Theming**: Strictly styled against theme variables (`var(--panel)`, `var(--text)`, etc.) to prevent jarring unstyled flashes. Centrally managed in the Settings dialog under "04 Theme & Appearance", supporting 4 official themes:
-  - **Light (`light`)**: Clean white background with optimal contrast and high readability;
-  - **Dark (`dark`)**: Immersive dark background, easy on the eyes in dim lighting;
-  - **Endfield (`endfield`)**: Industrial dark-gray palette with engineering hazard yellow accents;
-  - **Lone Trail (`lonetrail`)**: Rice-paper textured background, engineering blueprint grid, and aerospace tricolor identification strip.
-  > *Historical note: Early design documents used names like "Lone Trail" or "Endfield" with spaces/caps; internal keys are strictly lowercase. Independent startup animations (`rhinelab` / `endfield`) are controlled by `startupAnimationStyle` and operate independently of UI themes.*
+- **Unified CSS Variable Theming**: Settings offers Light (`light`), Dark (`dark`) and Warm Paper (compatible with the `lonetrail` key). The retired Endfield UI theme falls back to Dark. Startup animations remain separate from UI themes.
 - **Autonomous Modular Design**: Clear boundaries between workspaces and auxiliary plugins, with standardized integration into `src/sdk/` for windows, context menus, notifications, and image viewports.
 - **Pure Browser Extension**: Native Host, Native Messaging, hardware device probes, and desktop pets have been completely removed. Media caching and sticker storage use standard browser permissions and APIs.
 
-*Some features remain in active iteration. The appearance of an entry in older screenshots, documentation, or codebase does not guarantee it is enabled by default or stable.*
+*Some features remain in active iteration. The YouTube workspace has been removed: upgrading clears its extension-local favorites and settings, and old backups no longer restore them. Your browser login and account playlists are unaffected.*
 
 ---
 
@@ -174,7 +171,7 @@ Once built, load the repository root directory as an unpacked extension followin
 - **Radio Collection Overwrite Protection**: Eliminated implicit overwrites when saving empty playlist names; empty fields trigger a highlighted shake animation and focus prompt.
 - **Smart Failover & Anti-Stall**: Automatically aborts dead retries on timeouts, network errors, or auth limits, with up to 3 fallback source switches.
 - **WebDAV Cloud Roaming**: Custom radio station playlists are now backed up and restored via Nutstore / self-hosted WebDAV (`bili_radio_custom_series`).
-- **YouTube Recommendations**: Upgraded to a soft purple gradient card with capsule badges.
+- **Historical note**: This version included a video recommendation card redesign; the associated workspace was removed in later development.
 - **Three-Tier Documentation & Official Theme System**: Established 4 official themes (`light`, `dark`, `endfield`, `lonetrail`) and startup animations (`rhinelab` / `endfield`).
 - **Build Optimization**: Cleaned up 847 unused legacy chunk artifacts.
 
@@ -204,11 +201,11 @@ This extension strictly adheres to the **Chromium Manifest V3** security standar
 | `storage` / `unlimitedStorage` | Store shortcuts, custom groups, theme settings, radio queues, and offline caches locally in `chrome.storage.local` and IndexedDB. |
 | `bookmarks` | Read browser bookmarks to display in the new-tab kanban grid; support organization, folder creation, and drag-and-drop sorting (indexed locally via Web Worker). |
 | `tabs` / `activeTab` | Power the top-bar tab manager (tree display of open tabs, one-click switching), avoiding duplicate opened tabs. |
-| `cookies` | Bilibili actions read the `bili_jct` CSRF cookie. Background code also retains YouTube session authentication and YouTube/Google cookie-name diagnostics. NetEase uses website-session requests rather than cookie extraction. The archived YouTube UI does not mean these background paths are removed; see the [permission audit](docs/MANIFEST_PERMISSION_AUDIT.md). |
+| `cookies` | Bilibili actions read the `bili_jct` CSRF cookie. NetEase uses website-session requests. The YouTube workspace and its background authentication and cookie diagnostics have been removed; see the [permission audit](docs/MANIFEST_PERMISSION_AUDIT.md). |
 | `downloads` | Triggered strictly by user action: exporting configuration backups, downloading cached audio/video, and saving wallpapers. |
 | `scripting` | Injects an isolated, non-modal overlay sidebar or web translation helper only on explicit user invocation. The sidebar (suggested shortcut: `Alt+W`) does not resize webpages. Browser internal pages, extension stores and other protected pages cannot be injected. |
 | `identity` | Optional Google Calendar OAuth2 authorization for agenda synchronization. |
-| `declarativeNetRequest` | Rewrite anti-hotlinking headers: appends necessary `Referer` headers when requesting stream fragments or cover art from official Bilibili/YouTube CDNs to ensure smooth playback. |
+| `declarativeNetRequest` | Sets required headers for extension-originated Bilibili media and image requests and removes obsolete network rules. |
 | `contextMenus` / `clipboardWrite` | Context menus for shortcut cards, and one-click copying of URLs, clone commands, or AI news summaries to clipboard. |
 
 ### 2. Where Does Data Go?
@@ -218,7 +215,7 @@ This extension strictly adheres to the **Chromium Manifest V3** security standar
   - When utilizing Bilibili favorites, GitHub Stars, Todoist tasks, NetEase Cloud Music, or Open-Meteo weather, requests **travel directly between your browser and the respective official service**.
   - Your API tokens and keys remain strictly in local storage and are only sent in request headers to the corresponding official endpoint.
 - **Self-Hosted Beaver Chatroom**: Chatrooms are entirely self-hosted. Messages sync only with your specified server address after you manually provide an invite code; no public relay exists.
-- **WebDAV Cloud Sync**: Backups transfer via HTTPS strictly to your configured Nutstore or private WebDAV server when you click backup or restore.
+- **WebDAV Cloud Sync**: Requires a configured server and separate backup passphrase. Backups are encrypted locally; manual operations and optional startup sync are supported, with conflict prompts. Use HTTPS; old server versions and exported files are not automatically deleted.
 
 ---
 

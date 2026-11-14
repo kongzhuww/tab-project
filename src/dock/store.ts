@@ -274,8 +274,7 @@ export const macDockController: MacDockController = {
     const currentHref = typeof window !== "undefined" ? (window.location.pathname + window.location.href) : "";
     const isStandalonePage = currentHref.includes("bilibili.html") ||
       currentHref.includes("github.html") ||
-      currentHref.includes("aihot.html") ||
-      currentHref.includes("youtube.html");
+      currentHref.includes("aihot.html");
 
     if (type === "home") {
       if (isStandalonePage) {
@@ -306,8 +305,7 @@ export const macDockController: MacDockController = {
       const targetTabMap: Record<string, string> = {
         "daily-bilibili": "bilibili.html",
         "card-github": "github.html",
-        "daily-aihot": "aihot.html",
-        "daily-youtube": "youtube.html"
+        "daily-aihot": "aihot.html"
       };
 
       // 如果在独立子页面点击了其它卡片，切换对应独立页面或切回主页
@@ -346,7 +344,7 @@ export const macDockController: MacDockController = {
       }
 
       // 桌面级轻量浮层工具窗口，绝不退出当前全屏卡片，允许在 B站收藏夹、GitHub 等任意视图中就地打开伴随！
-      const keepCurrentViewTools = ["todoist", "music", "siren", "wallpaper", "stickers", "sync", "chat"];
+      const keepCurrentViewTools = ["todoist", "music", "siren", "wallpaper", "stickers", "sync", "chat", "backpack", "multica"];
       if (!keepCurrentViewTools.includes(id) && typeof window !== "undefined") {
         const win = window as any;
         if (typeof win.exitFullscreenCard === "function") {
