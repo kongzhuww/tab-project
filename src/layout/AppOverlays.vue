@@ -137,8 +137,6 @@ const PluginMarketDialog = defineAsyncComponent(async () => {
       <SettingsDialog />
     </div>
 
-    <!-- 随身 WiFi 流量卡额度调整弹窗 -->
-
     <!-- 中央时钟偏好配置菜单 -->
     <div id="vue-clock-settings-root">
       <ClockSettingsMenu v-if="mountClockSettings" />

@@ -4,8 +4,7 @@ import { parseBackpackRevision, PROMPT_REVISION_KEY, StaleBackpackError, writeBa
 import {
   BACKPACK_STORAGE_KEY,
   BACKPACK_CATEGORIES_KEY,
-  DEFAULT_PROMPT_CATEGORIES,
-  INITIAL_PRESET_PROMPTS
+  DEFAULT_PROMPT_CATEGORIES
 } from "./constants";
 
 export interface BackpackState {
@@ -49,25 +48,13 @@ let writeQueue: Promise<unknown> = Promise.resolve();
 import { extractVariables, fillVariables } from "./utils";
 export { extractVariables, fillVariables };
 
-const LEGACY_PRESET_IDS = new Set(["preset-code-review", "preset-prompt-enhancer", "preset-bilingual-polisher", "preset-summary-action"]);
-const LEGACY_CATEGORIES = new Set(["coding", "writing", "productivity", "roleplay"]);
-
 function sanitizeData(prompts: PromptItem[], categories: PromptCategory[]): { prompts: PromptItem[]; categories: PromptCategory[] } {
-  // 过滤用户要求删除的旧内置示例提示词
-  const cleanPrompts = prompts.filter(p => !LEGACY_PRESET_IDS.has(p.id) && !p.id.startsWith("preset-"));
-  // 过滤旧系统预制分类
-  let cleanCategories = categories.filter(c => !LEGACY_CATEGORIES.has(c.id));
+  // Opening the integrated library must never delete prompts or rewrite their category IDs.
+  const cleanCategories = [...categories];
   if (!cleanCategories.some(c => c.id === "default")) {
     cleanCategories.push({ id: "default", name: "默认分组", icon: "📁", isBuiltin: false });
   }
-  // 确保 prompt 的 category 指向有效分类
-  const validCatIds = new Set(cleanCategories.map(c => c.id));
-  for (const p of cleanPrompts) {
-    if (!validCatIds.has(p.category)) {
-      p.category = "default";
-    }
-  }
-  return { prompts: cleanPrompts, categories: cleanCategories };
+  return { prompts: [...prompts], categories: cleanCategories };
 }
 
 function loadFromLocalStorage(): { prompts: PromptItem[]; categories: PromptCategory[] } | null {

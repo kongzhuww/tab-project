@@ -1,9 +1,6 @@
 /**
- * Steam 工坊壁纸一键克隆与即时应用器
- * 1. 0 毫秒即时上屏：直接使用本地 File 实例瞬间换壁纸，UI 绝不卡顿
- * 2. 持久化存储 heroBackground：确保页面刷新后 100% 保持当前壁纸不失效
- * 3. 写入 OPFS 私有文件系统：保证关机重启、重开浏览器 0 弹窗秒播
- * 4. 绕过 IndexedDB 实体大二进制写入：防止 180MB 限制报错
+ * Steam 工坊壁纸应用器：读取本地壁纸文件，尝试写入 OPFS，
+ * 应用壁纸并保存元数据。文件访问和后续恢复仍可能受权限或存储状态影响。
  */
 
 import type { WorkshopItemInfo } from "./workshop-scanner";
@@ -92,14 +89,14 @@ export async function applyWorkshopWallpaper(item: WorkshopItemInfo): Promise<bo
       isWorkshop: true
     };
 
-    // 1. 率先完整写入 OPFS 私有文件系统 (确保后续任何并发或存储事件读取 OPFS 时 100% 命中)
+    // 1. 尝试缓存文件到 OPFS，失败时继续应用本次选择的壁纸。
     try {
       await saveActiveWallpaperToOpfs(pack);
     } catch (e) {
       console.warn("[Workshop Applier] OPFS save warning:", e);
     }
 
-    // 2. 0 毫秒即刻上屏并持久化 heroBackground (保证页面刷新不失效)
+    // 2. 应用壁纸并保存配置。
     await WallpaperService.setWallpaper(wallpaperVal, pack);
 
     // 3. 存入轻量历史记录元数据 (附带封面图，绝不重复生成卡片)

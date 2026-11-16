@@ -43,6 +43,10 @@ import { radioTapeState } from "./bilibili/radio-tape-store";
 import { scheduleDockModulesPrefetch } from "./modules/prefetch";
 import { notifications } from './sdk/notifications';
 import { settingsController } from './settings/store';
+import { installQuickSearchReceiver, type QuickSearchRequest } from './search/quick-search-bridge';
+import { requestWorkspaceSearch } from './search/workspace-search';
+import { fullscreenCardsController } from './core/fullscreen-cards.store';
+import { gitHubService } from './services/github.service';
 
 interface ViewMeta {
   title: string;
@@ -68,7 +72,7 @@ const VIEW_METAS: Record<string, ViewMeta> = {
     iconType: "image/svg+xml"
   },
   "multica": {
-    title: "Agent 工作台 · Multica",
+    title: "AI 工作区",
     icon: "assets/nav-multica.png",
     iconType: "image/png"
   },
@@ -96,6 +100,13 @@ const VIEW_METAS: Record<string, ViewMeta> = {
 
 let currentFaviconHref = "";
 let autoSyncTimer: ReturnType<typeof setTimeout> | undefined;
+let removeQuickSearchReceiver: (() => void) | undefined;
+function acceptQuickWorkspaceSearch(request:QuickSearchRequest) {
+  if (request.target === 'github' && request.githubRule) gitHubService.setSearchRule(request.githubRule);
+  requestWorkspaceSearch(request.target, request.keyword);
+  if (request.target === 'netease') windowManagerController.open('music');
+  else fullscreenCardsController.enter(request.target === 'github' ? 'card-github' : 'daily-bilibili');
+}
 
 function updateFavicon(iconPath: string, type = "image/svg+xml"): void {
   if (typeof document === "undefined") return;
@@ -164,6 +175,7 @@ const activeWorkspaceId = computed(() => activeViewId.value === "home" ? "" : ac
 watch(() => fullscreenCardState.activeId, syncFullscreenPresentation, { immediate: true, flush: "sync" });
 
 onMounted(() => {
+  if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) removeQuickSearchReceiver = installQuickSearchReceiver(acceptQuickWorkspaceSearch);
   if (typeof document !== "undefined") {
     document.body.dataset.spa = "1";
     // Intro host owns loader teardown, including disabled startup and previews.
@@ -201,6 +213,7 @@ onMounted(() => {
   }
 });
 onUnmounted(() => {
+  removeQuickSearchReceiver?.();
   if (autoSyncTimer) clearTimeout(autoSyncTimer);
   navWheelRuntime.stop();
   launcherRuntime.stop();

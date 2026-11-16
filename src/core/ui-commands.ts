@@ -44,7 +44,7 @@ export function registerUiCommands(commands: CommandRegistry): void {
     run: () => window.LogicWeaverSearch?.focus()
   });
   commands.register({
-    id: "search.cycle-mode", title: "切换搜索模式", category: "搜索", description: "在网页/B站/GitHub/网易云之间切换搜索模式",
+    id: "search.cycle-mode", title: "切换搜索模式", category: "搜索", description: "在网页、B站、GitHub、网易云等搜索模式之间切换",
     keywords: ["搜索模式", "bilibili", "github", "netease"], concurrency: "drop",
     enabled: () => typeof window.LogicWeaverSearch?.cycleMode === "function",
     run: () => window.LogicWeaverSearch?.cycleMode()

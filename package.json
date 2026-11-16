@@ -1,6 +1,6 @@
 {
   "name": "tab-project",
-  "version": "1.0.22",
+  "version": "1.0.23",
   "private": true,
   "type": "module",
   "description": "tab-project-next desktop Chromium browser extension with Vue UI",
@@ -8,6 +8,7 @@
     "build": "npm run ui:build",
     "build:wasm": "wasm-pack build crates/fast-search --target web --out-dir ../../src/wasm/fast-search",
     "clean:chunks": "node scripts/clean-chunks.mjs",
+    "audit:chunks": "node scripts/audit-generated.mjs",
     "release:build": "node scripts/build-release.mjs",
     "check": "npm run ui:check",
     "test": "node --test tests/*.test.mjs",

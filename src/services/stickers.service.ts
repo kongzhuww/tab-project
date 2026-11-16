@@ -802,8 +802,8 @@ export class StickersService {
   }
 
   /**
-   * 极速直落「新标签页/收藏夹」引擎
-   * 通过后台 Junction 物理直写（0 弹窗、0 交互门槛、100% 成功落盘）
+   * 通过后台创建图片下载，保存到浏览器下载目录的「新标签页/收藏夹」。
+   * 返回成功仅表示下载请求已创建，不保证文件已经下载完成。
    */
   public async saveImageToDiskSafe(param: {
     file?: File;

@@ -101,7 +101,8 @@ function saveCustomOrder(order: { cards?: string[]; tools?: string[] }) {
 }
 
 export function getVisibleDockTools(): DockToolItem[] {
-  const visible = DOCK_TOOLS.filter(tool => pluginMarketController.isInstalled(tool.id));
+  // Preserve access for profiles that have not enabled AI Workspace yet.
+  const visible = DOCK_TOOLS.filter(tool => !(tool.id === 'backpack' && pluginMarketController.isInstalled('multica')) && pluginMarketController.isInstalled(tool.id));
   const saved = loadCustomOrder().tools;
   if (Array.isArray(saved) && saved.length > 0) {
     const map = new Map(visible.map(t => [t.id, t]));

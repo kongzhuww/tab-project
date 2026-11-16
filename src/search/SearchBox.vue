@@ -436,6 +436,7 @@ onUnmounted(() => {
       <img
         v-if="item.iconSrc"
         :src="item.iconSrc"
+        :referrerpolicy="item.badge?.className === 'badge-bilibili' ? 'no-referrer' : undefined"
         alt=""
         loading="lazy"
         decoding="async"

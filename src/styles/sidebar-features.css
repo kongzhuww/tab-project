@@ -1,0 +1,15 @@
+/* Shared geometry for Bilibili and AI Hot workspace navigation. */
+:root {
+  --workspace-sidebar-width: 210px;
+  --workspace-sidebar-compact-width: 175px;
+  --workspace-sidebar-fullscreen-width: 220px;
+}
+
+.fo-sidebar-sub-wrap, .aihot-nav-wrap { padding:0 4px 10px; margin-bottom:8px; border-bottom:1px solid var(--border); }
+.fo-sidebar-sub-btn, .aihot-tabs .aihot-nav-card { display:flex; align-items:center; justify-content:space-between; width:100%; padding:8px 10px; border-radius:9px; cursor:pointer; transition:all .2s ease; text-align:left; box-sizing:border-box; }
+.fo-sidebar-sub-main, .aihot-nav-main { display:flex; align-items:center; gap:8px; min-width:0; }
+.fo-sidebar-sub-icon, .aihot-nav-icon { font-size:16px; line-height:1; flex-shrink:0; }
+.fo-sidebar-sub-text, .aihot-nav-copy { display:flex; flex-direction:column; min-width:0; gap:1px; }
+.fo-sidebar-sub-text strong, .aihot-nav-copy strong { font-size:12px; font-weight:600; color:var(--heading); line-height:1.2; }
+.fo-sidebar-sub-text small, .aihot-nav-copy small { font-size:9.5px; color:var(--dim); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.fo-sidebar-sub-badge, .aihot-nav-badge { font-size:9px; font-weight:700; padding:2px 6px; border-radius:999px; color:#fff; letter-spacing:.5px; flex-shrink:0; }

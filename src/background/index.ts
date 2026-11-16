@@ -29,6 +29,8 @@ import { handleSearchWebImages, handleFetchSiteImages } from "./image-proxy";
 import { acquireImageSlot, fetchImageBytes, mediaUrl, MAX_IMAGE_BYTES, MAX_IMAGE_PIXELS, validateImagePixels } from "./media-fetch";
 import { initTodoistBackgroundSync, syncTodoistInBackground } from "./todoist-sync";
 import { initWebSideDrawer, toggleWebSideDrawer } from "./web-side-drawer";
+import { initAiTaskTracker } from "./ai-task-tracker";
+import { initAiScheduler } from "./ai-scheduler";
 
 declare const chrome: any;
 
@@ -36,6 +38,8 @@ declare const chrome: any;
 initBilibiliNetRules();
 initNotificationListeners();
 initTodoistBackgroundSync();
+initAiTaskTracker();
+initAiScheduler();
 // Retire persisted alarms from the removed mail/social feeds. Never clear other modules.
 for (const name of ["gmail-inbox-poll", "x-account-poll"]) {
   chrome.alarms.clear(name).catch(() => console.warn("[Migration] Could not clear retired feed alarm"));

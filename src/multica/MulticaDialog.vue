@@ -12,12 +12,16 @@ import ComposerTools from "./ComposerTools.vue";
 import LoadingIndicator from "./LoadingIndicator.vue";
 import ResourceAttachmentCard from "./ResourceAttachment.vue";
 import { messageWithResources, RESOURCE_LIMIT, type ResourceAttachment } from "./resource-content";
+import { parseTodoistResource, TODOIST_RESOURCE_MIME } from '../todoist/task-resource';
 import { shouldSendComposer } from "./composer-keyboard";
+import { aiWorkspaceBridge } from "./workspace-bridge";
 
 const AiHotPanel = defineAsyncComponent(() => import('./AiHotPanel.vue'));
 const ResourcePanel = defineAsyncComponent(() => import('./ResourcePanel.vue'));
 const TodoistPanel = defineAsyncComponent(() => import('./TodoistPanel.vue'));
 const AiSettings = defineAsyncComponent(() => import('./AiSettings.vue'));
+const AiSchedulePanel = defineAsyncComponent(() => import('./AiSchedulePanel.vue'));
+const BackpackLibrary = defineAsyncComponent(() => import('../backpack/BackpackDialog.vue'));
 const RunTrace = defineAsyncComponent(() => import('./RunTrace.vue'));
 const MessageMarkdown = defineAsyncComponent({
   loader: () => import('./MessageMarkdown.vue'),
@@ -27,16 +31,18 @@ const MessageMarkdown = defineAsyncComponent({
 });
 
 const service = ref<'multica' | 'deepseek'>('multica');
+const workspaceSection = ref<'chat' | 'library' | 'schedule'>('chat');
+const libraryOpened = ref(false), scheduleOpened = ref(false);
 const workspaceVisible = computed(() => fullscreenCardState.activeId === 'multica');
-const active = computed(() => workspaceVisible.value && service.value === 'multica');
+const active = computed(() => workspaceVisible.value && service.value === 'multica' && workspaceSection.value === 'chat');
 const byok = useByokChat();
 const { conversations: localConversations, current: byokCurrent, currentId: byokCurrentId, error: byokError, configured: byokConfigured, model: byokModel, effort: byokEffort, sending: byokSending } = byok;
 const deepseekModels = ref<string[]>([]);
 async function refreshByokConfig() { try { const c = await byok.refreshConfig(); deepseekModels.value = c.key ? c.models : []; } catch { deepseekModels.value = []; } }
 async function refreshLocalConversations() { try { await byok.refreshHistory(); } catch { byokError.value = '本地会话读取失败。'; } }
 onMounted(() => { void refreshByokConfig(); void refreshLocalConversations(); });
-watch(workspaceVisible, visible => { if (visible) { void refreshByokConfig(); void refreshLocalConversations(); } else byok.stop(); });
-function openLocalConversation(id: string) { if (byokSending.value || sending.value || switchingAgent.value) return; byok.selectChat(id); service.value = 'deepseek'; }
+watch(workspaceVisible, visible => { if (visible) { void refreshByokConfig(); void refreshLocalConversations(); } });
+function openLocalConversation(id: string) { if (byokSending.value || sending.value || switchingAgent.value) return; workspaceSection.value = 'chat'; byok.selectChat(id); service.value = 'deepseek'; }
 function chooseDeepseek(model: string) {
   if (service.value !== 'deepseek') { byok.newChat(); selected.value = null; service.value = 'deepseek'; }
   void byok.chooseModel(model);
@@ -46,8 +52,8 @@ function chooseAgent(id: string) {
   else if (selected.value) replacementAgentId.value = id;
   else agentId.value = id;
 }
-function openIssue(issue: MulticaIssue) { if (byokSending.value) return; service.value = 'multica'; selectIssue(issue); }
-function newConversation() { if (service.value === 'deepseek') byok.newChat(); else startNew(); }
+function openIssue(issue: MulticaIssue) { if (byokSending.value || sending.value || switchingAgent.value) return; workspaceSection.value = 'chat'; service.value = 'multica'; selectIssue(issue); }
+function newConversation() { if (anySending.value || switchingAgent.value) return; workspaceSection.value = 'chat'; if (service.value === 'deepseek') byok.newChat(); else startNew(); }
 const connected = ref(false), loading = ref(false), sending = ref(false), uncertain = ref(false), switchingAgent = ref(false);
 const replacementAgentId = ref('');
 const issuesLoading = ref(false), agentsLoading = ref(false);
@@ -55,6 +61,7 @@ const error = ref(""), issuesError = ref(""), agentsError = ref(""), notice = re
 let refreshPromise: Promise<void> | null = null;
 let refreshVersion = 0;
 const settingsOpen = ref(false), settingsBusy = ref(false);
+const workspaceIdForAgents = ref('');
 const settingsTab = ref<'multica' | 'deepseek'>('multica');
 function openSettings(tab: 'multica' | 'deepseek' = service.value) { settingsTab.value = tab; settingsOpen.value = true; }
 const agents = ref<MulticaAgent[]>([]), runtimes = ref<MulticaRuntime[]>([]), issues = ref<MulticaIssue[]>([]);
@@ -76,6 +83,48 @@ watch(comments, list => {
 onBeforeUnmount(() => { if (commentFrame !== undefined) cancelAnimationFrame(commentFrame); clearInterval(commentPollTimer); });
 const agentId = ref("");
 const activePanel = ref<'aihot' | 'bilibili' | 'github' | 'todoist' | null>(null);
+const todoistPanelOpened = ref(false);
+watch(activePanel, panel => { if (panel === 'todoist') todoistPanelOpened.value = true; });
+const resourceBrowserOpen = computed(() => workspaceSection.value === 'chat' && Boolean(activePanel.value));
+const composerWrap = ref<HTMLElement | null>(null);
+let composerMotion: Animation | undefined;
+let composerMotionVersion = 0;
+watch(resourceBrowserOpen, async () => {
+  const node = composerWrap.value;
+  if (!node || !workspaceVisible.value || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const before = node.getBoundingClientRect();
+  composerMotion?.cancel();
+  const version = ++composerMotionVersion;
+  await nextTick();
+  if (version !== composerMotionVersion || !node.isConnected || node !== composerWrap.value || !workspaceVisible.value) return;
+  const after = node.getBoundingClientRect();
+  const x = before.left - after.left, y = before.top - after.top;
+  if (Math.abs(x) < 1 && Math.abs(y) < 1) return;
+  composerMotion = node.animate([{ transform: `translate(${x}px, ${y}px)` }, { transform: 'translate(0, 0)' }], { duration: 300, easing: 'cubic-bezier(.22, 1, .36, 1)' });
+}, { flush: 'pre' });
+onBeforeUnmount(() => { composerMotionVersion++; composerMotion?.cancel(); });
+const dragged = ref<{ kind:'resource'; value:ResourceAttachment } | { kind:'article'; value:AiHotFeedArticle } | null>(null);
+const todoistDragOver = ref(false);
+function hasTodoistDrag(event:DragEvent) { return activePanel.value === 'todoist' && Array.from(event.dataTransfer?.types || []).includes(TODOIST_RESOURCE_MIME); }
+function acceptDrag(event:DragEvent) { if ((dragged.value || hasTodoistDrag(event)) && !anySending.value) { event.preventDefault(); if (event.dataTransfer) event.dataTransfer.dropEffect = 'copy'; todoistDragOver.value = hasTodoistDrag(event); } }
+function leaveComposer(event:DragEvent) { if (!event.currentTarget || !(event.currentTarget as HTMLElement).contains(event.relatedTarget as Node | null)) todoistDragOver.value = false; }
+function dropResource(event:DragEvent) {
+  const todoist = hasTodoistDrag(event);
+  todoistDragOver.value = false;
+  if ((!dragged.value && !todoist) || anySending.value) return;
+  event.preventDefault();
+  if (todoist) {
+    const resource = parseTodoistResource(event.dataTransfer?.getData(TODOIST_RESOURCE_MIME) || '');
+    if (resource && !draft.value.resources.some(item => item.kind === 'todoist' && item.id === resource.id)) toggleResource(resource);
+  } else {
+    const item=dragged.value; dragged.value=null;
+    if (!item) return;
+    if (item.kind === 'article') {
+      if (!draft.value.articles.some(article => article.url === item.value.url && article.title === item.value.title)) toggleArticle(item.value);
+    } else if (!draft.value.resources.some(resource => resource.kind === item.value.kind && resource.id.toLowerCase() === item.value.id.toLowerCase())) toggleResource(item.value);
+  }
+  void nextTick(() => composerInput.value?.focus());
+}
 const composerInput = ref<HTMLTextAreaElement | null>(null);
 const drafts = reactive<Record<string, { text: string; articles: AiHotFeedArticle[]; resources: ResourceAttachment[] }>>({ new: { text: "", articles: [], resources: [] } });
 const draftKey = computed(() => service.value === 'deepseek' ? (byokCurrentId.value ? `byok:${byokCurrentId.value}` : 'new') : (selected.value ? `multica:${selected.value.id}` : 'new'));
@@ -83,6 +132,39 @@ const currentConversation = computed(() => service.value === 'deepseek' ? Boolea
 const anySending = computed(() => sending.value || byokSending.value);
 const draft = computed(() => drafts[draftKey.value] || (drafts[draftKey.value] = { text: "", articles: [], resources: [] }));
 const onlineAgents = computed(() => agents.value.filter(a => !a.archived_at && a.runtime_id && runtimes.value.some(r => r.id === a.runtime_id && r.status === "online")));
+watch(() => [workspaceVisible.value, aiWorkspaceBridge.pending?.id, anySending.value, switchingAgent.value] as const, async ([visible, id, busy, switching]) => {
+  if (!visible || !id || busy || switching) return;
+  const request = aiWorkspaceBridge.pending;
+  if (!request || request.id !== id) return;
+  if (request.kind === 'deepseek') {
+    await refreshLocalConversations();
+    if (!workspaceVisible.value || aiWorkspaceBridge.pending?.id !== id || anySending.value || switchingAgent.value) return;
+    if (!localConversations.value.some(item => item.id === request.conversationId)) { byokError.value = '该本地会话已不存在。'; aiWorkspaceBridge.pending = null; return; }
+    openLocalConversation(request.conversationId);
+  } else if (request.kind === 'multica') {
+    openIssue(request.issue);
+  } else {
+    newConversation();
+    const existing = draft.value.text;
+    draft.value.text = existing.trim() ? `${existing}\n\n${request.text}` : request.text;
+    if (request.resource && !draft.value.resources.some(item => item.kind === request.resource!.kind && item.id.toLowerCase() === request.resource!.id.toLowerCase())) {
+      if (draft.value.resources.length < RESOURCE_LIMIT) draft.value.resources.push(request.resource);
+      else {
+        const message = `草稿已有 ${RESOURCE_LIMIT} 个资源，仓库 ${request.resource.id} 未添加；请先移除一个资源再添加。`;
+        if (service.value === 'deepseek') byokError.value = message; else notice.value = message;
+      }
+    }
+    activePanel.value = null;
+    void nextTick(() => composerInput.value?.focus());
+  }
+  if (aiWorkspaceBridge.pending?.id === id) aiWorkspaceBridge.pending = null;
+}, { immediate: true });
+function navigateWorkspace(section: 'library' | 'schedule') {
+  workspaceSection.value = section; activePanel.value = null;
+  if (section === 'library') libraryOpened.value = true;
+  if (section === 'schedule') scheduleOpened.value = true;
+  if (section === 'schedule') void nextTick(async () => { if (refreshPromise) await refreshPromise; if (workspaceVisible.value && workspaceSection.value === 'schedule') await refresh(); });
+}
 let commentRequest = 0;
 const statusNames: Record<string, string> = { backlog: "待处理", todo: "待处理", in_progress: "进行中", in_review: "待审核", done: "已完成", cancelled: "已取消", canceled: "已取消" };
 function statusName(issue: MulticaIssue) { return statusNames[issue.status_category || ""] || statusNames[issue.status || ""] || issue.status || "未知"; }
@@ -110,7 +192,7 @@ async function refresh() {
       const hasConnection = await multicaService.isConnected();
       if (version !== refreshVersion) return;
       connected.value = hasConnection;
-      if (!connected.value) { issues.value = []; agents.value = []; runtimes.value = []; selected.value = null; return; }
+      if (!connected.value) { issues.value = []; agents.value = []; runtimes.value = []; selected.value = null; workspaceIdForAgents.value = ''; return; }
       await Promise.all([
         (async () => {
           try {
@@ -125,7 +207,7 @@ async function refresh() {
           try {
             const info = await multicaService.info(true);
             if (version !== refreshVersion) return;
-            runtimes.value = info.runtimes; agents.value = info.agents;
+            runtimes.value = info.runtimes; agents.value = info.agents; workspaceIdForAgents.value = info.workspaceId;
             if (!onlineAgents.value.some(a => a.id === agentId.value)) agentId.value = onlineAgents.value[0]?.id || '';
           } catch (e) { if (version === refreshVersion) agentsError.value = e instanceof Error ? e.message : '助手列表读取失败'; }
           finally { agentsLoading.value = false; }
@@ -151,7 +233,7 @@ async function onConnectionChanged() {
   refreshVersion++;
   ++commentRequest;
   connected.value = false; selected.value = null; comments.value = []; commentsLoading.value = false;
-  issues.value = []; agents.value = []; runtimes.value = []; agentId.value = '';
+  issues.value = []; agents.value = []; runtimes.value = []; agentId.value = ''; workspaceIdForAgents.value = '';
   const pending = refreshPromise;
   if (pending) await pending;
   if (active.value) await refresh();
@@ -218,15 +300,13 @@ function toggleArticle(article: AiHotFeedArticle) {
 function selectArticle(article: AiHotFeedArticle) {
   if (anySending.value) return;
   toggleArticle(article);
-  activePanel.value = null;
-  void nextTick(() => composerInput.value?.focus());
 }
 function toggleResource(resource: ResourceAttachment) {
   if (anySending.value) return;
   const list = draft.value.resources;
   const index = list.findIndex(item => item.kind === resource.kind && item.id.toLowerCase() === resource.id.toLowerCase());
   if (index >= 0) list.splice(index, 1);
-  else if (list.length >= RESOURCE_LIMIT) notice.value = `每条消息最多添加 ${RESOURCE_LIMIT} 个视频或仓库。`;
+  else if (list.length >= RESOURCE_LIMIT) notice.value = `每条消息最多添加 ${RESOURCE_LIMIT} 个资源。`;
   else { list.push(resource); notice.value = ''; }
 }
 function updateResource(resource: ResourceAttachment) {
@@ -252,24 +332,41 @@ async function send() {
   const text = currentDraft.text.trim(), title = sessionTitle(text), content = messageWithResources(messageWithArticles(text, currentDraft.articles), currentDraft.resources, { multicaBridge:true });
   if (!connected.value || (!issue && (!agentId.value || agentsLoading.value || Boolean(agentsError.value)))) return;
   sending.value = true; notice.value = "";
+  let workspaceId = '', knownRunIds: string[] = [];
+  try {
+    workspaceId = await multicaService.activeWorkspaceId() || '';
+    if (!workspaceId) throw new Error('当前 Multica 工作区不可用');
+    if (issue) knownRunIds = (await multicaService.issueRuns(issue.id, workspaceId)).map(run => run.id);
+  } catch (e) {
+    notice.value = `无法建立执行记录基线，消息未发送：${e instanceof Error ? e.message : '请稍后重试'}`;
+    sending.value = false; return;
+  }
+  async function trackSent(issueId: string) {
+    try {
+      const reply = await chrome.runtime.sendMessage({ type:'ai-workspace:track-multica', issueId, title, knownRunIds, workspaceId });
+      if (!reply?.ok) throw new Error(reply?.error || '后台未确认');
+    } catch (e) { notice.value = `消息已发送，但完成提醒未启用：${e instanceof Error ? e.message : '请手动查看进度'}。请勿重复发送。`; }
+  }
   try {
     if (!issue) {
-      const result = await multicaService.createIssue(title, content, agentId.value);
+      const result = await multicaService.createIssue(title, content, agentId.value, workspaceId);
       currentDraft.text = ""; currentDraft.articles = []; currentDraft.resources = [];
       const created = issues.value.find(i => i.id === result.id) || { id: result.id, identifier: result.identifier, title, description: content, assignee_id: agentId.value };
       if (!issues.value.some(i => i.id === created.id)) issues.value = [created, ...issues.value];
       selectIssueAfterSend(created);
       notice.value = `会话 ${result.identifier || result.id} 已创建`;
+      await trackSent(result.id);
       void refresh();
     } else {
-      await multicaService.addIssueComment(issue.id, content);
+      await multicaService.addIssueComment(issue.id, content, workspaceId);
       currentDraft.text = ""; currentDraft.articles = []; currentDraft.resources = [];
       // A successful comment must never be retried just because renaming failed.
       try {
-        await multicaService.renameIssue(issue.id, title);
+        await multicaService.renameIssue(issue.id, title, workspaceId);
         issue.title = title;
         issues.value = issues.value.map(item => item.id === issue.id ? { ...item, title } : item);
       } catch { notice.value = "消息已发送，但会话标题更新失败；请刷新或到 Multica 核对。"; }
+      await trackSent(issue.id);
       await loadComments(issue);
     }
   } catch (e) { uncertain.value = true; notice.value = `${e instanceof Error ? e.message : "发送失败"} 请先到 Multica 核对是否已发送，避免重复。`; }
@@ -278,13 +375,14 @@ async function send() {
 function selectIssueAfterSend(issue: MulticaIssue) { replacementAgentId.value = issue.assignee_id || ''; selected.value = issue; comments.value = []; uncertain.value = false; void loadComments(issue); }
 </script>
 <template>
-  <section v-if="workspaceVisible" id="multica" class="card wide card-fullscreen agent-workspace">
+  <section v-show="workspaceVisible" id="multica" class="card wide agent-workspace" :class="{ 'card-fullscreen': workspaceVisible, 'workspace-hidden': !workspaceVisible }">
     <div class="workspace-body">
-      <button type="button" class="workspace-settings-button" :disabled="anySending" aria-label="AI 设置" title="设置" @click="openSettings()">⚙ <span>设置</span></button>
-      <ConversationSidebar :service="service" :selected-id="service === 'deepseek' ? byokCurrentId : selected?.id || ''" :issues="issues" :agents="agents" :conversations="localConversations" :disabled="anySending || switchingAgent" :connected="connected" :loading="issuesLoading" :error="issuesError" :comments-loading="commentsLoading || commentsShown < comments.length" @new="newConversation" @select-issue="openIssue" @select-conversation="openLocalConversation" @delete-conversation="byok.removeChat" @retry="refresh" />
-      <main class="workspace-main" :class="{'new-view':!currentConversation}">
+      <button v-if="workspaceSection === 'chat'" type="button" class="workspace-settings-button" :disabled="anySending" aria-label="AI 设置" title="设置" @click="openSettings()">⚙ <span>设置</span></button>
+      <ConversationSidebar :section="workspaceSection" :service="service" :selected-id="service === 'deepseek' ? byokCurrentId : selected?.id || ''" :issues="issues" :agents="agents" :conversations="localConversations" :disabled="anySending || switchingAgent" :connected="connected" :loading="issuesLoading" :error="issuesError" :comments-loading="commentsLoading || commentsShown < comments.length" @new="newConversation" @navigate="navigateWorkspace" @select-issue="openIssue" @select-conversation="openLocalConversation" @delete-conversation="byok.removeChat" @retry="refresh" />
+      <main class="workspace-main" :class="{'new-view':workspaceSection === 'chat' && !currentConversation, 'embedded-view':workspaceSection !== 'chat', 'browsing-resources':resourceBrowserOpen}">
+        <template v-if="workspaceSection === 'chat'">
         <p v-if="service === 'multica' && error" class="alert" role="alert">{{ error }}</p>
-        <p v-if="service === 'multica' && notice" class="notice" role="status">{{ notice }}</p>
+        <p v-if="notice" class="notice" role="status">{{ notice }}</p>
         <p v-if="service === 'deepseek' && byokError" class="alert" role="alert">{{ byokError }}</p>
         <template v-if="service === 'multica' && selected">
           <div class="conversation-header"><div><small>{{ selected.identifier || '会话' }} · {{ statusName(selected) }}</small><h2>{{ selected.title }}</h2><p>{{ agentName(selected.assignee_id) }} · {{ agentModel(selected.assignee_id) }}</p></div></div>
@@ -295,17 +393,20 @@ function selectIssueAfterSend(issue: MulticaIssue) { replacementAgentId.value = 
           <div class="conversation"><article v-for="(message,index) in byokCurrent.messages" :key="index" class="bubble-row"><div class="avatar" :class="message.role === 'assistant' ? 'bot' : 'person'">{{ message.role === 'assistant' ? '✦' : '你' }}</div><div class="bubble-content"><div class="bubble-meta"><strong>{{ message.role === 'assistant' ? '助手' : '你' }}</strong></div><details v-if="message.reasoning" class="reasoning"><summary>思考过程</summary><pre>{{ message.reasoning }}</pre></details><div class="bubble" :class="message.role === 'assistant' ? 'bot-bubble' : 'human-bubble'"><MessageMarkdown v-if="message.content" :content="message.content" /><span v-else class="muted">{{ byokSending && index === byokCurrent.messages.length - 1 ? '正在生成…' : '没有回复内容' }}</span></div><small v-if="message.incomplete && !(byokSending && index >= byokCurrent.messages.length - 2)" class="incomplete">未完成 · 不会作为后续上下文</small></div></article></div>
         </template>
         <div v-else class="welcome"><h1>需要我为你做些什么？</h1><p>把问题交给你的助手，开启一段新会话。</p></div>
-        <div class="composer-wrap" :class="{centered:!currentConversation}">
+        <div ref="composerWrap" class="composer-wrap" :class="{centered:!currentConversation, 'drag-over-available':Boolean(dragged) || todoistDragOver}" @dragover="acceptDrag" @dragleave="leaveComposer" @drop="dropResource">
           <section v-if="service === 'multica' && selected && replacementAgentId && replacementAgentId !== (selected.assignee_id || '')" class="switch-agent-panel" aria-label="确认切换会话助手"><div><strong>切换到 {{ agentName(replacementAgentId) }} · {{ agentModel(replacementAgentId) }}</strong><p>会话负责人将改变，可能使用不同账号；不更改助手全局模型，不停止已有运行。请求不自动启动新运行，实际行为取决于 Multica 版本。</p></div><div class="switch-agent-actions"><button type="button" class="subtle" :disabled="switchingAgent" @click="replacementAgentId = selected.assignee_id || ''">取消</button><button type="button" class="subtle" :disabled="switchingAgent || uncertain || !onlineAgents.some(agent => agent.id === replacementAgentId)" @click="switchAgent">{{ switchingAgent ? '切换中…' : '确认切换' }}</button></div></section>
           <div v-if="draft.resources.length" class="resource-attachments"><ResourceAttachmentCard v-for="resource in draft.resources" :key="`${draftKey}:${resource.kind}:${resource.id}`" :resource="resource" :disabled="anySending" :multica="service === 'multica'" @update="updateResource" @remove="toggleResource(resource)" /></div>
           <div v-if="draft.articles.length" class="attachments"><span v-for="article in draft.articles" :key="article.url + article.title" class="attachment"><span class="attachment-title" :title="article.title">✦ {{ article.title }}</span><button type="button" class="attachment-remove" :disabled="anySending" :aria-label="`移除 ${article.title}`" title="移除文章" @click="toggleArticle(article)">×</button></span></div>
-          <div class="composer"><ComposerTools :panel-open="Boolean(activePanel)" :open-up="currentConversation" @select="activePanel=$event" /><textarea ref="composerInput" v-model="draft.text" :disabled="anySending" rows="1" :placeholder="currentConversation ? '继续输入你的问题…' : '输入你的问题…'" @input="resizeComposer" @keydown="onComposerKeydown" /><ProviderPicker :service="service" :selected-id="service === 'deepseek' ? byokCurrent?.model || byokModel : selected ? replacementAgentId : agentId" :effort="byokCurrent?.reasoningEffort || byokEffort" :agents="onlineAgents" :runtimes="runtimes" :models="deepseekModels" :disabled="anySending || switchingAgent || (service === 'multica' && uncertain)" :loading="agentsLoading" :error="agentsError" :fallback-name="selected && service === 'multica' ? agentName(selected.assignee_id) : undefined" @choose-agent="chooseAgent" @choose-model="service === 'deepseek' ? byok.chooseModel($event) : chooseDeepseek($event)" @choose-effort="byok.chooseEffort" @open-settings="openSettings('deepseek')" @retry="refresh" /><button v-if="byokSending" type="button" class="send-button stop-button" aria-label="停止生成" @click="byok.stop">■</button><button v-else type="button" class="send-button" :disabled="sending || switchingAgent || !draft.text.trim() || (service === 'deepseek' ? !byokConfigured : uncertain || (selected && replacementAgentId !== (selected.assignee_id || '')) || !connected || (!selected && (!agentId || agentsLoading || Boolean(agentsError))))" aria-label="发送消息" @click="send">{{ sending ? '…' : '↑' }}</button></div>
+          <div class="composer"><ComposerTools :panel-open="Boolean(activePanel)" :selected="activePanel" :open-up="currentConversation" @select="activePanel=$event" /><textarea ref="composerInput" v-model="draft.text" :disabled="anySending" rows="1" :placeholder="currentConversation ? '继续输入你的问题…' : '输入你的问题…'" @input="resizeComposer" @keydown="onComposerKeydown" /><ProviderPicker :service="service" :selected-id="service === 'deepseek' ? byokCurrent?.model || byokModel : selected ? replacementAgentId : agentId" :effort="byokCurrent?.reasoningEffort || byokEffort" :agents="onlineAgents" :runtimes="runtimes" :models="deepseekModels" :disabled="anySending || switchingAgent || (service === 'multica' && uncertain)" :loading="agentsLoading" :error="agentsError" :fallback-name="selected && service === 'multica' ? agentName(selected.assignee_id) : undefined" @choose-agent="chooseAgent" @choose-model="service === 'deepseek' ? byok.chooseModel($event) : chooseDeepseek($event)" @choose-effort="byok.chooseEffort" @open-settings="openSettings('deepseek')" @retry="refresh" /><button v-if="byokSending" type="button" class="send-button stop-button" aria-label="停止生成" @click="byok.stop">■</button><button v-else type="button" class="send-button" :disabled="sending || switchingAgent || !draft.text.trim() || (service === 'deepseek' ? !byokConfigured : uncertain || (selected && replacementAgentId !== (selected.assignee_id || '')) || !connected || (!selected && (!agentId || agentsLoading || Boolean(agentsError))))" aria-label="发送消息" @click="send">{{ sending ? '…' : '↑' }}</button></div>
           <p class="composer-hint"><template v-if="service === 'multica' && !connected && !loading">请先<button class="inline-setting" type="button" @click="openSettings('multica')">连接服务</button>，或选择其他模型。</template><template v-else-if="service === 'deepseek' && !byokConfigured">请先<button class="inline-setting" type="button" @click="openSettings('deepseek')">配置 API Key</button>。</template><template v-else-if="draft.articles.length || draft.resources.length">所选资源将随消息发送，请检查敏感内容。</template><span>Enter 发送 · Shift + Enter 换行</span></p>
         </div>
+        <AiHotPanel v-if="activePanel === 'aihot'" class="tool-resource-enter" :selected="draft.articles" :disabled="anySending" @close="activePanel=null" @select="selectArticle" @drag-start="dragged={kind:'article',value:$event}" @drag-end="dragged=null" />
+        <ResourcePanel v-else-if="activePanel === 'bilibili' || activePanel === 'github'" class="tool-resource-enter" :key="activePanel" :kind="activePanel" :selected-resources="draft.resources" :disabled="anySending" @select="toggleResource" @close="activePanel=null" @drag-start="dragged={kind:'resource',value:$event}" @drag-end="dragged=null" />
+        </template>
+        <Transition name="tool-panel"><TodoistPanel v-if="todoistPanelOpened" v-show="workspaceSection === 'chat' && activePanel === 'todoist'" :active="workspaceVisible && workspaceSection === 'chat' && activePanel === 'todoist'" @close="activePanel=null" /></Transition>
+        <BackpackLibrary v-if="libraryOpened" v-show="workspaceSection === 'library'" embedded />
+        <AiSchedulePanel v-if="scheduleOpened" v-show="workspaceSection === 'schedule'" embedded :active="workspaceVisible && workspaceSection === 'schedule'" :provider="service" :model="byokCurrent?.model || byokModel" :agents="onlineAgents" :workspace-id="workspaceIdForAgents" :agent-id="selected?.assignee_id || agentId" />
       </main>
-      <AiHotPanel v-if="activePanel === 'aihot'" :selected="draft.articles" @close="activePanel=null" @select="selectArticle" />
-      <ResourcePanel v-else-if="activePanel === 'bilibili' || activePanel === 'github'" :key="activePanel" :kind="activePanel" :selected-resources="draft.resources" :disabled="anySending" @select="toggleResource" @close="activePanel=null" />
-      <TodoistPanel v-else-if="activePanel === 'todoist'" @close="activePanel=null" />
     </div>
     <AiSettings v-if="settingsOpen" :initial-tab="settingsTab" @close="!settingsBusy && (settingsOpen=false)" @connection-changed="onConnectionChanged" @config-changed="refreshByokConfig" @busy-changed="settingsBusy=$event" />
   </section>
@@ -315,8 +416,9 @@ function selectIssueAfterSend(issue: MulticaIssue) { replacementAgentId.value = 
 .service-switch { display:flex; justify-content:space-between; align-items:center; gap:5px; margin:0 2px 12px; font-size:11px; color:var(--muted,#94a3b8); }.service-switch button { border:0; background:transparent; color:#7569df; cursor:pointer; font-size:11px; }
 /* Override the shared fullscreen inset while preserving space for the Dock. */
 #multica.card.card-fullscreen { padding:0 0 74px !important; }
-.agent-workspace { display:flex!important; flex-direction:column!important; padding:0!important; background:var(--panel,#fff)!important; color:var(--text,#26334b); font:13px/1.5 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; overflow:hidden!important; }.agent-workspace * { box-sizing:border-box; }.agent-workspace button,.agent-workspace textarea,.agent-workspace select { font:inherit; }.agent-workspace button { cursor:pointer; }.agent-workspace button:disabled { opacity:.5; cursor:not-allowed; }.agent-topbar { min-height:68px; padding:0 26px; display:flex; align-items:center; justify-content:space-between; gap:18px; border-bottom:1px solid var(--border,#e9edf4); background:var(--panel,#fff); }.brand,.top-actions { display:flex; align-items:center; gap:12px; }.brand strong,.brand small { display:block; }.brand strong { font-size:15px; }.brand small { color:#9aa6bc; font-size:9px; letter-spacing:.13em; }.logo { width:36px; height:36px; display:grid; place-items:center; border-radius:12px; color:#fff; font-size:24px; background:linear-gradient(145deg,#736af0,#6abcec); }.top-actions { gap:8px; }.top-actions button,.top-actions a,.subtle { color:var(--text,#52627a); background:var(--surface,#fff); border:1px solid var(--border,#e4e9f1); border-radius:8px; padding:7px 11px; text-decoration:none; font-size:12px; }.connection { color:#8492a8; font-size:11px; white-space:nowrap; }.connection i { display:inline-block; width:7px; height:7px; border-radius:50%; background:#cbd5e1; margin-right:6px; }.connection i.online { background:#43c893; }.workspace-body { flex:1; min-height:0; display:flex; position:relative; background:var(--bg,#f7f8fc); padding:12px; gap:12px; }.side-panel { width:248px; flex:none; min-height:0; padding:14px; display:flex; flex-direction:column; border:1px solid var(--border,#e4e9f1); border-radius:16px; background:var(--panel,#fff); box-shadow:0 4px 20px rgba(0,0,0,.04); }.new-button { width:100%; padding:12px; border:1px solid #a5d9ef; border-radius:10px; text-align:left; color:var(--text,#26334b); font-weight:650!important; background:linear-gradient(110deg,rgba(99,190,238,.16),rgba(157,139,244,.09)); }.new-button span { color:#6999e6; font-size:18px; margin-right:6px; }.session-header { display:flex; justify-content:space-between; align-items:center; margin:16px 4px 8px; }.session-header small { color:#a2aec0; font-size:10px; }.session-list { flex:1; overflow:auto; min-height:0; display:flex; flex-direction:column; gap:4px; }.session-item { display:flex; flex-direction:column; gap:4px; text-align:left; background:transparent; border:1px solid transparent; border-radius:8px; padding:9px; color:var(--text,#26334b); }.session-item:hover { background:var(--surface,#f4f6fb); }.session-item.chosen { background:rgba(111,103,232,.09); border-color:rgba(111,103,232,.14); }.session-top { display:flex; justify-content:space-between; color:#998ff1; font-size:10px; }.session-top span:last-child,.session-item small { color:#9aa7ba; }.session-top .session-status.review:last-child { color:#b77912; }.session-top .session-status.done:last-child { color:#16835a; }.session-top .session-status.pending:last-child { color:#d34545; }.session-item strong { font-size:12px; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }.session-item small { font-size:10px; }.side-footer { padding:11px; border-radius:9px; background:linear-gradient(115deg,rgba(129,112,244,.1),rgba(80,197,225,.09)); font-size:11px; }.side-footer small { display:block; margin-left:22px; color:#9caac0; font-size:10px; }
-.workspace-main { flex:1; min-width:0; min-height:0; display:flex; flex-direction:column; overflow:auto; padding:24px clamp(16px,3.5vw,48px) 16px; border:1px solid var(--border,#e4e9f1); border-radius:16px; background:var(--panel,#fff); box-shadow:0 4px 20px rgba(0,0,0,.03); }.workspace-main.new-view { background:radial-gradient(ellipse at 50% 50%,rgba(128,193,248,.24),transparent 65%); }.conversation-header { display:flex; justify-content:space-between; align-items:center; gap:18px; width:100%; max-width:920px; margin:0 auto; padding-bottom:18px; border-bottom:1px solid var(--border,#e8ebf3); }.conversation-header small { color:#8f83e9; }.conversation-header h2 { margin:6px 0; font-size:20px; }.conversation-header p { margin:0; color:#98a5b9; font-size:12px; }.conversation { flex:1; min-height:0; overflow:auto; width:100%; max-width:920px; margin:0 auto; padding:20px 8px 16px; }.day-divider { text-align:center; color:#b1bbca; font-size:10px; margin-bottom:22px; }.bubble-row { display:flex; gap:10px; align-items:flex-start; margin-bottom:21px; }.avatar { flex:none; width:32px; height:32px; display:grid; place-items:center; border-radius:11px; font-size:12px; font-weight:700; }.avatar.bot { color:#fff; background:linear-gradient(140deg,#8577f1,#69b9e9); }.avatar.person { color:#8a78e4; background:#ece9fc; }.bubble-content { max-width:min(720px,90%); min-width:0; }.bubble-meta { display:flex; gap:10px; margin-bottom:6px; font-size:11px; }.bubble-meta span { color:#b1bdcd; }.bubble { white-space:pre-wrap; overflow-wrap:anywhere; line-height:1.75; padding:13px 16px; border-radius:4px 14px 14px 14px; }.bot-bubble { background:var(--panel,#fff); border:1px solid var(--border,#e9edf4); }.human-bubble { background:rgba(118,106,232,.08); border:1px solid rgba(118,106,232,.10); }.welcome { margin:auto auto 25px; text-align:center; }.welcome h1 { font-size:clamp(26px,3vw,36px); font-weight:500; margin:0 0 12px; }.welcome p { color:#98a5b9; }.composer-wrap { width:100%; max-width:920px; margin:12px auto 0; }.composer-wrap.centered { max-width:760px; margin:0 auto auto; }.composer { display:flex; align-items:center; gap:8px; padding:10px 12px; border:1px solid var(--border,#e1e6f0); border-radius:20px; background:var(--panel,#fff); box-shadow:0 7px 28px #5d6c8b18; }.centered .composer { border-radius:32px; padding:11px 14px; }.composer textarea { flex:1; min-width:0; max-height:160px; border:0; outline:0; resize:vertical; background:transparent; color:var(--text,#26334b); padding:8px 2px; }.composer select { max-width:180px; border:0; outline:0; background:transparent; color:var(--text,#52627a); font-size:12px; }.add-button,.send-button { flex:none; width:34px; height:34px; border:0; border-radius:50%; font-size:21px!important; background:transparent; color:var(--text,#52627a); }.add-button.on { background:#ebedff; color:#7569ec; }.send-button { background:#7569ec; color:white; }.composer-hint { color:#9caabd; font-size:10px; margin:8px 12px; }.composer-hint span { float:right; }.attachments { display:flex; flex-wrap:wrap; gap:6px; margin:0 8px 8px; }.attachment { max-width:270px; padding:5px 8px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; background:rgba(92,177,230,.12); border-radius:8px; color:var(--text,#456582); font-size:11px; }.attachment button { border:0; background:transparent; color:inherit; }.muted { color:#9ba8bc; font-size:12px; }.alert { color:#b45309; background:rgba(245,158,11,.12); padding:9px; border-radius:7px; }.notice { color:#a05b14; font-size:12px; }.disconnected { margin:auto; text-align:center; }.disconnected p { color:#9ba8bc; }.primary { border:0; border-radius:8px; padding:9px 15px; background:#7668e9; color:white; }
+.agent-workspace.workspace-hidden { display:none !important; }
+.agent-workspace { display:flex!important; flex-direction:column!important; padding:0!important; background:var(--panel,#fff)!important; color:var(--text,#26334b); font:13px/1.5 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; overflow:hidden!important; }.agent-workspace * { box-sizing:border-box; }.agent-workspace button,.agent-workspace textarea,.agent-workspace select { font:inherit; }.agent-workspace button { cursor:pointer; }.agent-workspace button:disabled { opacity:.5; cursor:not-allowed; }.agent-topbar { min-height:68px; padding:0 26px; display:flex; align-items:center; justify-content:space-between; gap:18px; border-bottom:1px solid var(--border,#e9edf4); background:var(--panel,#fff); }.brand,.top-actions { display:flex; align-items:center; gap:12px; }.brand strong,.brand small { display:block; }.brand strong { font-size:15px; }.brand small { color:#9aa6bc; font-size:9px; letter-spacing:.13em; }.logo { width:36px; height:36px; display:grid; place-items:center; border-radius:12px; color:#fff; font-size:24px; background:linear-gradient(145deg,#736af0,#6abcec); }.top-actions { gap:8px; }.top-actions button,.top-actions a,.subtle { color:var(--text,#52627a); background:var(--surface,#fff); border:1px solid var(--border,#e4e9f1); border-radius:8px; padding:7px 11px; text-decoration:none; font-size:12px; }.connection { color:#8492a8; font-size:11px; white-space:nowrap; }.connection i { display:inline-block; width:7px; height:7px; border-radius:50%; background:#cbd5e1; margin-right:6px; }.connection i.online { background:#43c893; }.workspace-body { flex:1; min-height:0; display:flex; position:relative; background:var(--background,#f7f8fc); padding:12px; gap:12px; }.side-panel { width:248px; flex:none; min-height:0; padding:14px; display:flex; flex-direction:column; border:1px solid var(--border,#e4e9f1); border-radius:16px; background:var(--panel,#fff); box-shadow:0 4px 20px rgba(0,0,0,.04); }.new-button { width:100%; padding:12px; border:1px solid #a5d9ef; border-radius:10px; text-align:left; color:var(--text,#26334b); font-weight:650!important; background:linear-gradient(110deg,rgba(99,190,238,.16),rgba(157,139,244,.09)); }.new-button span { color:#6999e6; font-size:18px; margin-right:6px; }.session-header { display:flex; justify-content:space-between; align-items:center; margin:16px 4px 8px; }.session-header small { color:#a2aec0; font-size:10px; }.session-list { flex:1; overflow:auto; min-height:0; display:flex; flex-direction:column; gap:4px; }.session-item { display:flex; flex-direction:column; gap:4px; text-align:left; background:transparent; border:1px solid transparent; border-radius:8px; padding:9px; color:var(--text,#26334b); }.session-item:hover { background:var(--surface,#f4f6fb); }.session-item.chosen { background:rgba(111,103,232,.09); border-color:rgba(111,103,232,.14); }.session-top { display:flex; justify-content:space-between; color:#998ff1; font-size:10px; }.session-top span:last-child,.session-item small { color:#9aa7ba; }.session-top .session-status.review:last-child { color:#b77912; }.session-top .session-status.done:last-child { color:#16835a; }.session-top .session-status.pending:last-child { color:#d34545; }.session-item strong { font-size:12px; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }.session-item small { font-size:10px; }.side-footer { padding:11px; border-radius:9px; background:linear-gradient(115deg,rgba(129,112,244,.1),rgba(80,197,225,.09)); font-size:11px; }.side-footer small { display:block; margin-left:22px; color:#9caac0; font-size:10px; }
+.workspace-main { flex:1; min-width:0; min-height:0; display:flex; flex-direction:column; overflow:auto; padding:24px clamp(16px,3.5vw,48px) 16px; border:1px solid var(--border,#e4e9f1); border-radius:16px; background:var(--panel,#fff); box-shadow:0 4px 20px rgba(0,0,0,.03); }.workspace-main.new-view { background:radial-gradient(ellipse at 50% 50%,rgba(128,193,248,.14),transparent 65%),var(--panel,#fff); }.conversation-header { display:flex; justify-content:space-between; align-items:center; gap:18px; width:100%; max-width:920px; margin:0 auto; padding-bottom:18px; border-bottom:1px solid var(--border,#e8ebf3); }.conversation-header small { color:#8f83e9; }.conversation-header h2 { margin:6px 0; font-size:20px; }.conversation-header p { margin:0; color:#98a5b9; font-size:12px; }.conversation { flex:1; min-height:0; overflow:auto; width:100%; max-width:920px; margin:0 auto; padding:20px 8px 16px; }.day-divider { text-align:center; color:#b1bbca; font-size:10px; margin-bottom:22px; }.bubble-row { display:flex; gap:10px; align-items:flex-start; margin-bottom:21px; }.avatar { flex:none; width:32px; height:32px; display:grid; place-items:center; border-radius:11px; font-size:12px; font-weight:700; }.avatar.bot { color:#fff; background:linear-gradient(140deg,#8577f1,#69b9e9); }.avatar.person { color:#8a78e4; background:#ece9fc; }.bubble-content { max-width:min(720px,90%); min-width:0; }.bubble-meta { display:flex; gap:10px; margin-bottom:6px; font-size:11px; }.bubble-meta span { color:#b1bdcd; }.bubble { white-space:pre-wrap; overflow-wrap:anywhere; line-height:1.75; padding:13px 16px; border-radius:4px 14px 14px 14px; }.bot-bubble { background:var(--panel,#fff); border:1px solid var(--border,#e9edf4); }.human-bubble { background:rgba(118,106,232,.08); border:1px solid rgba(118,106,232,.10); }.welcome { margin:auto auto 25px; text-align:center; }.welcome h1 { font-size:clamp(26px,3vw,36px); font-weight:500; margin:0 0 12px; }.welcome p { color:#98a5b9; }.composer-wrap { width:100%; max-width:920px; margin:12px auto 0; }.composer-wrap.centered { max-width:760px; margin:0 auto auto; }.composer { display:flex; align-items:center; gap:8px; padding:10px 12px; border:1px solid var(--border,#e1e6f0); border-radius:20px; background:var(--panel,#fff); box-shadow:0 7px 28px #5d6c8b18; }.centered .composer { border-radius:32px; padding:11px 14px; }.composer textarea { flex:1; min-width:0; max-height:160px; border:0; outline:0; resize:vertical; background:transparent; color:var(--text,#26334b); padding:8px 2px; }.composer select { max-width:180px; border:0; outline:0; background:transparent; color:var(--text,#52627a); font-size:12px; }.add-button,.send-button { flex:none; width:34px; height:34px; border:0; border-radius:50%; font-size:21px!important; background:transparent; color:var(--text,#52627a); }.add-button.on { background:#ebedff; color:#7569ec; }.send-button { background:#7569ec; color:white; }.composer-hint { color:#9caabd; font-size:10px; margin:8px 12px; }.composer-hint span { float:right; }.attachments { display:flex; flex-wrap:wrap; gap:6px; margin:0 8px 8px; }.attachment { max-width:270px; padding:5px 8px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; background:rgba(92,177,230,.12); border-radius:8px; color:var(--text,#456582); font-size:11px; }.attachment button { border:0; background:transparent; color:inherit; }.muted { color:#9ba8bc; font-size:12px; }.alert { color:#b45309; background:rgba(245,158,11,.12); padding:9px; border-radius:7px; }.notice { color:#a05b14; font-size:12px; }.disconnected { margin:auto; text-align:center; }.disconnected p { color:#9ba8bc; }.primary { border:0; border-radius:8px; padding:9px 15px; background:#7668e9; color:white; }
 .conversation-actions,.switch-agent-actions { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }.switch-agent-panel { width:100%; max-width:920px; box-sizing:border-box; margin:10px auto; padding:12px 14px; border:1px solid var(--border,#dfe5ed); border-radius:10px; background:var(--panel,#fff); }.switch-agent-panel p { margin:4px 0 8px; font-size:11px; color:var(--muted,#64748b); line-height:1.5; }
 .resource-attachments { display:flex; flex-wrap:wrap; gap:8px; max-height:40vh; overflow:auto; margin:0 8px 8px; }
 .attachment { display:inline-flex; align-items:center; gap:6px; max-width:min(320px,100%); overflow:visible; }
@@ -325,6 +427,18 @@ function selectIssueAfterSend(issue: MulticaIssue) { replacementAgentId.value = 
 .attachment .attachment-remove:hover,.attachment .attachment-remove:focus-visible { background:rgba(82,98,122,.16); }
 .workspace-settings-button { position:absolute; z-index:4; right:28px; top:24px; padding:7px 11px; border:1px solid var(--border,#e4e9f1); border-radius:8px; background:var(--panel,#fff); color:var(--text,#52627a); font-size:12px; }
 .workspace-settings-button:hover { background:var(--surface,#f4f6fb); }
+.workspace-main.embedded-view { padding:0; overflow:hidden; }
+.workspace-main.browsing-resources { overflow:hidden; padding-top:18px; }
+.workspace-main.browsing-resources .welcome,.workspace-main.browsing-resources .conversation,.workspace-main.browsing-resources .conversation-header { display:none; }
+.workspace-main.browsing-resources .composer-wrap,.workspace-main.browsing-resources .composer-wrap.centered { flex:none; max-width:none; margin:0 auto 12px; padding-right:80px; }
+.workspace-main.browsing-resources .resource-attachments { max-height:18vh; }
+.tool-resource-enter { animation:tool-resource-in .22s cubic-bezier(.2,.8,.2,1); }
+.tool-panel-enter-active { transition:opacity .18s ease,transform .22s cubic-bezier(.2,.8,.2,1); }
+.tool-panel-enter-from { opacity:0; transform:translateY(8px); }
+@keyframes tool-resource-in { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+@media(prefers-reduced-motion:reduce) { .tool-resource-enter { animation:none; } .tool-panel-enter-active { transition:none; } }
+.composer-wrap.drag-over-available .composer { outline:2px dashed #7569ec; outline-offset:3px; }
+@media(max-width:850px) { .workspace-main.browsing-resources .composer-wrap,.workspace-main.browsing-resources .composer-wrap.centered { padding-right:0; margin-top:40px; } }
 .conversation-header { padding-right:82px; }
 .multica-settings-overlay { position:absolute; inset:0; z-index:40; display:flex; align-items:flex-start; justify-content:flex-end; padding:60px 20px 20px; background:rgba(15,23,42,.25); }
 .multica-settings-dialog { width:min(480px,100%); max-height:100%; overflow:auto; padding:18px; border:1px solid var(--border,#e4e9f1); border-radius:12px; background:var(--panel,#fff); box-shadow:0 15px 40px #0f172a30; }

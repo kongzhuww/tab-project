@@ -301,7 +301,7 @@
             <input
               type="text"
               class="ms-netease-search-input"
-              placeholder="全网搜索网易云单曲、歌手名或专辑…"
+              placeholder="搜索网易云歌曲或歌手…"
               v-model="searchQuery"
               @keydown.enter="onSearchEnter"
               @input="onSearchInput"
@@ -402,7 +402,7 @@
               <span class="ms-netease-track-dur">{{ formatDuration(song) }}</span>
             </div>
             <div v-if="!currentSongList.length" style="padding: 30px; text-align: center; color: var(--muted); font-size: 13px;">
-              未找到曲目，可尝试在上方搜索框输入关键词
+              {{ workspaceState.message ? '搜索未完成，请查看上方提示。' : isSearching ? '未找到匹配的歌曲，请尝试其他关键词。' : '暂无曲目，可尝试在上方搜索框输入关键词。' }}
             </div>
 
               <!-- 10 首分页控制底栏 -->
@@ -543,6 +543,7 @@ const DEFAULT_USER_AVATAR =
 import { type NeteasePlaylist, type NeteaseSong } from "../services/netease.service";
 import { musicService } from "../services/music.service";
 import { windowManagerController } from "../core/window-manager.store";
+import { workspaceSearchRequests, consumeWorkspaceSearch } from '../search/workspace-search';
 
 const searchWrapRef = ref<HTMLElement | null>(null);
 const searchQuery = ref("");
@@ -713,7 +714,7 @@ const isShowingFavorites = computed(() => {
 });
 
 function selectFavoritesList() {
-  workspace.pause();
+  clearSearch();
   isShowingRhine.value = false;
   selectedRhineAlbum.value = null;
   isShowingRecent.value = false;
@@ -726,7 +727,7 @@ function selectFavoritesList() {
 }
 
 const isSearching = computed(() => {
-  return searchQuery.value.trim().length > 0 && workspaceState.neteaseSearchResults.length > 0;
+  return searchQuery.value.trim().length > 0;
 });
 
 const currentSongList = computed<NeteaseSong[]>(() => {
@@ -783,7 +784,7 @@ function handleClose() {
 }
 
 function selectRecentList() {
-  workspace.pause();
+  clearSearch();
   isShowingRhine.value = false;
   selectedRhineAlbum.value = null;
   isShowingRecent.value = true;
@@ -791,6 +792,7 @@ function selectRecentList() {
 }
 
 function selectPlaylist(pl: NeteasePlaylist) {
+  clearSearch();
   isShowingRhine.value = false;
   selectedRhineAlbum.value = null;
   isShowingRecent.value = false;
@@ -799,6 +801,7 @@ function selectPlaylist(pl: NeteasePlaylist) {
 
 function onSearchInput() {
   workspace.pause();
+  workspaceState.neteaseSearchResults = [];
   if (searchTimer) clearTimeout(searchTimer);
   searchTimer = setTimeout(() => {
     if (!active.value) return;
@@ -817,6 +820,7 @@ function onSearchEnter() {
 }
 
 function clearSearch() {
+  if (searchTimer) { clearTimeout(searchTimer); searchTimer = null; }
   workspace.pause();
   searchQuery.value = "";
   workspaceState.neteaseSearchResults = [];
@@ -873,10 +877,29 @@ function pauseView() {
 }
 const detachPause = onMusicPause(pauseView);
 let initialRequested = false;
-function initialRead() { if (!initialRequested && active.value) { initialRequested = true; void workspace.refresh(); } }
+function initialRead() {
+  if (initialRequested || !active.value) return;
+  initialRequested = true;
+  // A home-search request may already have started during setup. A playlist
+  // refresh uses the same read scope and would cancel that first search.
+  if (!searchQuery.value.trim()) void workspace.refresh();
+}
 function visibility() { pageVisible.value = !document.hidden; }
 function recentUpdated() { workspace.syncLocal(); }
 function accountUpdated() { workspace.accountChanged(); }
+watch(() => [active.value, workspaceSearchRequests.netease?.id] as const, ([visible, id]) => {
+  if (!visible || !id) return;
+  const request = consumeWorkspaceSearch('netease');
+  if (!request) return;
+  if (searchTimer) { clearTimeout(searchTimer); searchTimer = null; }
+  isShowingRhine.value = false;
+  selectedRhineAlbum.value = null;
+  isShowingRecent.value = false;
+  isSearchFocused.value = false;
+  searchQuery.value = request.keyword;
+  addSearchHistory(request.keyword);
+  void workspace.search(request.keyword);
+}, { immediate:true, flush:'post' });
 watch(active, visible => {
   if (!visible) pauseView();
   else { workspace.syncLocal(); document.addEventListener("click", onDocumentClick); initialRead(); }

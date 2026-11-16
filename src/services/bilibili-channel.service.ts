@@ -378,10 +378,10 @@ export class BilibiliChannelService {
   // ---------- 4. 搜索与动作接口 (LogicWeaverBiliSearchActions) ----------
 
   public readonly searchActions = {
-    search: async (keyword: string) => {
+    search: async (keyword: string, page = 1, pageSize = 12) => {
       const { ik, sk } = await bilibiliService.getWbiKeys();
       const { signedQuery } = calculateWbiSign(
-        { search_type: "video", keyword, page: 1, page_size: 12 },
+        { search_type: "video", keyword, page, page_size: pageSize },
         ik,
         sk
       );

@@ -114,6 +114,7 @@ export const multicaService = {
     });
   },
   async isConnected(): Promise<boolean> { return Boolean(await session()); },
+  async activeWorkspaceId(): Promise<string | null> { return (await session())?.workspaceId || null; },
   /** Only call inside an encrypted backup; never include in ordinary exports. */
   async credentialForEncryptedBackup(): Promise<Session | null> { return session(); },
   async restoreEncryptedCredential(value: unknown): Promise<'restored' | 'kept'> {
@@ -154,9 +155,10 @@ export const multicaService = {
     const data = await request<{ issues?: unknown }>(current.token, "/api/issues?limit=50&sort=updated_at&direction=desc", current.workspaceId);
     return array<MulticaIssue>(data?.issues, "任务");
   },
-  async issueRuns(issueId: string): Promise<MulticaRun[]> {
+  async issueRuns(issueId: string, expectedWorkspaceId?: string): Promise<MulticaRun[]> {
     const current = await session();
     if (!current) throw new Error("请先在 Agent 工作台右上角设置中连接 Multica");
+    if (expectedWorkspaceId && current.workspaceId !== expectedWorkspaceId) throw new Error("Multica 工作区已更换，暂停检查原工作区的任务。");
     if (!issueId) throw new Error("缺少任务编号");
     return array<MulticaRun>(await request(current.token, `/api/issues/${encodeURIComponent(issueId)}/task-runs`, current.workspaceId), "运行记录");
   },
@@ -185,25 +187,28 @@ export const multicaService = {
     if (!updated || updated.id !== issueId || updated.assignee_id !== agentId || updated.assignee_type !== 'agent') throw new Error('切换结果无法确认；请刷新会话或到 Multica 核对，避免重复操作。');
     return updated;
   },
-  async renameIssue(issueId: string, title: string): Promise<void> {
+  async renameIssue(issueId: string, title: string, expectedWorkspaceId?: string): Promise<void> {
     const current = await session();
     if (!current) throw new Error("请先在 Agent 工作台右上角设置中连接 Multica");
+    if (expectedWorkspaceId && current.workspaceId !== expectedWorkspaceId) throw new Error("Multica 工作区已更换，未更新标题。");
     if (!issueId || !title.trim()) throw new Error("缺少任务编号或标题");
     await request<unknown>(current.token, `/api/issues/${encodeURIComponent(issueId)}`, current.workspaceId, {
       method: "PUT", body: JSON.stringify({ title: title.trim() })
     });
   },
-  async addIssueComment(issueId: string, content: string): Promise<void> {
+  async addIssueComment(issueId: string, content: string, expectedWorkspaceId?: string): Promise<void> {
     const current = await session();
     if (!current) throw new Error("请先在 Agent 工作台右上角设置中连接 Multica");
+    if (expectedWorkspaceId && current.workspaceId !== expectedWorkspaceId) throw new Error("Multica 工作区已更换，消息未发送。");
     if (!issueId || !content.trim()) throw new Error("请填写消息");
     await request<unknown>(current.token, `/api/issues/${encodeURIComponent(issueId)}/comments`, current.workspaceId, {
       method: "POST", body: JSON.stringify({ content: content.trim(), type: "comment" })
     });
   },
-  async createIssue(title: string, description: string, agentId: string): Promise<{ id: string; identifier?: string }> {
+  async createIssue(title: string, description: string, agentId: string, expectedWorkspaceId?: string): Promise<{ id: string; identifier?: string }> {
     const current = await session();
     if (!current) throw new Error("请先在 Agent 工作台右上角设置中连接 Multica");
+    if (expectedWorkspaceId && current.workspaceId !== expectedWorkspaceId) throw new Error("Multica 工作区已更换，任务未派发。");
     if (!title.trim() || !description.trim() || !agentId) throw new Error("请填写任务并选择智能体");
     const result = await request<{ id?: unknown; identifier?: unknown }>(current.token, "/api/issues", current.workspaceId, {
       method: "POST", body: JSON.stringify({ title: title.trim(), description, assignee_type: "agent", assignee_id: agentId })

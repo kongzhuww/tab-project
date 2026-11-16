@@ -1,6 +1,7 @@
-import { computed, onBeforeUnmount, reactive, ref } from 'vue';
-import { deleteConversation, loadConfig, loadConversations, saveConversation, streamDeepSeek, type ChatMessage, type LocalConversation, type ReasoningEffort } from '../services/byok.service';
+import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
+import { BYOK_HISTORY_KEY, deleteConversation, loadConfig, loadConversations, saveConversation, streamDeepSeek, type ChatMessage, type LocalConversation, type ReasoningEffort } from '../services/byok.service';
 import { sessionTitle } from './session-content';
+import { publishAiNotification } from './ai-notifications';
 
 /** Local chat state only; the workbench owns the single shared UI and composer. */
 export function useByokChat() {
@@ -8,7 +9,11 @@ export function useByokChat() {
   const configured = ref(false), model = ref('deepseek-flash'), effort = ref<ReasoningEffort>('high'), loading = ref(false), sending = ref(false);
   const current = computed(() => conversations.value.find(item => item.id === currentId.value));
   let controller: AbortController | null = null, closed = false;
-  onBeforeUnmount(() => { closed = true; controller?.abort(); });
+  const onHistoryChange = (changes: any, area: string) => {
+    if (area === 'local' && changes[BYOK_HISTORY_KEY] && !sending.value) void refreshHistory().catch(() => { if (!closed) error.value = '本地会话读取失败。'; });
+  };
+  onMounted(() => { if (typeof chrome !== 'undefined') chrome.storage?.onChanged?.addListener(onHistoryChange); });
+  onBeforeUnmount(() => { closed = true; controller?.abort(); if (typeof chrome !== 'undefined') chrome.storage?.onChanged?.removeListener(onHistoryChange); });
   async function refreshConfig() { const config = await loadConfig(); configured.value = Boolean(config.key); if (!current.value) model.value = config.model; return config; }
   async function refreshHistory() { const list = await loadConversations(); if (!sending.value) conversations.value = list; }
   function newChat() { if (!sending.value) { currentId.value = ''; error.value = ''; } }
@@ -37,6 +42,7 @@ export function useByokChat() {
     if (content.length > 100000) { error.value = '消息及附件内容过长，请控制在 100,000 字符以内。'; return; }
     sending.value = true; error.value = ''; controller = new AbortController();
     let chat: LocalConversation | undefined, user: ChatMessage | undefined, assistant: ChatMessage | undefined, sent = false;
+    let outcome: 'success' | 'error' | 'unknown' | null = null;
     try {
       const config = await loadConfig(); if (!config.key) throw new Error('请先在设置中配置 DeepSeek API Key。');
       chat = current.value || reactive<LocalConversation>({ id: crypto.randomUUID(), provider: 'deepseek', model: model.value, reasoningEffort: effort.value, title: sessionTitle(prompt), updatedAt: Date.now(), messages: [] });
@@ -50,11 +56,21 @@ export function useByokChat() {
       await streamDeepSeek(config.key, chat.model, history, controller.signal, chunk => { if (assistant) assistant.content += chunk; }, chat.reasoningEffort || 'high', chunk => { if (assistant) assistant.reasoning = (assistant.reasoning || '') + chunk; });
       if (!assistant.content.trim()) throw new Error('没有返回可显示的正文。');
       user.incomplete = false; assistant.incomplete = false;
+      outcome = 'success';
     } catch (e) {
+      if (sent && !controller?.signal.aborted) outcome = e instanceof Error && /（(?:401|402|429)）|HTTP \d{3}/.test(e.message) ? 'error' : 'unknown';
       if (chat && user && assistant && !sent) chat.messages = chat.messages.filter(m => m !== user && m !== assistant);
       if (!closed) error.value = controller?.signal.aborted ? '已停止生成；请求可能已计费。未完成的内容不会加入后续上下文。' : `${e instanceof Error ? e.message : '请求失败'}${sent ? ' 请求可能已计费，未完成内容不会加入后续上下文。' : ''}`;
     } finally {
-      if (chat && sent) { chat.updatedAt = Date.now(); try { await saveConversation(chat); } catch { if (!closed) error.value = '回复保存失败，请勿关闭页面并检查浏览器存储。'; } }
+      if (chat && sent) {
+        chat.updatedAt = Date.now();
+        try { await saveConversation(chat); }
+        catch { outcome = 'unknown'; if (!closed) error.value = '回复保存失败，请勿关闭页面并检查浏览器存储。'; }
+        if (outcome) {
+          try { await publishAiNotification(`ai_ds_${crypto.randomUUID()}`, 'DeepSeek', chat.title, outcome); }
+          catch { if (!closed) error.value = '回复已结束，但通知未能保存，请在当前会话查看结果。'; }
+        }
+      }
       controller = null; sending.value = false;
     }
   }

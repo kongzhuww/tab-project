@@ -2,10 +2,45 @@ import { createGitHubReadHeaders, readGitHubJson } from '../github/api-client';
 import { loadGitHubAccountSettings } from '../github/account-settings';
 import type { MyRepoItem } from '../github/my-repos-store';
 import { inferGroupsForRepo } from '../github/repo-group-inference';
+import type { GitHubRawRepo } from '../services/github.service';
+import { peekLocalStarGroups, projectLocalStarGroups } from '../github/local-star-groups';
 
 declare const chrome: any;
 export interface OwnRepositorySnapshot { repos: MyRepoItem[]; customGroups: string[]; repoGroupsMap: Record<string, string[]>; warning: string }
 const GROUP_KEY = 'gh_my_repo_groups_v2', MAP_KEY = 'gh_my_repo_groups_map_v2';
+
+/** Load Star resources independently of the GitHub workspace, without mutating its state. */
+export async function loadStarRepositorySnapshot(signal: AbortSignal) {
+  const { ghUser, ghToken } = await loadGitHubAccountSettings();
+  signal.throwIfAborted();
+  if (!ghUser && !ghToken) throw new Error('请先在 GitHub 插件设置用户名或 Token。');
+  if (ghUser && !/^[a-z0-9-]{1,39}$/i.test(ghUser)) throw new Error('GitHub 用户名格式无效，请检查设置。');
+  const headers = createGitHubReadHeaders(ghToken);
+  let owner = `user:${ghUser.toLowerCase()}`;
+  if (ghToken) {
+    const identity = await readGitHubJson<any>('/user', { headers, maxBytes:256*1024, timeoutMs:15000, signal });
+    if (!Number.isSafeInteger(identity.data?.id) || typeof identity.data?.login !== 'string') throw new Error('GitHub 账号身份无法确认。');
+    owner = `github-id:${identity.data.id}`;
+  }
+  const url = ghToken ? '/user/starred' : `/users/${encodeURIComponent(ghUser)}/starred`;
+  const repos: GitHubRawRepo[] = [];
+  let partial = false;
+  for (let page=1;page<=10;page++) {
+    const result = await readGitHubJson<unknown>(`${url}?per_page=100&page=${page}`, { headers, maxBytes:4*1024*1024, timeoutMs:15000, signal });
+    if (!Array.isArray(result.data)) throw new Error('GitHub 返回的 Star 列表格式异常。');
+    for (const repo of result.data) if (repo && Number.isSafeInteger(repo.id) && /^[a-z0-9-]+\/[a-z0-9_.-]+$/i.test(repo.full_name || '')) repos.push(repo as GitHubRawRepo);
+    if (!/rel="next"/.test(result.link)) break;
+    if (page === 10) partial = true;
+  }
+  let groupsWarning = '';
+  let groups: Awaited<ReturnType<typeof peekLocalStarGroups>> = null;
+  try { groups = await peekLocalStarGroups(owner); } catch { groupsWarning = '本地 Star 分组读取失败，仍可查看全部收藏。'; }
+  const projected = groups ? projectLocalStarGroups(groups) : null;
+  const latest = await loadGitHubAccountSettings();
+  signal.throwIfAborted();
+  if (latest.ghUser !== ghUser || latest.ghToken !== ghToken) throw new Error('GitHub 账号已切换，请重新加载收藏。');
+  return { repos, lists:projected?.lists || [], repoListNames:projected?.repoListNames || new Map<string,string[]>(), loading:false, warning:[partial ? 'Star 收藏较多，当前最多读取 1000 条。' : '',groupsWarning].filter(Boolean).join(' ') };
+}
 
 /** Read-only snapshot: never seed, infer, or persist the GitHub plugin's groups. */
 export async function loadOwnRepositorySnapshot(signal: AbortSignal): Promise<OwnRepositorySnapshot> {

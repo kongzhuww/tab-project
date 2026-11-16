@@ -13,6 +13,7 @@ import {
 } from "../aihot/aihot-feed-store";
 import { storageCache } from "./storage-cache.service";
 import { parseModernLeaderboard } from "../aihot/leaderboard-parser";
+import { parseDailyArchives, parseDailyReport } from "../aihot/daily-parser";
 
 export const DEFAULT_AIHOT_API = "https://aihot.virxact.com/api/v1";
 
@@ -76,7 +77,7 @@ export class AiHotService {
   private currentKey(): string {
     const s = aihotFeedController.state;
     if (s.currentView === "leaderboard") return "aihot_leaderboard_items";
-    if (s.currentView === "daily") return s.activeDailyDate ? `aihot_daily_${s.activeDailyDate}` : "aihot_daily_latest";
+    if (s.currentView === "daily") return s.activeDailyDate ? `aihot_daily_v2_${s.activeDailyDate}` : "aihot_daily_v2_latest";
     return `aihot_feed_articles_${s.feedCategory || ""}_${s.feedWindow || "24h"}`;
   }
 
@@ -264,23 +265,32 @@ export class AiHotService {
 
   public async loadDaily(targetDate = "", force = false): Promise<void> {
     if (targetDate && !/^\d{4}-\d{2}-\d{2}$/.test(targetDate)) return;
-    const key = targetDate ? `aihot_daily_${targetDate}` : "aihot_daily_latest";
-    await this.read<{ report: AiHotDailyReport | null; archives: AiHotDailyArchive[] }>("daily", key, force, 60 * 60 * 1000,
-      (value): value is { report: AiHotDailyReport | null; archives: AiHotDailyArchive[] } => {
+    const key = targetDate ? `aihot_daily_v2_${targetDate}` : "aihot_daily_v2_latest";
+    await this.read<{ report: AiHotDailyReport | null; archives: AiHotDailyArchive[]; archiveWarning: string }>("daily", key, force, 60 * 60 * 1000,
+      (value): value is { report: AiHotDailyReport | null; archives: AiHotDailyArchive[]; archiveWarning: string } => {
         const data = value as any;
         return !!data && (data.report === null || (typeof data.report?.date === "string" && Array.isArray(data.report?.sections) &&
           data.report.sections.every((section: any) => section && Array.isArray(section.items)))) && Array.isArray(data.archives) &&
-          data.archives.every((archive: any) => archive && typeof archive.date === "string");
+          data.archives.every((archive: any) => archive && typeof archive.date === "string") && typeof data.archiveWarning === "string";
       },
       async signal => {
         const url = targetDate ? `${DEFAULT_AIHOT_API}/dailies/${encodeURIComponent(targetDate)}` : `${DEFAULT_AIHOT_API}/dailies/latest`;
-        const res = await fetch(url, { headers: { Accept: "application/json" }, signal });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const json = await res.json();
-        if (!json || !Object.prototype.hasOwnProperty.call(json, "report")) throw new Error("日报响应格式不匹配");
-        return { report: json.report, archives: json.archives || [] };
+        const reportPromise = fetch(url, { headers: { Accept: "application/json" }, signal }).then(async res => {
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const json = await res.json();
+          if (!json || !Object.prototype.hasOwnProperty.call(json, "report")) throw new Error("日报响应格式不匹配");
+          return parseDailyReport(json.report);
+        });
+        const archivesPromise = fetch(`${DEFAULT_AIHOT_API}/dailies`, { headers: { Accept: "application/json" }, signal }).then(async res => {
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          return parseDailyArchives(await res.json());
+        });
+        const [reportResult, archivesResult] = await Promise.allSettled([reportPromise, archivesPromise]);
+        signal.throwIfAborted();
+        if (reportResult.status === "rejected") throw reportResult.reason;
+        return { report: reportResult.value, archives: archivesResult.status === "fulfilled" ? archivesResult.value : [...aihotFeedController.state.dailyArchives], archiveWarning: archivesResult.status === "rejected" ? "历史日期读取失败，可刷新重试。" : "" };
       },
-      data => aihotFeedController.updateState({ dailyReport: data.report, dailyArchives: data.archives, activeDailyDate: targetDate }));
+      data => aihotFeedController.updateState({ dailyReport: data.report, dailyArchives: data.archives, dailyArchiveWarning: data.archiveWarning, activeDailyDate: targetDate }));
   }
 
   private aihotArticleCache: Map<string, string> = new Map();

@@ -13,6 +13,10 @@ import GitHubTrending from "./GitHubTrending.vue";
 import GitHubAwesome from "./GitHubAwesome.vue";
 import GitHubMyRepos from "./GitHubMyRepos.vue";
 import GitHubStarsBoard from "./GitHubStarsBoard.vue";
+import GitHubGlobalSearch from "./GitHubGlobalSearch.vue";
+import GitHubLocalSearch from "./GitHubLocalSearch.vue";
+import GitHubDashboard from "./GitHubDashboard.vue";
+import { workspaceSearchRequests, consumeWorkspaceSearch } from "../search/workspace-search";
 import GitHubNotificationPanel from "./GitHubNotificationPanel.vue";
 import GitHubNotificationDetailDrawer from "./GitHubNotificationDetailDrawer.vue";
 import {
@@ -33,12 +37,16 @@ let initialVersion = 0, initialized = false;
 let repositoryReadScope: AbortController | undefined;
 const initialError = ref("");
 
-type GitHubChannel = "stars" | "trending" | "awesome" | "repos";
-const activeChannel = ref<GitHubChannel>("stars");
+type GitHubChannel = "dashboard" | "stars" | "trending" | "awesome" | "repos" | "search";
+const activeChannel = ref<GitHubChannel>("dashboard");
 watch(() => active.value && activeChannel.value === "stars", visible => gitHubService.setAiViewActive(visible), { immediate: true, flush: "sync" });
 const isChannelsCollapsed = ref(false);
 const searchScope = ref<"local" | "global">("local");
 const searchText = ref("");
+const globalSearchQuery = ref("");
+const globalSearchRequestId = ref(0);
+const globalSearchRule = ref<GitHubSearchRule>("fuzzy");
+const dashboardSearchMode = ref<"local" | "global" | null>(null);
 const isSettingsOpen = ref(false);
 const isGuideOpen = ref(false);
 watch(active, visible => { if (!visible) isGuideOpen.value = false; });
@@ -51,9 +59,15 @@ function openAiSettings() {
 const settingsMounted = ref(false);
 watch(isSettingsOpen, open => { if (open) settingsMounted.value = true; });
 const settingsButton = ref<HTMLElement | null>(null);
+const accountRevision = ref(0);
+function openAccountSettings(anchor?: HTMLElement | null): void {
+  settingsButton.value = anchor || document.getElementById("gh-sidebar-stars-btn");
+  isSettingsOpen.value = true;
+}
 let searchTimer = 0;
 
 function switchChannel(channel: GitHubChannel) {
+  if (channel === "dashboard") dashboardSearchMode.value = null;
   activeChannel.value = channel;
   if (channel === "trending") {
     gitHubTrendingController.switchTab("trending");
@@ -105,9 +119,23 @@ function toggleSearchScope(): void {
 }
 
 function clearSearch(): void {
+  dashboardSearchMode.value = null;
   searchText.value = "";
   clearTimeout(searchTimer);
   gitHubService.resetLocalSearch();
+}
+
+function openGlobalSearch(query: string, rule: GitHubSearchRule): void {
+  const q = query.trim();
+  if (!q) return;
+  clearTimeout(searchTimer);
+  globalSearchQuery.value = q;
+  globalSearchRule.value = rule;
+  globalSearchRequestId.value++;
+  searchScope.value = "global";
+  searchText.value = q;
+  switchChannel("dashboard");
+  dashboardSearchMode.value = "global";
 }
 
 function submitSearch(): void {
@@ -116,11 +144,29 @@ function submitSearch(): void {
     clearTimeout(searchTimer);
     gitHubService.setSearchQuery(query.toLowerCase());
   } else if (query) {
-    window.open(`https://github.com/search?q=${encodeURIComponent(query)}&type=repositories`, "_blank", "noopener,noreferrer");
+    openGlobalSearch(query, "fuzzy");
+  }
+}
+
+watch(() => [active.value, workspaceSearchRequests.github?.id] as const, ([visible, id]) => {
+  if (!visible || !id) return;
+  const request = consumeWorkspaceSearch("github");
+  if (request) openGlobalSearch(request.keyword, gitHubService.searchRule || "exact");
+}, { immediate: true });
+
+function submitDashboardSearch(): void {
+  if (!searchText.value.trim()) return;
+  if (searchScope.value === "local") {
+    clearTimeout(searchTimer);
+    gitHubService.setSearchQuery(searchText.value.trim().toLowerCase());
+    dashboardSearchMode.value = "local";
+  } else {
+    submitSearch();
   }
 }
 
 function onAccountReload() {
+  ++accountRevision.value;
   ++initialVersion;
   initialized = true;
   initialError.value = "";
@@ -174,7 +220,7 @@ onBeforeUnmount(() => { gitHubService.setAiViewActive(false); ++initialVersion; 
             <div class="fo-sidebar-toggle-title">
               <span class="fo-sidebar-toggle-icon">⚡</span>
               <span>{{ t('github.channel.channels') }}</span>
-              <span v-if="isChannelsCollapsed" class="fo-sidebar-toggle-pill">3</span>
+              <span v-if="isChannelsCollapsed" class="fo-sidebar-toggle-pill">5</span>
             </div>
             <button
               type="button"
@@ -188,6 +234,12 @@ onBeforeUnmount(() => { gitHubService.setAiViewActive(false); ++initialVersion; 
           </div>
 
           <div v-if="!isChannelsCollapsed" class="fo-sidebar-features-wrap">
+            <div class="fo-sidebar-sub-wrap">
+              <button id="gh-sidebar-dashboard-btn" type="button" class="fo-sidebar-sub-btn" :class="{ on: activeChannel === 'dashboard' }" title="GitHub 首页" @click="switchChannel('dashboard')">
+                <div class="fo-sidebar-sub-main"><span class="fo-sidebar-sub-icon">⌂</span><div class="fo-sidebar-sub-text"><strong>首页</strong><small>工作区概览</small></div></div>
+                <span class="fo-sidebar-sub-badge" style="background:var(--surface-hover);color:var(--muted);">HOME</span>
+              </button>
+            </div>
             <!-- 频道 1: Star 收藏 -->
             <div class="fo-sidebar-sub-wrap">
               <button
@@ -288,13 +340,35 @@ onBeforeUnmount(() => { gitHubService.setAiViewActive(false); ++initialVersion; 
 
         <!-- 3. 主视图容器：根据当前频道动态切换 -->
         <section class="gh-bili-main" id="gh-bili-main">
+          <GitHubDashboard v-if="activeChannel === 'dashboard'" :active="active" :account-revision="accountRevision" :show-results="Boolean(dashboardSearchMode)" @channel="switchChannel" @settings="openAccountSettings" @notifications="gitHubNotificationsController.open()">
+            <template #search>
+              <div class="card-fullscreen-gh-search">
+                <form class="gh-search-box" role="search" @submit.prevent="submitDashboardSearch">
+                  <button type="button" class="gh-search-mode-toggle" :title="searchScope === 'local' ? t('github.searchScope.toGlobal') : t('github.searchScope.toLocal')" @click="toggleSearchScope">
+                    <span class="gh-mode-icon">{{ searchScope === 'local' ? '⭐' : '🌐' }}</span>
+                    <span class="gh-mode-text">{{ searchScope === 'local' ? t('github.searchScope.local') : t('github.searchScope.global') }}</span><span class="gh-mode-arrow">▾</span>
+                  </button>
+                  <input v-model="searchText" :placeholder="searchPlaceholder" aria-label="搜索 GitHub 仓库" autocomplete="off" />
+                  <button v-if="searchScope === 'local'" type="button" class="gh-search-rule-btn" :class="`rule-${activeRuleMeta.id}`" :title="t('github.ruleHint', { rule: activeRuleMeta.name, desc: activeRuleMeta.desc })" @click.stop="cycleSearchRule"><span class="gh-search-rule-icon">{{ activeRuleMeta.icon }}</span><span class="gh-search-rule-text">{{ activeRuleMeta.name }}</span></button>
+                  <button v-show="searchText" type="button" class="gh-search-clear-btn" :title="t('github.clearSearch')" @click="clearSearch">✕</button>
+                  <button type="submit" title="搜索" aria-label="搜索">⌕</button>
+                </form>
+              </div>
+            </template>
+            <template #results>
+              <GitHubGlobalSearch v-if="dashboardSearchMode === 'global'" embedded :query="globalSearchQuery" :request-id="globalSearchRequestId" :rule="globalSearchRule" @back="clearSearch" />
+              <GitHubLocalSearch v-else-if="dashboardSearchMode === 'local'" @back="clearSearch" />
+            </template>
+          </GitHubDashboard>
+          <!-- 全站搜索不依赖已配置的 Star 账号。 -->
+          <GitHubGlobalSearch v-else-if="activeChannel === 'search'" :query="globalSearchQuery" :request-id="globalSearchRequestId" :rule="globalSearchRule" @back="switchChannel('stars')" />
           <!-- 视图 A: Star 收藏 -->
           <AccountSetupGuide
-            v-if="activeChannel === 'stars' && githubStatusState.accountConfigured === false"
+            v-else-if="activeChannel === 'stars' && githubStatusState.accountConfigured === false"
             icon="⭐"
             title="尚未配置 GitHub 账号"
             description="填写 GitHub 用户名即可查看 Star 收藏；Token 可选，用于提高访问额度及管理 Star。"
-            @configure="isSettingsOpen = true"
+            @configure="openAccountSettings()"
           />
           <template v-else-if="activeChannel === 'stars'">
             <header class="gh-bili-hero" id="gh-hero">
@@ -366,8 +440,7 @@ onBeforeUnmount(() => { gitHubService.setAiViewActive(false); ++initialVersion; 
                     >
                       ⚙️
                     </button>
-                    <!-- GitHub 专属非模态轻量设置面板 -->
-                    <GitHubSettingsModal v-if="settingsMounted" :visible="active && isSettingsOpen" :anchor="settingsButton" :ai-request="aiSettingsRequest" @account-reload="onAccountReload" @close="isSettingsOpen = false" />
+                    <!-- 设置面板挂载在工作台根部，首页和未配置账号时也可打开。 -->
                   </div>
                 </template>
               </GitHubHero>
@@ -394,6 +467,7 @@ onBeforeUnmount(() => { gitHubService.setAiViewActive(false); ++initialVersion; 
         </section>
       </div>
     </div>
+    <GitHubSettingsModal v-if="settingsMounted" :visible="active && isSettingsOpen" :anchor="settingsButton" :ai-request="aiSettingsRequest" @account-reload="onAccountReload" @close="isSettingsOpen = false" />
     <GitHubBookGuide v-if="isGuideOpen" :open="isGuideOpen" title="GitHub 使用手册" :spreads="githubGuideSpreads" help-selector=".gh-github-help-btn" @close="isGuideOpen = false" />
     <!-- GitHub 消息与通知中心弹窗 -->
     <GitHubNotificationPanel />

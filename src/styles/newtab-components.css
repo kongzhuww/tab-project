@@ -325,7 +325,7 @@ body.hide-bookmarks .bookmark-panel { display: none !important; }
 body[data-page="home"] .launcher,
 body[data-page="daily"] .launcher { transform: translateY(0); }
 
-/* 回到首页时：仅在非全屏卡片模式下，主工作区容器（B站、YouTube等双栏卡片）瞬时隐身且无过渡滑落，杜绝一闪而过 */
+/* 在非全屏卡片模式下返回首页时，隐藏工作区容器并禁用过渡。 */
 body:not(.has-card-fullscreen)[data-page="home"] .wrap,
 body:not(.has-card-fullscreen)[data-page="home"] #daily-section,
 body:not(.has-card-fullscreen):not([data-page="daily"]) #daily-section,
@@ -372,7 +372,7 @@ body:not(.has-card-fullscreen):not([data-page="daily"]) .wrap {
 .notice { font-size: 13px; color: var(--muted); line-height: 1.6; }
 .notice a { color: #7dd3fc; }
 
-/* todo */
+/* 待办条目样式 */
 .todo {
   display: flex; align-items: center; gap: 10px; width: 100%;
   padding: 8px 8px; border: 0; background: none; color: var(--text);
@@ -508,28 +508,22 @@ html[data-theme="light"] .repo .meta {
 .aihot-m { display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:5px 10px;margin-top:6px;font-size:11px;color:var(--dim); }
 .aihot-m time { flex:none;color:var(--muted);font-variant-numeric:tabular-nums; }
 /* Match Bilibili's fo-bili-layout / fo-sidebar-sub-* measurements. */
-.aihot-workspace { display:grid; grid-template-columns:210px minmax(0,1fr); min-width:0; min-height:0; flex:1 1 auto; border:1px solid var(--border); border-radius:14px; background:color-mix(in srgb,var(--panel) 95%,transparent); overflow:hidden; }
+.aihot-workspace { display:grid; grid-template-columns:var(--workspace-sidebar-width,210px) minmax(0,1fr); min-width:0; min-height:0; flex:1 1 auto; border:1px solid var(--border); border-radius:14px; background:color-mix(in srgb,var(--panel) 95%,transparent); overflow:hidden; }
 .aihot-main { display:flex; flex-direction:column; min-width:0; min-height:0; padding:16px 18px; container-type:inline-size; }
 .aihot-main .card-head { margin-top:0; }
 .aihot-tabs { display:flex; flex-direction:column; min-width:0; min-height:0; padding:14px 10px; border-right:1px solid var(--border); background:color-mix(in srgb,var(--surface) 68%,transparent); }
-.aihot-nav-wrap { padding:0 4px 10px; margin-bottom:8px; border-bottom:1px solid var(--border); }
-.aihot-tabs .aihot-nav-card { --nav-accent:#00aeec; --nav-rgb:0,174,236; display:flex; align-items:center; justify-content:space-between; width:100%; padding:8px 10px; border:1px solid rgba(var(--nav-rgb),.28); border-radius:9px; background:linear-gradient(135deg,rgba(var(--nav-rgb),.12),rgba(var(--nav-rgb),.04)); color:var(--heading); cursor:pointer; transition:all .2s ease; text-align:left; box-sizing:border-box; font:inherit; }
+.aihot-tabs .aihot-nav-card { --nav-accent:#00aeec; --nav-rgb:0,174,236; border:1px solid rgba(var(--nav-rgb),.28); background:linear-gradient(135deg,rgba(var(--nav-rgb),.12),rgba(var(--nav-rgb),.04)); color:var(--heading); font:inherit; }
 .aihot-tabs .aihot-nav-card.feed { --nav-accent:#10b981; --nav-rgb:16,185,129; }
 .aihot-tabs .aihot-nav-card.daily { --nav-accent:#8b5cf6; --nav-rgb:139,92,246; }
 .aihot-tabs .aihot-nav-card:hover { background:linear-gradient(135deg,rgba(var(--nav-rgb),.22),rgba(var(--nav-rgb),.08)); border-color:var(--nav-accent); transform:translateY(-1px); box-shadow:0 4px 12px rgba(var(--nav-rgb),.15); }
 .aihot-tabs .aihot-nav-card.active { background:var(--nav-accent); color:#fff; border-color:var(--nav-accent); box-shadow:0 4px 14px rgba(var(--nav-rgb),.35); }
 .aihot-nav-card:focus-visible { outline:2px solid var(--nav-accent); outline-offset:2px; }
-.aihot-nav-main { display:flex; align-items:center; gap:8px; min-width:0; }
-.aihot-nav-icon { font-size:16px; line-height:1; flex-shrink:0; }
-.aihot-nav-copy { display:flex; flex-direction:column; min-width:0; gap:1px; }
-.aihot-nav-copy strong { font-size:12px; font-weight:600; color:var(--heading); line-height:1.2; }
-.aihot-nav-copy small { font-size:9.5px; color:var(--dim); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.aihot-nav-badge { font-size:9px; font-weight:700; padding:2px 6px; border-radius:999px; background:var(--nav-accent); color:#fff; letter-spacing:.5px; flex-shrink:0; }
+.aihot-nav-badge { background:var(--nav-accent); }
 .aihot-nav-card.active .aihot-nav-copy strong,.aihot-nav-card.active .aihot-nav-copy small,.aihot-nav-card.active .aihot-nav-badge { color:#fff; }
-@media(max-width:900px) { .aihot-workspace { grid-template-columns:175px minmax(0,1fr); } .aihot-main { padding-inline:13px; } }
+@media(max-width:900px) { .aihot-workspace { grid-template-columns:var(--workspace-sidebar-compact-width,175px) minmax(0,1fr); } .aihot-main { padding-inline:13px; } }
 @media(max-width:620px) { .aihot-workspace { display:block; } .aihot-tabs { height:auto; border-right:0; border-bottom:1px solid var(--border); } }
 /* Bilibili switches to 220px and 12px corners in its fullscreen workspace. */
-.aihot-standalone-body .aihot-workspace, #daily-aihot.card-fullscreen .aihot-workspace { display:grid; grid-template-columns:220px minmax(0,1fr); border-radius:12px; height:100%; }
+.aihot-standalone-body .aihot-workspace, #daily-aihot.card-fullscreen .aihot-workspace { display:grid; grid-template-columns:var(--workspace-sidebar-fullscreen-width,220px) minmax(0,1fr); border-radius:12px; height:100%; }
 .aihot-standalone-body .aihot-main, #daily-aihot.card-fullscreen .aihot-main { padding:16px 18px 24px; box-sizing:border-box; }
 @media(max-width:620px) { .aihot-standalone-body .aihot-tabs, #daily-aihot.card-fullscreen .aihot-tabs { height:100%; border-right:1px solid var(--border); border-bottom:0; } }
 .aihot-subbar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px 12px; padding: 7px 12px; margin-bottom: 12px; border-radius: 12px; background: color-mix(in srgb, var(--surface) 80%, transparent); border: 1px solid var(--border); }
@@ -2303,7 +2297,7 @@ a.fo-upper-link:hover { color:#c4b5fd;text-decoration:underline; }
   margin-left: 0;
 }
 
-/* 全屏卡片头部通用物理碰撞流式弹性布局（GitHub / B站 / AI HOT / YouTube） */
+/* 全屏卡片头部通用弹性布局。 */
 #card-github.card-fullscreen .card-head,
 #daily-bilibili.card-fullscreen .card-head {
   display: none !important;

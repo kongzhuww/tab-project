@@ -26,6 +26,7 @@ import { fullscreenCardState } from "../core/fullscreen-card-state";
 import { hideRegisteredCard } from "../core/fullscreen-card-state";
 import { useTaskInvalidation } from "./use-task-invalidation";
 import { t } from "../i18n";
+const props = withDefaults(defineProps<{ embedded?: boolean }>(), { embedded: false });
 const taskNavigationMounted = ref(false);
 const TodoistAccountSettings = defineAsyncComponent(() => import("./TodoistAccountSettings.vue"));
 const accountSettingsOpen = ref(false);
@@ -175,11 +176,11 @@ function handleClose() {
       id="todoist-workspace"
       ref="panelRef"
       class="card wide todoist-workspace"
-      :style="initialStyle"
+      :style="props.embedded ? undefined : initialStyle"
       :aria-label="t('todoist.workspaceAria')"
       v-show="todoistModuleState.visible"
     >
-      <header ref="headerRef" class="todoist-workspace-head" @pointerdown="onHeaderPointerDown($event)">
+      <header ref="headerRef" class="todoist-workspace-head" @pointerdown="!props.embedded && onHeaderPointerDown($event)">
         <div class="todoist-head-title-wrap">
           <span class="todoist-mark" aria-hidden="true">✓</span>
           <h2 id="todoist-workspace-title">{{ state.title }}</h2>
@@ -230,6 +231,7 @@ function handleClose() {
 
         <button
           id="todoist-workspace-minimize"
+          v-if="!props.embedded"
           class="no-drag"
           type="button"
           :title="t('todoist.minimizeHint')"
@@ -241,6 +243,7 @@ function handleClose() {
 
         <button
           id="todoist-workspace-close"
+          v-if="!props.embedded"
           class="no-drag"
           type="button"
           :title="t('todoist.closeHint')"
@@ -265,7 +268,7 @@ function handleClose() {
           <TodoistCalendarSidebar />
         </div>
         <div class="todoist-workspace-task-area">
-          <TodoistTaskList />
+          <TodoistTaskList :embedded="props.embedded" />
         </div>
       </div>
 
@@ -274,7 +277,7 @@ function handleClose() {
 
       <div id="todoist-toast-container" class="todoist-toast-container" aria-live="polite"></div>
 
-      <template v-if="!isFullscreen">
+      <template v-if="!isFullscreen && !props.embedded">
         <i class="todoist-resize-handle todoist-resize-n" data-resize-edge="n" aria-hidden="true" @pointerdown="onResizePointerDown($event, 'n')"></i>
         <i class="todoist-resize-handle todoist-resize-e" data-resize-edge="e" aria-hidden="true" @pointerdown="onResizePointerDown($event, 'e')"></i>
         <i class="todoist-resize-handle todoist-resize-s" data-resize-edge="s" aria-hidden="true" @pointerdown="onResizePointerDown($event, 's')"></i>

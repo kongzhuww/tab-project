@@ -102,7 +102,7 @@ export const DEFAULT_BUILTIN_SLOTS: SearchSlotDef[] = [
   {
     id: "netease",
     name: "网易云音乐",
-    placeholder: "搜索网易云音乐歌曲、歌手…（回车搜索，点击播放）",
+    placeholder: "搜索网易云音乐歌曲、歌手…（回车在插件内搜索）",
     iconType: "svg",
     iconValue: "assets/netease.svg",
     themeColor: "#ef4444",
@@ -156,7 +156,8 @@ function loadInitialSlots(): SearchSlotDef[] {
             if (s.isBuiltin) s.enabled = true;
           }
         }
-        return result;
+        if (!result.some((s: SearchSlotDef) => s.id === 'netease')) result.push({ ...DEFAULT_BUILTIN_SLOTS.find(s => s.id === 'netease')! });
+        return result.length ? result : JSON.parse(JSON.stringify(DEFAULT_BUILTIN_SLOTS));
       }
     }
   } catch (err) {
@@ -190,7 +191,8 @@ if (typeof chrome !== "undefined" && chrome.storage?.local) {
             if (s.isBuiltin) s.enabled = true;
           }
         }
-        searchSlots.value = result;
+        if (!result.some((s: SearchSlotDef) => s.id === 'netease')) result.push({ ...DEFAULT_BUILTIN_SLOTS.find(s => s.id === 'netease')! });
+        searchSlots.value = result.length ? result : JSON.parse(JSON.stringify(DEFAULT_BUILTIN_SLOTS));
       }
     }
   });

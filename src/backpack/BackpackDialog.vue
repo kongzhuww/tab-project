@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from "vue";
-import AppWindowFrame from "../core/AppWindowFrame.vue";
+import BackpackFrame from "./BackpackFrame.vue";
+defineProps<{ embedded?: boolean }>();
 import { windowManagerController } from "../core/window-manager.store";
 import { backpackModuleState } from "./module-state";
 import {
@@ -382,7 +383,8 @@ function formatDate(ts: number): string {
 </script>
 
 <template>
-  <AppWindowFrame
+  <BackpackFrame
+    :embedded="embedded"
     id="backpack-workspace-dialog"
     window-id="backpack"
     title="背包工作台"
@@ -398,7 +400,7 @@ function formatDate(ts: number): string {
   >
     <!-- 顶栏右侧操作区 -->
     <template #header-actions>
-      <div class="bp-top-actions">
+      <div class="bp-top-actions" :class="{ 'bp-integrated': embedded }">
         <!-- 提示词频道动作 -->
         <template v-if="activeChannel === 'prompts'">
           <button
@@ -448,7 +450,7 @@ function formatDate(ts: number): string {
     </template>
 
     <!-- 窗口主体内容 -->
-    <div class="bp-container">
+    <div class="bp-container" :class="{ 'bp-integrated': embedded }">
       <div v-if="importMessage" class="bp-alert-tip-bar">
         {{ importMessage }}
       </div>
@@ -466,7 +468,7 @@ function formatDate(ts: number): string {
             @click="toggleChannels"
           >
             <div class="bp-sidebar-toggle-title">
-              <span class="bp-sidebar-toggle-icon">⚡</span>
+              <span v-if="!embedded" class="bp-sidebar-toggle-icon">⚡</span>
               <strong>快捷频道</strong>
             </div>
             <div class="bp-sidebar-toggle-action">
@@ -490,13 +492,13 @@ function formatDate(ts: number): string {
                 @click="switchChannel(ch.id)"
               >
                 <div class="bp-channel-main">
-                  <span class="bp-channel-icon">{{ ch.icon }}</span>
+                  <span v-if="!embedded" class="bp-channel-icon">{{ ch.icon }}</span>
                   <div class="bp-channel-text">
                     <strong>{{ ch.title }}</strong>
                     <small>{{ ch.subTitle }}</small>
                   </div>
                 </div>
-                <span class="bp-channel-badge">{{ ch.badge }}</span>
+                <span v-if="!embedded" class="bp-channel-badge">{{ ch.badge }}</span>
               </button>
             </div>
           </div>
@@ -505,7 +507,7 @@ function formatDate(ts: number): string {
           <template v-if="activeChannel === 'prompts'">
             <div class="bp-sidebar-favorite-hub">
               <div class="bp-hub-main">
-                <span class="bp-hub-icon">📁</span>
+                <span v-if="!embedded" class="bp-hub-icon">📁</span>
                 <div class="bp-hub-text">
                   <strong>提示词分组</strong>
                   <small>按自定义分组整理</small>
@@ -550,7 +552,7 @@ function formatDate(ts: number): string {
                   <button type="button" class="bp-btn-mini" @click="editingCategoryId = null">✕</button>
                 </div>
                 <button v-else type="button" class="bp-folder-btn" @click="selectCategory(cat.id)">
-                  <span class="bp-folder-icon">{{ cat.icon || "📁" }}</span>
+                  <span v-if="!embedded" class="bp-folder-icon">{{ cat.icon || "📁" }}</span>
                   <span class="bp-folder-name" :title="cat.name">{{ cat.name }}</span>
                   <span class="bp-folder-badge" v-if="cat.id === 'all'">{{ backpackState.prompts.length }}</span>
                   <span class="bp-folder-badge" v-else-if="cat.id === 'starred'">{{ backpackState.prompts.filter(p => p.pinned).length }}</span>
@@ -563,7 +565,7 @@ function formatDate(ts: number): string {
               </div>
             </div>
 
-            <div v-if="allBackpackTags.length > 0" class="bp-tags-container">
+            <div v-if="!embedded && allBackpackTags.length > 0" class="bp-tags-container">
               <div class="bp-tags-title">常用标签</div>
               <div class="bp-tags-cloud">
                 <span
@@ -583,7 +585,7 @@ function formatDate(ts: number): string {
           <template v-else-if="activeChannel === 'articles'">
             <div class="bp-sidebar-favorite-hub bp-hub-article">
               <div class="bp-hub-main">
-                <span class="bp-hub-icon">📚</span>
+                <span v-if="!embedded" class="bp-hub-icon">📚</span>
                 <div class="bp-hub-text">
                   <strong>文章分组</strong>
                   <small>文章多级分类整理</small>
@@ -628,7 +630,7 @@ function formatDate(ts: number): string {
                   <button type="button" class="bp-btn-mini" @click="editingArticleCatId = null">✕</button>
                 </div>
                 <button v-else type="button" class="bp-folder-btn" @click="selectArticleCategory(cat.id)">
-                  <span class="bp-folder-icon">{{ cat.icon || "📑" }}</span>
+                  <span v-if="!embedded" class="bp-folder-icon">{{ cat.icon || "📑" }}</span>
                   <span class="bp-folder-name" :title="cat.name">{{ cat.name }}</span>
                   <span class="bp-folder-badge" v-if="cat.id === 'all'">{{ articleState.articles.length }}</span>
                   <span class="bp-folder-badge" v-else-if="cat.id === 'starred'">{{ articleState.articles.filter(a => a.pinned).length }}</span>
@@ -1027,7 +1029,7 @@ function formatDate(ts: number): string {
         </transition>
       </div>
     </div>
-  </AppWindowFrame>
+  </BackpackFrame>
 </template>
 
 <style scoped>
@@ -1043,7 +1045,7 @@ function formatDate(ts: number): string {
   flex: 1;
   height: 100%;
   overflow: hidden;
-  background: var(--bg, #f8fafc);
+  background: var(--background, #f8fafc);
   color: var(--text, #1e293b);
   position: relative;
 }
@@ -1502,7 +1504,7 @@ function formatDate(ts: number): string {
   flex-direction: column;
   overflow-y: auto;
   padding: 14px 18px;
-  background: var(--bg, #f8fafc);
+  background: var(--background, #f8fafc);
   min-width: 280px;
 }
 
@@ -1874,4 +1876,48 @@ function formatDate(ts: number): string {
   max-height: 130px;
   overflow-y: auto;
 }
+/* AI 工作区资料库：中性层次与单一强调色，不改变旧背包窗口或数据。 */
+.bp-top-actions.bp-integrated .bp-btn-primary { background:var(--text,#334155); border-color:var(--text,#334155); color:var(--panel,#fff); }
+.bp-container.bp-integrated .bp-bili-sidebar { gap:5px; }
+.bp-container.bp-integrated .bp-sidebar-toggle-bar,
+.bp-container.bp-integrated .bp-sidebar-toggle-bar.is-collapsed { background:transparent; border-color:transparent; box-shadow:none; padding:6px 9px; }
+.bp-container.bp-integrated .bp-sidebar-toggle-bar:hover { background:var(--surface,#f2f3f6); }
+.bp-container.bp-integrated .bp-channels-list { gap:3px; }
+.bp-container.bp-integrated .bp-channel-wrap .bp-channel-btn { background:transparent; border-color:transparent; box-shadow:none; transform:none; padding:9px 10px; }
+.bp-container.bp-integrated .bp-channel-wrap .bp-channel-btn:hover { background:var(--surface,#f2f3f6); border-color:transparent; box-shadow:none; transform:none; }
+.bp-container.bp-integrated .bp-channel-wrap .bp-channel-btn.on { background:var(--surface-hover,#eceef2) !important; border-color:transparent !important; color:var(--text,#334155) !important; box-shadow:none !important; }
+.bp-container.bp-integrated .bp-channel-wrap .bp-channel-btn.on strong { color:var(--heading,#0f172a) !important; }
+.bp-container.bp-integrated .bp-channel-wrap .bp-channel-btn.on small { color:var(--muted,#64748b) !important; }
+.bp-container.bp-integrated .bp-sidebar-favorite-hub,
+.bp-container.bp-integrated .bp-hub-article { margin:8px 2px 2px; background:transparent; border-color:transparent; box-shadow:none; }
+.bp-container.bp-integrated .bp-hub-add-btn,
+.bp-container.bp-integrated .bp-hub-add-btn.bp-btn-indigo { border-radius:7px; background:var(--surface,#f2f3f6) !important; color:var(--text,#334155); box-shadow:none !important; }
+.bp-container.bp-integrated .bp-hub-add-btn:hover,
+.bp-container.bp-integrated .bp-hub-add-btn.bp-btn-indigo:hover { background:var(--surface-hover,#e5e7eb) !important; transform:none; }
+.bp-container.bp-integrated .bp-folder-row.active,
+.bp-container.bp-integrated .bp-row-indigo.active { background:var(--surface-hover,#eceef2) !important; color:var(--text,#334155) !important; box-shadow:none; }
+.bp-container.bp-integrated .bp-folder-row.active .bp-folder-name { color:var(--text,#334155) !important; }
+.bp-container.bp-integrated .bp-folder-row.active .bp-folder-badge { background:var(--surface,#f2f3f6); color:var(--muted,#64748b); }
+.bp-container.bp-integrated .bp-btn-mini.primary { background:var(--text,#334155) !important; border-color:var(--text,#334155) !important; color:var(--panel,#fff); }
+.bp-container.bp-integrated .bp-add-cat-input { border-color:var(--border-strong,#cbd5e1); }
+.bp-container.bp-integrated .bp-add-cat-input:focus,
+.bp-container.bp-integrated .bp-add-cat-input.bp-border-indigo:focus { border-color:var(--text,#334155) !important; }
+.bp-container.bp-integrated .bp-active-filter-badge,
+.bp-container.bp-integrated .bp-var-pill,
+.bp-container.bp-integrated .bp-btn-use,
+.bp-container.bp-integrated .bp-btn-read { background:var(--surface,#f2f3f6); border-color:var(--border,#e2e8f0); color:var(--text,#334155); }
+.bp-container.bp-integrated .bp-var-pill:hover,
+.bp-container.bp-integrated .bp-btn-use:hover,
+.bp-container.bp-integrated .bp-btn-read:hover,
+.bp-container.bp-integrated .bp-btn-copy:hover:not(.success) { background:var(--surface-hover,#e5e7eb); color:var(--text,#334155); }
+.bp-container.bp-integrated .bp-card.is-selected,
+.bp-container.bp-integrated .bp-card-article.is-selected { border-color:var(--border-strong,#94a3b8); box-shadow:0 0 0 1px var(--border-strong,#94a3b8); }
+.bp-container.bp-integrated .bp-tag-micro:hover { color:var(--text,#334155); }
+.bp-container.bp-integrated :deep(.sidebar-folder-card.active) { background:var(--surface-hover,#eceef2) !important; border-color:var(--border,#e2e8f0) !important; box-shadow:none !important; }
+.bp-container.bp-integrated :deep(.sidebar-folder-card.active .subfolder-card-name),
+.bp-container.bp-integrated :deep(.sidebar-folder-card.active .subfolder-card-arrow),
+.bp-container.bp-integrated :deep(#sticker-library-count) { color:var(--text,#334155) !important; }
+.bp-container.bp-integrated :deep(.sticker-pack-form button),
+.bp-container.bp-integrated :deep(.sticker-quick-import-btn:hover) { background:var(--surface-hover,#eceef2); border-color:var(--border,#e2e8f0); color:var(--text,#334155); }
+.bp-container.bp-integrated button:focus-visible { outline:2px solid var(--text,#334155); outline-offset:2px; }
 </style>

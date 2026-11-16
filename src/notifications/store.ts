@@ -16,6 +16,8 @@ export interface NotificationOptions {
   showActions?: boolean;
   duration?: number;
   history?: boolean;
+  /** Existing archived record represented by this transient toast. */
+  historyId?: string;
   level?: NotificationLevel;
   target?: NotificationTarget;
   onClick?: (() => void | Promise<void>) | null;
@@ -48,6 +50,7 @@ export interface NotificationItem {
   duration: number;
   onClick: (() => void | Promise<void>) | null;
   closing: boolean;
+  historyId?: string;
   target?: NotificationTarget;
 }
 
@@ -118,6 +121,7 @@ function show(options: NotificationOptions): NotificationHandle | null {
     duration,
     onClick: typeof options.onClick === "function" ? options.onClick : null,
     closing: false,
+    historyId: options.historyId,
     target
   };
 

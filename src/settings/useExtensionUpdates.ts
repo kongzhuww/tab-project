@@ -1,5 +1,6 @@
 import { onUnmounted, ref, watch } from "vue";
 import { optionsService } from "../services/options.service";
+import { buildRequiresReload, embeddedBuildInfo, parseBuildInfo, type UiBuildInfo } from './build-info';
 import { RELEASE_API, compareVersions, parseRelease, record, selectExtensionAsset,
   type ReleaseAsset, type ReleaseInfo } from "./release-model";
 
@@ -15,6 +16,8 @@ export function useExtensionUpdates(notify: (message: string, error?: boolean) =
   const needsReloadToApply = ref(false);
   const currentVersionText = ref(`LogicWeaver 当前版本: v${browser?.runtime?.getManifest().version || "未知"}`);
   const currentCommitText = ref("本地构建版本");
+  const runningBuild = embeddedBuildInfo();
+  const currentBuildText = ref(runningBuild ? `当前构建 ${runningBuild.id.slice(0, 8)} · ${runningBuild.builtAt}` : '当前构建标识不可用');
   const checkingUpdate = ref(false), canApplyUpdate = ref(false);
   const updateStatusMessage = ref("");
   const onlineRelease = ref<ReleaseInfo | null>(null), onlineAsset = ref<ReleaseAsset | null>(null);
@@ -42,6 +45,7 @@ export function useExtensionUpdates(notify: (message: string, error?: boolean) =
   async function syncLocalVersion(): Promise<string> {
     const sequence = ++localVersion;
     let diskVersion = "";
+    let diskBuild: UiBuildInfo | null = null;
     const request = requestScope(10000);
     try {
       if (browser?.runtime) {
@@ -50,11 +54,20 @@ export function useExtensionUpdates(notify: (message: string, error?: boolean) =
         if (typeof manifest.version === "string") diskVersion = manifest.version;
       }
     } catch { /* Runtime manifest remains a valid fallback when disk read fails. */ }
+    try {
+      if (browser?.runtime && !request.signal.aborted) {
+        const response = await fetch(browser.runtime.getURL('generated/build-info.json') + '?t=' + Date.now(), { signal:request.signal, cache:'no-store' });
+        if (response.ok) diskBuild = parseBuildInfo(await response.json());
+      }
+    } catch { /* Older builds may not include metadata; do not claim a mismatch. */ }
     finally { request.finish(); }
     const running = browser?.runtime?.getManifest().version || diskVersion;
     const effective = diskVersion || running;
     if (alive && isActive() && sequence === localVersion) {
-      needsReloadToApply.value = Boolean(diskVersion && running && diskVersion !== running);
+      needsReloadToApply.value = Boolean(diskVersion && running && diskVersion !== running) || buildRequiresReload(runningBuild, diskBuild);
+      currentBuildText.value = runningBuild
+        ? `当前构建 ${runningBuild.id.slice(0, 8)} · ${runningBuild.builtAt}${buildRequiresReload(runningBuild, diskBuild) ? `；磁盘构建 ${diskBuild!.id.slice(0, 8)}（需重载）` : diskBuild ? '' : '；无法核对磁盘构建'}`
+        : '当前构建标识不可用；旧版本可重载扩展后重试';
       currentVersionText.value = needsReloadToApply.value
         ? `LogicWeaver 当前版本: v${running} (磁盘最新: v${diskVersion})`
         : `LogicWeaver 当前版本: ${effective ? 'v' + effective : '未知'}`;
@@ -233,7 +246,7 @@ export function useExtensionUpdates(notify: (message: string, error?: boolean) =
     clearTimeout(reloadTimer);
     githubToken.value = "";
   });
-  return { needsReloadToApply, currentVersionText, currentCommitText, checkingUpdate, canApplyUpdate,
+  return { needsReloadToApply, currentVersionText, currentCommitText, currentBuildText, checkingUpdate, canApplyUpdate,
     updateStatusMessage, onlineRelease, onlineAsset, isDownloading, downloadPercent, downloadReceivedText,
     downloadCompleted, githubToken, showTokenInput, syncLocalVersion, loadGithubToken, saveGithubToken,
     checkAllUpdates, downloadReleaseAsset, reloadExtension, applyGitUpdate };

@@ -51,7 +51,7 @@ function close(item: NotificationItem): void {
 }
 
 function activate(item: NotificationItem): void {
-  void notificationHistoryController.markRead(item.id);
+  void notificationHistoryController.markRead(item.historyId || item.id);
   close(item);
   if (!item.onClick) { if (item.target) void notificationHistoryController.openTarget(item.target); return; }
   try {

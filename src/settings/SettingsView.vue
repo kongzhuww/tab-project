@@ -872,6 +872,7 @@
                 <div>
                   <div style="font-weight:700;font-size:13px;color:var(--heading);">{{ currentVersionText }}</div>
                   <div style="font-size:10px;color:var(--dim);margin-top:4px;">{{ currentCommitText }}</div>
+                  <div style="font-size:10px;color:var(--dim);margin-top:4px;overflow-wrap:anywhere;">{{ currentBuildText }}</div>
                 </div>
                 <div style="display:flex;gap:8px;align-items:center;">
                   <button v-if="needsReloadToApply" type="button" class="btn-save-green" :title="t('settings.release.reloadTip')" @click="reloadExtension">
@@ -1547,7 +1548,7 @@ const legacyIgnoredCount = computed(() => ignoredFolders.value.length - visibleI
 const selectedFolderToAdd = ref("");
 
 const {
-  needsReloadToApply, currentVersionText, currentCommitText, checkingUpdate, canApplyUpdate,
+  needsReloadToApply, currentVersionText, currentCommitText, currentBuildText, checkingUpdate, canApplyUpdate,
   updateStatusMessage, onlineRelease, onlineAsset, isDownloading, downloadPercent,
   downloadReceivedText, downloadCompleted, githubToken, showTokenInput, syncLocalVersion,
   loadGithubToken, saveGithubToken, checkAllUpdates, downloadReleaseAsset, reloadExtension, applyGitUpdate

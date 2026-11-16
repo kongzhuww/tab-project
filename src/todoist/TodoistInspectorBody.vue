@@ -106,8 +106,7 @@
             class="subtask-input-field"
             :placeholder="t('todoist.subtask.inputPlaceholder')"
             @input="emit('update:newSubtaskText', ($event.target as HTMLInputElement).value)"
-            @keydown.enter.prevent="emit('confirmAddSubtask')"
-            @keydown.esc="emit('update:isAddingSubtask', false)"
+            @keydown="onSubtaskKeyDown"
           />
           <div class="subtask-actions">
             <button type="button" class="btn-subtask-ok" @click="emit('confirmAddSubtask')">{{ t('common.add') }}</button>
@@ -290,6 +289,7 @@ import { ref, computed, nextTick, watch, onMounted, onUnmounted } from "vue";
 import { t } from "../i18n";
 import { useMachine } from "../core/useMachine";
 import { TodoistInspectorMachine } from "./inspector-machine";
+import { isImeKey, shouldCreateTask } from "./task-keyboard";
 import InspectorPopover from "./InspectorPopover.vue";
 import TaskRepositoryLinks from "./TaskRepositoryLinks.vue";
 import ReminderPicker from "./ReminderPicker.vue";
@@ -422,6 +422,11 @@ function onDescInput(event: Event) {
   const el = event.target as HTMLTextAreaElement;
   resizeText(el);
   emit('update:editDescription', el.value); emit('scheduleDraftSave', event);
+}
+function onSubtaskKeyDown(event: KeyboardEvent) {
+  if (isImeKey(event)) return;
+  if (shouldCreateTask(event)) { event.preventDefault(); emit('confirmAddSubtask'); }
+  else if (event.key === 'Escape') { event.preventDefault(); emit('update:isAddingSubtask', false); }
 }
 function finishDescEdit() {
   emit('saveTitleAndDesc');

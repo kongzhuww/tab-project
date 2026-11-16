@@ -19,6 +19,18 @@ function environment() {
   Object.defineProperty(globalThis,'navigator',{configurable:true,value:{locks}});
   return data;
 }
+test('opening the library preserves every stored prompt and category', async () => {
+  const data=environment();
+  const prompts=[{id:'preset-custom',title:'Keep',content:'content',category:'coding',tags:[],createdAt:1,updatedAt:1}];
+  const categories=[{id:'default',name:'Default'},{id:'coding',name:'Existing group'}];
+  data.logicweaver_prompt_backpack_v1=structuredClone(prompts);
+  data.logicweaver_prompt_backpack_categories_v1=structuredClone(categories);
+  const [a]=await loadTwice('src/backpack/backpack.service.ts');
+  await a.backpackService.init();
+  assert.deepEqual(data.logicweaver_prompt_backpack_v1,prompts);
+  assert.deepEqual(data.logicweaver_prompt_backpack_categories_v1,categories);
+  assert.equal(a.backpackState.prompts[0].category,'coding');
+});
 test('a stale prompt tab cannot overwrite a newer prompt write', async () => {
   const data=environment(); const [a,b]=await loadTwice('src/backpack/backpack.service.ts');
   await a.backpackService.init(); const revision=data.logicweaver_prompt_backpack_revision_v1; await b.backpackService.init();

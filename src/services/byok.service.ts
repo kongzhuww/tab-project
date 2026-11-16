@@ -6,7 +6,9 @@ export type ReasoningEffort = 'none' | 'low' | 'high' | 'max';
 export interface ChatMessage { role: 'user' | 'assistant'; content: string; reasoning?: string; incomplete?: boolean }
 export interface LocalConversation { id: string; provider: ProviderId; model: string; title: string; updatedAt: number; messages: ChatMessage[]; reasoningEffort?: ReasoningEffort }
 export function supportsReasoningEffort(model: string): boolean { return model === 'deepseek-flash' || model === 'deepseek-v4-pro'; }
-const CONFIG = 'byokConfigV1', HISTORY = 'byokConversationsV1';
+const CONFIG = 'byokConfigV1';
+export const BYOK_HISTORY_KEY = 'byokConversationsV1';
+const HISTORY = BYOK_HISTORY_KEY;
 const area = () => chrome.storage.local;
 export async function loadConfig(): Promise<{ key: string; model: string; models: string[] }> {
   const raw = (await area().get(CONFIG))[CONFIG]?.deepseek;

@@ -109,7 +109,7 @@
             <textarea
               v-model="composerContent"
               rows="2"
-              placeholder="任务名称（Enter 创建，Shift+Enter 换行，支持 Ctrl+V 粘贴图片）"
+              placeholder="任务名称（Enter 换行，⌘/Ctrl+Enter 创建，支持粘贴图片）"
               @keydown="onComposerKeyDown($event, col)"
               @paste="onComposerPaste($event)"
             ></textarea>
@@ -127,7 +127,7 @@
                   <span class="date-hint-sub">({{ detectedComposerDate.formattedDate }})</span>
                 </span>
                 <span v-if="!ignoreDetectedDate" class="date-hint-preview">
-                  精简任务名: <strong>{{ detectedComposerDate.cleanTitle }}</strong>
+                  精简任务名: <strong>{{ datePreviewTitle }}</strong>
                 </span>
                 <span v-else class="date-hint-preview ignored-text">
                   (已忽略日期，按纯文本创建)
@@ -721,6 +721,7 @@
 <script setup lang="ts">
 import { ref, reactive, computed, nextTick, watch, onMounted, onUnmounted } from "vue";
 import { useTodoistBoardDrag } from "./useTodoistBoardDrag";
+import { isImeKey, shouldCreateTask } from "./task-keyboard";
 import TodoistVirtualList from "./TodoistVirtualList.vue";
 import { todoistModuleState, withTodoistWrite } from "./module-state";
 import { imageViewerController } from "../viewers/image-viewer-store";
@@ -795,6 +796,7 @@ function openGitHubRepo(fullName: string) {
   githubRepoDetailController.open(fullName);
 }
 
+const props = withDefaults(defineProps<{ embedded?: boolean }>(), { embedded: false });
 const state = todoistTaskListState;
 
 // 添加板块
@@ -808,6 +810,11 @@ const ignoreDetectedDate = ref(false);
 const detectedComposerDate = computed(() => {
   if (!composerContent.value) return null;
   return parseDateKeyword(composerContent.value);
+});
+// Display only: the full cleanTitle remains unchanged when the task is created.
+const datePreviewTitle = computed(() => {
+  const chars = Array.from((detectedComposerDate.value?.cleanTitle || '').replace(/\s+/g, ' ').trim());
+  return chars.length > 40 ? `${chars.slice(0, 40).join('')}…` : chars.join('');
 });
 
 interface PastedImageItem {
@@ -1036,6 +1043,7 @@ const {
   onColDragOver, onColDragLeave, onTaskDragOver, onTaskDrop, onColDrop
 } = useTodoistBoardDrag({
   state,
+  allowResourceDrag: () => props.embedded,
   isActive: () => todoistModuleState.active,
   editingTaskId: () => editingTaskId.value,
   closePopovers: closeAllPopovers,
@@ -1092,6 +1100,7 @@ function finishEditing(task: TodoistTaskItem, save: boolean) {
 }
 
 function onEditorKeyDown(event: KeyboardEvent, task: TodoistTaskItem) {
+  if (isImeKey(event)) return;
   if (event.key === "Enter") {
     if (!event.shiftKey) {
       event.preventDefault();
@@ -1217,9 +1226,10 @@ async function submitComposer(col: TodoistColumnItem) {
 }
 
 function onComposerKeyDown(event: KeyboardEvent, col: TodoistColumnItem) {
-  if (event.key === "Enter" && !event.shiftKey) {
+  if (isImeKey(event)) return;
+  if (shouldCreateTask(event)) {
     event.preventDefault();
-    submitComposer(col);
+    void submitComposer(col);
   } else if (event.key === "Escape") {
     event.preventDefault();
     closeComposer();
@@ -1347,6 +1357,7 @@ function onMenuSaveDesc() {
 }
 
 function onDescKeyDown(event: KeyboardEvent) {
+  if (isImeKey(event)) return;
   if (event.key === "Enter") {
     if (!event.shiftKey) {
       event.preventDefault();

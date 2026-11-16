@@ -37,7 +37,7 @@ onMounted(() => {
       </div>
 
       <!-- Agent 全屏工作台 -->
-      <div id="vue-multica-root"><DockCardModuleHost id="multica" /></div>
+      <div id="vue-multica-root" :hidden="fullscreenCardState.activeId !== 'multica'"><DockCardModuleHost id="multica" /></div>
 
       <!-- GitHub 综合仪表盘（纯血 Vue 3 统一卡片工作台） -->
       <DockCardModuleHost id="card-github" />
@@ -47,3 +47,8 @@ onMounted(() => {
     </main>
   </div>
 </template>
+
+<style scoped>
+/* Keep the component mounted, but hard-hide its entire host when another card is active. */
+#vue-multica-root[hidden] { display: none !important; }
+</style>

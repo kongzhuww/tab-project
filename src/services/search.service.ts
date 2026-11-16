@@ -17,6 +17,8 @@ import { bookmarksService } from "./bookmarks.service";
 import { gitHubService, GH_SEARCH_SYNONYMS } from "./github.service";
 import { readGitHubJson, loadGitHubReadHeaders, GitHubReadError } from "../github/api-client";
 import { formatBiliCompactNumber } from "../bilibili/channel-format";
+import { requestWorkspaceSearch, type WorkspaceSearchTarget } from "../search/workspace-search";
+import { handoffQuickSearch, isQuickSearchPage } from '../search/quick-search-bridge';
 import {
   searchSlots,
   enabledSearchSlots,
@@ -424,7 +426,8 @@ export class SearchService {
     const suggestions: SearchSuggestionItem[] = videos.slice(0, 8).map((item: any) => {
       const bvid = item.bvid || (item.param && String(item.param).startsWith("BV") ? item.param : "");
       const cleanTitle = (item.title || "").replace(/<[^>]+>/g, "");
-      const pic = (item.pic || "").replace(/^http:/, "https:");
+      const rawPic = String(item.pic || "").replace(/^http:/, "https:");
+      const pic = rawPic.startsWith("//") ? `https:${rawPic}` : rawPic;
       return {
         id: bvid,
         title: cleanTitle,
@@ -438,9 +441,10 @@ export class SearchService {
     suggestions.unshift({
       id: `search-${keyword}`,
       title: `在 B站 搜索 “${keyword}”`,
-      meta: "按 Enter 或点击直达",
+      meta: "按 Enter 或点击在插件内搜索视频",
       iconSrc: "assets/bilibili.svg",
-      url: `https://search.bilibili.com/all?keyword=${encodeURIComponent(keyword)}`
+      type: "bilibili-search-trigger",
+      rawQuery: keyword
     });
 
     searchController.setSuggestions(suggestions);
@@ -462,7 +466,8 @@ export class SearchService {
       if (data?.code === 0 && Array.isArray(data?.data?.item)) {
         const suggestions: SearchSuggestionItem[] = data.data.item.slice(0, 6).map((item: any) => {
           const bvid = item.bvid || "";
-          const pic = (item.pic || "").replace(/^http:/, "https:");
+          const rawPic = String(item.pic || "").replace(/^http:/, "https:");
+          const pic = rawPic.startsWith("//") ? `https:${rawPic}` : rawPic;
           const ownerName = item.owner?.name || "";
           return {
             id: bvid,
@@ -547,7 +552,7 @@ export class SearchService {
     suggestions.unshift({
       id: `gh-search-${keyword}`,
       title: `在 GitHub 搜索 “${keyword}”`,
-      meta: "点击直接在界面内搜索 · 按 Enter 跳转网页",
+      meta: "按 Enter 或点击在插件内搜索仓库",
       iconSrc: "assets/nav-github.svg",
       type: "github-search-trigger",
       rawQuery: keyword,
@@ -665,16 +670,18 @@ export class SearchService {
         title: s.name,
         meta: (s.artists || []).map((a: any) => a.name).join(" / ") || "网易云音乐",
         iconSrc: "assets/netease.svg",
-        url: `https://music.163.com/#/song?id=${s.id}`,
+        type: "netease-search-trigger",
+        rawQuery: s.name,
         badge: { className: "badge-netease", text: "网易云", icon: "🎵" }
       }));
 
       suggestions.unshift({
         id: `ne-search-${keyword}`,
         title: `在 网易云音乐 搜索 “${keyword}”`,
-        meta: "按 Enter 或点击直达",
+        meta: "按 Enter 或点击在网易云插件内搜索",
         iconSrc: "assets/netease.svg",
-        url: `https://music.163.com/#/search/m/?s=${encodeURIComponent(keyword)}`
+        type: "netease-search-trigger",
+        rawQuery: keyword
       });
 
       searchController.setSuggestions(suggestions);
@@ -886,12 +893,8 @@ export class SearchService {
       return;
     }
 
-    if (this.currentMode === "bilibili") {
-      this.openUrl(`https://search.bilibili.com/all?keyword=${encodeURIComponent(q)}`);
-    } else if (this.currentMode === "github") {
-      this.openUrl(`https://github.com/search?q=${encodeURIComponent(q)}`);
-    } else if (this.currentMode === "netease") {
-      this.openUrl(`https://music.163.com/#/search/m/?s=${encodeURIComponent(q)}`);
+    if (this.currentMode === "bilibili" || this.currentMode === "github" || this.currentMode === "netease") {
+      void this.openWorkspaceSearch(this.currentMode, q);
     } else if (this.currentMode === "qcc") {
       this.openUrl(`https://www.qcc.com/web/search?key=${encodeURIComponent(q)}`);
     } else {
@@ -931,11 +934,16 @@ export class SearchService {
       });
       return;
     }
-    if (item.type === "github-search-trigger" && item.rawQuery) {
-      void this.searchGithubOnline(item.rawQuery);
+    if ((item.type === "github-search-trigger" || item.type === "bilibili-search-trigger") && item.rawQuery) {
+      void this.openWorkspaceSearch(item.type === "github-search-trigger" ? "github" : "bilibili", item.rawQuery);
+      return;
+    }
+    if (item.type === "netease-search-trigger" && item.rawQuery) {
+      void this.openWorkspaceSearch("netease", item.rawQuery);
       return;
     }
     if (item.type === "netease-play" && item.rawSong) {
+      if (isQuickSearchPage()) { void this.openWorkspaceSearch('netease', item.title); return; }
       const win = typeof window !== "undefined" ? (window as any) : null;
       if (win?.LogicWeaverHomeMusic?.playNetease) {
         win.LogicWeaverHomeMusic.playNetease(item.rawSong);
@@ -949,6 +957,26 @@ export class SearchService {
     } else {
       this.submit(item.title);
     }
+  }
+
+  private async openWorkspaceSearch(target: WorkspaceSearchTarget, keyword: string): Promise<void> {
+    this.abortController?.abort();
+    searchController.setSuggestionsVisible(false);
+    if (isQuickSearchPage()) {
+      try { await handoffQuickSearch({target,keyword,githubRule:target === 'github' ? gitHubService.searchRule : undefined}); }
+      catch (error) {
+        searchController.setSuggestions([{id:'workspace-search-error',title:error instanceof Error ? error.message : '打开插件搜索失败',meta:'请稍后重试',badge:{className:'badge-qcc',text:'提示',icon:'⚠'}}]);
+      }
+      return;
+    }
+    requestWorkspaceSearch(target, keyword);
+    if (target === 'netease') {
+      const { windowManagerController } = await import('../core/window-manager.store');
+      windowManagerController.open('music');
+      return;
+    }
+    const { fullscreenCardsController } = await import("../core/fullscreen-cards.store");
+    fullscreenCardsController.enter(target === "github" ? "card-github" : "daily-bilibili");
   }
 
   private openUrl(url: string): void {

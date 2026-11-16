@@ -52,7 +52,7 @@
 .todoist-board-check.checked,.todoist-inline-actions button.primary { border-color:#14b8a6;background:#14b8a6; }
 .todoist-column-add:hover { color:#0f9f91; }
 
-/* GitHub Release notifications supplied by the owner-only n8n workflow. */
+/* GitHub 和 B 站通知列表的共享样式。 */
 .github-update-toolbar, .bili-message-toolbar { position:sticky;z-index:2;top:0;display:flex;align-items:center;justify-content:space-between;gap:12px;margin:-8px -10px 3px;padding:10px 13px;border-bottom:1px solid var(--border);background:color-mix(in srgb,var(--panel) 98%,transparent); }
 .github-update-toolbar>div, .bili-message-toolbar>div { display:flex;align-items:baseline;gap:8px;min-width:0; }
 .github-update-toolbar strong, .bili-message-toolbar strong { color:var(--heading);font-size:11px; }

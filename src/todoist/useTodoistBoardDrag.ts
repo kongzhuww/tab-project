@@ -1,9 +1,11 @@
 import { ref, shallowRef, watch, onUnmounted } from "vue";
 import type { TodoistColumnItem, TodoistTaskItem, TodoistTaskListState } from "./task-list-store";
+import { makeTodoistResource, TODOIST_RESOURCE_MIME } from './task-resource';
 
 interface BoardDragOptions {
   state: TodoistTaskListState;
   isActive: () => boolean;
+  allowResourceDrag?: () => boolean;
   editingTaskId: () => string | null;
   closePopovers: () => void;
   moveTask: (taskId: string, target: { projectId?: string; sectionId?: string; dueDate?: string }, beforeTaskId?: string) => Promise<boolean>;
@@ -116,7 +118,8 @@ export function useTodoistBoardDrag(options: BoardDragOptions) {
     dragPreviewTask.value = { ...task };
     captureDragSlots(event.currentTarget as HTMLElement);
     if (event.dataTransfer) {
-      event.dataTransfer.effectAllowed = "move";
+      const resource = options.allowResourceDrag?.() ? makeTodoistResource(task) : null;
+      event.dataTransfer.effectAllowed = resource ? "copyMove" : "move";
       const card = event.currentTarget as HTMLElement;
       const rect = card.getBoundingClientRect();
       // Keep the drag image grabbed at the exact pointer offset; the browser composites it.
@@ -126,6 +129,7 @@ export function useTodoistBoardDrag(options: BoardDragOptions) {
       event.dataTransfer.setData("application/x-todoist-task-id", task.id);
       event.dataTransfer.setData("application/x-logicweaver-todoist-task", task.id);
       event.dataTransfer.setData("application/x-todoist-task", JSON.stringify({ taskId: task.id, sectionId: col.sectionId }));
+      if (resource) event.dataTransfer.setData(TODOIST_RESOURCE_MIME, JSON.stringify(resource));
     }
   }
 

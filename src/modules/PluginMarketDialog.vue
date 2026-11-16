@@ -34,7 +34,7 @@ watch(() => state.isOpen, async open => {
 
 const filteredPlugins = computed(() => {
   const kind = state.kindFilter;
-  return PLUGIN_CATALOG.filter((plugin) => (plugin.kind || "module") === kind);
+  return PLUGIN_CATALOG.filter((plugin) => !(plugin.id === 'backpack' && pluginMarketController.isInstalled('multica')) && (plugin.kind || "module") === kind);
 });
 
 function handleInstall(id: string) {
@@ -45,7 +45,7 @@ function handleUninstall(id: string) {
   pluginMarketController.uninstall(id);
 }
 
-const visibleCatalog = computed(() => PLUGIN_CATALOG);
+const visibleCatalog = computed(() => PLUGIN_CATALOG.filter(plugin => !(plugin.id === 'backpack' && pluginMarketController.isInstalled('multica'))));
 const installedCount = computed(() => visibleCatalog.value.filter(p => pluginMarketController.isInstalled(p.id)).length);
 const totalCount = computed(() => visibleCatalog.value.length);
 

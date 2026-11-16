@@ -55,6 +55,7 @@ export interface AiHotFeedState {
   // 3. 官方日报
   dailyReport: AiHotDailyReport | null;
   dailyArchives: AiHotDailyArchive[];
+  dailyArchiveWarning: string;
   activeDailyDate: string;
   // 全局状态
   isLoading: boolean;
@@ -67,7 +68,7 @@ export const aihotFeedState = shallowReactive<AiHotFeedState>({
   currentView: "feed",
   leaderboard: [], leaderboardSearch: "", leaderboardProvider: "",
   feedArticles: [], feedCategory: "", feedWindow: "24h",
-  dailyReport: null, dailyArchives: [], activeDailyDate: "",
+  dailyReport: null, dailyArchives: [], dailyArchiveWarning: "", activeDailyDate: "",
   isLoading: false, errorMessage: "", statusMessage: ""
 });
 

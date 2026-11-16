@@ -207,7 +207,7 @@ function safeSnapshot(raw) {
 // src/notifications/history-repository.ts
 var queue = Promise.resolve();
 function notificationHistoryOperation(action, payload) {
-  const operation = queue.then(async () => {
+  const run = async () => {
     if (typeof chrome === "undefined" || !chrome.storage?.local) {
       throw new Error("Chrome storage API unavailable");
     }
@@ -243,6 +243,12 @@ function notificationHistoryOperation(action, payload) {
     snapshot.version++;
     await chrome.storage.local.set({ [NOTIFICATION_HISTORY_KEY]: snapshot });
     return snapshot;
+  };
+  const operation = queue.then(async () => {
+    if (typeof navigator !== "undefined" && navigator.locks) {
+      return await navigator.locks.request("tab-project:notification-history", async () => await run());
+    }
+    return await run();
   });
   queue = operation.catch(() => {
   });
@@ -1342,11 +1348,11 @@ function trigger(target, type, key, newValue, oldValue, oldTarget) {
   }
   endBatch();
 }
-function reactiveReadArray(array) {
-  const raw = /* @__PURE__ */ toRaw(array);
-  if (raw === array) return raw;
+function reactiveReadArray(array2) {
+  const raw = /* @__PURE__ */ toRaw(array2);
+  if (raw === array2) return raw;
   track(raw, "iterate", ARRAY_ITERATE_KEY);
-  return /* @__PURE__ */ isShallow(array) ? raw : raw.map(toReactive);
+  return /* @__PURE__ */ isShallow(array2) ? raw : raw.map(toReactive);
 }
 function shallowReadArray(arr) {
   track(arr = /* @__PURE__ */ toRaw(arr), "iterate", ARRAY_ITERATE_KEY);
@@ -5252,11 +5258,745 @@ function initWebSideDrawer() {
   });
 }
 
+// src/services/multica.service.ts
+var BASE = "https://api.multica.ai";
+var KEY2 = "multicaSessionV1";
+var PERSISTENT_KEY = "multicaCredentialV1";
+function localStorageArea() {
+  if (typeof chrome === "undefined" || !chrome.storage?.local) throw new Error("\u9700\u8981\u5728\u6269\u5C55\u4E2D\u4F7F\u7528 Multica");
+  return chrome.storage.local;
+}
+function validMulticaCredential(value) {
+  const item = value;
+  return Boolean(item && typeof item.token === "string" && item.token.trim() && typeof item.workspaceId === "string" && item.workspaceId.trim());
+}
+async function withCredentialLock(action) {
+  const locks = typeof navigator !== "undefined" ? navigator.locks : void 0;
+  return locks ? await locks.request("tab-project:multica-credentials", action) : await action();
+}
+async function session() {
+  const local = localStorageArea();
+  const value = (await local.get(PERSISTENT_KEY))[PERSISTENT_KEY];
+  if (value !== void 0) return validMulticaCredential(value) ? value : null;
+  const legacy = chrome.storage?.session;
+  if (!legacy) return null;
+  if (legacy.setAccessLevel) await legacy.setAccessLevel({ accessLevel: "TRUSTED_CONTEXTS" });
+  const previous = (await legacy.get(KEY2))[KEY2];
+  if (!validMulticaCredential(previous)) return null;
+  if (typeof navigator === "undefined" || !navigator.locks) return previous;
+  return withCredentialLock(async () => {
+    const current = (await local.get(PERSISTENT_KEY))[PERSISTENT_KEY];
+    if (current !== void 0) return validMulticaCredential(current) ? current : null;
+    const live = (await legacy.get(KEY2))[KEY2];
+    if (!validMulticaCredential(live)) return null;
+    await local.set({ [PERSISTENT_KEY]: live });
+    await legacy.remove(KEY2);
+    return live;
+  });
+}
+var MulticaRequestError = class extends Error {
+  constructor(message, status, retryAfterMs2) {
+    super(message);
+    this.status = status;
+    this.retryAfterMs = retryAfterMs2;
+    this.name = "MulticaRequestError";
+  }
+  status;
+  retryAfterMs;
+};
+async function request(token, path, workspaceId, init = {}) {
+  const headers = { Authorization: `Bearer ${token}`, Accept: "application/json" };
+  if (workspaceId) headers["X-Workspace-ID"] = workspaceId;
+  if (init.body) headers["Content-Type"] = "application/json";
+  let response;
+  const isWrite = Boolean(init.method && init.method.toUpperCase() !== "GET");
+  for (let attempt = 0; attempt < (isWrite ? 1 : 2); attempt++) {
+    try {
+      response = await fetch(`${BASE}${path}`, { ...init, headers, redirect: "error", credentials: "omit", signal: AbortSignal.timeout(isWrite ? 25e3 : 1e4) });
+      if (!isWrite && attempt === 0 && [502, 503, 504].includes(response.status)) {
+        void response.body?.cancel().catch(() => {
+        });
+        response = void 0;
+      } else break;
+    } catch {
+      if (attempt === (isWrite ? 0 : 1)) {
+        throw new MulticaRequestError(isWrite ? "\u8FDE\u63A5\u4E2D\u65AD\u6216\u8D85\u65F6\uFF0C\u64CD\u4F5C\u53EF\u80FD\u5DF2\u7ECF\u6210\u529F\u3002\u8BF7\u5148\u5230 Multica \u68C0\u67E5\uFF0C\u907F\u514D\u91CD\u590D\u63D0\u4EA4\u3002" : "\u8FDE\u63A5 Multica \u5931\u8D25\u6216\u8D85\u65F6\uFF0C\u8BF7\u68C0\u67E5\u6D4F\u89C8\u5668\u7F51\u7EDC\u548C\u4EE3\u7406\u540E\u91CD\u8BD5\u3002\u6B64\u9519\u8BEF\u4E0D\u4EE3\u8868\u4EE4\u724C\u65E0\u6548\u3002");
+      }
+    }
+    await new Promise((resolve) => setTimeout(resolve, 600 + Math.floor(Math.random() * 400)));
+  }
+  if (!response) throw new Error("\u8FDE\u63A5 Multica \u5931\u8D25\uFF0C\u8BF7\u68C0\u67E5\u7F51\u7EDC\u540E\u91CD\u8BD5\u3002");
+  if (!response.ok) {
+    if (response.status === 401) throw new MulticaRequestError("Multica \u4EE4\u724C\u65E0\u6548\u6216\u5DF2\u8FC7\u671F\uFF08HTTP 401\uFF09\uFF0C\u8BF7\u5728 Multica \u8BBE\u7F6E\u4E2D\u68C0\u67E5\u4EE4\u724C\u3002", 401);
+    if (response.status === 403) throw new MulticaRequestError("Multica \u62D2\u7EDD\u8BBF\u95EE\uFF08HTTP 403\uFF09\uFF0C\u8BF7\u68C0\u67E5\u8D26\u53F7\u548C\u5DE5\u4F5C\u533A\u6743\u9650\u3002", 403);
+    const retryAfter = response.headers.get("retry-after");
+    const seconds = retryAfter && /^\d+$/.test(retryAfter) ? Number(retryAfter) * 1e3 : retryAfter ? Date.parse(retryAfter) - Date.now() : NaN;
+    const retryAfterMs2 = Number.isFinite(seconds) ? Math.max(0, seconds) : void 0;
+    throw new MulticaRequestError(`Multica \u8BF7\u6C42\u5931\u8D25\uFF08HTTP ${response.status}\uFF09\u3002${isWrite ? "\u8BF7\u5148\u68C0\u67E5\u64CD\u4F5C\u662F\u5426\u5DF2\u751F\u6548\uFF0C\u907F\u514D\u91CD\u590D\u63D0\u4EA4\u3002" : "\u8BF7\u7A0D\u540E\u91CD\u8BD5\u3002"}`, response.status, retryAfterMs2);
+  }
+  try {
+    return await response.json();
+  } catch {
+    throw new Error(init.method === "POST" ? "\u670D\u52A1\u5668\u54CD\u5E94\u65E0\u6CD5\u786E\u8BA4\uFF1B\u8BF7\u5148\u5230 Multica \u68C0\u67E5\u64CD\u4F5C\u662F\u5426\u5DF2\u751F\u6548\uFF0C\u907F\u514D\u91CD\u590D\u63D0\u4EA4\u3002" : "Multica \u8FD4\u56DE\u7684\u6570\u636E\u65E0\u6CD5\u89E3\u6790");
+  }
+}
+function array(data, label) {
+  if (!Array.isArray(data)) throw new Error(`Multica \u8FD4\u56DE\u7684${label}\u683C\u5F0F\u4E0D\u53D7\u652F\u6301`);
+  return data;
+}
+var multicaService = {
+  async workspaces(token) {
+    if (!token.trim()) throw new Error("\u8BF7\u586B\u5199 Multica \u4E2A\u4EBA\u8BBF\u95EE\u4EE4\u724C");
+    return array(await request(token.trim(), "/api/workspaces"), "\u5DE5\u4F5C\u533A");
+  },
+  async connect(token, workspaceId) {
+    const clean = token.trim();
+    const list = await this.workspaces(clean);
+    if (!list.some((w) => w.id === workspaceId)) throw new Error("\u8BF7\u9009\u62E9\u6709\u6548\u7684\u5DE5\u4F5C\u533A");
+    await withCredentialLock(async () => {
+      const local = localStorageArea();
+      await local.set({ [PERSISTENT_KEY]: { token: clean, workspaceId } });
+      if (chrome.storage?.session) await chrome.storage.session.remove(KEY2);
+    });
+  },
+  async disconnect() {
+    await withCredentialLock(async () => {
+      const local = localStorageArea();
+      if (chrome.storage?.session) await chrome.storage.session.remove(KEY2);
+      await local.remove(PERSISTENT_KEY);
+    });
+  },
+  async isConnected() {
+    return Boolean(await session());
+  },
+  async activeWorkspaceId() {
+    return (await session())?.workspaceId || null;
+  },
+  /** Only call inside an encrypted backup; never include in ordinary exports. */
+  async credentialForEncryptedBackup() {
+    return session();
+  },
+  async restoreEncryptedCredential(value) {
+    if (!validMulticaCredential(value)) throw new Error("\u52A0\u5BC6\u5907\u4EFD\u4E2D\u7684 Multica \u8FDE\u63A5\u683C\u5F0F\u65E0\u6548");
+    return withCredentialLock(async () => {
+      const local = localStorageArea();
+      const current = (await local.get(PERSISTENT_KEY))[PERSISTENT_KEY];
+      const legacy = chrome.storage?.session ? (await chrome.storage.session.get(KEY2))[KEY2] : void 0;
+      if (current !== void 0 || legacy !== void 0) return "kept";
+      await local.set({ [PERSISTENT_KEY]: { token: value.token, workspaceId: value.workspaceId } });
+      return "restored";
+    });
+  },
+  async info(includeArchived = false) {
+    const current = await session();
+    if (!current) throw new Error("\u8BF7\u5148\u5728 Agent \u5DE5\u4F5C\u53F0\u53F3\u4E0A\u89D2\u8BBE\u7F6E\u4E2D\u8FDE\u63A5 Multica");
+    const [runtimes, agents] = await Promise.all([
+      request(current.token, "/api/runtimes", current.workspaceId),
+      request(current.token, includeArchived ? "/api/agents?include_archived=true" : "/api/agents", current.workspaceId)
+    ]);
+    return { workspaceId: current.workspaceId, runtimes: array(runtimes, "\u8FD0\u884C\u65F6"), agents: array(agents, "\u667A\u80FD\u4F53") };
+  },
+  async archiveAgent(agentId) {
+    const current = await session();
+    if (!current) throw new Error("\u8BF7\u5148\u5728 Agent \u5DE5\u4F5C\u53F0\u53F3\u4E0A\u89D2\u8BBE\u7F6E\u4E2D\u8FDE\u63A5 Multica");
+    if (!agentId) throw new Error("\u7F3A\u5C11\u667A\u80FD\u4F53\u7F16\u53F7");
+    await request(current.token, `/api/agents/${encodeURIComponent(agentId)}/archive`, current.workspaceId, { method: "POST" });
+  },
+  async restoreAgent(agentId) {
+    const current = await session();
+    if (!current) throw new Error("\u8BF7\u5148\u5728 Agent \u5DE5\u4F5C\u53F0\u53F3\u4E0A\u89D2\u8BBE\u7F6E\u4E2D\u8FDE\u63A5 Multica");
+    if (!agentId) throw new Error("\u7F3A\u5C11\u667A\u80FD\u4F53\u7F16\u53F7");
+    await request(current.token, `/api/agents/${encodeURIComponent(agentId)}/restore`, current.workspaceId, { method: "POST" });
+  },
+  async issues() {
+    const current = await session();
+    if (!current) throw new Error("\u8BF7\u5148\u5728 Agent \u5DE5\u4F5C\u53F0\u53F3\u4E0A\u89D2\u8BBE\u7F6E\u4E2D\u8FDE\u63A5 Multica");
+    const data = await request(current.token, "/api/issues?limit=50&sort=updated_at&direction=desc", current.workspaceId);
+    return array(data?.issues, "\u4EFB\u52A1");
+  },
+  async issueRuns(issueId, expectedWorkspaceId) {
+    const current = await session();
+    if (!current) throw new Error("\u8BF7\u5148\u5728 Agent \u5DE5\u4F5C\u53F0\u53F3\u4E0A\u89D2\u8BBE\u7F6E\u4E2D\u8FDE\u63A5 Multica");
+    if (expectedWorkspaceId && current.workspaceId !== expectedWorkspaceId) throw new Error("Multica \u5DE5\u4F5C\u533A\u5DF2\u66F4\u6362\uFF0C\u6682\u505C\u68C0\u67E5\u539F\u5DE5\u4F5C\u533A\u7684\u4EFB\u52A1\u3002");
+    if (!issueId) throw new Error("\u7F3A\u5C11\u4EFB\u52A1\u7F16\u53F7");
+    return array(await request(current.token, `/api/issues/${encodeURIComponent(issueId)}/task-runs`, current.workspaceId), "\u8FD0\u884C\u8BB0\u5F55");
+  },
+  async runMessages(runId) {
+    const current = await session();
+    if (!current) throw new Error("\u8BF7\u5148\u5728 Agent \u5DE5\u4F5C\u53F0\u53F3\u4E0A\u89D2\u8BBE\u7F6E\u4E2D\u8FDE\u63A5 Multica");
+    if (!runId) throw new Error("\u7F3A\u5C11\u8FD0\u884C\u7F16\u53F7");
+    return array(await request(current.token, `/api/tasks/${encodeURIComponent(runId)}/messages`, current.workspaceId), "\u6267\u884C\u8BB0\u5F55");
+  },
+  async issueComments(issueId) {
+    const current = await session();
+    if (!current) throw new Error("\u8BF7\u5148\u5728 Agent \u5DE5\u4F5C\u53F0\u53F3\u4E0A\u89D2\u8BBE\u7F6E\u4E2D\u8FDE\u63A5 Multica");
+    if (!issueId) throw new Error("\u7F3A\u5C11\u4EFB\u52A1\u7F16\u53F7");
+    return array(await request(current.token, `/api/issues/${encodeURIComponent(issueId)}/comments`, current.workspaceId), "\u8BC4\u8BBA");
+  },
+  async switchIssueAgent(issueId, expectedAssigneeId, agentId) {
+    const current = await session();
+    if (!current) throw new Error("\u8BF7\u5148\u8FDE\u63A5 Multica");
+    if (!issueId || !agentId) throw new Error("\u7F3A\u5C11\u4F1A\u8BDD\u6216\u52A9\u624B\u7F16\u53F7");
+    const latest = await request(current.token, `/api/issues/${encodeURIComponent(issueId)}`, current.workspaceId);
+    if (!latest || latest.id !== issueId || !Number.isSafeInteger(latest.revision) || Number(latest.revision) < 1) throw new Error("\u65E0\u6CD5\u786E\u8BA4\u4F1A\u8BDD\u7248\u672C\uFF1B\u672A\u5207\u6362\u52A9\u624B\uFF0C\u8BF7\u5237\u65B0\u540E\u91CD\u8BD5\u3002");
+    if ((latest.assignee_id || null) !== expectedAssigneeId) throw new Error("\u4F1A\u8BDD\u8D1F\u8D23\u4EBA\u5DF2\u5728\u5176\u4ED6\u5730\u65B9\u6539\u53D8\uFF1B\u672A\u5207\u6362\uFF0C\u8BF7\u5237\u65B0\u540E\u786E\u8BA4\u3002");
+    const updated = await request(current.token, `/api/issues/${encodeURIComponent(issueId)}`, current.workspaceId, {
+      method: "PUT",
+      body: JSON.stringify({ assignee_type: "agent", assignee_id: agentId, expected_revision: latest.revision, suppress_run: true })
+    });
+    if (!updated || updated.id !== issueId || updated.assignee_id !== agentId || updated.assignee_type !== "agent") throw new Error("\u5207\u6362\u7ED3\u679C\u65E0\u6CD5\u786E\u8BA4\uFF1B\u8BF7\u5237\u65B0\u4F1A\u8BDD\u6216\u5230 Multica \u6838\u5BF9\uFF0C\u907F\u514D\u91CD\u590D\u64CD\u4F5C\u3002");
+    return updated;
+  },
+  async renameIssue(issueId, title, expectedWorkspaceId) {
+    const current = await session();
+    if (!current) throw new Error("\u8BF7\u5148\u5728 Agent \u5DE5\u4F5C\u53F0\u53F3\u4E0A\u89D2\u8BBE\u7F6E\u4E2D\u8FDE\u63A5 Multica");
+    if (expectedWorkspaceId && current.workspaceId !== expectedWorkspaceId) throw new Error("Multica \u5DE5\u4F5C\u533A\u5DF2\u66F4\u6362\uFF0C\u672A\u66F4\u65B0\u6807\u9898\u3002");
+    if (!issueId || !title.trim()) throw new Error("\u7F3A\u5C11\u4EFB\u52A1\u7F16\u53F7\u6216\u6807\u9898");
+    await request(current.token, `/api/issues/${encodeURIComponent(issueId)}`, current.workspaceId, {
+      method: "PUT",
+      body: JSON.stringify({ title: title.trim() })
+    });
+  },
+  async addIssueComment(issueId, content, expectedWorkspaceId) {
+    const current = await session();
+    if (!current) throw new Error("\u8BF7\u5148\u5728 Agent \u5DE5\u4F5C\u53F0\u53F3\u4E0A\u89D2\u8BBE\u7F6E\u4E2D\u8FDE\u63A5 Multica");
+    if (expectedWorkspaceId && current.workspaceId !== expectedWorkspaceId) throw new Error("Multica \u5DE5\u4F5C\u533A\u5DF2\u66F4\u6362\uFF0C\u6D88\u606F\u672A\u53D1\u9001\u3002");
+    if (!issueId || !content.trim()) throw new Error("\u8BF7\u586B\u5199\u6D88\u606F");
+    await request(current.token, `/api/issues/${encodeURIComponent(issueId)}/comments`, current.workspaceId, {
+      method: "POST",
+      body: JSON.stringify({ content: content.trim(), type: "comment" })
+    });
+  },
+  async createIssue(title, description, agentId, expectedWorkspaceId) {
+    const current = await session();
+    if (!current) throw new Error("\u8BF7\u5148\u5728 Agent \u5DE5\u4F5C\u53F0\u53F3\u4E0A\u89D2\u8BBE\u7F6E\u4E2D\u8FDE\u63A5 Multica");
+    if (expectedWorkspaceId && current.workspaceId !== expectedWorkspaceId) throw new Error("Multica \u5DE5\u4F5C\u533A\u5DF2\u66F4\u6362\uFF0C\u4EFB\u52A1\u672A\u6D3E\u53D1\u3002");
+    if (!title.trim() || !description.trim() || !agentId) throw new Error("\u8BF7\u586B\u5199\u4EFB\u52A1\u5E76\u9009\u62E9\u667A\u80FD\u4F53");
+    const result = await request(current.token, "/api/issues", current.workspaceId, {
+      method: "POST",
+      body: JSON.stringify({ title: title.trim(), description, assignee_type: "agent", assignee_id: agentId })
+    });
+    if (!result || typeof result.id !== "string") throw new Error("\u670D\u52A1\u5668\u8FD4\u56DE\u7ED3\u679C\u65E0\u6CD5\u786E\u8BA4\uFF1B\u8BF7\u5148\u5230 Multica \u68C0\u67E5\u662F\u5426\u5DF2\u521B\u5EFA\uFF0C\u907F\u514D\u91CD\u590D\u63D0\u4EA4\u3002");
+    return { id: result.id, identifier: typeof result.identifier === "string" ? result.identifier : void 0 };
+  }
+};
+
+// src/multica/ai-notifications.ts
+async function publishAiNotification(id, provider, title, outcome) {
+  const level = outcome === "success" ? "success" : outcome === "error" ? "error" : "warning";
+  await notificationHistoryOperation("append", {
+    id,
+    appType: "ai-workspace",
+    appName: "AI \u5DE5\u4F5C\u533A",
+    title: outcome === "success" ? `${provider} \u6267\u884C\u5DF2\u5B8C\u6210` : outcome === "error" ? `${provider} \u6267\u884C\u5931\u8D25` : outcome === "skipped" ? `${provider} \u5B9A\u65F6\u4EFB\u52A1\u5DF2\u8DF3\u8FC7` : `${provider} \u6267\u884C\u7ED3\u679C\u672A\u786E\u8BA4`,
+    subtitle: title.slice(0, 160),
+    message: outcome === "unknown" ? "\u8BF7\u6253\u5F00 AI \u5DE5\u4F5C\u533A\u6838\u5BF9\uFF0C\u52FF\u76F2\u76EE\u91CD\u590D\u6267\u884C\u3002" : outcome === "skipped" ? "\u9519\u8FC7\u8BA1\u5212\u65F6\u95F4\u8D85\u8FC7 10 \u5206\u949F\uFF0C\u672C\u6B21\u672A\u6267\u884C\u3002" : "",
+    level,
+    createdAt: Date.now(),
+    read: false,
+    target: { type: "module", moduleId: "multica" }
+  });
+}
+
+// src/multica/task-tracking.ts
+function classifyRun(run) {
+  const status = String(run.status || "").toLowerCase();
+  if (["failed", "error", "timed_out", "timeout"].includes(status) || ["completed", "succeeded", "success"].includes(status) && Boolean(run.error)) return "error";
+  if (["completed", "succeeded", "success"].includes(status)) return "success";
+  return null;
+}
+function trackedRun(task, runs) {
+  const known = new Set(task.knownRunIds);
+  return runs.filter((run) => typeof run.id === "string" && !known.has(run.id)).sort((a, b) => String(a.created_at || a.started_at || "").localeCompare(String(b.created_at || b.started_at || "")))[0];
+}
+function trackingDelay(failures) {
+  return Math.min(60 * 60 * 1e3, 2 * 60 * 1e3 * 2 ** Math.min(Math.max(0, failures - 1), 5));
+}
+
+// src/background/ai-task-tracker.ts
+var KEY3 = "aiTrackedMulticaTasksV1";
+var ALARM = "ai-workspace-track-v1";
+var MAX = 100;
+var LIMIT_AGE = 48 * 60 * 60 * 1e3;
+var queue3 = Promise.resolve();
+function serial(run) {
+  const result = queue3.then(run);
+  queue3 = result.catch(() => {
+  });
+  return result;
+}
+async function read() {
+  const value = (await chrome.storage.local.get(KEY3))[KEY3];
+  if (value === void 0) return [];
+  if (!Array.isArray(value) || value.length > MAX || value.some((item) => !item || typeof item.id !== "string" || typeof item.workspaceId !== "string" || typeof item.issueId !== "string" || typeof item.title !== "string" || !Array.isArray(item.knownRunIds) || !Number.isFinite(item.createdAt) || !Number.isFinite(item.failures) || !Number.isFinite(item.retryAt))) throw new Error("\u4EFB\u52A1\u8FFD\u8E2A\u8BB0\u5F55\u683C\u5F0F\u5F02\u5E38\uFF0C\u672A\u8986\u76D6\u539F\u6570\u636E");
+  return value;
+}
+async function ensureAlarm(tasks) {
+  if (!tasks.length) {
+    await chrome.alarms.clear(ALARM);
+    return;
+  }
+  if (!await chrome.alarms.get(ALARM)) await chrome.alarms.create(ALARM, { delayInMinutes: 1, periodInMinutes: 2 });
+}
+async function trackMulticaTask(issueId, title, knownRunIds, workspaceId) {
+  return serial(async () => {
+    if (!/^[A-Za-z0-9_-]{1,100}$/.test(issueId) || !/^[A-Za-z0-9_-]{1,100}$/.test(workspaceId) || !Array.isArray(knownRunIds) || knownRunIds.length > 200 || knownRunIds.some((id) => typeof id !== "string" || id.length > 100)) throw new Error("\u4EFB\u52A1\u8FFD\u8E2A\u53C2\u6570\u65E0\u6548");
+    if (await multicaService.activeWorkspaceId() !== workspaceId) throw new Error("\u53D1\u9001\u540E\u5DE5\u4F5C\u533A\u5DF2\u5207\u6362\uFF0C\u672A\u542F\u52A8\u8FFD\u8E2A\uFF1B\u8BF7\u56DE\u539F\u5DE5\u4F5C\u533A\u67E5\u770B\u3002");
+    const tasks = await read();
+    if (tasks.length >= MAX) throw new Error("\u5F85\u8FFD\u8E2A\u4EFB\u52A1\u8FC7\u591A\uFF0C\u8BF7\u5148\u68C0\u67E5\u5DF2\u6709\u4EFB\u52A1\u3002");
+    tasks.push({ id: crypto.randomUUID(), workspaceId, issueId, title: String(title).slice(0, 160), knownRunIds, createdAt: Date.now(), failures: 0, retryAt: 0 });
+    await chrome.storage.local.set({ [KEY3]: tasks });
+    await ensureAlarm(tasks);
+  });
+}
+async function checkTrackedMulticaTasks() {
+  return serial(async () => {
+    const tasks = await read(), now = Date.now();
+    const workspace = await multicaService.activeWorkspaceId();
+    const remaining = [];
+    for (const task of tasks) {
+      if (task.workspaceId !== workspace || task.retryAt > now) {
+        remaining.push(task);
+        continue;
+      }
+      if (now - task.createdAt > LIMIT_AGE) {
+        try {
+          await publishAiNotification(`ai_mc_${task.id}`, "Multica", task.title, "unknown");
+        } catch {
+          remaining.push(task);
+        }
+        continue;
+      }
+      try {
+        const run = trackedRun(task, await multicaService.issueRuns(task.issueId, task.workspaceId));
+        const result = run && classifyRun(run);
+        if (!result) {
+          task.failures = 0;
+          task.retryAt = 0;
+          remaining.push(task);
+          continue;
+        }
+        await publishAiNotification(`ai_mc_${task.id}`, "Multica", task.title, result);
+      } catch (error) {
+        task.failures++;
+        const delay = error instanceof MulticaRequestError && error.retryAfterMs ? Math.max(trackingDelay(task.failures), error.retryAfterMs) : trackingDelay(task.failures);
+        task.retryAt = now + delay;
+        remaining.push(task);
+      }
+    }
+    await chrome.storage.local.set({ [KEY3]: remaining });
+    await ensureAlarm(remaining);
+  });
+}
+function initAiTaskTracker() {
+  chrome.runtime.onMessage.addListener((message, sender, reply) => {
+    if (message?.type !== "ai-workspace:track-multica") return;
+    if (sender.id !== chrome.runtime.id || !String(sender.url || "").startsWith(chrome.runtime.getURL(""))) {
+      reply({ ok: false, error: "\u65E0\u6743\u8FFD\u8E2A\u4EFB\u52A1" });
+      return;
+    }
+    void trackMulticaTask(message.issueId, message.title, message.knownRunIds, message.workspaceId).then(() => reply({ ok: true })).catch((error) => reply({ ok: false, error: error instanceof Error ? error.message : "\u4EFB\u52A1\u8FFD\u8E2A\u672A\u786E\u8BA4" }));
+    return true;
+  });
+  chrome.alarms.onAlarm.addListener((alarm) => {
+    if (alarm?.name === ALARM) void checkTrackedMulticaTasks().catch(() => console.warn("[AI] Task tracking check not confirmed."));
+  });
+  void serial(async () => ensureAlarm(await read())).catch(() => console.warn("[AI] Task tracking restore not confirmed."));
+}
+
+// src/multica/schedule-contract.ts
+var AI_SCHEDULE_KEY = "aiWorkspaceSchedulesV1";
+function validateScheduleInput(input, now = Date.now()) {
+  if (!input || !["multica", "deepseek"].includes(input.provider) || !["once", "daily"].includes(input.repeat)) throw new Error("\u8BF7\u9009\u62E9\u6709\u6548\u7684\u670D\u52A1\u4E0E\u91CD\u590D\u65B9\u5F0F\u3002");
+  if (typeof input.prompt !== "string" || !input.prompt.trim() || input.prompt.length > 1e4) throw new Error("\u8BF7\u8F93\u5165\u4E0D\u8D85\u8FC7 10,000 \u5B57\u7684\u4EFB\u52A1\u5185\u5BB9\u3002");
+  if (!Number.isFinite(input.runAt) || input.runAt <= now + 1e4 || input.runAt > now + 366 * 864e5) throw new Error("\u8BF7\u9009\u62E9 10 \u79D2\u540E\u81F3\u4E00\u5E74\u5185\u7684\u65F6\u95F4\u3002");
+  if (input.provider === "multica" && (typeof input.agentId !== "string" || !/^[A-Za-z0-9_-]{1,100}$/.test(input.agentId) || typeof input.workspaceId !== "string" || !/^[A-Za-z0-9_-]{1,100}$/.test(input.workspaceId))) throw new Error("\u8BF7\u9009\u62E9\u5F53\u524D\u5DE5\u4F5C\u533A\u7684 Multica \u667A\u80FD\u4F53\u3002");
+  if (input.provider === "deepseek" && (typeof input.keyFingerprint !== "string" || !/^[a-f0-9]{64}$/.test(input.keyFingerprint))) throw new Error("\u65E0\u6CD5\u786E\u8BA4\u5F53\u524D DeepSeek \u8D26\u53F7\uFF0C\u8BF7\u91CD\u65B0\u6253\u5F00\u5B9A\u65F6\u4EFB\u52A1\u3002");
+  if (input.provider === "deepseek" && (typeof input.model !== "string" || !/^[A-Za-z0-9._-]{1,100}$/.test(input.model))) throw new Error("\u8BF7\u9009\u62E9\u6709\u6548\u7684 DeepSeek \u6A21\u578B\u3002");
+}
+async function keyFingerprint(key) {
+  const bytes = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(key));
+  return Array.from(new Uint8Array(bytes), (b) => b.toString(16).padStart(2, "0")).join("");
+}
+function nextDaily(hour, minute, after) {
+  const next = new Date(after);
+  next.setHours(hour, minute, 0, 0);
+  if (next.getTime() <= after) next.setDate(next.getDate() + 1);
+  return next.getTime();
+}
+function safeScheduleList(value) {
+  if (value === void 0) return [];
+  if (!Array.isArray(value) || value.length > 100 || value.some((item) => !item || typeof item.id !== "string" || !["multica", "deepseek"].includes(item.provider) || typeof item.prompt !== "string" || item.prompt.length > 1e4 || !Number.isFinite(item.runAt) || !Number.isFinite(item.createdAt) || !Number.isInteger(item.localHour) || item.localHour < 0 || item.localHour > 23 || !Number.isInteger(item.localMinute) || item.localMinute < 0 || item.localMinute > 59 || !["once", "daily"].includes(item.repeat) || !["pending", "running", "completed", "failed", "unknown", "paused", "skipped"].includes(item.state))) throw new Error("\u5B9A\u65F6\u4EFB\u52A1\u6570\u636E\u683C\u5F0F\u5F02\u5E38\uFF0C\u672A\u8986\u76D6\u539F\u6570\u636E\u3002");
+  for (const item of value) {
+    if (item.state === "running" && (typeof item.runId !== "string" || !/^[A-Za-z0-9_-]{1,100}$/.test(item.runId) || !Number.isFinite(item.startedAt))) throw new Error("\u5B9A\u65F6\u4EFB\u52A1\u8FD0\u884C\u8BB0\u5F55\u683C\u5F0F\u5F02\u5E38\uFF0C\u672A\u8986\u76D6\u539F\u6570\u636E\u3002");
+    if (item.notificationPending && (typeof item.notificationPending.runId !== "string" || !/^[A-Za-z0-9_-]{1,100}$/.test(item.notificationPending.runId) || !["success", "error", "unknown", "skipped"].includes(item.notificationPending.outcome))) throw new Error("\u5B9A\u65F6\u4EFB\u52A1\u901A\u77E5\u8BB0\u5F55\u683C\u5F0F\u5F02\u5E38\uFF0C\u672A\u8986\u76D6\u539F\u6570\u636E\u3002");
+  }
+  return value;
+}
+
+// src/services/byok.service.ts
+function supportsReasoningEffort(model) {
+  return model === "deepseek-flash" || model === "deepseek-v4-pro";
+}
+var CONFIG = "byokConfigV1";
+var BYOK_HISTORY_KEY = "byokConversationsV1";
+var HISTORY = BYOK_HISTORY_KEY;
+var area = () => chrome.storage.local;
+async function loadConfig() {
+  const raw = (await area().get(CONFIG))[CONFIG]?.deepseek;
+  const models = Array.isArray(raw?.models) ? raw.models.filter((m) => typeof m === "string" && /^[a-zA-Z0-9._-]{1,100}$/.test(m)) : [];
+  return { key: typeof raw?.key === "string" ? raw.key : "", model: typeof raw?.model === "string" && raw.model ? raw.model : "deepseek-flash", models };
+}
+async function loadConversations() {
+  const value = (await area().get(HISTORY))[HISTORY];
+  return Array.isArray(value) ? value.filter((v) => v && v.provider === "deepseek" && typeof v.id === "string" && Array.isArray(v.messages)) : [];
+}
+async function historyLock(action) {
+  return typeof navigator !== "undefined" && navigator.locks ? navigator.locks.request("tab-project:byok-history", action) : action();
+}
+async function saveConversation(conversation) {
+  await historyLock(async () => {
+    const list = await loadConversations();
+    const snapshot = JSON.parse(JSON.stringify(conversation));
+    if (list.length >= 50 && !list.some((c) => c.id === snapshot.id)) throw new Error("\u672C\u673A\u4F1A\u8BDD\u5DF2\u8FBE 50 \u6761\uFF0C\u8BF7\u5148\u5220\u9664\u4E0D\u9700\u8981\u7684\u4F1A\u8BDD\u3002");
+    await area().set({ [HISTORY]: [snapshot, ...list.filter((c) => c.id !== snapshot.id)] });
+  });
+}
+async function streamDeepSeek(key, model, messages, signal, onText, effort, onReasoning) {
+  const clean = key.trim();
+  if (!/^[\x21-\x7e]{1,512}$/.test(clean)) throw new Error("\u8BF7\u5148\u5728\u8BBE\u7F6E\u4E2D\u586B\u5199\u6709\u6548\u7684 DeepSeek API Key\u3002");
+  if (!/^[a-zA-Z0-9._-]{1,100}$/.test(model)) throw new Error("\u6A21\u578B\u540D\u79F0\u683C\u5F0F\u65E0\u6548\u3002");
+  const history = messages.filter((m) => !m.incomplete && (m.role === "user" || m.role === "assistant")).map((m) => ({ role: m.role, content: m.content }));
+  const response = await fetch("https://api.deepseek.com/chat/completions", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${clean}`, "Content-Type": "application/json", Accept: "text/event-stream" },
+    body: JSON.stringify({ model, messages: history, stream: true, ...supportsReasoningEffort(model) && effort && ["none", "low", "high", "max"].includes(effort) ? { reasoning_effort: effort } : {} }),
+    signal,
+    credentials: "omit",
+    redirect: "error",
+    referrerPolicy: "no-referrer",
+    cache: "no-store"
+  });
+  if (!response.ok) {
+    void response.body?.cancel().catch(() => {
+    });
+    if (response.status === 401) throw new Error("DeepSeek API Key \u65E0\u6548\u6216\u5DF2\u8FC7\u671F\uFF08401\uFF09\u3002");
+    if (response.status === 402) throw new Error("DeepSeek API \u4F59\u989D\u4E0D\u8DB3\uFF08402\uFF09\uFF0C\u8BF7\u68C0\u67E5 API \u8D26\u6237\u3002");
+    if (response.status === 429) throw new Error("DeepSeek \u8BF7\u6C42\u8FC7\u4E8E\u9891\u7E41\uFF08429\uFF09\uFF0C\u8BF7\u7A0D\u540E\u518D\u8BD5\u3002");
+    throw new Error(`DeepSeek \u8BF7\u6C42\u5931\u8D25\uFF08HTTP ${response.status}\uFF09\uFF0C\u8BF7\u68C0\u67E5\u6A21\u578B\u3001\u4F59\u989D\u6216\u7F51\u7EDC\u3002`);
+  }
+  if (!response.body) throw new Error("DeepSeek \u672A\u8FD4\u56DE\u56DE\u590D\u6D41\u3002");
+  const reader = response.body.getReader(), decoder = new TextDecoder();
+  let buffer = "", done = false, length = 0;
+  const process2 = (event) => {
+    const data = event.split("\n").filter((line) => line.startsWith("data:")).map((line) => line.slice(5).trimStart()).join("\n");
+    if (!data) return;
+    if (data.trim() === "[DONE]") {
+      done = true;
+      return;
+    }
+    let chunk;
+    try {
+      chunk = JSON.parse(data);
+    } catch {
+      throw new Error("DeepSeek \u56DE\u590D\u6D41\u683C\u5F0F\u5F02\u5E38\u3002");
+    }
+    if (chunk.error) throw new Error("DeepSeek \u56DE\u590D\u6D41\u51FA\u73B0\u9519\u8BEF\uFF0C\u8BF7\u68C0\u67E5\u8D26\u6237\u540E\u91CD\u8BD5\u3002");
+    const delta = chunk?.choices?.[0]?.delta;
+    for (const [text, callback] of [[delta?.content, onText], [delta?.reasoning_content, onReasoning]]) {
+      if (typeof text === "string" && text) {
+        length += text.length;
+        if (length > 1e6) throw new Error("\u56DE\u590D\u8FC7\u957F\uFF0C\u5DF2\u505C\u6B62\u63A5\u6536\u3002");
+        callback?.(text);
+      }
+    }
+  };
+  try {
+    while (!done) {
+      const part = await reader.read();
+      buffer += decoder.decode(part.value, { stream: !part.done }).replace(/\r\n/g, "\n");
+      let end;
+      while ((end = buffer.indexOf("\n\n")) >= 0) {
+        const event = buffer.slice(0, end);
+        buffer = buffer.slice(end + 2);
+        process2(event);
+      }
+      if (buffer.length > 2e6) throw new Error("DeepSeek \u56DE\u590D\u6D41\u8FC7\u5927\u3002");
+      if (part.done) break;
+    }
+    if (!done) throw new Error("\u56DE\u590D\u8FDE\u63A5\u63D0\u524D\u4E2D\u65AD\uFF0C\u5185\u5BB9\u53EF\u80FD\u4E0D\u5B8C\u6574\uFF1B\u8BF7\u6C42\u53EF\u80FD\u5DF2\u8BA1\u8D39\u3002");
+  } finally {
+    void reader.cancel().catch(() => {
+    });
+    reader.releaseLock();
+  }
+}
+
+// src/multica/session-content.ts
+function sessionTitle(message) {
+  const text = message.trim();
+  const questions = text.match(/[^。！？!?\n]+[？?]/g);
+  const candidate = questions?.at(-1)?.trim() || text.split(/\n+/).map((line) => line.trim()).filter(Boolean).at(-1) || "\u65B0\u4F1A\u8BDD";
+  return Array.from(candidate.replace(/\s+/g, " ")).slice(0, 200).join("");
+}
+
+// src/background/ai-scheduler.ts
+var ALARM2 = "ai-workspace-schedule-v1";
+var MAX_LATE = 10 * 60 * 1e3;
+var WATCHDOG = 10 * 60 * 1e3;
+var queue4 = Promise.resolve();
+function serial2(fn) {
+  const result = queue4.then(fn);
+  queue4 = result.catch(() => {
+  });
+  return result;
+}
+async function read2() {
+  return safeScheduleList((await chrome.storage.local.get(AI_SCHEDULE_KEY))[AI_SCHEDULE_KEY]);
+}
+async function write(items) {
+  await chrome.storage.local.set({ [AI_SCHEDULE_KEY]: items });
+}
+async function arm(items) {
+  const running = items.some((item) => item.state === "running");
+  const due = items.flatMap((item) => [item.notificationPending ? Date.now() + 6e4 : Infinity, item.state === "pending" && !running && !item.notificationPending ? item.runAt : item.state === "running" && Number.isFinite(item.startedAt) ? item.startedAt + WATCHDOG : Infinity]).filter(Number.isFinite);
+  if (!due.length) {
+    await chrome.alarms.clear(ALARM2);
+    return;
+  }
+  await chrome.alarms.create(ALARM2, { when: Math.max(Date.now() + 1e3, Math.min(...due)) });
+}
+async function createAiSchedule(input) {
+  validateScheduleInput(input);
+  let workspaceId, keyFingerprint2;
+  if (input.provider === "multica") {
+    workspaceId = await multicaService.activeWorkspaceId() || void 0;
+    if (!workspaceId) throw new Error("\u8BF7\u5148\u8FDE\u63A5 Multica \u5DE5\u4F5C\u533A\u3002");
+    if (workspaceId !== input.workspaceId) throw new Error("\u5DE5\u4F5C\u533A\u5DF2\u66F4\u6362\uFF0C\u8BF7\u91CD\u65B0\u9009\u62E9\u667A\u80FD\u4F53\u3002");
+  } else {
+    const config = await loadConfig();
+    if (!config.key) throw new Error("\u8BF7\u5148\u914D\u7F6E DeepSeek API Key\u3002");
+    keyFingerprint2 = await keyFingerprint(config.key);
+    if (keyFingerprint2 !== input.keyFingerprint) throw new Error("DeepSeek \u8D26\u53F7\u5DF2\u66F4\u6362\uFF0C\u8BF7\u91CD\u65B0\u6253\u5F00\u5B9A\u65F6\u4EFB\u52A1\u3002");
+  }
+  const date = new Date(input.runAt);
+  const item = {
+    id: crypto.randomUUID(),
+    provider: input.provider,
+    prompt: input.prompt.trim(),
+    runAt: input.runAt,
+    repeat: input.repeat,
+    localHour: date.getHours(),
+    localMinute: date.getMinutes(),
+    state: "pending",
+    createdAt: Date.now(),
+    ...workspaceId ? { workspaceId, agentId: input.agentId } : { keyFingerprint: keyFingerprint2, model: input.model }
+  };
+  return serial2(async () => {
+    const all = await read2();
+    if (all.length >= 100) throw new Error("\u5B9A\u65F6\u4EFB\u52A1\u5DF2\u8FBE\u4E0A\u9650\uFF0C\u8BF7\u5148\u5220\u9664\u65E7\u8BB0\u5F55\u3002");
+    all.unshift(item);
+    await write(all);
+    try {
+      await arm(all);
+    } catch {
+      throw new Error("\u4EFB\u52A1\u5DF2\u4FDD\u5B58\uFF0C\u4F46\u6D4F\u89C8\u5668\u5B9A\u65F6\u5524\u9192\u672A\u786E\u8BA4\uFF1B\u8BF7\u67E5\u770B\u5217\u8868\uFF0C\u52FF\u91CD\u590D\u521B\u5EFA\u3002");
+    }
+    return item;
+  });
+}
+async function listAiSchedules() {
+  return serial2(read2);
+}
+async function changeAiSchedule(action, id) {
+  return serial2(async () => {
+    const all = await read2(), index = all.findIndex((item2) => item2.id === id);
+    if (index < 0) throw new Error("\u5B9A\u65F6\u4EFB\u52A1\u4E0D\u5B58\u5728\u3002");
+    const item = all[index];
+    if (item.state === "running") throw new Error("\u4EFB\u52A1\u5DF2\u5F00\u59CB\u6267\u884C\uFF0C\u4E0D\u80FD\u5047\u88C5\u53D6\u6D88\uFF1B\u8BF7\u7B49\u5F85\u7ED3\u679C\u3002");
+    if (action === "delete") all.splice(index, 1);
+    else if (action === "pause") {
+      if (item.state !== "pending") throw new Error("\u8BE5\u4EFB\u52A1\u5F53\u524D\u4E0D\u80FD\u6682\u505C\u3002");
+      item.state = "paused";
+    } else {
+      if (item.repeat === "daily" && ["paused", "failed", "unknown"].includes(item.state)) item.runAt = nextDaily(item.localHour, item.localMinute, Date.now());
+      else if (!(item.repeat === "once" && item.state === "paused" && item.runAt > Date.now() + 1e4)) throw new Error("\u6B64\u4EFB\u52A1\u4E0D\u80FD\u6062\u590D\uFF0C\u8BF7\u91CD\u65B0\u521B\u5EFA\u3002");
+      item.state = "pending";
+      item.lastResult = "\u5DF2\u6062\u590D";
+    }
+    await write(all);
+    await arm(all);
+  });
+}
+async function execute(item) {
+  if (item.provider === "multica") {
+    if (!item.workspaceId || !item.agentId || await multicaService.activeWorkspaceId() !== item.workspaceId) return { outcome: "error", message: "\u5DE5\u4F5C\u533A\u5DF2\u66F4\u6362\u6216\u672A\u8FDE\u63A5\uFF0C\u672A\u6D3E\u53D1\u3002", notify: true };
+    let sent = false;
+    try {
+      const result = await multicaService.createIssue(sessionTitle(item.prompt), item.prompt, item.agentId, item.workspaceId);
+      sent = true;
+      await trackMulticaTask(result.id, sessionTitle(item.prompt), [], item.workspaceId);
+      return { outcome: "success", message: "\u5DF2\u6D3E\u53D1\uFF0C\u7B49\u5F85\u667A\u80FD\u4F53\u6267\u884C\u7ED3\u675F\u3002", notify: false };
+    } catch (error) {
+      const definite = !sent && error instanceof MulticaRequestError && [400, 401, 403, 404, 422].includes(error.status || 0);
+      return { outcome: definite ? "error" : "unknown", message: sent ? "\u6D3E\u53D1\u5DF2\u786E\u8BA4\u4F46\u5B8C\u6210\u8FFD\u8E2A\u672A\u542F\u7528\uFF0C\u8BF7\u5230 Multica \u6838\u5BF9\u3002" : "\u6D3E\u53D1\u7ED3\u679C\u672A\u786E\u8BA4\uFF0C\u8BF7\u5230 Multica \u6838\u5BF9\uFF0C\u52FF\u91CD\u590D\u63D0\u4EA4\u3002", notify: true };
+    }
+  }
+  const config = await loadConfig();
+  if (!config.key || !item.keyFingerprint || await keyFingerprint(config.key) !== item.keyFingerprint || !item.model) return { outcome: "error", message: "DeepSeek \u8D26\u53F7\u5DF2\u66F4\u6362\u6216\u672A\u914D\u7F6E\uFF0C\u672A\u53D1\u8D77\u8BF7\u6C42\u3002", notify: true };
+  const chat = { id: crypto.randomUUID(), provider: "deepseek", model: item.model, title: sessionTitle(item.prompt), updatedAt: Date.now(), messages: [{ role: "user", content: item.prompt, incomplete: true }, { role: "assistant", content: "", incomplete: true }] };
+  try {
+    await saveConversation(chat);
+  } catch {
+    return { outcome: "error", message: "\u4F1A\u8BDD\u672A\u80FD\u4FDD\u5B58\uFF0C\u8BF7\u6C42\u672A\u53D1\u9001\u3002", notify: true };
+  }
+  try {
+    await streamDeepSeek(config.key, item.model, [{ role: "user", content: item.prompt }], AbortSignal.timeout(9 * 60 * 1e3), (text) => {
+      chat.messages[1].content += text;
+    }, void 0, (text) => {
+      chat.messages[1].reasoning = (chat.messages[1].reasoning || "") + text;
+    });
+    if (!chat.messages[1].content.trim()) throw new Error("\u6CA1\u6709\u8FD4\u56DE\u53EF\u663E\u793A\u7684\u6B63\u6587");
+    chat.messages[0].incomplete = false;
+    chat.messages[1].incomplete = false;
+    chat.updatedAt = Date.now();
+    try {
+      await saveConversation(chat);
+    } catch {
+      return { outcome: "unknown", message: "\u56DE\u590D\u4FDD\u5B58\u672A\u786E\u8BA4\uFF0C\u8BF7\u5728\u672C\u673A\u4F1A\u8BDD\u6838\u5BF9\u3002", notify: true };
+    }
+    return { outcome: "success", message: "\u56DE\u590D\u5DF2\u4FDD\u5B58\u5230\u672C\u673A\u4F1A\u8BDD\u3002", notify: true };
+  } catch (error) {
+    chat.updatedAt = Date.now();
+    try {
+      await saveConversation(chat);
+    } catch {
+    }
+    const definite = error instanceof Error && /（(?:401|402|429)）|HTTP (?:400|401|402|403|404|422|429)\b/.test(error.message);
+    return { outcome: definite ? "error" : "unknown", message: definite ? "\u8BF7\u6C42\u5931\u8D25\uFF0C\u8BF7\u68C0\u67E5 DeepSeek \u914D\u7F6E\u3002" : "\u8BF7\u6C42\u4E2D\u65AD\u6216\u7ED3\u679C\u4E0D\u786E\u5B9A\uFF0C\u53EF\u80FD\u5DF2\u8BA1\u8D39\uFF1B\u8BF7\u5148\u6838\u5BF9\uFF0C\u52FF\u81EA\u52A8\u91CD\u8BD5\u3002", notify: true };
+  }
+}
+async function flushNotifications() {
+  await serial2(async () => {
+    const all = await read2();
+    for (const item of all) {
+      const pending = item.notificationPending;
+      if (!pending) continue;
+      try {
+        await publishAiNotification(`ai_sched_${pending.runId}`, item.provider === "multica" ? "Multica" : "DeepSeek", sessionTitle(item.prompt), pending.outcome);
+        delete item.notificationPending;
+        await write(all);
+      } catch {
+      }
+    }
+    await arm(all);
+  });
+}
+async function runDueAiSchedules() {
+  await flushNotifications();
+  const selected = await serial2(async () => {
+    const all = await read2(), now = Date.now();
+    for (const item2 of all) if (item2.state === "running" && item2.startedAt && now - item2.startedAt >= WATCHDOG) {
+      item2.state = "unknown";
+      item2.lastResult = "\u6267\u884C\u4E2D\u65AD\u6216\u8D85\u65F6\uFF0C\u7ED3\u679C\u672A\u786E\u8BA4\uFF1B\u672A\u81EA\u52A8\u91CD\u8BD5\u3002";
+      if (item2.runId) item2.notificationPending = { runId: item2.runId, outcome: "unknown" };
+    }
+    if (all.some((item2) => item2.state === "running")) {
+      await write(all);
+      await arm(all);
+      return null;
+    }
+    const item = all.filter((x) => x.state === "pending" && !x.notificationPending && x.runAt <= now).sort((a, b) => a.runAt - b.runAt)[0];
+    if (!item) {
+      await write(all);
+      await arm(all);
+      return null;
+    }
+    const runId = crypto.randomUUID();
+    if (now - item.runAt > MAX_LATE) {
+      item.lastResult = "\u9519\u8FC7\u8BA1\u5212\u65F6\u95F4\u8D85\u8FC7 10 \u5206\u949F\uFF0C\u672C\u6B21\u672A\u6267\u884C\u3002";
+      item.runId = runId;
+      item.notificationPending = { runId, outcome: "skipped" };
+      if (item.repeat === "daily") item.runAt = nextDaily(item.localHour, item.localMinute, now);
+      else item.state = "skipped";
+      await write(all);
+      await arm(all);
+      return { item: { ...item }, runId, missed: true };
+    }
+    item.state = "running";
+    item.startedAt = now;
+    item.runId = runId;
+    await write(all);
+    await arm(all);
+    return { item: { ...item }, runId, missed: false };
+  });
+  if (!selected) {
+    await flushNotifications();
+    return;
+  }
+  if (selected.missed) {
+    await flushNotifications();
+    void runDueAiSchedules().catch(() => {
+    });
+    return;
+  }
+  let result;
+  try {
+    result = await execute(selected.item);
+  } catch {
+    result = { outcome: "unknown", message: "\u8FD0\u884C\u4E2D\u65AD\uFF0C\u7ED3\u679C\u672A\u786E\u8BA4\uFF1B\u8BF7\u6838\u5BF9\u540E\u518D\u64CD\u4F5C\u3002", notify: true };
+  }
+  const committed = await serial2(async () => {
+    const all = await read2(), live = all.find((x) => x.id === selected.item.id);
+    if (!live || live.state !== "running" || live.runId !== selected.runId) return false;
+    live.lastResult = result.message;
+    if (result.notify) live.notificationPending = { runId: selected.runId, outcome: result.outcome };
+    if (result.outcome === "success" && live.repeat === "daily") {
+      live.state = "pending";
+      live.runAt = nextDaily(live.localHour, live.localMinute, Date.now());
+    } else live.state = result.outcome === "success" ? "completed" : result.outcome === "error" ? "failed" : "unknown";
+    await write(all);
+    await arm(all);
+    return true;
+  });
+  if (committed && result.notify) await flushNotifications();
+  void runDueAiSchedules().catch(() => {
+  });
+}
+function initAiScheduler() {
+  chrome.runtime.onMessage.addListener((message, sender, reply) => {
+    if (typeof message?.type !== "string" || !message.type.startsWith("ai-schedule:")) return;
+    if (sender.id !== chrome.runtime.id || !String(sender.url || "").startsWith(chrome.runtime.getURL(""))) {
+      reply({ ok: false, error: "\u65E0\u6743\u64CD\u4F5C\u5B9A\u65F6\u4EFB\u52A1" });
+      return;
+    }
+    const action = message.type.slice("ai-schedule:".length);
+    const operation = action === "list" ? listAiSchedules() : action === "create" ? createAiSchedule(message.input) : ["pause", "resume", "delete"].includes(action) ? changeAiSchedule(action, message.id) : Promise.reject(new Error("\u672A\u77E5\u64CD\u4F5C"));
+    void operation.then((result) => reply({ ok: true, result })).catch((error) => reply({ ok: false, error: error instanceof Error ? error.message : "\u64CD\u4F5C\u672A\u786E\u8BA4" }));
+    return true;
+  });
+  chrome.alarms.onAlarm.addListener((alarm) => {
+    if (alarm?.name === ALARM2) void runDueAiSchedules().catch(() => console.warn("[AI schedule] Execution not confirmed."));
+  });
+  void serial2(async () => {
+    const all = await read2();
+    for (const item of all) if (item.state === "running") {
+      item.state = "unknown";
+      item.lastResult = "\u540E\u53F0\u5DF2\u91CD\u542F\uFF0C\u7ED3\u679C\u672A\u786E\u8BA4\uFF1B\u672A\u81EA\u52A8\u91CD\u8BD5\u3002";
+      if (item.runId) item.notificationPending = { runId: item.runId, outcome: "unknown" };
+    }
+    await write(all);
+    await arm(all);
+  }).then(() => flushNotifications()).catch(() => console.warn("[AI schedule] Restore not confirmed."));
+}
+
 // src/background/index.ts
 void removeRetiredYouTubeStorage().catch((error) => console.warn("\u65E7 YouTube \u6570\u636E\u6E05\u7406\u5931\u8D25", error));
 initBilibiliNetRules();
 initNotificationListeners();
 initTodoistBackgroundSync();
+initAiTaskTracker();
+initAiScheduler();
 for (const name of ["gmail-inbox-poll", "x-account-poll"]) {
   chrome.alarms.clear(name).catch(() => console.warn("[Migration] Could not clear retired feed alarm"));
 }

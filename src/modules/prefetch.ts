@@ -4,8 +4,8 @@ let prefetched = false;
 
 /**
  * 空闲时静默预加载所有 Dock 模块的视图组件代码 (Idle Prefetching)
- * 作用：在首屏渲染完成后的系统空闲期，提前将网易云、YouTube、B站等切片代码拉入浏览器缓存/内存。
- * 即使开发者随后在终端重新 build/clean，旧标签页内点击模块依然直接命中内存缓存，100% 杜绝 404 / Chunk 丢失。
+ * 作用：在首屏渲染后的空闲期，预加载当前已注册 Dock 模块的视图代码。
+ * 预加载可以减少后续打开模块的等待，但不能保证旧构建产物始终可用。
  */
 export function scheduleDockModulesPrefetch(delayMs: number = 1800) {
   if (prefetched || typeof window === "undefined") return;

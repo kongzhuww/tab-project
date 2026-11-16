@@ -34,7 +34,7 @@ export const PLUGIN_CATALOG: readonly PluginMarketItem[] = [
   // ==================== 1. 独立模块区 (Modules) ====================
   {
     id: "multica",
-    title: "Agent 工作台",
+    title: "AI 工作区",
     version: "v1.0.0",
     kind: "plugin",
     category: "productivity",

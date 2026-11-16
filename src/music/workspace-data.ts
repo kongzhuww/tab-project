@@ -161,10 +161,10 @@ export function createMusicWorkspaceData(canRead: () => boolean) {
     await read(async (signal, current) => {
       state.neteaseSearchResults = [];
       const uid = neteaseService.getUser()?.uid;
-      let songs: NeteaseSong[] = [];
-      try { songs = (await neteaseService.request("/cloudsearch", { keywords: query.trim(), type: 1, limit: 60 }, signal)).result?.songs || []; }
-      catch { signal.throwIfAborted(); }
-      if (!songs.length) songs = (await neteaseService.request("/search", { keywords: query.trim(), limit: 60 }, signal)).result?.songs || [];
+      // Both legacy names map to the same endpoint; do not retry an empty or failed response as a different search.
+      const response = await neteaseService.request("/cloudsearch", { keywords: query.trim(), type: 1, limit: 60 }, signal);
+      if (!Array.isArray(response?.result?.songs) && response?.result?.songs != null) throw new Error('网易云搜索结果格式异常，请稍后重试。');
+      const songs: NeteaseSong[] = response?.result?.songs || [];
       if (current() && uid === neteaseService.getUser()?.uid) state.neteaseSearchResults = songs;
     });
   }

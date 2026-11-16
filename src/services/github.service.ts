@@ -1485,6 +1485,11 @@ ${repoInfo}`;
     });
   }
 
+  /** Same category and search-rule semantics used by the Star workspace. */
+  public getDashboardSearchResults(): GitHubRawRepo[] {
+    return this.getFilteredRepositories();
+  }
+
   private getFilteredRepositories(): GitHubRawRepo[] {
     let list: GitHubRawRepo[] = [];
     if (this.active === "全部") {

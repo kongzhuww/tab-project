@@ -27,7 +27,7 @@
 
 > **Now available on Microsoft Edge Add-ons**: [Install tab-project](https://microsoftedge.microsoft.com/addons/detail/tabproject-%E6%96%B0%E6%A0%87%E7%AD%BE%E9%A1%B5/dbkaiojfbolnkpaegflocfbdgpmhjcco) without Developer mode. Edge manages automatic updates for store installations. Each new version still requires a separate store submission and review; GitHub commits and releases do not immediately update the store version.
 
-> **Repository Version**: **1.0.22**, adding a prompt backpack, AI workspace, and encrypted WebDAV backup safeguards, plus AI Hot and theme updates. Store versions may lag behind GitHub Releases. See the [Changelog](CHANGELOG.md).
+> **Repository Version**: **1.0.23**, improving AI workspace scheduling, notifications, resource browsing, Todoist integration and search. Store versions may lag behind GitHub Releases. See the [Changelog](CHANGELOG.md).
 
 ---
 

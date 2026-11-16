@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { defineAsyncComponent, ref, onMounted } from "vue";
+import { defineAsyncComponent, ref, onMounted, onBeforeUnmount } from "vue";
 import BookmarkFolderStrip from "../bookmarks/BookmarkFolderStrip.vue";
 import TopInfoCube from "./TopInfoCube.vue";
 import { fullscreenCardState } from "../core/fullscreen-card-state";
@@ -7,6 +7,10 @@ import { settingsController } from "../settings/store";
 import { windowManagerController } from "../core/window-manager.store";
 import { topProfileState, profileMenuController } from "../profile/store";
 import { notificationHistoryController, notificationHistoryState, notificationUnreadCount } from "../notifications/history-store";
+import { NOTIFICATION_HISTORY_KEY } from "../notifications/history-contract";
+import { newAiNotifications } from "../multica/notification-filter";
+import { notificationController } from "../notifications/store";
+declare const chrome: any;
 import { bookmarkFolderStripState } from "../bookmarks/folder-strip-store";
 import { bookmarksService } from "../services/bookmarks.service";
 import { sideDrawerState, sideDrawerController } from "../sidepanel/drawer-store";
@@ -67,12 +71,23 @@ function handleTopBarSelectStart(e: Event) {
   e.preventDefault();
 }
 
+function onHistoryChanged(changes: any, area: string) {
+  if (area !== 'local' || !changes[NOTIFICATION_HISTORY_KEY] || document.visibilityState !== 'visible') return;
+  try {
+    const change = changes[NOTIFICATION_HISTORY_KEY];
+    for (const item of newAiNotifications(change.oldValue, change.newValue)) {
+      notificationController.show({ id:item.id, appType:item.appType, appName:item.appName, icon:'assets/nav-multica.png', title:item.title, subtitle:item.subtitle, message:item.message, target:item.target, history:false, historyId:item.id, actionLabel:'查看任务' });
+    }
+  } catch { /* history store exposes malformed-storage errors */ }
+}
 onMounted(() => {
   notificationHistoryController.start();
+  if (typeof chrome !== 'undefined') chrome.storage?.onChanged?.addListener(onHistoryChanged);
   const saved = normalizeSystemTheme(localStorage.getItem("theme"));
   document.documentElement.dataset.theme = saved;
   document.documentElement.setAttribute("data-theme", saved);
 });
+onBeforeUnmount(() => { if (typeof chrome !== 'undefined') chrome.storage?.onChanged?.removeListener(onHistoryChanged); });
 
 </script>
 

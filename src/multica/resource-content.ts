@@ -1,12 +1,13 @@
 export const RESOURCE_LIMIT = 5;
 export const RESOURCE_TEXT_LIMIT = 12000;
 export interface ResourceAttachment {
-  kind: 'bilibili' | 'github';
+  kind: 'bilibili' | 'github' | 'todoist';
   id: string;
   title: string;
   url: string;
   author?: string;
   duration?: number;
+  dueDate?: string;
   description?: string;
   language?: string | null;
   visibility?: 'public' | 'private' | 'unknown';
@@ -26,6 +27,12 @@ export function limitResourceText(text: string): { text: string; truncated: bool
 export function messageWithResources(message: string, resources: ResourceAttachment[], options: { multicaBridge?: boolean } = {}): string {
   if (!resources.length) return message;
   const blocks = resources.map((resource, index) => {
+    if (resource.kind === 'todoist') {
+      const lines = [`资料 ${index + 1}（Todoist 任务）`, `任务：${resource.title}`, `链接：${resource.url}`];
+      if (resource.dueDate) lines.push(`截止日期：${resource.dueDate}`);
+      if (resource.description) lines.push(`描述${resource.truncated ? '（已截断）' : ''}：${resource.description}`);
+      return lines.join('\n');
+    }
     const video = resource.kind === 'bilibili';
     const label = video ? '字幕' : 'README';
     const lines = [`资料 ${index + 1}（${video ? 'B站视频' : 'GitHub 仓库'}）`, `名称：${resource.title}`, `链接：${resource.url}`];

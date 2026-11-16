@@ -99,6 +99,13 @@ async function save(owner: string, data: LocalStarGroups): Promise<void> {
     throw new Error("本地分组保存或核对未完成，可能已保存；请刷新核对后再操作。");
   }
 }
+/** Read an existing group snapshot without creating or migrating any data. */
+export async function peekLocalStarGroups(owner: string): Promise<LocalStarGroups | null> {
+  if (!owner || typeof chrome === 'undefined' || !chrome.storage?.local) return null;
+  const key = keyFor(owner);
+  const stored = await chrome.storage.local.get(key);
+  return stored[key] === undefined ? null : decode(stored[key], owner);
+}
 export async function loadLocalStarGroups(owner: string, seed?: LocalGroupSeed): Promise<LocalStarGroups> {
   return exclusive(owner, () => readOrSeed(owner, seed));
 }

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { loadTsModule } from './helpers/load-ts.mjs';
-const { loadOwnRepositorySnapshot } = await loadTsModule('src/multica/github-resources.ts');
+const { loadOwnRepositorySnapshot, loadStarRepositorySnapshot } = await loadTsModule('src/multica/github-resources.ts');
 const { repositoriesInBoard } = await loadTsModule('src/multica/board-filters.ts');
 const repo = (id,name,privateValue=false) => ({id,name,full_name:`owner/${name}`,private:privateValue,fork:false});
 
@@ -19,6 +19,15 @@ test('loads repositories and groups without writing or inferring classifications
     assert.deepEqual(repositoriesInBoard(result.repos,result.repoGroupsMap,'ungrouped').map(r=>r.name),['b']);
     assert.deepEqual(repositoriesInBoard(result.repos,result.repoGroupsMap,'group:分类').map(r=>r.name),['a']);
   } finally { globalThis.chrome=originalChrome; globalThis.fetch=originalFetch; }
+});
+
+test('loads starred repositories and existing local groups without opening GitHub or writing storage', async () => {
+  const originalChrome=globalThis.chrome, originalFetch=globalThis.fetch;
+  const data={ghUser:'owner',ghToken:'', 'ghLocalStarGroupsV1:user:owner':{version:1,owner:'user:owner',groups:[{id:'g',name:'AI'}],memberships:{'owner/a':['g']}}};
+  globalThis.chrome={storage:{local:{async get(keys) { return Object.fromEntries((Array.isArray(keys)?keys:[keys]).map(key=>[key,data[key]])); }, async set(){throw Error('unexpected write');}}}};
+  let calls=0;
+  globalThis.fetch=async url=>{calls++;assert.match(String(url),/users\/owner\/starred/);return calls===1?Response.json([repo(1,'a')],{headers:{link:'<https://api.github.com/next>; rel="next"'}}):Response.json([repo(2,'b')]);};
+  try {const result=await loadStarRepositorySnapshot(new AbortController().signal);assert.equal(calls,2);assert.equal(result.repos.length,2);assert.equal(result.lists[0].name,'AI');assert.deepEqual(result.repoListNames.get('owner/a'),['AI']);assert.equal(result.warning,'');} finally {globalThis.chrome=originalChrome;globalThis.fetch=originalFetch;}
 });
 
 test('failed or changed account does not produce an empty successful snapshot', async () => {

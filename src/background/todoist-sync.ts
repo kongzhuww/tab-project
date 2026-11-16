@@ -4,7 +4,7 @@
  * 作用：
  * 1. 周期性（每 15 分钟）静默拉取 Todoist 最新快照并写入 chrome.storage.local
  * 2. 在浏览器启动 (onStartup) 或扩展安装 (onInstalled) 时静默预取一次
- * 3. 使前端打开 Todoist 时永远能 0ms 呈现最新鲜的任务数据，彻底消除全屏转圈等待
+ * 3. 为前端准备缓存，减少打开工作区时的等待；数据新鲜度取决于同步结果
  */
 
 import { todoistService } from "../services/todoist.service";

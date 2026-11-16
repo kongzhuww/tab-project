@@ -1,7 +1,7 @@
 /**
  * OPFS (Origin Private File System) 活跃壁纸静默存储管线
- * 解决浏览器重启后 showDirectoryPicker 句柄断连需二次授权问题
- * 确保当前正在使用的壁纸 100% 零弹窗、零授权、冷启动瞬时秒读
+ * 在浏览器支持 OPFS 时缓存活跃壁纸，减少对原目录句柄的依赖。
+ * 存储或读取仍可能因配额、权限和浏览器状态失败。
  */
 
 export interface OpfsFileEntry {
@@ -57,8 +57,7 @@ async function getOrCreateSubdir(
 }
 
 /**
- * 将当前活跃壁纸打包并持久化写入 OPFS 私有文件系统
- * 此后无论关机重启、重开浏览器，均可 100% 静默读取，永不弹窗
+ * 尝试将当前活跃壁纸打包写入 OPFS，返回值表示写入是否成功。
  */
 export async function saveActiveWallpaperToOpfs(pack: {
   type: "web" | "video" | "scene" | "image";

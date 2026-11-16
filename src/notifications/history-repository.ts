@@ -8,7 +8,7 @@ let queue: Promise<unknown> = Promise.resolve();
  * 无论是主屏界面还是 Background Service Worker，均可通过此函数操作，自带安全格式化与并发队列保护。
  */
 export function notificationHistoryOperation(action: 'list' | 'append' | 'read-all' | 'read' | 'remove' | 'clear', payload?: unknown): Promise<HistorySnapshot> {
-  const operation = queue.then(async () => {
+  const run = async () => {
     if (typeof chrome === 'undefined' || !chrome.storage?.local) {
       throw new Error('Chrome storage API unavailable');
     }
@@ -47,8 +47,14 @@ export function notificationHistoryOperation(action: 'list' | 'append' | 'read-a
     snapshot.version++;
     await chrome.storage.local.set({ [NOTIFICATION_HISTORY_KEY]: snapshot });
     return snapshot;
+  };
+  // UI pages and the background worker have separate module queues.
+  const operation: Promise<HistorySnapshot> = queue.then(async () => {
+    if (typeof navigator !== 'undefined' && navigator.locks) {
+      return await navigator.locks.request('tab-project:notification-history', async () => await run());
+    }
+    return await run();
   });
-
   queue = operation.catch(() => {});
   return operation;
 }

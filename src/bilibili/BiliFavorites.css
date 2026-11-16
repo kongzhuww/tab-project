@@ -616,7 +616,7 @@
 .fo-bili-loading { display:flex;min-height:360px;align-items:center;justify-content:center;gap:10px;color:var(--muted);font-size:12px; }
 .fo-bili-loading i { width:18px;height:18px;border:2px solid var(--border);border-top-color:#00aeec;border-radius:50%;animation:fo-bili-spin .8s linear infinite; }
 @keyframes fo-bili-spin { to { transform:rotate(360deg); } }
-.fo-bili-layout { display:grid;min-height:560px;grid-template-columns:210px minmax(0,1fr);border:1px solid var(--border);border-radius:14px;background:color-mix(in srgb,var(--panel) 95%,transparent);overflow:hidden; }
+.fo-bili-layout { display:grid;min-height:560px;grid-template-columns:var(--workspace-sidebar-width,210px) minmax(0,1fr);border:1px solid var(--border);border-radius:14px;background:color-mix(in srgb,var(--panel) 95%,transparent);overflow:hidden; }
 .fo-bili-sidebar { min-width:0;padding:14px 10px;border-right:1px solid var(--border);background:color-mix(in srgb,var(--surface) 68%,transparent);display:flex;flex-direction:column;height:100%;min-height:0;overflow:hidden; }
 .fo-bili-sidebar>header { display:flex;align-items:center;gap:10px;padding:6px 8px 14px;color:var(--heading); }
 .fo-bili-sidebar>header>div { display:grid;min-width:0;flex:1;gap:2px; }
@@ -980,7 +980,7 @@
 .fo-feed-layout .fo-bili-grid { flex:1;align-content:start; }
 .fo-feed-hero-title { display:flex;align-items:center;gap:10px; }
 .fo-feed-badge { display:inline-block;padding:2px 8px;border-radius:999px;background:rgba(0,174,236,.12);color:#00aeec;font-size:10px;font-weight:600; }
-@media(max-width:900px){.fo-bili-layout{grid-template-columns:175px minmax(0,1fr)}.fo-bili-main{padding-inline:13px}.fo-bili-grid{grid-template-columns:repeat(auto-fill,minmax(145px,1fr))}.fo-bili-hero{grid-template-columns:58px minmax(0,1fr)}.fo-bili-cover{width:58px;height:46px}.fo-bili-actions{grid-column:1/-1}.fo-bili-search input{width:130px}}
+@media(max-width:900px){.fo-bili-layout{grid-template-columns:var(--workspace-sidebar-compact-width,175px) minmax(0,1fr)}.fo-bili-main{padding-inline:13px}.fo-bili-grid{grid-template-columns:repeat(auto-fill,minmax(145px,1fr))}.fo-bili-hero{grid-template-columns:58px minmax(0,1fr)}.fo-bili-cover{width:58px;height:46px}.fo-bili-actions{grid-column:1/-1}.fo-bili-search input{width:130px}}
 @media(max-width:620px){.fo-bili-layout{display:block}.fo-bili-sidebar{border-right:0;border-bottom:1px solid var(--border)}.fo-bili-folder-list{display:flex;overflow-x:auto}.fo-bili-group-label,.fo-bili-group-caption{display:none}.fo-bili-folder{min-width:145px}.fo-bili-toolbar{align-items:stretch;flex-direction:column}.fo-bili-search{margin-left:0}.fo-bili-search input{width:100%;flex:1}.fo-bili-batch-actions{margin-left:0;overflow-x:auto}.fo-bili-batch-actions button{flex:none}.fo-bili-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 
 /* 统一侧边栏快捷频道折叠条（B站与 GitHub 全景通用） */
@@ -1057,15 +1057,9 @@
 }
 
 /* B站收藏夹侧边栏：订阅视频（刹那观察室）入口按钮 */
-.fo-sidebar-sub-wrap { padding:0 4px 10px;margin-bottom:8px;border-bottom:1px solid var(--border); }
-.fo-sidebar-sub-btn { display:flex;align-items:center;justify-content:space-between;width:100%;padding:8px 10px;border:1px solid rgba(0,174,236,.28);border-radius:9px;background:linear-gradient(135deg,rgba(0,174,236,.12),rgba(0,174,236,.04));color:var(--heading);cursor:pointer;transition:all .2s ease;text-align:left;box-sizing:border-box; }
+.fo-sidebar-sub-btn { border:1px solid rgba(0,174,236,.28);background:linear-gradient(135deg,rgba(0,174,236,.12),rgba(0,174,236,.04));color:var(--heading); }
 .fo-sidebar-sub-btn:hover { background:linear-gradient(135deg,rgba(0,174,236,.22),rgba(0,174,236,.08));border-color:#00aeec;transform:translateY(-1px);box-shadow:0 4px 12px rgba(0,174,236,.15); }
-.fo-sidebar-sub-main { display:flex;align-items:center;gap:8px;min-width:0; }
-.fo-sidebar-sub-icon { font-size:16px;line-height:1;flex-shrink:0; }
-.fo-sidebar-sub-text { display:flex;flex-direction:column;min-width:0;gap:1px; }
-.fo-sidebar-sub-text strong { font-size:12px;font-weight:600;color:var(--heading);line-height:1.2; }
-.fo-sidebar-sub-text small { font-size:9.5px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
-.fo-sidebar-sub-badge { font-size:9px;font-weight:700;padding:2px 6px;border-radius:999px;background:#00aeec;color:#fff;letter-spacing:.5px;flex-shrink:0; }
+.fo-sidebar-sub-badge { background:#00aeec; }
 .fo-sidebar-sub-btn.on { background:#00aeec !important;color:#fff !important;box-shadow:0 4px 14px rgba(0,174,236,.35) !important;border-color:#00aeec !important; }
 .fo-sidebar-sub-btn.on .fo-sidebar-sub-text strong,.fo-sidebar-sub-btn.on .fo-sidebar-sub-text small,.fo-sidebar-sub-btn.on .fo-sidebar-sub-badge { color:#fff !important; }
 .fo-sidebar-cache-wrap { margin-top:-3px; }
@@ -2143,7 +2137,7 @@ html[data-theme="dark"] .bili-speed-check { color: #38bdf8; }
 .bili-mini-dock { position:absolute;z-index:1000;display:flex;height:36px;align-items:flex-end;gap:3px;padding:0 2px;overflow-x:auto;overflow-y:hidden;box-sizing:border-box;pointer-events:auto;scrollbar-width:none; }
 .bili-mini-dock[hidden] { display:none!important; }
 .fo-mini-dock-anchor .bili-mini-dock { position:relative!important;inset:auto!important;left:auto!important;top:auto!important;width:100%!important;height:100%!important;z-index:2!important; }
-/* 只有当 daily-bilibili 处于全屏激活卡片状态时，bili-mini-dock 才能显示，防止切换至 GitHub、YouTube 或返回首页时残留 */
+/* 仅在 B 站工作区全屏激活时显示迷你播放器的 Dock。 */
 body:not(.has-card-fullscreen) .bili-mini-dock,
 body:not(:has(#daily-bilibili.card-fullscreen)) .bili-mini-dock {
   display: none !important;
@@ -3591,7 +3585,7 @@ body.has-card-fullscreen .topbar {
   pointer-events: none !important;
 }
 
-/* 全屏卡片激活时，底层兄弟卡片（如 YouTube、AI HOT、定价等）全部彻底隐形，绝不产生界面一闪而过 */
+/* 全屏卡片激活时隐藏未激活的兄弟卡片。 */
 body.has-card-fullscreen #daily-section > :not(:has(.card-fullscreen)):not(.card-fullscreen) {
   display: none !important;
 }
@@ -3755,7 +3749,7 @@ body.has-card-fullscreen .card.card-fullscreen:hover {
   min-height: 0;
   height: 100%;
   display: grid;
-  grid-template-columns: 220px minmax(0, 1fr);
+  grid-template-columns: var(--workspace-sidebar-fullscreen-width, 220px) minmax(0, 1fr);
   border-radius: 12px;
   overflow: hidden !important;
 }

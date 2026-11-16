@@ -31,7 +31,7 @@ async function remove() {
 <template>
   <div class="settings-overlay" @click.self="!busy && emit('close')" @keydown.esc.stop="!busy && emit('close')">
     <section class="settings-dialog" role="dialog" aria-modal="true" aria-labelledby="ai-settings-title">
-      <aside class="nav"><div class="nav-heading"><span>✦</span><div><strong>AI 工作台</strong><small>服务与连接设置</small></div></div><p>服务提供商</p><button type="button" :disabled="busy" :class="{selected:tab==='deepseek'}" @click="tab='deepseek'"><span class="provider-icon">D</span> DeepSeek <i>API</i></button><button type="button" :disabled="busy" :class="{selected:tab==='multica'}" @click="tab='multica'"><span class="provider-icon multica">✦</span> Multica <i>工作区</i></button><small class="nav-foot">后续将支持更多厂商</small></aside>
+      <aside class="nav"><div class="nav-heading"><span>✦</span><div><strong>AI 工作区</strong><small>服务与连接设置</small></div></div><p>服务提供商</p><button type="button" :disabled="busy" :class="{selected:tab==='deepseek'}" @click="tab='deepseek'"><span class="provider-icon">D</span> DeepSeek <i>API</i></button><button type="button" :disabled="busy" :class="{selected:tab==='multica'}" @click="tab='multica'"><span class="provider-icon multica">✦</span> Multica <i>工作区</i></button><small class="nav-foot">后续将支持更多厂商</small></aside>
       <main><header><div><small>服务设置 / {{ tab === 'deepseek' ? 'DeepSeek' : 'Multica' }}</small><h2 id="ai-settings-title">{{ tab === 'deepseek' ? 'DeepSeek API' : 'Multica 连接' }}</h2></div><button class="close" type="button" :disabled="busy" aria-label="关闭设置" @click="emit('close')">✕</button></header>
         <template v-if="tab === 'deepseek'">
           <p class="intro">使用自己的 API Key 直接连接 DeepSeek。对话独立于 Multica，不具备文件或命令操作能力。</p>

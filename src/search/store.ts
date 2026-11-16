@@ -74,7 +74,7 @@ export const SEARCH_MODE_METAS: Record<SearchMode, {
     iconText: "⌕"
   },
   bilibili: {
-    placeholder: "搜索 B站 视频、UP主、番剧…（回车在 B站 打开）",
+    placeholder: "搜索 B站视频…（回车在插件内查看）",
     title: "当前为 B站 搜索，点击切换为 GitHub 仓库搜索",
     iconSrc: "assets/bilibili.svg",
     iconText: ""
@@ -86,7 +86,7 @@ export const SEARCH_MODE_METAS: Record<SearchMode, {
     iconText: ""
   },
   netease: {
-    placeholder: "搜索网易云音乐歌曲、歌手…（回车搜索，点击播放）",
+    placeholder: "搜索网易云音乐歌曲、歌手…（回车在插件内搜索）",
     title: "当前为网易云音乐搜索，点击切换为企查查企业搜索",
     iconSrc: "assets/netease.svg",
     iconText: ""

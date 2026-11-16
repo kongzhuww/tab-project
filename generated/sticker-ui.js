@@ -1,8 +1,8 @@
-import { d as F, B as M, x as P, o as n, e as a, i as o, f as d, p as v, t as h, F as g, g as V, u as b, A as z, C as w, b as p, c as D } from "./chunks/vendor-vue-BkY5-p5y.js";
-import { S as L } from "./chunks/StickerBoard-BZGARh75.js";
-import { a as f, w as $ } from "./chunks/stickers.service-CLmzoD5s.js";
+import { d as D, B as F, x as M, o as n, e as a, i as o, f as d, p as v, t as h, F as g, g as P, u as b, A as V, D as w, b as p, c as z } from "./chunks/vendor-vue-C09jaOfK.js";
+import { S as L } from "./chunks/StickerBoard-BoyQDzab.js";
+import { a as f, w as $ } from "./chunks/stickers.service-BVu9MhEk.js";
 import { g as y, i as S, s as H } from "./chunks/quick-links-export.service-bmE4-0fH.js";
-import { _ as Q } from "./chunks/_plugin-vue_export-helper-Bz4EjXjr.js";
+import { _ as Q } from "./chunks/_plugin-vue_export-helper-BTb4PcVA.js";
 const U = { class: "sticker-app" }, j = {
   key: 0,
   class: "sticker-side-nav"
@@ -15,19 +15,19 @@ const U = { class: "sticker-app" }, j = {
 }, J = { class: "sticker-page-grid" }, K = {
   key: 0,
   class: "sticker-empty"
-}, O = ["title", "onClick"], R = ["src"], X = ["hidden"], Y = /* @__PURE__ */ F({
+}, O = ["title", "onClick"], R = ["src"], X = ["hidden"], Y = /* @__PURE__ */ D({
   __name: "StickerStandalone",
   setup(tt) {
-    const T = w(() => import("./chunks/SettingsDialog-DO4yS8Y1.js")), B = w(() => import("./chunks/AppPromptModal-B2uejygF.js")), k = document.body.dataset.mode === "sidepanel", l = p([]), i = p("等待扫描"), u = p(""), _ = p(!1);
+    const T = w(() => import("./chunks/SettingsDialog-Bfuz8wlC.js")), B = w(() => import("./chunks/AppPromptModal-Cd7woz49.js")), k = document.body.dataset.mode === "sidepanel", l = p([]), i = p("等待扫描"), u = p(""), _ = p(!1);
     let m = 0;
     function r(s, e = !1) {
       u.value = s, _.value = e, clearTimeout(m), m = window.setTimeout(() => {
         u.value = "";
       }, 2800);
     }
-    M(() => {
+    F(() => {
       f.onToast = r;
-    }), P(() => {
+    }), M(() => {
       f.onToast = void 0, clearTimeout(m);
     });
     function A() {
@@ -101,7 +101,7 @@ const U = { class: "sticker-app" }, j = {
           ]),
           o("div", J, [
             i.value.endsWith("0 张 · 点击保存") ? (n(), a("div", K, "当前页面没有可收集的图片")) : d("", !0),
-            (n(!0), a(g, null, V(l.value, (t) => (n(), a("button", {
+            (n(!0), a(g, null, P(l.value, (t) => (n(), a("button", {
               key: t.url,
               type: "button",
               class: "sticker-page-image",
@@ -122,10 +122,10 @@ const U = { class: "sticker-app" }, j = {
       v(b(B)),
       o("div", {
         id: "sticker-toast",
-        class: z(["sticker-toast", { bad: _.value }]),
+        class: V(["sticker-toast", { bad: _.value }]),
         hidden: !u.value
       }, h(u.value), 11, X)
     ], 64));
   }
 }), Z = /* @__PURE__ */ Q(Y, [["__scopeId", "data-v-7b038dbe"]]), C = document.getElementById("vue-sticker-standalone-root");
-C && D(Z).mount(C);
+C && z(Z).mount(C);

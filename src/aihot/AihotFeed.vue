@@ -515,6 +515,7 @@ function handleSelectDailyDate(date: string) {
             </button>
           </div>
 
+          <p v-if="state.dailyArchiveWarning" class="muted small" role="status">{{ state.dailyArchiveWarning }}</p>
           <p v-if="!state.dailyReport && !state.isLoading" class="muted small">暂无当日日报内容。</p>
           <!-- 导语头条 -->
           <div class="aihot-daily-lead" v-if="state.dailyReport">
@@ -536,9 +537,10 @@ function handleSelectDailyDate(date: string) {
             >
               {{ state.dailyReport.leadTitle }}
             </p>
-            <p style="line-height:1.6">
-              {{ state.dailyReport.leadParagraph || "每天早晨精编汇总过去 24 小时 AI 行业的重大发布、算力生态与前沿突破。" }}
+            <p v-if="state.dailyReport.leadParagraph" style="line-height:1.6">
+              {{ state.dailyReport.leadParagraph }}
             </p>
+            <p v-else-if="!state.dailyReport.sections.length" class="muted small">官方本期暂无更多内容。</p>
           </div>
 
           <!-- 各分组列表 -->
@@ -571,9 +573,6 @@ function handleSelectDailyDate(date: string) {
             </div>
           </div>
 
-          <p class="muted small" v-if="!state.dailyReport">
-            暂无官方日报内容。
-          </p>
         </div>
       </div>
       </main>

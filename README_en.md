@@ -33,7 +33,7 @@
 >
 > Store installations do not require Developer mode and benefit from browser-managed automated updates. Each new release requires store review; store updates may lag slightly behind GitHub commits and releases.
 
-> **Repository Version**: **1.0.22**, adding a prompt backpack, AI workspace, and encrypted WebDAV backup safeguards, plus AI Hot and theme updates. Store versions may lag behind GitHub Releases. See the [Changelog](CHANGELOG.md).
+> **Repository Version**: **1.0.23**, improving AI workspace scheduling, notifications, resource browsing, Todoist integration and search. Store versions may lag behind GitHub Releases. See the [Changelog](CHANGELOG.md).
 
 ---
 

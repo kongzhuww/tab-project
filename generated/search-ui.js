@@ -1,6 +1,6 @@
-import { d as w, b as d, B as b, D as _, x as k, o as y, e as S, i as t, t as a, m as E, h as D, p as x, E as $, F as B, s as c, c as C } from "./chunks/vendor-vue-BkY5-p5y.js";
-import { S as L, i as T } from "./chunks/SearchBox-BEPEbzLb.js";
-import { s as H } from "./chunks/search.service-DF5Rt2Wp.js";
+import { d as w, b as d, B as b, E as _, x as k, o as y, e as S, i as t, t as a, m as E, h as x, p as D, G as $, F as B, s as c, c as C } from "./chunks/vendor-vue-C09jaOfK.js";
+import { S as L, i as T } from "./chunks/SearchBox-BSaJNdli.js";
+import { s as H } from "./chunks/search.service-Dzs18alc.js";
 const I = { class: "sub-newtab-topbar" }, M = { class: "sub-newtab-center" }, N = { class: "hero-clock" }, V = { id: "greeting" }, F = {
   id: "clock",
   class: "clock"
@@ -9,7 +9,7 @@ const I = { class: "sub-newtab-topbar" }, M = { class: "sub-newtab-center" }, N 
   class: "date"
 }, P = /* @__PURE__ */ w({
   __name: "SearchLauncher",
-  setup(U) {
+  setup(G) {
     const o = d(/* @__PURE__ */ new Date()), n = d(document.documentElement.dataset.theme || "light");
     let l = 0;
     const m = c(() => {
@@ -56,10 +56,10 @@ const I = { class: "sub-newtab-topbar" }, M = { class: "sub-newtab-center" }, N 
         t("form", {
           id: "search",
           class: "search",
-          onSubmit: s[0] || (s[0] = D(() => {
+          onSubmit: s[0] || (s[0] = x(() => {
           }, ["prevent"]))
         }, [
-          x(L)
+          D(L)
         ], 32)
       ]),
       t("aside", { class: "enter-home-dock" }, [
