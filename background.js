@@ -748,7 +748,7 @@ async function validateImagePixels(buffer, mime) {
   }
 }
 
-// ../../../node_modules/@vue/shared/dist/shared.esm-bundler.js
+// node_modules/@vue/shared/dist/shared.esm-bundler.js
 // @__NO_SIDE_EFFECTS__
 function makeMap(str) {
   const map2 = /* @__PURE__ */ Object.create(null);
@@ -830,7 +830,7 @@ var isBooleanAttr = /* @__PURE__ */ makeMap(
   specialBooleanAttrs + `,async,autofocus,autoplay,controls,default,defer,disabled,inert,loop,open,required,reversed,scoped,seamless,checked,muted,multiple,selected`
 );
 
-// ../../../node_modules/@vue/reactivity/dist/reactivity.esm-bundler.js
+// node_modules/@vue/reactivity/dist/reactivity.esm-bundler.js
 function warn(msg, ...args) {
   console.warn(`[Vue warn] ${msg}`, ...args);
 }
@@ -2280,7 +2280,7 @@ function traverse(value, depth = Infinity, seen) {
   return value;
 }
 
-// ../../../node_modules/@vue/runtime-core/dist/runtime-core.esm-bundler.js
+// node_modules/@vue/runtime-core/dist/runtime-core.esm-bundler.js
 var stack = [];
 function pushWarningContext(vnode) {
   stack.push(vnode);
@@ -3611,7 +3611,7 @@ function initCustomFormatter() {
   }
 }
 
-// ../../../node_modules/vue/dist/vue.runtime.esm-bundler.js
+// node_modules/vue/dist/vue.runtime.esm-bundler.js
 function initDev() {
   {
     initCustomFormatter();
