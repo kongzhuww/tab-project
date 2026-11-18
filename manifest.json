@@ -3,7 +3,7 @@
   "minimum_chrome_version": "120",
   "default_locale": "zh_CN",
   "name": "__MSG_extName__",
-  "version": "1.0.23",
+  "version": "1.0.24",
   "description": "__MSG_extDescription__",
   "chrome_url_overrides": {
     "newtab": "newtab-bootstrap.html"
@@ -29,7 +29,8 @@
     "notifications",
     "downloads",
     "contextMenus",
-    "clipboardWrite"
+    "clipboardWrite",
+    "nativeMessaging"
   ],
   "host_permissions": [
     "https://*/*",

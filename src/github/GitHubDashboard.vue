@@ -3,7 +3,6 @@ import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { loadGitHubAccountSettings } from "./account-settings";
 import { createGitHubReadHeaders, readGitHubJson } from "./api-client";
 import { githubRepoDetailController } from "./repo-detail-store";
-import { multicaService, type MulticaIssue } from "../services/multica.service";
 import { loadConversations } from "../services/byok.service";
 import { requestAiConversation, requestAiDraft } from "../multica/workspace-bridge";
 import { openRegisteredCard } from "../core/fullscreen-card-state";
@@ -15,7 +14,7 @@ const props = defineProps<{ active: boolean; accountRevision: number; showResult
 const emit = defineEmits<{ channel: [name: "stars" | "repos" | "trending"]; settings: [anchor: HTMLElement]; notifications: [] }>();
 type Repo = { full_name: string; description?: string; language?: string; stargazers_count?: number; forks_count?: number; updated_at?: string };
 type Pull = { number: number; title: string; html_url: string; updated_at?: string; comments?: number; repository_url?: string };
-type Session = { kind: "multica"; id: string; title: string; updated: number; issue: MulticaIssue } | { kind: "deepseek"; id: string; title: string; updated: number; model: string };
+type Session = { kind: "deepseek"; id: string; title: string; updated: number; model: string };
 const username = ref("");
 const input = ref("");
 const repoPickerOpen = ref(false), repoPickerLoading = ref(false), repoPickerError = ref(""), repoPickerWarning = ref("");
@@ -70,18 +69,22 @@ async function load(): Promise<void> {
   accountError.value = ""; reposError.value = ""; pullsError.value = ""; sessionsError.value = "";
   githubLoading.value = true; sessionLoading.value = true;
   void (async () => {
-    const [local, remote] = await Promise.allSettled([
-      loadConversations(),
-      (async () => await multicaService.isConnected() ? await multicaService.issues() : [])()
-    ]);
-    if (!alive()) return;
-    const list: Session[] = [];
-    if (local.status === "fulfilled") for (const chat of local.value) list.push({ kind: "deepseek", id: chat.id, title: chat.title || "未命名对话", updated: Number(chat.updatedAt) || 0, model: chat.model });
-    if (remote.status === "fulfilled") for (const issue of remote.value) list.push({ kind: "multica", id: issue.id, title: issue.title || "未命名会话", updated: Date.parse(issue.updated_at || "") || 0, issue });
-    const failures = [local.status === "rejected" ? "DeepSeek 本机会话读取失败" : "", remote.status === "rejected" ? "Multica 会话读取失败" : ""].filter(Boolean);
-    sessionsError.value = failures.join("；");
-    sessions.value = list.sort((a, b) => b.updated - a.updated).slice(0, 4);
-    sessionLoading.value = false;
+    try {
+      const local = await loadConversations();
+      if (!alive()) return;
+      const list: Session[] = local.map(chat => ({
+        kind: "deepseek",
+        id: chat.id,
+        title: chat.title || "未命名对话",
+        updated: Number(chat.updatedAt) || 0,
+        model: chat.model
+      }));
+      sessions.value = list.sort((a, b) => b.updated - a.updated).slice(0, 4);
+    } catch {
+      if (alive()) sessionsError.value = "DeepSeek 本机会话读取失败";
+    } finally {
+      if (alive()) sessionLoading.value = false;
+    }
   })();
   try {
     const account = await loadGitHubAccountSettings();
@@ -122,8 +125,7 @@ function openDraft(): void {
   openRegisteredCard("multica");
 }
 function openSession(item: Session): void {
-  if (item.kind === "deepseek") requestAiConversation("deepseek", item.id);
-  else requestAiConversation("multica", item.issue);
+  requestAiConversation("deepseek", item.id);
   openRegisteredCard("multica");
 }
 function openAi(): void { openRegisteredCard("multica"); }
@@ -143,11 +145,11 @@ function repoNameFromPull(pull: Pull): string { const url = safePullUrl(pull.htm
           <div class="composer-bottom"><div class="composer-left"><div class="repo-picker-anchor"><button type="button" class="repo-picker-toggle" :aria-expanded="repoPickerOpen" @click="toggleRepoPicker">⌘ {{ selectedRepo ? selectedRepo.fullName : '选择仓库' }} ▾</button><div v-if="repoPickerOpen" class="repo-picker"><div class="repo-picker-head"><strong>选择我的仓库</strong><button type="button" title="刷新仓库" :disabled="repoPickerLoading" @click="loadOwnRepos">↻</button></div><input v-model="repoQuery" placeholder="搜索仓库名称…" aria-label="搜索我的仓库" /><p v-if="repoPickerLoading" class="repo-picker-hint">正在读取仓库…</p><p v-else-if="repoPickerError" class="repo-picker-hint" role="alert">{{ repoPickerError }} <button type="button" @click="loadOwnRepos">重试</button></p><p v-if="repoPickerWarning" class="repo-picker-hint">{{ repoPickerWarning }}</p><div class="repo-picker-list"><button v-for="repo in filteredOwnRepos" :key="repo.fullName" type="button" @click="chooseRepo(repo)"><span>{{ repo.fullName }}</span><small>{{ repo.isPrivate ? '私有' : '公开' }}</small></button><p v-if="!repoPickerLoading && !repoPickerError && !filteredOwnRepos.length" class="repo-picker-hint">没有找到仓库。</p></div><button v-if="selectedRepo" type="button" class="repo-picker-clear" @click="selectedRepo = null; repoPickerOpen = false">不选择仓库</button><p class="repo-picker-hint">仅附带仓库链接与简介；发送时会共享所选信息，README 需手动读取。</p></div></div><span>✳ &nbsp;AI 工作区 <small>· 不会自动发送</small></span></div><button type="button" :disabled="!input.trim()" @click="openDraft">继续到 AI 工作区 <span>↗</span></button></div>
         </div>
         <section class="dashboard-section">
-          <div class="section-heading"><div><h3>最近会话</h3><small>Multica 与 DeepSeek</small></div><button type="button" @click="openAi">查看全部 <span>→</span></button></div>
+          <div class="section-heading"><div><h3>最近会话</h3><small>DeepSeek 本机记录</small></div><button type="button" @click="openAi">查看全部 <span>→</span></button></div>
           <div class="dashboard-list">
             <p v-if="sessionLoading" class="empty">正在读取会话…</p>
             <p v-else-if="!sessions.length" class="empty">暂无可显示的会话，打开 AI 工作区开始对话。</p>
-            <button v-for="session in sessions" :key="`${session.kind}:${session.id}`" type="button" class="list-row" @click="openSession(session)"><span class="status-dot"></span><span class="row-copy"><strong>{{ session.title }}</strong><small>{{ session.kind === 'multica' ? 'Multica' : 'DeepSeek · ' + session.model }}<template v-if="session.updated"> · {{ relativeTime(session.updated) }}</template></small></span><span class="row-arrow">↗</span></button>
+            <button v-for="session in sessions" :key="`${session.kind}:${session.id}`" type="button" class="list-row" @click="openSession(session)"><span class="status-dot"></span><span class="row-copy"><strong>{{ session.title }}</strong><small>DeepSeek · {{ session.model }}<template v-if="session.updated"> · {{ relativeTime(session.updated) }}</template></small></span><span class="row-arrow">↗</span></button>
             <p v-if="sessionsError" class="inline-error">{{ sessionsError }}</p>
           </div>
         </section>

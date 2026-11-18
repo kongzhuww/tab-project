@@ -1,5 +1,5 @@
-import { c as i } from "./chunks/vendor-vue-C09jaOfK.js";
-import { S as a } from "./chunks/SidePanelApp-DV3E5FFY.js";
+import { c as i } from "./chunks/vendor-vue-BrDsOMg2.js";
+import { S as a } from "./chunks/SidePanelApp-JcuAAA2c.js";
 /* empty css                       */
 async function s() {
   const e = document.getElementById("vue-sidepanel-root");

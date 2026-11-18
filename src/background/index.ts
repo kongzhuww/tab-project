@@ -29,8 +29,8 @@ import { handleSearchWebImages, handleFetchSiteImages } from "./image-proxy";
 import { acquireImageSlot, fetchImageBytes, mediaUrl, MAX_IMAGE_BYTES, MAX_IMAGE_PIXELS, validateImagePixels } from "./media-fetch";
 import { initTodoistBackgroundSync, syncTodoistInBackground } from "./todoist-sync";
 import { initWebSideDrawer, toggleWebSideDrawer } from "./web-side-drawer";
-import { initAiTaskTracker } from "./ai-task-tracker";
 import { initAiScheduler } from "./ai-scheduler";
+import { initEmployeeWorker } from "./employee-worker";
 
 declare const chrome: any;
 
@@ -38,8 +38,8 @@ declare const chrome: any;
 initBilibiliNetRules();
 initNotificationListeners();
 initTodoistBackgroundSync();
-initAiTaskTracker();
 initAiScheduler();
+initEmployeeWorker();
 // Retire persisted alarms from the removed mail/social feeds. Never clear other modules.
 for (const name of ["gmail-inbox-poll", "x-account-poll"]) {
   chrome.alarms.clear(name).catch(() => console.warn("[Migration] Could not clear retired feed alarm"));
@@ -340,6 +340,24 @@ chrome.runtime.onMessage.addListener((message: any, sender: any, sendResponse: (
         sendResponse({ ok: false, error: error instanceof Error ? error.message : "图片读取失败" });
       } finally { release?.(); }
     })();
+    return true;
+  }
+
+  // L. 本机 Native Messaging 代理（供扩展页面在未直接暴露 sendNativeMessage 时走后台 Service Worker 调用）
+  if (message?.type === "native-bridge:send") {
+    const hostName = typeof message?.hostName === "string" ? message.hostName : "";
+    const payload = message?.payload;
+    if (!hostName || !payload || typeof payload !== "object") {
+      sendResponse({ ok: false, error: "无效的 Native Messaging 请求" });
+      return false;
+    }
+    if (typeof chrome.runtime?.sendNativeMessage !== "function") {
+      sendResponse({ ok: false, error: "UNSUPPORTED_CONTEXT" });
+      return false;
+    }
+    chrome.runtime.sendNativeMessage(hostName, payload)
+      .then((response: unknown) => sendResponse({ ok: true, response }))
+      .catch((error: unknown) => sendResponse({ ok: false, error: error instanceof Error ? error.message : String(error || "Native Messaging 调用失败") }));
     return true;
   }
 

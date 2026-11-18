@@ -6,9 +6,10 @@
 
 按用户要求，本仓库不分发 ArkPets、Web Mascot / Shimeji 引擎、Neuro / Evil 角色素材、Spine 运行时或其构建产物。旧文档中的桌宠记录仅用于说明历史，不是这些组件仍被包含的声明，也不为已删除组件重新授予许可。
 
-## 软件依赖
+## 软件依赖与设计借鉴
 
 - **Vue 3 / @vue**：MIT。来源：<https://github.com/vuejs/core>。运行时版权和完整许可保留于 `third_party/vue/LICENSE`。
+- **AGY Claude Style（`0DNANCY/agy-claude-style`）**：MIT（`Copyright (c) 2026 0DNANCY`）。来源：<https://github.com/0DNANCY/agy-claude-style>。本仓库 AI 工作区中的「上下文窗口与 Token 监控」浮窗结构、剩余容量圆环、遥测拆分卡片设计、首页编码矩阵波纹背景与用量热力图面板（`src/multica/ripple-core.ts`、`src/multica/CipherRippleCanvas.vue`、`src/multica/usage-analytics.ts`、`src/multica/HomeUsageCard.vue`），以及衍生自 MIT 许可 `dsh-claude-style` 的像素蟹宠状态机与精灵图（`src/multica/mascot-core.ts`、`src/multica/crab-assets.ts`、`src/multica/ClawdMascot.vue`）均致谢并遵循该 MIT 许可，未引入其 CDP 注入脚本。
 - 其余 npm 依赖与开发工具版本见 `package-lock.json`。本仓库不分发 `node_modules`；其许可证不能被本项目的 MIT 替代。
 
 ## 维护者原创素材声明

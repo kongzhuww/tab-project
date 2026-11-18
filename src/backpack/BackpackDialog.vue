@@ -19,6 +19,7 @@ import {
   allArticleTags
 } from "./article.service";
 import StickerBoard from "../stickers/StickerBoard.vue";
+import MessageMarkdown from "../multica/MessageMarkdown.vue";
 import type { PromptCategory, PromptItem, SavedArticleItem } from "./types";
 
 interface BackpackChannel {
@@ -278,6 +279,12 @@ function handleOpenArticleReader(item: SavedArticleItem) {
   articleService.openReader(item);
 }
 
+function articlePreviewExcerpt(content: string): string {
+  const clean = String(content || "").trim();
+  if (clean.length <= 600) return clean;
+  return `${clean.slice(0, 600)}\n…`;
+}
+
 function handleSubmitArticleEditor() {
   if (!artFormTitle.value.trim() && !artFormContent.value.trim()) return;
   const tags = artFormTagsInput.value.split(/[,，\s]+/).map(t => t.trim()).filter(Boolean);
@@ -380,6 +387,30 @@ function formatDate(ts: number): string {
   const d = new Date(ts);
   return `${d.getMonth() + 1}/${d.getDate()}`;
 }
+
+function formatFullDate(ts?: number): string {
+  if (!ts) return "";
+  const d = new Date(ts);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+function promptCategoryName(categoryId?: string): string {
+  return backpackState.categories.find(c => c.id === categoryId)?.name || "默认分组";
+}
+
+const articleSearchQuery = ref("");
+const displayedArticles = computed(() => {
+  const q = articleSearchQuery.value.trim().toLowerCase();
+  if (!q) return filteredArticles.value;
+  return filteredArticles.value.filter(item =>
+    item.title.toLowerCase().includes(q) ||
+    item.description?.toLowerCase().includes(q) ||
+    item.sourceName?.toLowerCase().includes(q) ||
+    item.content.toLowerCase().includes(q) ||
+    item.tags.some(t => t.toLowerCase().includes(q))
+  );
+});
 </script>
 
 <template>
@@ -398,11 +429,66 @@ function formatDate(ts: number): string {
     @close="handleClose"
     @minimize="handleMinimize"
   >
+    <!-- 嵌入式顶部频道分段切换 -->
+    <template v-if="embedded" #header-tabs>
+      <nav class="bp-seg-tabs" role="tablist" aria-label="资料库频道">
+        <button
+          type="button"
+          role="tab"
+          :aria-selected="activeChannel === 'prompts'"
+          class="bp-seg-tab"
+          :class="{ active: activeChannel === 'prompts' }"
+          @click="switchChannel('prompts')"
+        >
+          <span>提示词</span>
+          <small>{{ backpackState.prompts.length }}</small>
+        </button>
+        <button
+          type="button"
+          role="tab"
+          :aria-selected="activeChannel === 'articles'"
+          class="bp-seg-tab"
+          :class="{ active: activeChannel === 'articles' }"
+          @click="switchChannel('articles')"
+        >
+          <span>文章</span>
+          <small>{{ articleState.articles.length }}</small>
+        </button>
+        <button
+          type="button"
+          role="tab"
+          :aria-selected="activeChannel === 'stickers'"
+          class="bp-seg-tab"
+          :class="{ active: activeChannel === 'stickers' }"
+          @click="switchChannel('stickers')"
+        >
+          <span>表情包</span>
+        </button>
+      </nav>
+    </template>
+
     <!-- 顶栏右侧操作区 -->
     <template #header-actions>
       <div class="bp-top-actions" :class="{ 'bp-integrated': embedded }">
         <!-- 提示词频道动作 -->
         <template v-if="activeChannel === 'prompts'">
+          <label v-if="embedded" class="bp-search-pill">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.45" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="7" cy="7" r="4.6" />
+              <path d="M10.5 10.5L14 14" />
+            </svg>
+            <input v-model="backpackState.searchQuery" type="search" placeholder="搜索提示词…" aria-label="搜索提示词" />
+          </label>
+          <button type="button" class="bp-btn bp-btn-ghost" title="导出备份" @click="backpackService.exportBackup()">
+            <svg v-if="embedded" class="bp-svg-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2.5v7.5M5 7l3 3 3-3M3 11.5v1.3A1.2 1.2 0 0 0 4.2 14h7.6a1.2 1.2 0 0 0 1.2-1.2v-1.3"/></svg>
+            <span v-else class="bp-icon">💾</span>
+            <span>导出</span>
+          </button>
+          <button type="button" class="bp-btn bp-btn-ghost" title="从文件导入" @click="triggerPromptImport">
+            <svg v-if="embedded" class="bp-svg-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 10V2.5M5 5.5l3-3 3 3M3 11.5v1.3A1.2 1.2 0 0 0 4.2 14h7.6a1.2 1.2 0 0 0 1.2-1.2v-1.3"/></svg>
+            <span v-else class="bp-icon">📥</span>
+            <span>导入</span>
+          </button>
           <button
             type="button"
             class="bp-btn bp-btn-primary"
@@ -410,22 +496,32 @@ function formatDate(ts: number): string {
             title="新建提示词"
             @click="handleCreateNewPrompt"
           >
-            <span class="bp-icon">➕</span>
-            <span>新建提示词</span>
-          </button>
-          <button type="button" class="bp-btn bp-btn-ghost" title="导出备份" @click="backpackService.exportBackup()">
-            <span class="bp-icon">💾</span>
-            <span>导出</span>
-          </button>
-          <button type="button" class="bp-btn bp-btn-ghost" title="从文件导入" @click="triggerPromptImport">
-            <span class="bp-icon">📥</span>
-            <span>导入</span>
+            <svg v-if="embedded" class="bp-svg-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M8 3v10M3 8h10"/></svg>
+            <span v-else class="bp-icon">➕</span>
+            <span>{{ embedded ? '新建' : '新建提示词' }}</span>
           </button>
           <input ref="promptFileInputRef" type="file" accept=".json" style="display: none" @change="handlePromptFileChange" />
         </template>
 
         <!-- 文章保存频道动作 -->
         <template v-else-if="activeChannel === 'articles'">
+          <label v-if="embedded" class="bp-search-pill">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.45" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="7" cy="7" r="4.6" />
+              <path d="M10.5 10.5L14 14" />
+            </svg>
+            <input v-model="articleSearchQuery" type="search" placeholder="搜索文章…" aria-label="搜索文章" />
+          </label>
+          <button type="button" class="bp-btn bp-btn-ghost" title="导出文章备份" @click="articleService.exportBackup()">
+            <svg v-if="embedded" class="bp-svg-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2.5v7.5M5 7l3 3 3-3M3 11.5v1.3A1.2 1.2 0 0 0 4.2 14h7.6a1.2 1.2 0 0 0 1.2-1.2v-1.3"/></svg>
+            <span v-else class="bp-icon">💾</span>
+            <span>导出</span>
+          </button>
+          <button type="button" class="bp-btn bp-btn-ghost" title="从文件导入文章" @click="triggerArticleImport">
+            <svg v-if="embedded" class="bp-svg-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 10V2.5M5 5.5l3-3 3 3M3 11.5v1.3A1.2 1.2 0 0 0 4.2 14h7.6a1.2 1.2 0 0 0 1.2-1.2v-1.3"/></svg>
+            <span v-else class="bp-icon">📥</span>
+            <span>导入</span>
+          </button>
           <button
             type="button"
             class="bp-btn bp-btn-primary bp-btn-article-pri"
@@ -433,16 +529,9 @@ function formatDate(ts: number): string {
             title="保存新文章"
             @click="handleCreateNewArticle"
           >
-            <span class="bp-icon">➕</span>
-            <span>新建文章</span>
-          </button>
-          <button type="button" class="bp-btn bp-btn-ghost" title="导出文章备份" @click="articleService.exportBackup()">
-            <span class="bp-icon">💾</span>
-            <span>导出</span>
-          </button>
-          <button type="button" class="bp-btn bp-btn-ghost" title="从文件导入文章" @click="triggerArticleImport">
-            <span class="bp-icon">📥</span>
-            <span>导入</span>
+            <svg v-if="embedded" class="bp-svg-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M8 3v10M3 8h10"/></svg>
+            <span v-else class="bp-icon">➕</span>
+            <span>{{ embedded ? '新建' : '新建文章' }}</span>
           </button>
           <input ref="articleFileInputRef" type="file" accept=".json" style="display: none" @change="handleArticleFileChange" />
         </template>
@@ -459,8 +548,9 @@ function formatDate(ts: number): string {
 
       <!-- 双栏/三栏主工作区 -->
       <div class="bp-work-area">
-        <!-- 1. 左侧频道与分类侧边栏（B 站格式 UI） -->
-        <aside class="bp-bili-sidebar">
+        <!-- 1. 左侧频道与分类侧边栏 -->
+        <aside v-if="!embedded || activeChannel !== 'stickers'" class="bp-bili-sidebar">
+          <template v-if="!embedded">
           <!-- 快捷频道折叠栏 -->
           <div
             class="bp-sidebar-toggle-bar"
@@ -468,7 +558,7 @@ function formatDate(ts: number): string {
             @click="toggleChannels"
           >
             <div class="bp-sidebar-toggle-title">
-              <span v-if="!embedded" class="bp-sidebar-toggle-icon">⚡</span>
+              <span class="bp-sidebar-toggle-icon">⚡</span>
               <strong>快捷频道</strong>
             </div>
             <div class="bp-sidebar-toggle-action">
@@ -492,16 +582,17 @@ function formatDate(ts: number): string {
                 @click="switchChannel(ch.id)"
               >
                 <div class="bp-channel-main">
-                  <span v-if="!embedded" class="bp-channel-icon">{{ ch.icon }}</span>
+                  <span class="bp-channel-icon">{{ ch.icon }}</span>
                   <div class="bp-channel-text">
                     <strong>{{ ch.title }}</strong>
                     <small>{{ ch.subTitle }}</small>
                   </div>
                 </div>
-                <span v-if="!embedded" class="bp-channel-badge">{{ ch.badge }}</span>
+                <span class="bp-channel-badge">{{ ch.badge }}</span>
               </button>
             </div>
           </div>
+          </template>
 
           <!-- A. 提示词分组专属区域 -->
           <template v-if="activeChannel === 'prompts'">
@@ -510,10 +601,10 @@ function formatDate(ts: number): string {
                 <span v-if="!embedded" class="bp-hub-icon">📁</span>
                 <div class="bp-hub-text">
                   <strong>提示词分组</strong>
-                  <small>按自定义分组整理</small>
+                  <small v-if="!embedded">按自定义分组整理</small>
                 </div>
               </div>
-              <button type="button" class="bp-hub-add-btn" title="新增分组" @click="showAddCategoryInput = true">＋</button>
+              <button type="button" class="bp-hub-add-btn" title="新增分组" @click="showAddCategoryInput = true">+</button>
             </div>
 
             <div v-if="showAddCategoryInput" class="bp-add-category-box">
@@ -559,8 +650,14 @@ function formatDate(ts: number): string {
                   <span class="bp-folder-badge" v-else>{{ backpackState.prompts.filter(p => p.category === cat.id).length }}</span>
                 </button>
                 <div v-if="!cat.isBuiltin && editingCategoryId !== cat.id" class="bp-folder-actions">
-                  <button type="button" class="bp-tool-btn" title="重命名" @click.stop="startRenameCategory(cat)">✏️</button>
-                  <button type="button" class="bp-tool-btn danger" title="删除" @click.stop="handleDeleteCategory(cat)">🗑️</button>
+                  <button type="button" class="bp-tool-btn" title="重命名" @click.stop="startRenameCategory(cat)">
+                    <svg v-if="embedded" class="bp-svg-icon-sm" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11.5 2.5l2 2L5 13H3v-2l8.5-8.5z"/></svg>
+                    <template v-else>✏️</template>
+                  </button>
+                  <button type="button" class="bp-tool-btn danger" title="删除" @click.stop="handleDeleteCategory(cat)">
+                    <svg v-if="embedded" class="bp-svg-icon-sm" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 4.5h10M6 4.5V3h4v1.5M5 4.5l.6 8.5h4.8l.6-8.5"/></svg>
+                    <template v-else>🗑️</template>
+                  </button>
                 </div>
               </div>
             </div>
@@ -588,10 +685,10 @@ function formatDate(ts: number): string {
                 <span v-if="!embedded" class="bp-hub-icon">📚</span>
                 <div class="bp-hub-text">
                   <strong>文章分组</strong>
-                  <small>文章多级分类整理</small>
+                  <small v-if="!embedded">文章多级分类整理</small>
                 </div>
               </div>
-              <button type="button" class="bp-hub-add-btn bp-btn-indigo" title="新增文章分组" @click="showAddArticleCatInput = true">＋</button>
+              <button type="button" class="bp-hub-add-btn bp-btn-indigo" title="新增文章分组" @click="showAddArticleCatInput = true">+</button>
             </div>
 
             <div v-if="showAddArticleCatInput" class="bp-add-category-box">
@@ -637,13 +734,19 @@ function formatDate(ts: number): string {
                   <span class="bp-folder-badge" v-else>{{ articleState.articles.filter(a => a.category === cat.id).length }}</span>
                 </button>
                 <div v-if="!cat.isBuiltin && editingArticleCatId !== cat.id" class="bp-folder-actions">
-                  <button type="button" class="bp-tool-btn" title="重命名" @click.stop="startRenameArticleCategory(cat)">✏️</button>
-                  <button type="button" class="bp-tool-btn danger" title="删除" @click.stop="handleDeleteArticleCategory(cat)">🗑️</button>
+                  <button type="button" class="bp-tool-btn" title="重命名" @click.stop="startRenameArticleCategory(cat)">
+                    <svg v-if="embedded" class="bp-svg-icon-sm" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11.5 2.5l2 2L5 13H3v-2l8.5-8.5z"/></svg>
+                    <template v-else>✏️</template>
+                  </button>
+                  <button type="button" class="bp-tool-btn danger" title="删除" @click.stop="handleDeleteArticleCategory(cat)">
+                    <svg v-if="embedded" class="bp-svg-icon-sm" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 4.5h10M6 4.5V3h4v1.5M5 4.5l.6 8.5h4.8l.6-8.5"/></svg>
+                    <template v-else>🗑️</template>
+                  </button>
                 </div>
               </div>
             </div>
 
-            <div v-if="allArticleTags.length > 0" class="bp-tags-container">
+            <div v-if="!embedded && allArticleTags.length > 0" class="bp-tags-container">
               <div class="bp-tags-title">文章标签</div>
               <div class="bp-tags-cloud">
                 <span
@@ -673,10 +776,14 @@ function formatDate(ts: number): string {
           </div>
 
           <div v-if="filteredPrompts.length === 0" class="bp-empty-state">
-            <div class="bp-empty-icon">🎒</div>
-            <h3 class="bp-empty-title">提示词背包空空如也</h3>
-            <p class="bp-empty-desc">创建你的第一个提示词，永久收纳属于你的 Prompt 宝库！</p>
-            <button type="button" class="bp-btn bp-btn-primary" @click="handleCreateNewPrompt">立即新建提示词</button>
+            <div v-if="embedded" class="bp-empty-svg" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6.5A2.5 2.5 0 0 1 6.5 4h11A2.5 2.5 0 0 1 20 6.5v11a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 17.5z"/><path d="M8 9h8M8 13h5"/></svg>
+            </div>
+            <div v-else class="bp-empty-icon">🎒</div>
+            <h3 class="bp-empty-title">{{ backpackState.searchQuery.trim() || backpackState.selectedTag ? '没有匹配的提示词' : '暂无提示词' }}</h3>
+            <p v-if="backpackState.searchQuery.trim() || backpackState.selectedTag" class="bp-empty-desc">试试更换搜索词或清除标签筛选。</p>
+            <p v-else class="bp-empty-desc">把常用的系统提示、模板指令和 <code>&#123;&#123;变量&#125;&#125;</code> 存在这里，随时一键调用。</p>
+            <button type="button" class="bp-btn bp-btn-primary" @click="handleCreateNewPrompt">新建提示词</button>
           </div>
 
           <div v-else class="bp-card-grid">
@@ -685,10 +792,98 @@ function formatDate(ts: number): string {
               :key="item.id"
               class="bp-card"
               :class="{
+                'bp-compact-card': embedded,
                 'is-pinned': item.pinned,
                 'is-selected': backpackState.editingPrompt?.id === item.id
               }"
+              @click="embedded && handleEditPrompt(item)"
             >
+              <template v-if="embedded">
+                <div class="bp-compact-head">
+                  <h4 class="bp-compact-title" :title="item.title">{{ item.title }}</h4>
+                  <div class="bp-compact-actions" @click.stop>
+                    <button
+                      v-if="extractVariables(item.content).length > 0"
+                      type="button"
+                      class="bp-compact-icon-btn accent"
+                      title="填充变量并使用"
+                      @click.stop="handleOpenVariables(item)"
+                    >
+                      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.45" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 1.8L3.8 9h4.1L7 14.2 12.2 7H8.1L9 1.8Z"/></svg>
+                    </button>
+                    <button
+                      type="button"
+                      class="bp-compact-icon-btn"
+                      :class="{ success: backpackState.copySuccessId === item.id }"
+                      :title="backpackState.copySuccessId === item.id ? '已复制' : '复制提示词'"
+                      @click.stop="handleCopy(item)"
+                    >
+                      <svg v-if="backpackState.copySuccessId === item.id" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 8.5l3 3 6-6.5"/></svg>
+                      <svg v-else viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5.5" y="5.5" width="7.5" height="8.5" rx="1.4"/><path d="M10.5 5.5V3.6A1.4 1.4 0 0 0 9.1 2.2H4.2a1.4 1.4 0 0 0-1.4 1.4v6.7a1.4 1.4 0 0 0 1.4 1.4h1.3"/></svg>
+                    </button>
+                    <button type="button" class="bp-compact-icon-btn" title="编辑提示词" @click.stop="handleEditPrompt(item)">
+                      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11.5 2.5l2 2L5 13H3v-2l8.5-8.5z"/></svg>
+                    </button>
+                    <button type="button" class="bp-compact-icon-btn danger" title="删除提示词" @click.stop="handleDeletePrompt(item.id)">
+                      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 4.5h10M6 4.5V3h4v1.5M5 4.5l.6 8.5h4.8l.6-8.5"/></svg>
+                    </button>
+                  </div>
+                </div>
+
+                <p class="bp-compact-desc" :title="item.description || item.content">
+                  {{ item.description || item.content || '暂无内容描述' }}
+                </p>
+
+                <div class="bp-compact-chips">
+                  <button
+                    type="button"
+                    class="bp-compact-folder-chip"
+                    :title="`查看分组「${promptCategoryName(item.category)}」`"
+                    @click.stop="selectCategory(item.category || 'default')"
+                  >
+                    <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M2 4.2A1.7 1.7 0 0 1 3.7 2.5h2.5l1.3 1.4h4.8A1.7 1.7 0 0 1 14 5.6v6.2a1.7 1.7 0 0 1-1.7 1.7H3.7A1.7 1.7 0 0 1 2 11.8V4.2Z"/></svg>
+                    <span>{{ promptCategoryName(item.category) }}</span>
+                  </button>
+                  <span
+                    v-for="tag in item.tags"
+                    :key="tag"
+                    class="bp-compact-tag-chip"
+                    @click.stop="selectPromptTag(tag)"
+                  >#{{ tag }}</span>
+                  <span
+                    v-for="v in extractVariables(item.content)"
+                    :key="v"
+                    class="bp-compact-var-chip"
+                    :title="`点击填充变量 ${v}`"
+                    @click.stop="handleOpenVariables(item)"
+                  >{&#123;{{ v }}&#125;}</span>
+                </div>
+
+                <div class="bp-compact-meta">
+                  <div class="bp-compact-meta-left">
+                    <span class="bp-compact-kind">
+                      <i class="bp-compact-dot" :class="{ hasVars: extractVariables(item.content).length > 0 }"></i>
+                      <span>{{ extractVariables(item.content).length > 0 ? `${extractVariables(item.content).length} 变量` : 'Prompt' }}</span>
+                    </span>
+                    <button
+                      type="button"
+                      class="bp-compact-star"
+                      :class="{ active: item.pinned }"
+                      :title="item.pinned ? '取消置顶' : '星标置顶'"
+                      @click.stop="handleTogglePromptPin(item.id)"
+                    >
+                      <span>{{ item.pinned ? '★' : '☆' }}</span>
+                      <span v-if="item.useCount">{{ item.useCount }}</span>
+                    </button>
+                  </div>
+                  <div class="bp-compact-meta-right">
+                    <span v-if="backpackState.copySuccessId === item.id" class="bp-copied-tip">已复制</span>
+                    <span v-else class="bp-compact-date">{{ formatFullDate(item.updatedAt) }}</span>
+                  </div>
+                </div>
+              </template>
+
+              <template v-else>
               <div class="bp-card-header">
                 <div class="bp-card-title-group">
                   <button
@@ -753,6 +948,7 @@ function formatDate(ts: number): string {
                   </button>
                 </div>
               </div>
+              </template>
             </article>
           </div>
         </main>
@@ -761,7 +957,7 @@ function formatDate(ts: number): string {
         <main v-else-if="activeChannel === 'articles'" class="bp-content-pane">
           <div class="bp-pane-header">
             <div class="bp-result-stats">
-              <span>共 <strong>{{ filteredArticles.length }}</strong> 篇保存文章</span>
+              <span>共 <strong>{{ displayedArticles.length }}</strong> 篇文章</span>
               <span v-if="articleState.selectedTag" class="bp-active-filter-badge bp-badge-indigo">
                 标签: #{{ articleState.selectedTag }}
                 <button type="button" class="bp-tag-close" @click="articleState.selectedTag = null">✕</button>
@@ -769,16 +965,19 @@ function formatDate(ts: number): string {
             </div>
           </div>
 
-          <div v-if="filteredArticles.length === 0" class="bp-empty-state">
-            <div class="bp-empty-icon">📑</div>
-            <h3 class="bp-empty-title">文章收藏库空空如也</h3>
-            <p class="bp-empty-desc">在此保存精选长文、技术博客与深度报道，随时随地离线畅读！</p>
-            <button type="button" class="bp-btn bp-btn-primary bp-btn-indigo" @click="handleCreateNewArticle">立即保存第一篇文章</button>
+          <div v-if="displayedArticles.length === 0" class="bp-empty-state">
+            <div v-if="embedded" class="bp-empty-svg" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4.5A2.5 2.5 0 0 1 7.5 2H19v18H7.5A2.5 2.5 0 0 0 5 22z"/><path d="M5 4.5V22"/></svg>
+            </div>
+            <div v-else class="bp-empty-icon">📑</div>
+            <h3 class="bp-empty-title">{{ articleSearchQuery.trim() || articleState.selectedTag ? '没有匹配的文章' : '暂无保存文章' }}</h3>
+            <p class="bp-empty-desc">{{ articleSearchQuery.trim() || articleState.selectedTag ? '试试更换搜索词或清除标签筛选。' : '把有价值的深度长文、技术资料或视频分析笔记存在这里，随时离线阅读。' }}</p>
+            <button type="button" class="bp-btn bp-btn-primary bp-btn-indigo" @click="handleCreateNewArticle">保存文章</button>
           </div>
 
           <div v-else class="bp-card-grid">
             <article
-              v-for="item in filteredArticles"
+              v-for="item in displayedArticles"
               :key="item.id"
               class="bp-card bp-card-article"
               :class="{
@@ -810,22 +1009,28 @@ function formatDate(ts: number): string {
                   >
                     ↗
                   </a>
-                  <button type="button" class="bp-action-btn edit" title="编辑文章" @click.stop="handleEditArticle(item)">✏️</button>
-                  <button type="button" class="bp-action-btn delete" title="删除文章" @click.stop="handleDeleteArticle(item.id)">🗑️</button>
+                  <button type="button" class="bp-action-btn edit" title="编辑文章" @click.stop="handleEditArticle(item)">
+                    <svg v-if="embedded" class="bp-svg-icon-sm" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11.5 2.5l2 2L5 13H3v-2l8.5-8.5z"/></svg>
+                    <template v-else>✏️</template>
+                  </button>
+                  <button type="button" class="bp-action-btn delete" title="删除文章" @click.stop="handleDeleteArticle(item.id)">
+                    <svg v-if="embedded" class="bp-svg-icon-sm" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 4.5h10M6 4.5V3h4v1.5M5 4.5l.6 8.5h4.8l.6-8.5"/></svg>
+                    <template v-else>🗑️</template>
+                  </button>
                 </div>
               </div>
 
               <!-- 来源信息与更新时间 -->
               <div v-if="item.sourceName || item.updatedAt" class="bp-article-meta-line">
-                <span v-if="item.sourceName" class="bp-article-source">📰 {{ item.sourceName }}</span>
-                <span class="bp-article-date">🕒 {{ formatDate(item.updatedAt) }}</span>
+                <span v-if="item.sourceName" class="bp-article-source">{{ embedded ? item.sourceName : `📰 ${item.sourceName}` }}</span>
+                <span class="bp-article-date">{{ embedded ? formatDate(item.updatedAt) : `🕒 ${formatDate(item.updatedAt)}` }}</span>
               </div>
 
               <p v-if="item.description" class="bp-card-desc">{{ item.description }}</p>
 
               <!-- 文章正文预览 -->
-              <div class="bp-card-preview bp-article-preview" :title="item.content">
-                <pre><code>{{ item.content }}</code></pre>
+              <div class="bp-card-preview bp-article-preview">
+                <MessageMarkdown class="bp-preview-md" :content="articlePreviewExcerpt(item.content)" />
               </div>
 
               <div class="bp-card-footer">
@@ -835,7 +1040,7 @@ function formatDate(ts: number): string {
                 <div class="bp-card-button-row">
                   <span v-if="articleState.copySuccessId === item.id" class="bp-copied-tip">✓ 已复制!</span>
                   <button type="button" class="bp-btn-read" title="阅读全文" @click.stop="handleOpenArticleReader(item)">
-                    📖 阅读全文
+                    {{ embedded ? '阅读全文' : '📖 阅读全文' }}
                   </button>
                   <button
                     type="button"
@@ -861,7 +1066,7 @@ function formatDate(ts: number): string {
         <transition name="drawer-slide">
           <aside v-if="backpackState.isEditing && activeChannel === 'prompts'" class="bp-side-drawer">
             <header class="bp-drawer-header">
-              <h3 class="bp-drawer-title">{{ backpackState.editingPrompt?.id ? '✏️ 编辑提示词' : '➕ 新建提示词' }}</h3>
+              <h3 class="bp-drawer-title">{{ backpackState.editingPrompt?.id ? (embedded ? '编辑提示词' : '✏️ 编辑提示词') : (embedded ? '新建提示词' : '➕ 新建提示词') }}</h3>
               <button type="button" class="bp-btn-icon" title="收起" @click="backpackService.closeEditor()">✕</button>
             </header>
             <div class="bp-drawer-body">
@@ -914,7 +1119,7 @@ function formatDate(ts: number): string {
         <transition name="drawer-slide">
           <aside v-if="backpackState.isVariableDialogOpen && activeChannel === 'prompts'" class="bp-side-drawer">
             <header class="bp-drawer-header">
-              <h3 class="bp-drawer-title">⚡ 快速填充变量</h3>
+              <h3 class="bp-drawer-title">{{ embedded ? '填充变量' : '⚡ 快速填充变量' }}</h3>
               <button type="button" class="bp-btn-icon" title="关闭" @click="backpackService.closeVariableDialog()">✕</button>
             </header>
             <div class="bp-drawer-body">
@@ -941,7 +1146,7 @@ function formatDate(ts: number): string {
         <transition name="drawer-slide">
           <aside v-if="articleState.isEditing && activeChannel === 'articles'" class="bp-side-drawer bp-drawer-article">
             <header class="bp-drawer-header">
-              <h3 class="bp-drawer-title">{{ articleState.editingArticle?.id ? '✏️ 编辑文章' : '➕ 保存新文章' }}</h3>
+              <h3 class="bp-drawer-title">{{ articleState.editingArticle?.id ? (embedded ? '编辑文章' : '✏️ 编辑文章') : (embedded ? '保存新文章' : '➕ 保存新文章') }}</h3>
               <button type="button" class="bp-btn-icon" title="收起" @click="articleService.closeEditor()">✕</button>
             </header>
             <div class="bp-drawer-body">
@@ -998,7 +1203,7 @@ function formatDate(ts: number): string {
           <aside v-if="articleState.isReading && activeChannel === 'articles'" class="bp-side-drawer bp-reader-drawer">
             <header class="bp-drawer-header">
               <div class="bp-reader-head-info">
-                <span class="bp-badge-pill">📖 阅读器</span>
+                <span class="bp-badge-pill">{{ embedded ? '阅读模式' : '📖 阅读器' }}</span>
                 <span v-if="articleState.readingArticle?.sourceName" class="bp-reader-source">{{ articleState.readingArticle.sourceName }}</span>
               </div>
               <button type="button" class="bp-btn-icon" title="关闭阅读器" @click="articleService.closeReader()">✕</button>
@@ -1006,17 +1211,17 @@ function formatDate(ts: number): string {
             <div class="bp-drawer-body bp-reader-body">
               <h2 class="bp-reader-title">{{ articleState.readingArticle?.title }}</h2>
               <div class="bp-reader-meta">
-                <span v-if="articleState.readingArticle?.sourceName">📰 {{ articleState.readingArticle.sourceName }}</span>
-                <span v-if="articleState.readingArticle?.updatedAt">🕒 {{ formatDate(articleState.readingArticle.updatedAt) }}</span>
+                <span v-if="articleState.readingArticle?.sourceName">{{ embedded ? articleState.readingArticle.sourceName : `📰 ${articleState.readingArticle.sourceName}` }}</span>
+                <span v-if="articleState.readingArticle?.updatedAt">{{ embedded ? formatDate(articleState.readingArticle.updatedAt) : `🕒 ${formatDate(articleState.readingArticle.updatedAt)}` }}</span>
                 <a v-if="articleState.readingArticle?.url" :href="articleState.readingArticle.url" target="_blank" rel="noreferrer" class="bp-reader-link">
                   原文链接 ↗
                 </a>
               </div>
               <blockquote v-if="articleState.readingArticle?.description" class="bp-reader-quote">
-                💡 {{ articleState.readingArticle.description }}
+                {{ embedded ? articleState.readingArticle.description : `💡 ${articleState.readingArticle.description}` }}
               </blockquote>
               <div class="bp-reader-text">
-                <pre><code>{{ articleState.readingArticle?.content }}</code></pre>
+                <MessageMarkdown :content="articleState.readingArticle?.content || ''" />
               </div>
             </div>
             <footer class="bp-drawer-footer">
@@ -1721,23 +1926,26 @@ function formatDate(ts: number): string {
 .bp-empty-title { font-size: 15px; font-weight: 600; margin: 0 0 6px 0; color: var(--heading, #0f172a); }
 .bp-empty-desc { font-size: 13px; color: var(--muted, #64748b); line-height: 1.5; margin: 0 0 14px 0; }
 
-/* ================= 3. 无模态右侧边面板 ================= */
+/* ================= 3. 浮层右侧边面板（不挤压左侧列表） ================= */
 .bp-side-drawer {
-  width: 380px;
-  min-width: 330px;
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(400px, calc(100% - 24px));
   max-width: 460px;
   background: var(--panel, #ffffff);
   border-left: 1px solid var(--border, #e2e8f0);
   display: flex;
   flex-direction: column;
-  box-shadow: -4px 0 16px rgba(0, 0, 0, 0.05);
-  z-index: 10;
+  box-shadow: -14px 0 36px rgba(15, 23, 42, 0.14);
+  z-index: 30;
   overflow: hidden;
 }
 
 .bp-reader-drawer {
-  width: 480px;
-  max-width: 560px;
+  width: min(580px, calc(100% - 24px));
+  max-width: 660px;
 }
 
 .drawer-slide-enter-active,
@@ -1815,17 +2023,53 @@ function formatDate(ts: number): string {
   color: var(--text, #334155);
 }
 .bp-reader-text {
-  font-size: 13px;
-  line-height: 1.8;
+  font-size: 13.5px;
+  line-height: 1.75;
   color: var(--text, #334155);
-  white-space: pre-wrap;
   word-break: break-word;
+  user-select: text;
 }
-.bp-reader-text pre {
-  margin: 0;
-  white-space: pre-wrap;
-  word-break: break-word;
-  font-family: inherit;
+.bp-reader-text :deep(.message-markdown) {
+  font-size: 13.5px;
+  line-height: 1.75;
+}
+.bp-reader-text :deep(.message-markdown h1) { font-size: 17px; font-weight: 700; margin: 14px 0 8px; padding-bottom: 5px; border-bottom: 1px solid var(--border, #e2e8f0); }
+.bp-reader-text :deep(.message-markdown h2) { font-size: 15.5px; font-weight: 700; margin: 16px 0 8px; color: var(--heading, #0f172a); }
+.bp-reader-text :deep(.message-markdown h3) { font-size: 14px; font-weight: 650; margin: 13px 0 6px; color: var(--heading, #0f172a); }
+.bp-reader-text :deep(.message-markdown ul ul),
+.bp-reader-text :deep(.message-markdown ol ul) { margin: 4px 0; }
+.bp-reader-text :deep(.message-markdown th) { background: rgba(148, 163, 184, 0.1); font-weight: 600; font-size: 12.5px; }
+.bp-reader-text :deep(.message-markdown td) { font-size: 12.5px; }
+.bp-reader-text :deep(.message-markdown math) {
+  font-family: "Latin Modern Math", "Cambria Math", "STIX Two Math", "Noto Sans Math", serif;
+  font-size: 1.05em;
+}
+.bp-reader-text :deep(.message-markdown .obs-math-block) {
+  display: flex;
+  justify-content: center;
+  overflow-x: auto;
+  margin: 12px 0;
+  padding: 12px 16px;
+  border-radius: 8px;
+  background: var(--surface, rgba(148, 163, 184, 0.08));
+  border: 1px solid var(--border, #e2e8f0);
+}
+.bp-preview-md {
+  font-size: 11.5px !important;
+  line-height: 1.48 !important;
+  color: var(--text, #334155);
+}
+.bp-preview-md :deep(h1),
+.bp-preview-md :deep(h2),
+.bp-preview-md :deep(h3),
+.bp-preview-md :deep(h4) {
+  font-size: 11.5px;
+  margin: 0 0 3px;
+}
+.bp-preview-md :deep(p),
+.bp-preview-md :deep(ul),
+.bp-preview-md :deep(ol) {
+  margin: 0 0 3px;
 }
 
 /* 表单组件 */
@@ -1876,48 +2120,589 @@ function formatDate(ts: number): string {
   max-height: 130px;
   overflow-y: auto;
 }
-/* AI 工作区资料库：中性层次与单一强调色，不改变旧背包窗口或数据。 */
-.bp-top-actions.bp-integrated .bp-btn-primary { background:var(--text,#334155); border-color:var(--text,#334155); color:var(--panel,#fff); }
-.bp-container.bp-integrated .bp-bili-sidebar { gap:5px; }
-.bp-container.bp-integrated .bp-sidebar-toggle-bar,
-.bp-container.bp-integrated .bp-sidebar-toggle-bar.is-collapsed { background:transparent; border-color:transparent; box-shadow:none; padding:6px 9px; }
-.bp-container.bp-integrated .bp-sidebar-toggle-bar:hover { background:var(--surface,#f2f3f6); }
-.bp-container.bp-integrated .bp-channels-list { gap:3px; }
-.bp-container.bp-integrated .bp-channel-wrap .bp-channel-btn { background:transparent; border-color:transparent; box-shadow:none; transform:none; padding:9px 10px; }
-.bp-container.bp-integrated .bp-channel-wrap .bp-channel-btn:hover { background:var(--surface,#f2f3f6); border-color:transparent; box-shadow:none; transform:none; }
-.bp-container.bp-integrated .bp-channel-wrap .bp-channel-btn.on { background:var(--surface-hover,#eceef2) !important; border-color:transparent !important; color:var(--text,#334155) !important; box-shadow:none !important; }
-.bp-container.bp-integrated .bp-channel-wrap .bp-channel-btn.on strong { color:var(--heading,#0f172a) !important; }
-.bp-container.bp-integrated .bp-channel-wrap .bp-channel-btn.on small { color:var(--muted,#64748b) !important; }
+/* AI 工作区资料库：靛蓝/晴蓝高亮与通透白底层次，不改变旧背包窗口或数据。 */
+.bp-seg-tabs {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 10px;
+  border: 1px solid var(--border, #e2e8f0);
+  background: color-mix(in srgb, var(--surface, #f2f4f8) 88%, transparent);
+}
+.bp-seg-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--muted, #64748b);
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+}
+.bp-seg-tab small {
+  font-size: 10.5px;
+  font-weight: 650;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--text, #1e293b) 7%, transparent);
+  color: var(--muted, #64748b);
+  font-variant-numeric: tabular-nums;
+}
+.bp-seg-tab:hover { color: var(--text, #1e293b); }
+.bp-seg-tab.active {
+  background: var(--panel, #ffffff);
+  color: #4f46e5;
+  font-weight: 600;
+  box-shadow: 0 1px 4px rgba(79, 70, 229, 0.12), 0 1px 2px rgba(15, 23, 42, 0.05);
+}
+.bp-seg-tab.active small {
+  background: rgba(99, 102, 241, 0.12);
+  color: #4f46e5;
+}
+
+.bp-search-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 31px;
+  padding: 0 11px;
+  border-radius: 999px;
+  border: 1px solid var(--border, #dce2ec);
+  background: var(--panel, #ffffff);
+  color: var(--muted, #64748b);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.bp-search-pill:focus-within {
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.14);
+}
+.bp-search-pill svg { width: 13px; height: 13px; flex: none; color: #6366f1; opacity: 0.78; }
+.bp-search-pill input {
+  width: 152px;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--text, #1e293b);
+  font-size: 12px;
+}
+.bp-search-pill input::placeholder { color: var(--muted, #94a3b8); }
+.bp-svg-icon { width: 13.5px; height: 13.5px; flex: none; }
+.bp-svg-icon-sm { width: 12.5px; height: 12.5px; flex: none; display: block; }
+.bp-empty-svg {
+  width: 52px;
+  height: 52px;
+  margin: 0 auto 14px;
+  border-radius: 15px;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.14), rgba(59, 130, 246, 0.1));
+  border: 1px solid rgba(99, 102, 241, 0.22);
+  color: #5b5bd6;
+}
+.bp-empty-svg svg { width: 23px; height: 23px; }
+
+.bp-top-actions.bp-integrated .bp-btn {
+  height: 31px;
+  padding: 0 13px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 550;
+}
+.bp-top-actions.bp-integrated .bp-btn-ghost {
+  background: var(--panel, #ffffff);
+  border-color: var(--border, #dce2ec);
+  color: var(--text, #334155);
+}
+.bp-top-actions.bp-integrated .bp-btn-ghost:hover {
+  border-color: rgba(99, 102, 241, 0.35);
+  color: #4f46e5;
+  background: color-mix(in srgb, #6366f1 5%, var(--panel, #ffffff));
+}
+.bp-top-actions.bp-integrated .bp-btn-primary,
+.bp-top-actions.bp-integrated .bp-btn-article-pri {
+  background: linear-gradient(135deg, #6366f1, #4f6ef7);
+  border-color: transparent;
+  color: #ffffff;
+  box-shadow: 0 2px 10px rgba(99, 102, 241, 0.28);
+}
+.bp-top-actions.bp-integrated .bp-btn-primary:hover,
+.bp-top-actions.bp-integrated .bp-btn-article-pri:hover {
+  filter: brightness(1.06);
+  box-shadow: 0 4px 14px rgba(99, 102, 241, 0.36);
+}
+
+.bp-container.bp-integrated {
+  background: transparent;
+}
+.bp-container.bp-integrated .bp-bili-sidebar {
+  width: 196px;
+  min-width: 184px;
+  padding: 14px 10px;
+  background: color-mix(in srgb, var(--surface, #f5f7fb) 48%, transparent);
+  border-right: 1px solid var(--border, #e5e8ef);
+  gap: 6px;
+}
 .bp-container.bp-integrated .bp-sidebar-favorite-hub,
-.bp-container.bp-integrated .bp-hub-article { margin:8px 2px 2px; background:transparent; border-color:transparent; box-shadow:none; }
+.bp-container.bp-integrated .bp-hub-article {
+  margin: 0 4px 4px;
+  padding: 2px 4px 6px;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+.bp-container.bp-integrated .bp-hub-text strong {
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  color: var(--muted, #64748b);
+}
 .bp-container.bp-integrated .bp-hub-add-btn,
-.bp-container.bp-integrated .bp-hub-add-btn.bp-btn-indigo { border-radius:7px; background:var(--surface,#f2f3f6) !important; color:var(--text,#334155); box-shadow:none !important; }
+.bp-container.bp-integrated .bp-hub-add-btn.bp-btn-indigo {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  background: rgba(99, 102, 241, 0.1) !important;
+  color: #5b5bd6;
+  font-size: 15px;
+  box-shadow: none !important;
+}
 .bp-container.bp-integrated .bp-hub-add-btn:hover,
-.bp-container.bp-integrated .bp-hub-add-btn.bp-btn-indigo:hover { background:var(--surface-hover,#e5e7eb) !important; transform:none; }
+.bp-container.bp-integrated .bp-hub-add-btn.bp-btn-indigo:hover {
+  background: #6366f1 !important;
+  color: #ffffff;
+  transform: none;
+}
+.bp-container.bp-integrated .bp-folder-list { gap: 2px; }
+.bp-container.bp-integrated .bp-folder-row {
+  border-radius: 8px;
+  padding: 0 2px;
+}
+.bp-container.bp-integrated .bp-folder-btn {
+  padding: 7px 9px;
+  font-size: 12.5px;
+}
+.bp-container.bp-integrated .bp-folder-badge {
+  background: transparent;
+  color: var(--muted, #94a3b8);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.bp-container.bp-integrated .bp-folder-row:hover {
+  background: color-mix(in srgb, #6366f1 6%, transparent);
+}
 .bp-container.bp-integrated .bp-folder-row.active,
-.bp-container.bp-integrated .bp-row-indigo.active { background:var(--surface-hover,#eceef2) !important; color:var(--text,#334155) !important; box-shadow:none; }
-.bp-container.bp-integrated .bp-folder-row.active .bp-folder-name { color:var(--text,#334155) !important; }
-.bp-container.bp-integrated .bp-folder-row.active .bp-folder-badge { background:var(--surface,#f2f3f6); color:var(--muted,#64748b); }
-.bp-container.bp-integrated .bp-btn-mini.primary { background:var(--text,#334155) !important; border-color:var(--text,#334155) !important; color:var(--panel,#fff); }
-.bp-container.bp-integrated .bp-add-cat-input { border-color:var(--border-strong,#cbd5e1); }
+.bp-container.bp-integrated .bp-row-indigo.active {
+  background: rgba(99, 102, 241, 0.11) !important;
+  color: #4f46e5 !important;
+  box-shadow: none;
+}
+.bp-container.bp-integrated .bp-folder-row.active .bp-folder-name {
+  color: #4f46e5 !important;
+  font-weight: 600;
+}
+.bp-container.bp-integrated .bp-folder-row.active .bp-folder-badge {
+  background: rgba(99, 102, 241, 0.14);
+  color: #4f46e5;
+}
+.bp-container.bp-integrated .bp-btn-mini.primary,
+.bp-container.bp-integrated .bp-btn-mini.primary.bp-bg-indigo {
+  background: #6366f1 !important;
+  border-color: #6366f1 !important;
+  color: #ffffff;
+}
+.bp-container.bp-integrated .bp-add-cat-input {
+  border-radius: 7px;
+  background: var(--panel, #ffffff);
+  border-color: var(--border, #dce2ec);
+}
 .bp-container.bp-integrated .bp-add-cat-input:focus,
-.bp-container.bp-integrated .bp-add-cat-input.bp-border-indigo:focus { border-color:var(--text,#334155) !important; }
-.bp-container.bp-integrated .bp-active-filter-badge,
-.bp-container.bp-integrated .bp-var-pill,
-.bp-container.bp-integrated .bp-btn-use,
-.bp-container.bp-integrated .bp-btn-read { background:var(--surface,#f2f3f6); border-color:var(--border,#e2e8f0); color:var(--text,#334155); }
-.bp-container.bp-integrated .bp-var-pill:hover,
-.bp-container.bp-integrated .bp-btn-use:hover,
-.bp-container.bp-integrated .bp-btn-read:hover,
-.bp-container.bp-integrated .bp-btn-copy:hover:not(.success) { background:var(--surface-hover,#e5e7eb); color:var(--text,#334155); }
+.bp-container.bp-integrated .bp-add-cat-input.bp-border-indigo:focus {
+  border-color: #6366f1 !important;
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.16);
+}
+
+.bp-container.bp-integrated .bp-content-pane {
+  padding: 18px 24px 28px;
+  background: transparent;
+}
+.bp-container.bp-integrated .bp-pane-header {
+  margin-bottom: 14px;
+}
+.bp-container.bp-integrated .bp-result-stats {
+  font-size: 12px;
+  color: var(--muted, #64748b);
+}
+.bp-container.bp-integrated .bp-result-stats strong {
+  color: #4f46e5;
+}
+.bp-container.bp-integrated .bp-card-grid {
+  grid-template-columns: repeat(auto-fill, minmax(220px, 265px));
+  gap: 12px;
+  align-items: stretch;
+}
+.bp-container.bp-integrated .bp-compact-card {
+  border-radius: 12px;
+  padding: 13px 14px 12px;
+  gap: 8px;
+  background: var(--panel, #ffffff);
+  border: 1px solid var(--border, #e4e8f0);
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.03);
+  cursor: pointer;
+}
+.bp-container.bp-integrated .bp-compact-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(14, 165, 233, 0.36);
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.06);
+}
+.bp-compact-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+.bp-compact-title {
+  margin: 0;
+  font-size: 13.5px;
+  font-weight: 650;
+  color: var(--heading, #0f172a);
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bp-compact-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  flex: none;
+  opacity: 0;
+  transition: opacity 0.14s ease;
+}
+.bp-compact-card:hover .bp-compact-actions,
+.bp-compact-card.is-selected .bp-compact-actions,
+.bp-compact-actions:focus-within {
+  opacity: 1;
+}
+.bp-compact-icon-btn {
+  width: 22px;
+  height: 22px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted, #64748b);
+  display: grid;
+  place-items: center;
+  padding: 0;
+  cursor: pointer;
+}
+.bp-compact-icon-btn svg { width: 12.5px; height: 12.5px; }
+.bp-compact-icon-btn:hover { background: var(--surface, #f1f5f9); color: var(--heading, #0f172a); }
+.bp-compact-icon-btn.accent:hover { background: rgba(99, 102, 241, 0.12); color: #4f46e5; }
+.bp-compact-icon-btn.success { color: #16a34a; opacity: 1; }
+.bp-compact-icon-btn.danger:hover { background: rgba(239, 68, 68, 0.1); color: #dc2626; }
+.bp-compact-desc {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.48;
+  color: var(--muted, #52627a);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  min-height: 35px;
+}
+.bp-compact-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+}
+.bp-compact-folder-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: rgba(14, 165, 233, 0.12);
+  color: #0284c7;
+  font-size: 11px;
+  font-weight: 550;
+  cursor: pointer;
+}
+.bp-compact-folder-chip svg { width: 11px; height: 11px; flex: none; opacity: 0.85; }
+.bp-compact-folder-chip:hover { background: rgba(14, 165, 233, 0.2); }
+.bp-compact-tag-chip {
+  padding: 2px 7px;
+  border-radius: 6px;
+  background: var(--surface, #f3f5f8);
+  color: var(--muted, #52627a);
+  font-size: 11px;
+  cursor: pointer;
+}
+.bp-compact-tag-chip:hover { background: rgba(99, 102, 241, 0.1); color: #4f46e5; }
+.bp-compact-var-chip {
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: rgba(99, 102, 241, 0.09);
+  color: #5b5bd6;
+  font: 10.5px/1.3 ui-monospace, SFMono-Regular, Menlo, monospace;
+  cursor: pointer;
+}
+.bp-compact-var-chip:hover { background: #6366f1; color: #ffffff; }
+.bp-compact-meta {
+  margin-top: auto;
+  padding-top: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 11.5px;
+  color: var(--muted, #64748b);
+}
+.bp-compact-meta-left {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+.bp-compact-kind {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.bp-compact-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #0ea5e9;
+  display: inline-block;
+}
+.bp-compact-dot.hasVars { background: #6366f1; }
+.bp-compact-star {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  border: 0;
+  padding: 0 2px;
+  background: transparent;
+  color: var(--muted, #94a3b8);
+  font-size: 12px;
+  cursor: pointer;
+}
+.bp-compact-star.active,
+.bp-compact-star:hover { color: #f59e0b; }
+.bp-compact-date {
+  font-size: 11px;
+  color: var(--muted, #94a3b8);
+  font-variant-numeric: tabular-nums;
+}
+.bp-container.bp-integrated .bp-card {
+  border-radius: 12px;
+  padding: 15px 16px;
+  gap: 9px;
+  background: var(--panel, #ffffff);
+  border: 1px solid var(--border, #e4e8f0);
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.04);
+}
+.bp-container.bp-integrated .bp-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(99, 102, 241, 0.32);
+  box-shadow: 0 10px 24px rgba(79, 70, 229, 0.08);
+}
+.bp-container.bp-integrated .bp-card.is-pinned {
+  border-color: rgba(245, 158, 11, 0.42);
+}
 .bp-container.bp-integrated .bp-card.is-selected,
-.bp-container.bp-integrated .bp-card-article.is-selected { border-color:var(--border-strong,#94a3b8); box-shadow:0 0 0 1px var(--border-strong,#94a3b8); }
-.bp-container.bp-integrated .bp-tag-micro:hover { color:var(--text,#334155); }
-.bp-container.bp-integrated :deep(.sidebar-folder-card.active) { background:var(--surface-hover,#eceef2) !important; border-color:var(--border,#e2e8f0) !important; box-shadow:none !important; }
+.bp-container.bp-integrated .bp-card-article.is-selected {
+  border-color: #6366f1;
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.16);
+}
+.bp-container.bp-integrated .bp-card-title {
+  font-size: 13.5px;
+  font-weight: 600;
+}
+.bp-container.bp-integrated .bp-card-desc {
+  font-size: 12px;
+  line-height: 1.5;
+}
+.bp-container.bp-integrated .bp-card-preview {
+  border-radius: 9px;
+  padding: 9px 11px;
+  background: color-mix(in srgb, #6366f1 3.5%, var(--surface, #f6f8fc));
+  border: 1px solid color-mix(in srgb, #6366f1 10%, var(--border, #e2e8f0));
+}
+.bp-container.bp-integrated .bp-card-preview::after {
+  background: linear-gradient(to bottom, transparent, color-mix(in srgb, #6366f1 3.5%, var(--surface, #f6f8fc)));
+}
+.bp-container.bp-integrated .bp-card-footer {
+  padding-top: 9px;
+  border-top: 1px solid color-mix(in srgb, var(--border, #e2e8f0) 65%, transparent);
+}
+.bp-container.bp-integrated .bp-tag-micro {
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  background: rgba(99, 102, 241, 0.08);
+  color: #5b5bd6;
+}
+.bp-container.bp-integrated .bp-tag-micro:hover {
+  background: rgba(99, 102, 241, 0.16);
+  color: #4f46e5;
+}
+.bp-container.bp-integrated .bp-active-filter-badge {
+  background: rgba(99, 102, 241, 0.12);
+  border: 1px solid rgba(99, 102, 241, 0.25);
+  color: #4f46e5;
+  border-radius: 999px;
+  padding: 2px 9px;
+  font-size: 11px;
+}
+.bp-container.bp-integrated .bp-var-pill {
+  background: rgba(99, 102, 241, 0.1);
+  border: 1px solid rgba(99, 102, 241, 0.22);
+  color: #5b5bd6;
+  border-radius: 6px;
+  padding: 1px 6px;
+  font-size: 11px;
+}
+.bp-container.bp-integrated .bp-var-pill:hover {
+  background: #6366f1;
+  color: #ffffff;
+}
+.bp-container.bp-integrated .bp-btn-use,
+.bp-container.bp-integrated .bp-btn-read {
+  background: rgba(99, 102, 241, 0.1);
+  border: 1px solid rgba(99, 102, 241, 0.24);
+  color: #4f46e5;
+  border-radius: 999px;
+  padding: 3px 11px;
+  font-size: 11px;
+}
+.bp-container.bp-integrated .bp-btn-use:hover,
+.bp-container.bp-integrated .bp-btn-read:hover {
+  background: #6366f1;
+  border-color: #6366f1;
+  color: #ffffff;
+}
+.bp-container.bp-integrated .bp-btn-copy {
+  background: var(--panel, #ffffff);
+  border: 1px solid var(--border, #dce2ec);
+  color: var(--text, #334155);
+  border-radius: 999px;
+  padding: 3px 11px;
+  font-size: 11px;
+}
+.bp-container.bp-integrated .bp-btn-copy:hover:not(.success) {
+  border-color: rgba(99, 102, 241, 0.4);
+  color: #4f46e5;
+  background: rgba(99, 102, 241, 0.06);
+}
+.bp-container.bp-integrated .bp-empty-state .bp-btn-primary,
+.bp-container.bp-integrated .bp-empty-state .bp-btn-indigo {
+  height: 34px;
+  padding: 0 18px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #6366f1, #4f6ef7) !important;
+  border-color: transparent !important;
+  color: #ffffff;
+  box-shadow: 0 3px 12px rgba(99, 102, 241, 0.28) !important;
+}
+
+.bp-container.bp-integrated .bp-side-drawer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(410px, calc(100% - 24px));
+  max-width: 480px;
+  z-index: 30;
+  background: color-mix(in srgb, var(--panel, #ffffff) 96%, transparent);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-left: 1px solid var(--border, #e5e8ef);
+  box-shadow: -16px 0 40px rgba(15, 23, 42, 0.16);
+}
+.bp-container.bp-integrated .bp-reader-drawer {
+  width: min(560px, calc(100% - 24px));
+  max-width: 640px;
+}
+.bp-container.bp-integrated .bp-drawer-header {
+  padding: 15px 18px;
+  background: color-mix(in srgb, #6366f1 3%, var(--panel, #ffffff));
+}
+.bp-container.bp-integrated .bp-drawer-body { padding: 16px 18px; gap: 14px; }
+.bp-container.bp-integrated .bp-drawer-footer {
+  padding: 12px 18px;
+  background: color-mix(in srgb, var(--surface, #f7f8fb) 65%, transparent);
+}
+.bp-container.bp-integrated .bp-drawer-footer .bp-btn {
+  height: 32px;
+  padding: 0 15px;
+  border-radius: 999px;
+}
+.bp-container.bp-integrated .bp-drawer-footer .bp-btn-ghost {
+  background: var(--panel, #ffffff);
+  border-color: var(--border, #dce2ec);
+}
+.bp-container.bp-integrated .bp-drawer-footer .bp-btn-primary,
+.bp-container.bp-integrated .bp-drawer-footer .bp-btn-indigo {
+  background: linear-gradient(135deg, #6366f1, #4f6ef7) !important;
+  border-color: transparent !important;
+  color: #ffffff;
+  box-shadow: 0 2px 10px rgba(99, 102, 241, 0.26);
+}
+.bp-container.bp-integrated .bp-form-input,
+.bp-container.bp-integrated .bp-form-select {
+  border-radius: 9px;
+  padding: 8px 11px;
+  background: var(--panel, #ffffff);
+  border-color: var(--border, #dce2ec);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
+}
+.bp-container.bp-integrated .bp-form-input:focus,
+.bp-container.bp-integrated .bp-form-select:focus {
+  border-color: #6366f1 !important;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.14);
+}
+.bp-container.bp-integrated .bp-checkbox-label input[type="checkbox"] {
+  accent-color: #6366f1;
+}
+.bp-container.bp-integrated .bp-label-tip code {
+  background: rgba(99, 102, 241, 0.1);
+  color: #5b5bd6;
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+.bp-container.bp-integrated .bp-badge-pill {
+  background: rgba(99, 102, 241, 0.12);
+  color: #4f46e5;
+}
+.bp-container.bp-integrated .bp-reader-quote {
+  border-left-color: #6366f1;
+  background: rgba(99, 102, 241, 0.06);
+  border-radius: 8px;
+  padding: 10px 14px;
+}
+.bp-container.bp-integrated .bp-reader-link { color: #4f6ef7; }
+
+.bp-container.bp-integrated :deep(.sidebar-folder-card.active) { background: rgba(99, 102, 241, 0.11) !important; border-color: rgba(99, 102, 241, 0.24) !important; box-shadow: none !important; }
 .bp-container.bp-integrated :deep(.sidebar-folder-card.active .subfolder-card-name),
 .bp-container.bp-integrated :deep(.sidebar-folder-card.active .subfolder-card-arrow),
-.bp-container.bp-integrated :deep(#sticker-library-count) { color:var(--text,#334155) !important; }
+.bp-container.bp-integrated :deep(#sticker-library-count) { color: #4f46e5 !important; }
 .bp-container.bp-integrated :deep(.sticker-pack-form button),
-.bp-container.bp-integrated :deep(.sticker-quick-import-btn:hover) { background:var(--surface-hover,#eceef2); border-color:var(--border,#e2e8f0); color:var(--text,#334155); }
-.bp-container.bp-integrated button:focus-visible { outline:2px solid var(--text,#334155); outline-offset:2px; }
+.bp-container.bp-integrated :deep(.sticker-quick-import-btn:hover) { background: rgba(99, 102, 241, 0.1); border-color: rgba(99, 102, 241, 0.28); color: #4f46e5; }
+.bp-container.bp-integrated button:focus-visible { outline: 2px solid #6366f1; outline-offset: 2px; }
+@media (max-width: 780px) {
+  .bp-container.bp-integrated .bp-bili-sidebar { width: 156px; min-width: 140px; }
+  .bp-container.bp-integrated .bp-content-pane { padding: 14px; }
+  .bp-search-pill input { width: 105px; }
+}
 </style>

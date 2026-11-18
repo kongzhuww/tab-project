@@ -81,3 +81,25 @@ test('Markdown AST: supports fast renderer registration with seamless fallback f
   assert.ok(reverted.includes('<p>Hello World</p>'));
 });
 
+test('Markdown AST: renders Greek/accent subscripts, \\rm text, \\(...\\) inline math, and nested/ordered lists', () => {
+  const formula = markdownAstEngine.latexToMathML('\\tau_{\\rm cmd}=K_p(q_d-q)+K_d(\\dot q_d-\\dot q)+\\tau_{\\rm ff}', false);
+  assert.ok(formula.includes('<msub><mi>τ</mi><mrow><mtext>cmd</mtext></mrow></msub>'), formula);
+  assert.ok(formula.includes('<msub><mi>τ</mi><mrow><mtext>ff</mtext></mrow></msub>'), formula);
+  assert.ok(formula.includes('<msub><mover><mrow><mi>q</mi></mrow><mo>˙</mo></mover><mrow><mi>d</mi></mrow></msub>'), formula);
+
+  const md = [
+    '参数 \\(J\\) 与 \\(K_p\\) 关系如下：',
+    '',
+    '- **主项**',
+    '  - 子项 A',
+    '',
+    '1. 第一步',
+    '2. 第二步',
+  ].join('\n');
+  const html = markdownAstEngine.renderMarkdown(md, { useFastRenderer: false });
+  assert.ok(html.includes('<math '), html);
+  assert.ok(html.includes('<mi>J</mi>'), html);
+  assert.ok(html.includes('<ul><li><strong>主项</strong><ul><li>子项 A</li></ul></li></ul>'), html);
+  assert.ok(html.includes('<ol><li>第一步</li><li>第二步</li></ol>'), html);
+});
+

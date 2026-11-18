@@ -33,7 +33,7 @@
 >
 > 商店安装由浏览器官方托管安全检查与自动更新，无需开启开发者模式。每次新版本仍需单独提交各商店审核，GitHub 提交或 Release 与商店版可能存在发布时间差。
 
-> **仓库版本**：**1.0.23**。本版更新 AI 工作区定时任务与通知、资源浏览和 Todoist 集成，并修复搜索及 AI Hot 日报。商店版本以商店页面及实际安装版本为准，可能与 GitHub Release 存在时间差。详见 [更新日志](CHANGELOG.md)。
+> **仓库版本**：**1.0.24**。本版升级 AI 工作区为通用 OpenAI 兼容多模型与本机免 Key Ollama 接入、内置数字员工与 GitHub 今日榜单精选自动化（含模拟浏览器实时窥屏与回放），以及零配置自动兜底体验。商店版本以商店页面及实际安装版本为准，可能与 GitHub Release 存在时间差。详见 [更新日志](CHANGELOG.md)。
 
 ## 反馈与更新
 
@@ -148,6 +148,12 @@ npm run check
 `npm run release:build` 输出独立的发布目录，不会替换浏览器已加载的目录。`npm run audit:chunks` 只读盘点当前构建引用与可能过时的切片；候选文件仍可能被已打开的旧标签使用。**不要将它们视为可安全删除的证明**。`npm run clean:chunks` 会实际删除文件，清理前应备份并确认不再有旧页面使用。构建与可选浏览器测试步骤见 [开发构建与界面验证](docs/DEVELOPMENT_BUILD.md)。
 
 ## 最近更新
+
+### v1.0.24 · 通用模型接入、GitHub 榜单助手与自动化窥屏
+
+- **通用模型与本地 Ollama**：将原单一 DeepSeek 设置扩展为 OpenAI 兼容通用预设（DeepSeek / 硅基流动 / Kimi / 智谱 / 百炼 / OpenAI / OpenRouter / 本机免 Key Ollama / LM Studio）。
+- **GitHub 榜单自动化与模拟窥屏**：默认预置可自由编辑/删除的 GitHub 今日榜单精选助手，配备实时「窥屏」与「回放窥屏」以及 `auto` 智能引擎兜底（免配模型也能先生成结构化基础简报）。
+- **数字员工与本机多引擎桥接**：支持本机 Pi / Claude Code / Codex / OpenCode / ACP 与会话遥测监控。详见 [更新日志](CHANGELOG.md)。
 
 ### v1.0.23 · AI 工作区与搜索改进
 

@@ -1,8 +1,8 @@
-import { d as D, B as F, x as M, o as n, e as a, i as o, f as d, p as v, t as h, F as g, g as P, u as b, A as V, D as w, b as p, c as z } from "./chunks/vendor-vue-C09jaOfK.js";
-import { S as L } from "./chunks/StickerBoard-BoyQDzab.js";
-import { a as f, w as $ } from "./chunks/stickers.service-BVu9MhEk.js";
+import { d as D, B as F, x as M, o as n, e as a, i as o, f as d, p as v, t as h, F as g, g as P, u as b, A as V, D as w, b as p, c as z } from "./chunks/vendor-vue-BrDsOMg2.js";
+import { S as L } from "./chunks/StickerBoard-C-2RoE0P.js";
+import { a as f, w as $ } from "./chunks/stickers.service-DnMk8MjP.js";
 import { g as y, i as S, s as H } from "./chunks/quick-links-export.service-bmE4-0fH.js";
-import { _ as Q } from "./chunks/_plugin-vue_export-helper-BTb4PcVA.js";
+import { _ as Q } from "./chunks/_plugin-vue_export-helper-Do3lP4W5.js";
 const U = { class: "sticker-app" }, j = {
   key: 0,
   class: "sticker-side-nav"
@@ -18,7 +18,7 @@ const U = { class: "sticker-app" }, j = {
 }, O = ["title", "onClick"], R = ["src"], X = ["hidden"], Y = /* @__PURE__ */ D({
   __name: "StickerStandalone",
   setup(tt) {
-    const T = w(() => import("./chunks/SettingsDialog-Bfuz8wlC.js")), B = w(() => import("./chunks/AppPromptModal-Cd7woz49.js")), k = document.body.dataset.mode === "sidepanel", l = p([]), i = p("等待扫描"), u = p(""), _ = p(!1);
+    const T = w(() => import("./chunks/SettingsDialog-BxcoTRwj.js")), B = w(() => import("./chunks/AppPromptModal-kIGgX9Oh.js")), k = document.body.dataset.mode === "sidepanel", l = p([]), i = p("等待扫描"), u = p(""), _ = p(!1);
     let m = 0;
     function r(s, e = !1) {
       u.value = s, _.value = e, clearTimeout(m), m = window.setTimeout(() => {

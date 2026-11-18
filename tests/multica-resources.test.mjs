@@ -20,26 +20,10 @@ test('selected contents and partial status are included with the chosen part', (
   assert.equal(messageWithResources('hello', []), 'hello');
 });
 
-test('Multica video messages request the bridge only when content is needed and preserve the selected part', () => {
-  const content = messageWithResources('总结视频', [{...video, part:2, partTitle:'第二讲'}], { multicaBridge:true });
-  assert.match(content, /tab-project-bridge Skill/);
-  assert.match(content, /分P：P2 第二讲/);
-  assert.match(content, /字幕：未提供/);
-  assert.match(content, /字幕读取失败，请如实说明/);
-  assert.match(content, /不可读取浏览器 Cookie 或下载音视频/);
-  assert.match(messageWithResources('总结', [video], { multicaBridge:true }), /分P：P1（默认）/);
-  assert.doesNotMatch(messageWithResources('总结', [video]), /tab-project-bridge Skill/);
-  assert.doesNotMatch(messageWithResources('总结', [repo], { multicaBridge:true }), /tab-project-bridge Skill/);
-  assert.doesNotMatch(messageWithResources('总结', [{...video, id:'invalid'}], { multicaBridge:true }), /tab-project-bridge Skill/);
-});
-
-test('part selection is retained independently of fetching subtitles and only Multica enables the bridge', async () => {
+test('part selection is retained independently of fetching subtitles', async () => {
   const attachment = await readFile(new URL('../src/multica/ResourceAttachment.vue', import.meta.url), 'utf8');
-  const dialog = await readFile(new URL('../src/multica/MulticaDialog.vue', import.meta.url), 'utf8');
   assert.match(attachment, /patch\(\{ text:undefined, includeText:false, truncated:false, part:part\.page, partTitle:part\.part \}\)/);
   assert.match(attachment, /page\.page === \(props\.resource\.part \|\| 1\)/);
-  assert.equal((dialog.match(/multicaBridge:true/g) || []).length, 1);
-  assert.match(dialog, /:multica="service === 'multica'"/);
 });
 
 test('long text is bounded by Unicode codepoints and marked truncated', () => {

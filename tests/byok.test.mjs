@@ -108,3 +108,42 @@ test('local conversations roundtrip and deletion does not affect Key', async () 
   await api.deleteConversation('one'); assert.equal((await api.loadConversations()).length,0); assert.equal((await api.loadConfig()).key,'example-key');
   await api.clearConfig();
 });
+
+test('OpenAI-compatible URL normalization, presets, and keyless Ollama support', async () => {
+  assert.equal(api.normalizeBaseUrl('https://api.siliconflow.cn/v1/chat/completions'), 'https://api.siliconflow.cn/v1');
+  assert.equal(api.normalizeBaseUrl('https://openrouter.ai/api/v1/models/'), 'https://openrouter.ai/api/v1');
+  assert.equal(api.normalizeBaseUrl('http://localhost:11434/v1/'), 'http://localhost:11434/v1');
+  assert.throws(() => api.normalizeBaseUrl('http://api.example.com/v1'), /https:\/\//);
+
+  await api.saveConfig({ presetId: 'ollama', baseUrl: 'http://localhost:11434/v1', key: '', model: 'qwen2.5:7b' });
+  const loaded = await api.loadConfig();
+  assert.equal(loaded.presetId, 'ollama');
+  assert.equal(loaded.configured, true);
+  assert.equal(loaded.requiresKey, false);
+  assert.equal(loaded.model, 'qwen2.5:7b');
+
+  let captured;
+  globalThis.fetch = async (url, init) => {
+    captured = { url, init };
+    if (String(url).endsWith('/models')) {
+      return Response.json({ data: [{ id: 'qwen2.5:7b' }, { id: 'deepseek-r1:7b' }] });
+    }
+    return sse(['data: {"choices":[{"delta":{"reasoning":"先分析","content":"本机回复"}}]}\n\ndata: [DONE]\n\n']);
+  };
+  try {
+    const models = await api.fetchOpenAiCompatibleModels({ baseUrl: loaded.baseUrl, key: loaded.key, label: loaded.label, requiresKey: loaded.requiresKey });
+    assert.deepEqual(models, ['qwen2.5:7b', 'deepseek-r1:7b']);
+    assert.equal(captured.url, 'http://localhost:11434/v1/models');
+    assert.equal(captured.init.headers.Authorization, undefined);
+
+    let answer = '', reasoning = '';
+    await api.streamOpenAiCompatible(loaded, 'deepseek-r1:7b', [{ role: 'user', content: 'hi' }], new AbortController().signal, t => answer += t, undefined, r => reasoning += r);
+    assert.equal(captured.url, 'http://localhost:11434/v1/chat/completions');
+    assert.equal(captured.init.headers.Authorization, undefined);
+    assert.equal(reasoning, '先分析');
+    assert.equal(answer, '本机回复');
+  } finally {
+    globalThis.fetch = originalFetch;
+    await api.clearConfig();
+  }
+});

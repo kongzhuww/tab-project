@@ -6,6 +6,7 @@ import {
   ARTICLE_CATEGORIES_KEY,
   DEFAULT_ARTICLE_CATEGORIES
 } from "./constants";
+export { saveArticleFromBackground } from "./article-background";
 
 export interface ArticleBackpackState {
   articles: SavedArticleItem[];
@@ -95,6 +96,22 @@ export const articleService = {
         }
         if (stored?.[ARTICLE_CATEGORIES_KEY] && Array.isArray(stored[ARTICLE_CATEGORIES_KEY])) {
           articleState.categories = stored[ARTICLE_CATEGORIES_KEY];
+        }
+        if (chrome.storage?.onChanged?.addListener) {
+          chrome.storage.onChanged.addListener((changes: any, area: string) => {
+            if (area !== "local") return;
+            if (changes[ARTICLE_REVISION_KEY]) {
+              try {
+                storedRevision = parseBackpackRevision(changes[ARTICLE_REVISION_KEY].newValue);
+              } catch {}
+            }
+            if (changes[ARTICLES_STORAGE_KEY] && Array.isArray(changes[ARTICLES_STORAGE_KEY].newValue)) {
+              articleState.articles = changes[ARTICLES_STORAGE_KEY].newValue;
+            }
+            if (changes[ARTICLE_CATEGORIES_KEY] && Array.isArray(changes[ARTICLE_CATEGORIES_KEY].newValue)) {
+              articleState.categories = changes[ARTICLE_CATEGORIES_KEY].newValue;
+            }
+          });
         }
       } else if (!local) {
         persistToLocalStorage(articleState.articles, articleState.categories);

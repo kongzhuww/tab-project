@@ -76,7 +76,7 @@ function onHistoryChanged(changes: any, area: string) {
   try {
     const change = changes[NOTIFICATION_HISTORY_KEY];
     for (const item of newAiNotifications(change.oldValue, change.newValue)) {
-      notificationController.show({ id:item.id, appType:item.appType, appName:item.appName, icon:'assets/nav-multica.png', title:item.title, subtitle:item.subtitle, message:item.message, target:item.target, history:false, historyId:item.id, actionLabel:'查看任务' });
+      notificationController.show({ id:item.id, appType:item.appType, appName:item.appName, icon:'assets/nav-ai.svg', title:item.title, subtitle:item.subtitle, message:item.message, target:item.target, history:false, historyId:item.id, actionLabel:'查看任务' });
     }
   } catch { /* history store exposes malformed-storage errors */ }
 }

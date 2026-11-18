@@ -135,7 +135,7 @@ async function confirmOperation() {
       await load();
       machine.send({
         type: "OPERATION_COMPLETE",
-        message: `已恢复 ${result.restoredCount || 0} 项配置；已保留本机已有连接。${credentialResult === 'restored' ? 'Multica 连接已恢复。' : credentialResult === 'kept' ? '已保留本机 Multica 连接。' : ''}请手动刷新已打开页面。${baselineWarning}`
+        message: `已恢复 ${result.restoredCount || 0} 项配置；已保留本机已有连接。请手动刷新已打开页面。${baselineWarning}`
       });
     } else {
       machine.send({
@@ -169,9 +169,9 @@ function close() { void windowManagerController.close("sync"); }
         <h3>私有云中枢 / Native Host（已停用）</h3>
         <div class="actions"><button type="button" @click="request('cloud-push')" title="Native Host 已于 v1.0.2 彻底移除，请使用 WebDAV 备份">VPS 备份（已停用）</button><button type="button" @click="request('cloud-pull')" title="Native Host 已于 v1.0.2 彻底移除，请使用 WebDAV 备份">VPS 恢复（已停用）</button></div>
       </fieldset>
-      <p>WebDAV 备份包含白名单内的配置及可用的 Multica 连接，上传前会使用独立口令加密。旧版明文备份需先到「设置 → 同步」确认迁移。历史 Native Host 已停用。</p>
+      <p>WebDAV 备份包含白名单内的配置，上传前会使用独立口令加密。旧版明文备份需先到「设置 → 同步」确认迁移。</p>
       <section v-if="pending" class="confirmation" aria-label="同步操作确认">
-        <p>{{ restorePending ? '恢复会覆盖云端包含的普通配置、提示词和文章；本机已有账号连接会保留。若本机没有 Multica 连接，会从加密备份恢复。请先备份当前数据。' : '上传前会验证云端备份和口令，并加密本机配置与 Multica 连接。云端旧明文备份需在设置中单独确认迁移。确认目标后继续。' }}</p>
+        <p>{{ restorePending ? '恢复会覆盖云端包含的普通配置、提示词和文章；本机已有账号凭据会保留。请先备份当前数据。' : '上传前会验证云端备份和口令，并加密本机配置。云端旧明文备份需在设置中单独确认迁移。确认目标后继续。' }}</p>
         <div class="actions"><button type="button" :disabled="isBusy" @click="confirmOperation">{{ restorePending ? '确认恢复覆盖' : '确认上传' }}</button><button type="button" @click="cancelConfirmation">取消</button></div>
       </section>
       <p v-if="message" role="status">{{ message }}</p>

@@ -3,8 +3,10 @@
 export const reviewedApiPermissions = Object.freeze([
   'storage', 'unlimitedStorage', 'bookmarks', 'favicon', 'alarms',
   'activeTab', 'tabs', 'cookies', 'declarativeNetRequest', 'identity', 'scripting',
-  'notifications', 'downloads', 'contextMenus', 'clipboardWrite',
+  'notifications', 'downloads', 'contextMenus', 'clipboardWrite', 'nativeMessaging',
 ]);
+
+export const reviewedOptionalApiPermissions = Object.freeze([]);
 
 const retiredHosts = ['multica.ai', 'weread.qq.com'];
 
@@ -32,8 +34,11 @@ export function auditManifestPermissions(manifest) {
         }
       }
     } else {
+      const allowed = key === 'optional_permissions'
+        ? [...reviewedApiPermissions, ...reviewedOptionalApiPermissions]
+        : reviewedApiPermissions;
       for (const value of values) {
-        if (!reviewedApiPermissions.includes(value)) errors.push('Unreviewed API permission: ' + value);
+        if (!allowed.includes(value)) errors.push('Unreviewed API permission: ' + value);
       }
     }
   }

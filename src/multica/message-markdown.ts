@@ -51,8 +51,21 @@ export function safeMarkdownFragment(html: string, doc: Document = document): Do
         }
       } catch { /* Non-absolute or malformed links remain inert. */ }
     }
-    if (math && name === 'math' && element.getAttribute('display') === 'block') clean.setAttribute('display', 'block');
-    if (math && name === 'mstyle' && element.getAttribute('mathvariant') === 'bold') clean.setAttribute('mathvariant', 'bold');
+    if (name === 'div' && !math && element.getAttribute('class') === 'obs-math-block') {
+      clean.setAttribute('class', 'obs-math-block');
+    }
+    if ((name === 'th' || name === 'td') && !math) {
+      const alignMatch = (element.getAttribute('style') || '').match(/^text-align:\s*(left|center|right)$/i);
+      if (alignMatch) clean.setAttribute('style', `text-align:${alignMatch[1].toLowerCase()}`);
+    }
+    if (math && name === 'math') {
+      const display = element.getAttribute('display');
+      if (display === 'block' || display === 'inline') clean.setAttribute('display', display);
+    }
+    if (math && (name === 'mstyle' || name === 'mi')) {
+      const variant = element.getAttribute('mathvariant');
+      if (variant === 'bold' || variant === 'double-struck') clean.setAttribute('mathvariant', variant);
+    }
     if (math && name === 'mspace' && element.getAttribute('linebreak') === 'newline') clean.setAttribute('linebreak', 'newline');
     for (const child of Array.from(element.childNodes)) copy(child, clean);
     target.appendChild(clean);

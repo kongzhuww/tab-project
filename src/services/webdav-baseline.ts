@@ -1,5 +1,5 @@
 import { extractSyncPayload, readSyncSettings } from './sync.service';
-import { multicaService } from './multica.service';
+import { credentialForEncryptedBackup } from './webdav-legacy-credential';
 import type { WebDavConfig } from './webdav.service';
 declare const chrome: any;
 const BASELINE_KEY = 'webdavAutoBaselineV1';
@@ -21,9 +21,9 @@ export async function configFingerprint(config: WebDavConfig): Promise<string> {
 export async function snapshotFingerprint(settings: Record<string, unknown>, credential: unknown): Promise<string> {
   return digest({ settings:extractSyncPayload(settings).sanitized, multicaCredential:credential || null });
 }
-export async function currentSnapshot(): Promise<{ settings: Record<string, unknown>; credential: Awaited<ReturnType<typeof multicaService.credentialForEncryptedBackup>>; hash: string }> {
+export async function currentSnapshot(): Promise<{ settings: Record<string, unknown>; credential: Awaited<ReturnType<typeof credentialForEncryptedBackup>>; hash: string }> {
   const settings = await readSyncSettings();
-  const credential = await multicaService.credentialForEncryptedBackup();
+  const credential = await credentialForEncryptedBackup();
   return { settings, credential, hash:await snapshotFingerprint(settings,credential) };
 }
 function area() { if (typeof chrome === 'undefined' || !chrome.storage?.local) throw new Error('本地存储不可用'); return chrome.storage.local; }

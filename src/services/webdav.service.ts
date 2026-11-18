@@ -4,7 +4,7 @@ import { webDavFetch } from "./webdav-request";
 import { mergeSyncSettings } from "./sync-merger";
 import { encryptBackup, decryptBackup, isEncryptedBackup } from './webdav-crypto';
 import { webdavVault } from './webdav-vault';
-import { multicaService, validMulticaCredential } from './multica.service';
+import { credentialForEncryptedBackup, restoreEncryptedCredential, validMulticaCredential } from './webdav-legacy-credential';
 import { currentSnapshot, hasPotentialDataLoss, snapshotFingerprint, writeBaseline } from './webdav-baseline';
 
 export interface WebDavConfig {
@@ -330,7 +330,7 @@ export class WebDavService {
         }
       }
       if ((options.mergeRemote || options.migrateLegacy) && remote.ok) localSettings = mergeProtectingConnections(localSettings, remote.data.settings || remote.data);
-      const localCredential = await multicaService.credentialForEncryptedBackup();
+      const localCredential = await credentialForEncryptedBackup();
       if (options.expectedLocalHash && await snapshotFingerprint(await readSyncSettings(), localCredential) !== options.expectedLocalHash) return { ok:false, error:'本地配置已变化，请确认后再同步；未上传' };
       const remoteCredential = remote.encrypted ? remote.data?.multicaCredential : undefined;
       if (remoteCredential !== undefined && !validMulticaCredential(remoteCredential)) return { ok:false, error:'云端 Multica 凭证格式无效，未上传' };
@@ -376,8 +376,8 @@ export class WebDavService {
       const restoreResult = await restoreSyncBackup(dataToRestore, { allowCredentials:true, beforeCommit });
       let credentialResult: 'restored' | 'kept' | undefined;
       if (credential !== undefined) {
-        try { credentialResult = await multicaService.restoreEncryptedCredential(credential); }
-        catch { return { ok:false, error:'普通配置已恢复，但 Multica 连接保存失败；请在工作台检查后重试连接' }; }
+        try { credentialResult = await restoreEncryptedCredential(credential); }
+        catch { return { ok:false, error:'普通配置已恢复，但历史连接凭据保存失败' }; }
       }
       const baselineRecorded = await recordAlignedBaseline(config, res.data, res.etag, res.fileUrl);
       return { ok:true, ...restoreResult, credentialResult, etag:res.etag || undefined, baselineRecorded };

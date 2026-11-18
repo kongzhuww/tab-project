@@ -74,10 +74,10 @@ export default {
   "cube.manager.resetNotice": "自定义配置保留，但退出轮播",
 
   "market.item.multica.title": "AI 工作区",
-  "market.item.multica.category": "全屏插件 · AI 任务",
+  "market.item.multica.category": "全屏插件 · AI 助手",
   "market.item.multica.author": "tab-project Lab",
-  "market.item.multica.desc": "连接 Multica，以会话方式查看任务和执行过程，并将新任务派发给智能体。",
-  "market.item.multica.tags": "Multica,智能体,任务会话,全屏工作台",
+  "market.item.multica.desc": "集成本机终端 Agent 与 DeepSeek API 对话、定时自动化与资源库工作台。",
+  "market.item.multica.tags": "本机 Agent,DeepSeek,自动化,全屏工作台",
   "market.item.backpack.title": "提示词背包",
   "market.item.backpack.category": "独立模块 · 提示词",
   "market.item.backpack.author": "tab-project Lab",

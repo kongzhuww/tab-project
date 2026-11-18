@@ -860,7 +860,7 @@
                   {{ localBackupMsg }}
                 </span>
                 <small style="flex-basis: 100%; color: var(--muted); font-size: 10.5px; margin-top: 2px;">
-本地 JSON 导出没有加密，可能包含提示词、文章及 GitHub、Todoist、WebDAV 等凭据；请勿上传或分享。Multica 连接不会包含在本地 JSON 中。
+本地 JSON 导出没有加密，可能包含提示词、文章及 GitHub、Todoist、WebDAV 等凭据；请勿上传或分享。
                 </small>
               </div>
             </div>
@@ -1265,8 +1265,8 @@ async function handlePullWebDav(mergeMode = true) {
       webdavStatusMsg.value = mergeMode
         ? `✓ 合并成功！已无损融合云端配置。请刷新页面查看。`
         : `✓ 覆盖成功！已还原 ${res.restoredCount || 0} 项配置。请刷新页面查看。`;
-      if (res.credentialResult === 'restored') webdavStatusMsg.value += ' Multica 连接已恢复。';
-      if (res.credentialResult === 'kept') webdavStatusMsg.value += ' 已保留本机原有 Multica 连接。';
+      if (res.credentialResult === 'restored') webdavStatusMsg.value += ' 历史备份凭据已恢复。';
+      if (res.credentialResult === 'kept') webdavStatusMsg.value += ' 已保留本机原有凭据。';
       if (!res.baselineRecorded) webdavStatusMsg.value += ' 两端未完全一致或服务器未提供 ETag，自动同步基准未建立；请手动核对。';
       notify(mergeMode ? "已成功合并云端配置！" : `覆盖成功！已还原 ${res.restoredCount || 0} 项配置`);
       // 自动静默刷新一次对比动态

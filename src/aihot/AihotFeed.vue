@@ -14,7 +14,6 @@ import { aiHotService } from "../services/aihot.service";
 import { fullscreenCardState } from "../core/fullscreen-card-state";
 import { chatService } from "../chat/chat.service";
 import ChatShareMenu from "../chat/ChatShareMenu.vue";
-import MulticaSendDialog from "./MulticaSendDialog.vue";
 import type { ChatShareTarget } from "../chat/private-chat-client";
 import { windowManagerController } from "../core/window-manager.store";
 import { useContextMenu } from "../sdk/interactions";
@@ -53,11 +52,6 @@ function handleShareToRoom(target: ChatShareTarget) {
   aihotContextMenu.value.visible = false;
 }
 
-const multicaArticle = ref<AiHotFeedArticle | null>(null);
-function openMulticaSend() {
-  multicaArticle.value = aihotContextMenu.value.item;
-  closeArticleMenu();
-}
 function closeArticleMenu() {
   aihotContextMenu.value.visible = false;
 }
@@ -591,7 +585,6 @@ function handleSelectDailyDate(date: string) {
       @click.stop
     >
       <div class="menu-head">{{ aihotContextMenu.item?.title }}</div>
-      <button type="button" class="menu-item" role="menuitem" @click="openMulticaSend">🤖 交给 Multica 智能体</button>
       <ChatShareMenu
         label="💬 发送到聊天室"
         match-menu-item
@@ -600,7 +593,6 @@ function handleSelectDailyDate(date: string) {
       />
     </div>
   </Teleport>
-  <MulticaSendDialog v-if="multicaArticle" :article="multicaArticle" @close="multicaArticle = null" />
 </template>
 
 <style scoped>

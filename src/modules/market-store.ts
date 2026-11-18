@@ -38,12 +38,12 @@ export const PLUGIN_CATALOG: readonly PluginMarketItem[] = [
     version: "v1.0.0",
     kind: "plugin",
     category: "productivity",
-    categoryLabel: "全屏插件 · AI 任务",
-    icon: "assets/nav-multica.png",
-    emoji: "🤖",
-    desc: "连接 Multica，查看任务、智能体及运行时，确认后派发新任务。",
+    categoryLabel: "全屏插件 · AI 助手",
+    icon: "assets/nav-ai.svg",
+    emoji: "✦",
+    desc: "本机终端 Agent（Pi / Claude Code / Codex / ACP）与 DeepSeek 对话、定时自动化及资源库工作台。",
     author: "tab-project Lab",
-    tags: ["Multica", "Agent", "任务管理"],
+    tags: ["本机 Agent", "DeepSeek", "自动化", "工作台"],
     builtIn: true
   },
   {

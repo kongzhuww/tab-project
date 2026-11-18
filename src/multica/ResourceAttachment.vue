@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onBeforeUnmount, ref } from 'vue';
 import { limitResourceText, RESOURCE_TEXT_LIMIT, type ResourceAttachment } from './resource-content';
-const props = defineProps<{ resource: ResourceAttachment; disabled: boolean; multica?: boolean }>();
+const props = defineProps<{ resource: ResourceAttachment; disabled: boolean }>();
 const emit = defineEmits<{ update: [resource: ResourceAttachment]; remove: [] }>();
 const busy = ref(false), error = ref('');
 const pages = ref<{ cid: number | string; page: number; part: string }[]>([]);
@@ -33,7 +33,7 @@ function changePart() {
 async function readText() {
   if (busy.value) return;
   const item = props.resource;
-  if (item.kind === 'github' && item.visibility !== 'public' && !window.confirm('该仓库是私有或可见性未知。读取后可预览，只有勾选附带并发送时才会传给 Multica。继续读取吗？')) return;
+  if (item.kind === 'github' && item.visibility !== 'public' && !window.confirm('该仓库是私有或可见性未知。读取后可预览，只有勾选附带并发送时才会传给 AI 助手。继续读取吗？')) return;
   const ctl = new AbortController(); request = ctl; busy.value = true; error.value = '';
   const timer = setTimeout(() => ctl.abort(), 25000);
   try {
@@ -61,7 +61,7 @@ async function readText() {
 }
 function setInclude(event: Event) {
   const checked = (event.target as HTMLInputElement).checked;
-  if (checked && props.resource.kind === 'github' && props.resource.visibility !== 'public' && !window.confirm('确认将该仓库的 README 随消息发送给 Multica 及其运行时 / 模型？请检查是否包含敏感内容。')) { (event.target as HTMLInputElement).checked = false; return; }
+  if (checked && props.resource.kind === 'github' && props.resource.visibility !== 'public' && !window.confirm('确认将该仓库的 README 随消息发送给所选 AI 助手？请检查是否包含敏感内容。')) { (event.target as HTMLInputElement).checked = false; return; }
   patch({ includeText:checked });
 }
 onBeforeUnmount(() => { alive = false; request?.abort(); request = null; });
@@ -76,10 +76,10 @@ onBeforeUnmount(() => { alive = false; request?.abort(); request = null; });
       <button v-if="resource.kind === 'bilibili' && !pages.length" type="button" :disabled="disabled || busy" @click="prepareParts">{{ busy ? '读取中…' : '选择视频分P' }}</button>
       <template v-if="resource.kind === 'bilibili' && pages.length"><label>分P <select v-model="selectedCid" :disabled="disabled || busy" @change="changePart"><option v-for="page in pages" :key="String(page.cid)" :value="String(page.cid)">P{{ page.page }} {{ page.part }}</option></select></label></template>
       <button v-if="resource.kind === 'github' || pages.length" type="button" :disabled="disabled || busy" @click="readText">{{ busy ? '读取中…' : resource.kind === 'bilibili' ? '读取字幕' : '读取 README' }}</button>
-      <span v-if="!resource.text" class="status">未附带正文<span v-if="resource.kind === 'bilibili' && multica"> · P{{ resource.part || 1 }}，助手可按需尝试读取字幕</span></span>
+      <span v-if="!resource.text" class="status">未附带正文</span>
     </div>
     <p v-if="error" class="error" role="alert">{{ error }}；没有发送正文，可只发送基础信息。</p>
-    <details v-if="resource.text" open><summary>预览{{ resource.kind === 'bilibili' ? '字幕' : 'README' }} · {{ Array.from(resource.text).length }} 字符<span v-if="resource.truncated"> · 已截断（最多 {{ RESOURCE_TEXT_LIMIT }} 字符）</span></summary><pre>{{ resource.text }}</pre><label><input type="checkbox" :checked="resource.includeText" :disabled="disabled || busy" @change="setInclude" /> 附带以上预览正文发送给 Multica</label></details>
+    <details v-if="resource.text" open><summary>预览{{ resource.kind === 'bilibili' ? '字幕' : 'README' }} · {{ Array.from(resource.text).length }} 字符<span v-if="resource.truncated"> · 已截断（最多 {{ RESOURCE_TEXT_LIMIT }} 字符）</span></summary><pre>{{ resource.text }}</pre><label><input type="checkbox" :checked="resource.includeText" :disabled="disabled || busy" @change="setInclude" /> 附带以上预览正文发送给 AI 助手</label></details>
     </template>
   </section>
 </template>

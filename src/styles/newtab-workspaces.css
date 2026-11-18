@@ -19,23 +19,13 @@ math {
 }
 :is(.markdown-rendered, .obsidian-markdown-rendered) math[display="block"],
 math[display="block"] {
-  display: block;
-  margin: 12px auto;
-  text-align: center;
-  overflow-x: auto;
-  padding: 10px 14px;
-  background: rgba(0, 0, 0, 0.16);
-  border-radius: 8px;
-  border: 1px solid var(--border);
-  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.2);
+  margin: 0 auto;
 }
 :is(.markdown-rendered, .obsidian-markdown-rendered) math[display="inline"],
 math[display="inline"] {
-  display: inline-block;
-  vertical-align: -0.15em;
   margin: 0 2px;
   padding: 1px 4px;
-  background: rgba(0, 0, 0, 0.1);
+  background: rgba(0, 0, 0, 0.08);
   border-radius: 4px;
 }
 .obs-math-block {
@@ -43,6 +33,10 @@ math[display="inline"] {
   display: flex;
   justify-content: center;
   overflow-x: auto;
+  padding: 10px 14px;
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 8px;
+  border: 1px solid var(--border);
 }
 .obs-math-inline {
   display: inline-block;
@@ -62,8 +56,7 @@ html[data-theme="light"] :is(.markdown-rendered, .obsidian-markdown-rendered) ma
 html[data-theme="light"] math {
   color: #0f172a;
 }
-html[data-theme="light"] :is(.markdown-rendered, .obsidian-markdown-rendered) math[display="block"],
-html[data-theme="light"] math[display="block"] {
+html[data-theme="light"] .obs-math-block {
   background: rgba(0, 0, 0, 0.03);
   border-color: rgba(0, 0, 0, 0.08);
 }

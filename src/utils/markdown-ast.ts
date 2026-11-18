@@ -140,94 +140,87 @@ export class MarkdownAstEngine {
         if (p >= l) break;
         const char = input[p];
 
-        if (char === "}" || char === "&" || char === "\\") {
-          if (char === "\\") {
+        let node = "";
+        if (char === "\\") {
+          p++;
+          if (p < l && (input[p] === "\\" || input[p] === " ")) {
             p++;
-            if (p < l && (input[p] === "\\" || input[p] === " ")) {
-              p++;
-              nodes.push("<mspace linebreak='newline'/>");
-              continue;
-            }
-            let cmd = "";
-            while (p < l && /[a-zA-Z]/.test(input[p])) cmd += input[p++];
-            if (!cmd) {
-              if (p < l) {
-                const sym = input[p++];
-                nodes.push(`<mo>${escapeXml(sym)}</mo>`);
-              }
-              continue;
-            }
-
-            if (cmd === "frac") {
-              const num = readSubArg();
-              const den = readSubArg();
-              nodes.push(`<mfrac><mrow>${parseString(num)}</mrow><mrow>${parseString(den)}</mrow></mfrac>`);
-              continue;
-            }
-            if (cmd === "sqrt") {
-              skip();
-              let index = "";
-              if (p < l && input[p] === "[") {
-                p++;
-                const bStart = p;
-                while (p < l && input[p] !== "]") p++;
-                index = input.slice(bStart, p);
-                if (p < l && input[p] === "]") p++;
-              }
-              const rad = readSubArg();
-              if (index) {
-                nodes.push(`<mroot><mrow>${parseString(rad)}</mrow><mrow>${parseString(index)}</mrow></mroot>`);
-              } else {
-                nodes.push(`<msqrt><mrow>${parseString(rad)}</mrow></msqrt>`);
-              }
-              continue;
-            }
-            if (ACCENTS[cmd]) {
-              const body = readSubArg();
-              nodes.push(`<mover><mrow>${parseString(body)}</mrow><mo>${escapeXml(ACCENTS[cmd])}</mo></mover>`);
-              continue;
-            }
-            if (cmd === "mathbf" || cmd === "boldsymbol") {
-              const inner = readSubArg();
-              nodes.push(`<mstyle mathvariant='bold'>${parseString(inner)}</mstyle>`);
-              continue;
-            }
-            if (cmd === "mathbb") {
-              const inner = readSubArg().trim();
-              nodes.push(`<mi mathvariant='double-struck'>${escapeXml(BLACKBOARD[inner] || inner)}</mi>`);
-              continue;
-            }
-            if (cmd === "text" || cmd === "mathrm") {
-              const txt = readSubArg();
-              nodes.push(`<mtext>${escapeXml(txt)}</mtext>`);
-              continue;
-            }
-            if (GREEK[cmd]) {
-              nodes.push(`<mi>${escapeXml(GREEK[cmd])}</mi>`);
-              continue;
-            }
-            if (SYMBOLS[cmd]) {
-              nodes.push(`<mo>${escapeXml(SYMBOLS[cmd])}</mo>`);
-              continue;
-            }
-            if (FUNCTIONS.has(cmd)) {
-              nodes.push(`<mi class='obs-math-fn'>${escapeXml(cmd)}</mi>`);
-              continue;
-            }
-            nodes.push(`<mi>${escapeXml(cmd)}</mi>`);
+            nodes.push("<mspace linebreak='newline'/>");
             continue;
           }
-        }
-
-        let node = "";
-        if (/[0-9]/.test(char)) {
+          let cmd = "";
+          while (p < l && /[a-zA-Z]/.test(input[p])) cmd += input[p++];
+          if (!cmd) {
+            if (p < l) {
+              const sym = input[p++];
+              node = `<mo>${escapeXml(sym)}</mo>`;
+            }
+          } else if (cmd === "left" || cmd === "right") {
+            skip();
+            if (p < l) {
+              const delim = input[p++];
+              if (delim !== ".") nodes.push(`<mo>${escapeXml(delim)}</mo>`);
+            }
+            continue;
+          } else if (cmd === "frac") {
+            const num = readSubArg();
+            const den = readSubArg();
+            node = `<mfrac><mrow>${parseString(num)}</mrow><mrow>${parseString(den)}</mrow></mfrac>`;
+          } else if (cmd === "sqrt") {
+            skip();
+            let index = "";
+            if (p < l && input[p] === "[") {
+              p++;
+              const bStart = p;
+              while (p < l && input[p] !== "]") p++;
+              index = input.slice(bStart, p);
+              if (p < l && input[p] === "]") p++;
+            }
+            const rad = readSubArg();
+            node = index
+              ? `<mroot><mrow>${parseString(rad)}</mrow><mrow>${parseString(index)}</mrow></mroot>`
+              : `<msqrt><mrow>${parseString(rad)}</mrow></msqrt>`;
+          } else if (ACCENTS[cmd]) {
+            const body = readSubArg();
+            node = `<mover><mrow>${parseString(body)}</mrow><mo>${escapeXml(ACCENTS[cmd])}</mo></mover>`;
+          } else if (cmd === "mathbf" || cmd === "boldsymbol") {
+            const inner = readSubArg();
+            node = `<mstyle mathvariant='bold'>${parseString(inner)}</mstyle>`;
+          } else if (cmd === "mathbb") {
+            const inner = readSubArg().trim();
+            node = `<mi mathvariant='double-struck'>${escapeXml(BLACKBOARD[inner] || inner)}</mi>`;
+          } else if (cmd === "text" || cmd === "mathrm" || cmd === "textrm" || cmd === "operatorname") {
+            const txt = readSubArg();
+            node = `<mtext>${escapeXml(txt)}</mtext>`;
+          } else if (cmd === "rm" || cmd === "bf") {
+            skip();
+            let txt = "";
+            if (p < l && input[p] === "{") {
+              txt = readSubArg();
+            } else {
+              txt = input.slice(p).trim();
+              p = l;
+            }
+            node = cmd === "bf"
+              ? `<mstyle mathvariant='bold'>${escapeXml(txt)}</mstyle>`
+              : `<mtext>${escapeXml(txt)}</mtext>`;
+          } else if (GREEK[cmd]) {
+            node = `<mi>${escapeXml(GREEK[cmd])}</mi>`;
+          } else if (SYMBOLS[cmd]) {
+            node = `<mo>${escapeXml(SYMBOLS[cmd])}</mo>`;
+          } else if (FUNCTIONS.has(cmd)) {
+            node = `<mi class='obs-math-fn'>${escapeXml(cmd)}</mi>`;
+          } else {
+            node = `<mi>${escapeXml(cmd)}</mi>`;
+          }
+        } else if (/[0-9]/.test(char)) {
           let num = "";
           while (p < l && /[0-9.]/.test(input[p])) num += input[p++];
           node = `<mn>${num}</mn>`;
         } else if (/[a-zA-Z]/.test(char)) {
           node = `<mi>${char}</mi>`;
           p++;
-        } else if (char === "{" ) {
+        } else if (char === "{") {
           p++;
           const start = p;
           let depth = 1;
@@ -241,6 +234,8 @@ export class MarkdownAstEngine {
           node = `<mo>${escapeXml(char)}</mo>`;
           p++;
         }
+
+        if (!node) continue;
 
         // 处理上下标
         while (p < l) {
@@ -402,8 +397,9 @@ export class MarkdownAstEngine {
         return match;
       });
       text = text.replace(/\\\(([\s\S]+?)\\\)/g, (match, math) => {
-        if (this.isValidInlineLatex(math)) {
-          return `\u0000MATH${mathTokens.push(this.latexToMathML(math.trim(), false)) - 1}\u0000`;
+        const cleanedMath = String(math || "").trim();
+        if (cleanedMath && cleanedMath.length <= 300) {
+          return `\u0000MATH${mathTokens.push(this.latexToMathML(cleanedMath, false)) - 1}\u0000`;
         }
         return match;
       });
@@ -598,11 +594,42 @@ export class MarkdownAstEngine {
         continue;
       }
 
-      // 7. 列表项
+      // 7. 列表项（支持嵌套缩进子列表）
       if (/^\s*[-*+]\s+/.test(line)) {
-        const rows: string[] = [];
-        while (i < lines.length && /^\s*[-*+]\s+/.test(lines[i])) rows.push(lines[i++].replace(/^\s*[-*+]\s+/, ""));
-        html += `<ul>${rows.map((row) => `<li>${this.inlineMarkdown(row, options)}</li>`).join("")}</ul>`;
+        const entries: Array<{ indent: number; text: string; sub: string[] }> = [];
+        let baseIndent: number | null = null;
+        while (i < lines.length && /^\s*[-*+]\s+/.test(lines[i])) {
+          const match = lines[i].match(/^(\s*)[-*+]\s+(.*)$/);
+          const indent = match ? match[1].length : 0;
+          const body = match ? match[2] : lines[i].trim();
+          if (baseIndent === null) baseIndent = indent;
+          if (indent > baseIndent && entries.length > 0) {
+            entries[entries.length - 1].sub.push(body);
+          } else {
+            entries.push({ indent, text: body, sub: [] });
+          }
+          i++;
+        }
+        html += `<ul>${entries.map(entry => {
+          const subHtml = entry.sub.length
+            ? `<ul>${entry.sub.map(s => `<li>${this.inlineMarkdown(s, options)}</li>`).join("")}</ul>`
+            : "";
+          return `<li>${this.inlineMarkdown(entry.text, options)}${subHtml}</li>`;
+        }).join("")}</ul>`;
+        continue;
+      }
+
+      // 7b. 有序列表
+      if (/^\s*\d+\.\s+/.test(line)) {
+        const items: string[] = [];
+        while (i < lines.length && /^\s*\d+\.\s+/.test(lines[i])) {
+          let body = lines[i++].replace(/^\s*\d+\.\s+/, "");
+          while (i < lines.length && /^(?: {2,}|\t)(?!\s*(?:\$\$|```|[-*+]\s|\d+\.\s))/.test(lines[i]) && lines[i].trim()) {
+            body += " " + lines[i++].trim();
+          }
+          items.push(body);
+        }
+        html += `<ol>${items.map((item) => `<li>${this.inlineMarkdown(item, options)}</li>`).join("")}</ol>`;
         continue;
       }
 
@@ -646,7 +673,7 @@ export class MarkdownAstEngine {
       if (!line.trim()) { i++; continue; }
       const paragraph: string[] = [line];
       i++;
-      while (i < lines.length && lines[i].trim() && !/^(```|#{1,6}\s|>\s?|\s*[-*+]\s+|\s*\$\s*)/.test(lines[i]) && !(lines[i].includes("|") && this.isTableDelimiterRow(lines[i + 1]))) {
+      while (i < lines.length && lines[i].trim() && !/^(```|#{1,6}\s|>\s?|\s*[-*+]\s+|\s*\d+\.\s+|\s*\$\$)/.test(lines[i]) && !(lines[i].includes("|") && this.isTableDelimiterRow(lines[i + 1]))) {
         paragraph.push(lines[i++]);
       }
 

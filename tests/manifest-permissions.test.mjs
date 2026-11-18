@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { auditManifestPermissions, reviewedApiPermissions } from '../scripts/manifest-permission-policy.mjs';
+import { auditManifestPermissions, reviewedApiPermissions, reviewedOptionalApiPermissions } from '../scripts/manifest-permission-policy.mjs';
 
 const manifest = JSON.parse(await readFile(new URL('../manifest.json', import.meta.url), 'utf8'));
 const clone = () => structuredClone(manifest);
@@ -28,10 +28,11 @@ test('every reviewed API permission still has a source usage', async () => {
     declarativeNetRequest: 'declarativeNetRequest', identity: 'chrome.identity',
     scripting: 'chrome.scripting', notifications: 'chrome.notifications',
     downloads: 'downloads.download', contextMenus: 'chrome.contextMenus', clipboardWrite: 'clipboard.write',
+    nativeMessaging: 'sendNativeMessage',
   };
   for (const permission of manifest.permissions) {
     assert.ok(evidence[permission], 'Missing evidence mapping for ' + permission);
-    const output = execFileSync('git', ['grep', '-l', '-F', evidence[permission], '--', 'src'],
+    const output = execFileSync('git', ['grep', '-l', '-F', '--untracked', evidence[permission], '--', 'src'],
       { cwd: new URL('..', import.meta.url), encoding: 'utf8' });
     assert.ok(output.trim(), 'No source evidence for ' + permission);
   }
@@ -66,4 +67,5 @@ test('removing a reviewed permission is allowed', () => {
 
 test('policy list matches the manifest exactly so removals update the ceiling deliberately', () => {
   assert.deepEqual([...manifest.permissions].sort(), [...reviewedApiPermissions].sort());
+  assert.deepEqual([...(manifest.optional_permissions || [])].sort(), [...reviewedOptionalApiPermissions].sort());
 });

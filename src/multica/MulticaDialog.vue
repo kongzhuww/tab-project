@@ -1,28 +1,33 @@
 <script setup lang="ts">
 import { computed, defineAsyncComponent, defineComponent, h, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import { fullscreenCardState } from "../core/fullscreen-card-state";
-import { multicaService, type MulticaAgent, type MulticaRuntime, type MulticaIssue, type MulticaComment } from "../services/multica.service";
-import { commentPollBackoff } from './poll-backoff';
 import type { AiHotFeedArticle } from "../aihot/aihot-feed-store";
-import { sessionTitle, messageWithArticles } from "./session-content";
+import { messageWithArticles } from "./session-content";
 import ProviderPicker from "./ProviderPicker.vue";
 import { useByokChat } from './use-byok-chat';
+import { useNativeAgent } from './use-native-agent';
 import ConversationSidebar from './ConversationSidebar.vue';
 import ComposerTools from "./ComposerTools.vue";
+import ClawdMascot from "./ClawdMascot.vue";
 import LoadingIndicator from "./LoadingIndicator.vue";
 import ResourceAttachmentCard from "./ResourceAttachment.vue";
 import { messageWithResources, RESOURCE_LIMIT, type ResourceAttachment } from "./resource-content";
 import { parseTodoistResource, TODOIST_RESOURCE_MIME } from '../todoist/task-resource';
 import { shouldSendComposer } from "./composer-keyboard";
 import { aiWorkspaceBridge } from "./workspace-bridge";
+import { buildSessionTelemetry, extractChangedFiles, formatCompactK, parseContextWindowSize, type HudTurnInput } from "./token-hud";
+
+const TokenHudPopover = defineAsyncComponent(() => import('./TokenHudPopover.vue'));
+const CipherRippleCanvas = defineAsyncComponent(() => import('./CipherRippleCanvas.vue'));
+const HomeUsageCard = defineAsyncComponent(() => import('./HomeUsageCard.vue'));
 
 const AiHotPanel = defineAsyncComponent(() => import('./AiHotPanel.vue'));
 const ResourcePanel = defineAsyncComponent(() => import('./ResourcePanel.vue'));
 const TodoistPanel = defineAsyncComponent(() => import('./TodoistPanel.vue'));
 const AiSettings = defineAsyncComponent(() => import('./AiSettings.vue'));
 const AiSchedulePanel = defineAsyncComponent(() => import('./AiSchedulePanel.vue'));
+const EmployeesPanel = defineAsyncComponent(() => import('../agents/EmployeesPanel.vue'));
 const BackpackLibrary = defineAsyncComponent(() => import('../backpack/BackpackDialog.vue'));
-const RunTrace = defineAsyncComponent(() => import('./RunTrace.vue'));
 const MessageMarkdown = defineAsyncComponent({
   loader: () => import('./MessageMarkdown.vue'),
   loadingComponent: defineComponent({ setup: () => () => h(LoadingIndicator, { label: '正在加载内容' }) }),
@@ -30,58 +35,49 @@ const MessageMarkdown = defineAsyncComponent({
   delay: 150
 });
 
-const service = ref<'multica' | 'deepseek'>('multica');
-const workspaceSection = ref<'chat' | 'library' | 'schedule'>('chat');
-const libraryOpened = ref(false), scheduleOpened = ref(false);
+const service = ref<'deepseek' | 'native'>('native');
+const workspaceSection = ref<'chat' | 'library' | 'schedule' | 'agents'>('chat');
+const libraryOpened = ref(false), scheduleOpened = ref(false), agentsOpened = ref(false);
 const workspaceVisible = computed(() => fullscreenCardState.activeId === 'multica');
-const active = computed(() => workspaceVisible.value && service.value === 'multica' && workspaceSection.value === 'chat');
 const byok = useByokChat();
-const { conversations: localConversations, current: byokCurrent, currentId: byokCurrentId, error: byokError, configured: byokConfigured, model: byokModel, effort: byokEffort, sending: byokSending } = byok;
+const { conversations: localConversations, current: byokCurrent, currentId: byokCurrentId, error: byokError, configured: byokConfigured, model: byokModel, providerLabel: byokLabel, effort: byokEffort, sending: byokSending } = byok;
+const nativeAgent = useNativeAgent();
+const { conversations: nativeConversations, current: nativeCurrent, currentId: nativeCurrentId, error: nativeError, connected: nativeConnected, hostInfo: nativeHostInfo, discoveredAgents: nativeDiscoveredAgents, acpProfiles: nativeAcpProfiles, activeAgentId: nativeActiveAgentId, activeAgentLabel: nativeActiveAgentLabel, piModels: nativePiModels, activeModel: nativeActiveModel, activeThinking: nativeActiveThinking, piToolsEnabled: nativeToolsEnabled, sending: nativeSending } = nativeAgent;
 const deepseekModels = ref<string[]>([]);
-async function refreshByokConfig() { try { const c = await byok.refreshConfig(); deepseekModels.value = c.key ? c.models : []; } catch { deepseekModels.value = []; } }
+async function refreshByokConfig() { try { const c = await byok.refreshConfig(); deepseekModels.value = c.configured ? (c.models.length ? c.models : [c.model].filter(Boolean)) : []; } catch { deepseekModels.value = []; } }
 async function refreshLocalConversations() { try { await byok.refreshHistory(); } catch { byokError.value = '本地会话读取失败。'; } }
-onMounted(() => { void refreshByokConfig(); void refreshLocalConversations(); });
-watch(workspaceVisible, visible => { if (visible) { void refreshByokConfig(); void refreshLocalConversations(); } });
-function openLocalConversation(id: string) { if (byokSending.value || sending.value || switchingAgent.value) return; workspaceSection.value = 'chat'; byok.selectChat(id); service.value = 'deepseek'; }
+async function refreshNativeAgent() { await Promise.all([nativeAgent.refreshStatus(), nativeAgent.refreshHistory()]); }
+onMounted(() => { void refreshByokConfig(); void refreshLocalConversations(); void refreshNativeAgent(); });
+watch(workspaceVisible, visible => {
+  if (visible) {
+    void refreshByokConfig();
+    void refreshLocalConversations();
+    void refreshNativeAgent();
+  } else {
+    activePanel.value = null;
+    settingsOpen.value = false;
+    settingsBusy.value = false;
+  }
+});
+function openLocalConversation(id: string) { if (anySending.value) return; workspaceSection.value = 'chat'; byok.selectChat(id); service.value = 'deepseek'; }
+function openNativeConversation(id: string) { if (anySending.value) return; workspaceSection.value = 'chat'; nativeAgent.selectChat(id); service.value = 'native'; }
 function chooseDeepseek(model: string) {
-  if (service.value !== 'deepseek') { byok.newChat(); selected.value = null; service.value = 'deepseek'; }
+  if (service.value !== 'deepseek') { byok.newChat(); service.value = 'deepseek'; }
   void byok.chooseModel(model);
 }
-function chooseAgent(id: string) {
-  if (service.value === 'deepseek') { byok.newChat(); selected.value = null; agentId.value = id; service.value = 'multica'; }
-  else if (selected.value) replacementAgentId.value = id;
-  else agentId.value = id;
+function chooseNative(agentId = 'pi', modelId = '') {
+  if (anySending.value) return;
+  workspaceSection.value = 'chat';
+  if (service.value !== 'native') nativeAgent.newChat();
+  service.value = 'native';
+  void nativeAgent.chooseAgentAndModel(agentId, modelId);
+  void nativeAgent.refreshStatus();
 }
-function openIssue(issue: MulticaIssue) { if (byokSending.value || sending.value || switchingAgent.value) return; workspaceSection.value = 'chat'; service.value = 'multica'; selectIssue(issue); }
-function newConversation() { if (anySending.value || switchingAgent.value) return; workspaceSection.value = 'chat'; if (service.value === 'deepseek') byok.newChat(); else startNew(); }
-const connected = ref(false), loading = ref(false), sending = ref(false), uncertain = ref(false), switchingAgent = ref(false);
-const replacementAgentId = ref('');
-const issuesLoading = ref(false), agentsLoading = ref(false);
-const error = ref(""), issuesError = ref(""), agentsError = ref(""), notice = ref("");
-let refreshPromise: Promise<void> | null = null;
-let refreshVersion = 0;
+function newConversation() { if (anySending.value) return; workspaceSection.value = 'chat'; if (service.value === 'deepseek') byok.newChat(); else nativeAgent.newChat(); }
+const notice = ref("");
 const settingsOpen = ref(false), settingsBusy = ref(false);
-const workspaceIdForAgents = ref('');
-const settingsTab = ref<'multica' | 'deepseek'>('multica');
-function openSettings(tab: 'multica' | 'deepseek' = service.value) { settingsTab.value = tab; settingsOpen.value = true; }
-const agents = ref<MulticaAgent[]>([]), runtimes = ref<MulticaRuntime[]>([]), issues = ref<MulticaIssue[]>([]);
-const selected = ref<MulticaIssue | null>(null), comments = ref<MulticaComment[]>([]);
-const commentsLoading = ref(false), commentsError = ref("");
-const commentsShown = ref(0);
-const visibleComments = computed(() => comments.value.slice(0, commentsShown.value));
-let commentFrame: number | undefined;
-watch(comments, list => {
-  if (commentFrame !== undefined) cancelAnimationFrame(commentFrame);
-  commentsShown.value = Math.min(8, list.length);
-  const nextBatch = () => {
-    if (commentsShown.value >= comments.value.length) { commentFrame = undefined; return; }
-    commentsShown.value = Math.min(commentsShown.value + 8, comments.value.length);
-    commentFrame = requestAnimationFrame(nextBatch);
-  };
-  if (commentsShown.value < list.length) commentFrame = requestAnimationFrame(nextBatch);
-}, { flush: 'sync' });
-onBeforeUnmount(() => { if (commentFrame !== undefined) cancelAnimationFrame(commentFrame); clearInterval(commentPollTimer); });
-const agentId = ref("");
+const settingsTab = ref<'deepseek' | 'native'>('native');
+function openSettings(tab: 'deepseek' | 'native' = service.value) { settingsTab.value = tab; settingsOpen.value = true; }
 const activePanel = ref<'aihot' | 'bilibili' | 'github' | 'todoist' | null>(null);
 const todoistPanelOpened = ref(false);
 watch(activePanel, panel => { if (panel === 'todoist') todoistPanelOpened.value = true; });
@@ -89,7 +85,7 @@ const resourceBrowserOpen = computed(() => workspaceSection.value === 'chat' && 
 const composerWrap = ref<HTMLElement | null>(null);
 let composerMotion: Animation | undefined;
 let composerMotionVersion = 0;
-watch(resourceBrowserOpen, async () => {
+watch([resourceBrowserOpen, () => currentConversation.value], async () => {
   const node = composerWrap.value;
   if (!node || !workspaceVisible.value || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
   const before = node.getBoundingClientRect();
@@ -100,7 +96,10 @@ watch(resourceBrowserOpen, async () => {
   const after = node.getBoundingClientRect();
   const x = before.left - after.left, y = before.top - after.top;
   if (Math.abs(x) < 1 && Math.abs(y) < 1) return;
-  composerMotion = node.animate([{ transform: `translate(${x}px, ${y}px)` }, { transform: 'translate(0, 0)' }], { duration: 300, easing: 'cubic-bezier(.22, 1, .36, 1)' });
+  composerMotion = node.animate(
+    [{ transform: `translate3d(${x}px, ${y}px, 0)` }, { transform: 'translate3d(0, 0, 0)' }],
+    { duration: 640, easing: 'cubic-bezier(.25, .9, .3, 1)' }
+  );
 }, { flush: 'pre' });
 onBeforeUnmount(() => { composerMotionVersion++; composerMotion?.cancel(); });
 const dragged = ref<{ kind:'resource'; value:ResourceAttachment } | { kind:'article'; value:AiHotFeedArticle } | null>(null);
@@ -127,22 +126,19 @@ function dropResource(event:DragEvent) {
 }
 const composerInput = ref<HTMLTextAreaElement | null>(null);
 const drafts = reactive<Record<string, { text: string; articles: AiHotFeedArticle[]; resources: ResourceAttachment[] }>>({ new: { text: "", articles: [], resources: [] } });
-const draftKey = computed(() => service.value === 'deepseek' ? (byokCurrentId.value ? `byok:${byokCurrentId.value}` : 'new') : (selected.value ? `multica:${selected.value.id}` : 'new'));
-const currentConversation = computed(() => service.value === 'deepseek' ? Boolean(byokCurrent.value) : Boolean(selected.value));
-const anySending = computed(() => sending.value || byokSending.value);
+const draftKey = computed(() => service.value === 'native' ? (nativeCurrentId.value ? `native:${nativeCurrentId.value}` : 'new') : (byokCurrentId.value ? `byok:${byokCurrentId.value}` : 'new'));
+const currentConversation = computed(() => service.value === 'native' ? Boolean(nativeCurrent.value) : Boolean(byokCurrent.value));
+const anySending = computed(() => byokSending.value || nativeSending.value);
 const draft = computed(() => drafts[draftKey.value] || (drafts[draftKey.value] = { text: "", articles: [], resources: [] }));
-const onlineAgents = computed(() => agents.value.filter(a => !a.archived_at && a.runtime_id && runtimes.value.some(r => r.id === a.runtime_id && r.status === "online")));
-watch(() => [workspaceVisible.value, aiWorkspaceBridge.pending?.id, anySending.value, switchingAgent.value] as const, async ([visible, id, busy, switching]) => {
-  if (!visible || !id || busy || switching) return;
+watch(() => [workspaceVisible.value, aiWorkspaceBridge.pending?.id, anySending.value] as const, async ([visible, id, busy]) => {
+  if (!visible || !id || busy) return;
   const request = aiWorkspaceBridge.pending;
   if (!request || request.id !== id) return;
   if (request.kind === 'deepseek') {
     await refreshLocalConversations();
-    if (!workspaceVisible.value || aiWorkspaceBridge.pending?.id !== id || anySending.value || switchingAgent.value) return;
+    if (!workspaceVisible.value || aiWorkspaceBridge.pending?.id !== id || anySending.value) return;
     if (!localConversations.value.some(item => item.id === request.conversationId)) { byokError.value = '该本地会话已不存在。'; aiWorkspaceBridge.pending = null; return; }
     openLocalConversation(request.conversationId);
-  } else if (request.kind === 'multica') {
-    openIssue(request.issue);
   } else {
     newConversation();
     const existing = draft.value.text;
@@ -159,137 +155,243 @@ watch(() => [workspaceVisible.value, aiWorkspaceBridge.pending?.id, anySending.v
   }
   if (aiWorkspaceBridge.pending?.id === id) aiWorkspaceBridge.pending = null;
 }, { immediate: true });
-function navigateWorkspace(section: 'library' | 'schedule') {
+function navigateWorkspace(section: 'library' | 'schedule' | 'agents') {
   workspaceSection.value = section; activePanel.value = null;
   if (section === 'library') libraryOpened.value = true;
   if (section === 'schedule') scheduleOpened.value = true;
-  if (section === 'schedule') void nextTick(async () => { if (refreshPromise) await refreshPromise; if (workspaceVisible.value && workspaceSection.value === 'schedule') await refresh(); });
+  if (section === 'agents') agentsOpened.value = true;
 }
-let commentRequest = 0;
-const statusNames: Record<string, string> = { backlog: "待处理", todo: "待处理", in_progress: "进行中", in_review: "待审核", done: "已完成", cancelled: "已取消", canceled: "已取消" };
-function statusName(issue: MulticaIssue) { return statusNames[issue.status_category || ""] || statusNames[issue.status || ""] || issue.status || "未知"; }
-function statusColor(issue: MulticaIssue) {
-  const name = statusName(issue);
-  return name === '待审核' ? 'review' : name === '已完成' || name === '完成' ? 'done' : name === '待处理' ? 'pending' : '';
-}
-function agentName(id?: string | null) { return agents.value.find(a => a.id === id)?.name || "未分配或不可见"; }
-function agentModel(id?: string | null) { return agents.value.find(a => a.id === id)?.model || '运行时默认模型'; }
 function resizeComposer() {
   const input = composerInput.value;
   if (!input) return;
   input.style.height = "auto";
   input.style.height = `${Math.min(input.scrollHeight, 160)}px`;
 }
-watch([draftKey, () => draft.value.text, active, connected], () => { void nextTick(resizeComposer); }, { flush: "post" });
-function dateLabel(value?: string) { if (!value) return ""; const d = new Date(value); return Number.isNaN(d.getTime()) ? "" : d.toLocaleString(undefined, { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" }); }
-async function refresh() {
-  if (refreshPromise) return refreshPromise;
-  loading.value = true; issuesLoading.value = true; agentsLoading.value = true;
-  error.value = ''; issuesError.value = ''; agentsError.value = '';
-  const version = refreshVersion;
-  refreshPromise = (async () => {
-    try {
-      const hasConnection = await multicaService.isConnected();
-      if (version !== refreshVersion) return;
-      connected.value = hasConnection;
-      if (!connected.value) { issues.value = []; agents.value = []; runtimes.value = []; selected.value = null; workspaceIdForAgents.value = ''; return; }
-      await Promise.all([
-        (async () => {
-          try {
-            const list = await multicaService.issues();
-            if (version !== refreshVersion) return;
-            issues.value = list;
-            if (selected.value) selected.value = list.find(i => i.id === selected.value?.id) || selected.value;
-          } catch (e) { if (version === refreshVersion) issuesError.value = e instanceof Error ? e.message : '会话列表读取失败'; }
-          finally { issuesLoading.value = false; }
-        })(),
-        (async () => {
-          try {
-            const info = await multicaService.info(true);
-            if (version !== refreshVersion) return;
-            runtimes.value = info.runtimes; agents.value = info.agents; workspaceIdForAgents.value = info.workspaceId;
-            if (!onlineAgents.value.some(a => a.id === agentId.value)) agentId.value = onlineAgents.value[0]?.id || '';
-          } catch (e) { if (version === refreshVersion) agentsError.value = e instanceof Error ? e.message : '助手列表读取失败'; }
-          finally { agentsLoading.value = false; }
-        })()
-      ]);
-    } catch (e) { if (version === refreshVersion) error.value = e instanceof Error ? e.message : '读取失败'; }
-    finally { loading.value = false; issuesLoading.value = false; agentsLoading.value = false; }
-  })();
-  try { await refreshPromise; } finally { refreshPromise = null; }
+watch([draftKey, () => draft.value.text, workspaceVisible], () => { void nextTick(resizeComposer); }, { flush: "post" });
+const copiedKey = ref('');
+let copiedTimer: ReturnType<typeof setTimeout> | null = null;
+async function copyMessage(text: string, key: string) {
+  if (!text) return;
+  try {
+    await navigator.clipboard.writeText(text);
+    copiedKey.value = key;
+    if (copiedTimer) clearTimeout(copiedTimer);
+    copiedTimer = setTimeout(() => { if (copiedKey.value === key) copiedKey.value = ''; }, 1500);
+  } catch {}
 }
-watch(active, visible => {
-  if (visible) {
-    if (selected.value && !commentsLoading.value) void loadComments(selected.value);
-    const pending = refreshPromise;
-    if (pending) void pending.then(() => { if (active.value) void refresh(); });
-    else void refresh();
-  } else {
-    refreshVersion++; ++commentRequest; commentsLoading.value = false;
-    activePanel.value = null; settingsOpen.value = false; settingsBusy.value = false;
+function relativeTimeLabel(ts?: number) {
+  if (!ts) return '';
+  const mins = Math.floor(Math.max(0, Date.now() - ts) / 60000);
+  if (mins < 1) return '刚刚';
+  if (mins < 60) return `${mins}分钟前`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}小时前`;
+  return `${Math.floor(hours / 24)}天前`;
+}
+function durationLabel(ms?: number) {
+  if (typeof ms !== 'number' || !Number.isFinite(ms) || ms <= 0) return '';
+  if (ms < 1000) return `${Math.round(ms)}ms`;
+  if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`;
+  return `${Math.round(ms / 60000)}分钟`;
+}
+function usageDetail(
+  usage?: { input?: number; output?: number; cacheRead?: number; reasoning?: number; totalTokens?: number } | null,
+  durationMs?: number,
+  stepsCount?: number
+) {
+  const input = usage?.input || 0;
+  const output = usage?.output || 0;
+  const cacheRead = usage?.cacheRead || 0;
+  const reasoning = usage?.reasoning || 0;
+  const ctxTotal = input + cacheRead;
+  const totalTok = usage?.totalTokens || ctxTotal + output;
+  const cachePct = ctxTotal > 0 && cacheRead > 0 ? Math.round((cacheRead / ctxTotal) * 100) : 0;
+  const speed = durationMs && durationMs > 0 && output > 0 ? Math.round(output / (durationMs / 1000)) : 0;
+  const ctxLabel = ctxTotal > 0 ? formatCompactK(ctxTotal) : totalTok > 0 ? formatCompactK(totalTok) : '';
+  const deltaLabel = input > 0 && cacheRead > 0 ? `+${formatCompactK(input)}` : '';
+  const outLabel = output > 0 ? formatCompactK(output) : '';
+  const reasoningLabel = reasoning > 0 ? formatCompactK(reasoning) : '';
+  return {
+    hasAny: Boolean(ctxLabel || outLabel || reasoningLabel || stepsCount || speed || cachePct),
+    ctxLabel,
+    deltaLabel,
+    outLabel,
+    reasoningLabel,
+    stepsCount: stepsCount || 0,
+    speed,
+    cachePct,
+  };
+}
+function turnIndexOf(messages: Array<{ role: string }>, index: number) {
+  let count = 0;
+  for (let i = 0; i <= index; i++) {
+    if (messages[i]?.role === 'assistant') count++;
   }
+  return count;
+}
+function shortCwdLabel(cwd?: string) {
+  if (!cwd) return '本机';
+  const normalized = cwd.replace(/^\/Users\/[^/]+/, '~').replace(/^[A-Za-z]:\\Users\\[^\\]+/, '~');
+  if (normalized.length <= 24) return normalized;
+  const parts = normalized.split(/[\\/]/).filter(Boolean);
+  return parts.length ? `…/${parts[parts.length - 1]}` : normalized;
+}
+const turnCountLabel = computed(() => {
+  const list = service.value === 'native'
+    ? nativeCurrent.value?.messages
+    : byokCurrent.value?.messages;
+  if (!list?.length) return '';
+  const turns = list.filter((m: any) => m.role === 'assistant').length;
+  return turns ? `${turns} 轮` : '';
+});
+const conversationEl = ref<HTMLElement | null>(null);
+const activeRailIndex = ref(0);
+const railAnchors = computed(() => {
+  if (service.value === 'native' && nativeCurrent.value) {
+    return nativeCurrent.value.messages
+      .map((m, idx) => ({ idx, role: m.role, label: m.content.slice(0, 42) }))
+      .filter(item => item.role === 'user');
+  }
+  if (service.value === 'deepseek' && byokCurrent.value) {
+    return byokCurrent.value.messages
+      .map((m, idx) => ({ idx, role: m.role, label: m.content.slice(0, 42) }))
+      .filter(item => item.role === 'user');
+  }
+  return [];
+});
+function scrollToTurn(idx: number) {
+  activeRailIndex.value = idx;
+  const target = conversationEl.value?.querySelector<HTMLElement>(`[data-turn-anchor="${idx}"]`);
+  target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+watch(railAnchors, anchors => {
+  if (anchors.length) activeRailIndex.value = anchors[anchors.length - 1].idx;
 }, { immediate: true });
-async function onConnectionChanged() {
-  refreshVersion++;
-  ++commentRequest;
-  connected.value = false; selected.value = null; comments.value = []; commentsLoading.value = false;
-  issues.value = []; agents.value = []; runtimes.value = []; agentId.value = ''; workspaceIdForAgents.value = '';
-  const pending = refreshPromise;
-  if (pending) await pending;
-  if (active.value) await refresh();
+const hudOpen = ref(false);
+const hudAnchorEl = ref<HTMLElement | null>(null);
+const hudAnchorRect = ref<{ left: number; right: number; top: number; bottom: number } | null>(null);
+const hudAlign = ref<'left' | 'right'>('right');
+const isPetThinking = computed(() => {
+  if (service.value === 'deepseek' && byokSending.value && byokCurrent.value) {
+    const last = byokCurrent.value.messages[byokCurrent.value.messages.length - 1];
+    return Boolean(last && last.role === 'assistant' && !last.content);
+  }
+  if (service.value === 'native' && nativeSending.value) return true;
+  return false;
+});
+const activePetError = computed(() => {
+  if (service.value === 'native') return Boolean(nativeError.value);
+  return Boolean(byokError.value);
+});
+watch([workspaceVisible, workspaceSection], ([visible, sec]) => {
+  if (!visible || sec !== 'chat') {
+    hudOpen.value = false;
+    hudAnchorEl.value = null;
+  }
+});
+function syncHudAnchorRect() {
+  const el = hudAnchorEl.value;
+  if (!hudOpen.value || !el || !el.isConnected) return;
+  const rect = el.getBoundingClientRect();
+  hudAnchorRect.value = { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom };
 }
-let pollFailures = 0, nextCommentPollAt = 0, pollBlocked = false;
-async function loadComments(issue: MulticaIssue, silent = false) {
-  const current = ++commentRequest;
-  if (!silent) { commentsLoading.value = true; commentsError.value = ""; }
-  try {
-    const result = await multicaService.issueComments(issue.id);
-    if (current === commentRequest) {
-      if (JSON.stringify(comments.value) !== JSON.stringify(result)) comments.value = result;
-      commentsError.value = ''; pollFailures = 0; pollBlocked = false; nextCommentPollAt = Date.now() + 20000;
+function toggleHud(event: MouseEvent, align: 'left' | 'right') {
+  const el = event.currentTarget as HTMLElement | null;
+  if (hudOpen.value && hudAlign.value === align) {
+    hudOpen.value = false;
+    hudAnchorEl.value = null;
+    return;
+  }
+  hudAlign.value = align;
+  hudAnchorEl.value = el;
+  const rect = el ? el.getBoundingClientRect() : null;
+  hudAnchorRect.value = rect ? { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom } : null;
+  hudOpen.value = true;
+}
+function refreshHudTelemetry() {
+  void refreshByokConfig();
+  void refreshLocalConversations();
+  void refreshNativeAgent();
+  syncHudAnchorRect();
+}
+onMounted(() => { window.addEventListener('resize', syncHudAnchorRect); });
+onBeforeUnmount(() => { window.removeEventListener('resize', syncHudAnchorRect); });
+const activeModelLabelForHud = computed(() => {
+  if (service.value === 'native') {
+    if (nativeActiveAgentId.value === 'pi') return nativeCurrent.value?.model || nativeActiveModel.value || 'Pi 默认模型';
+    return nativeActiveAgentLabel.value;
+  }
+  return byokCurrent.value?.model || byokModel.value || 'DeepSeek';
+});
+const activeMaxContextForHud = computed(() => {
+  if (service.value === 'native' && nativeActiveAgentId.value === 'pi') {
+    const target = (nativeCurrent.value?.model || nativeActiveModel.value || '').toLowerCase();
+    const matched = nativePiModels.value.find(m => m.id.toLowerCase() === target || m.model.toLowerCase() === target);
+    const parsed = parseContextWindowSize(matched?.context);
+    if (parsed > 0) return parsed;
+  }
+  return service.value === 'deepseek' ? 128_000 : 200_000;
+});
+const sessionTelemetry = computed(() => {
+  const turns: HudTurnInput[] = [];
+  if (service.value === 'native' && nativeCurrent.value) {
+    let lastUser = '';
+    let turnNum = 0;
+    for (const msg of nativeCurrent.value.messages) {
+      if (msg.role === 'user') lastUser = msg.content;
+      else if (msg.role === 'assistant') {
+        turnNum++;
+        turns.push({
+          turn: turnNum,
+          model: msg.modelLabel || activeModelLabelForHud.value,
+          userPreview: lastUser,
+          durationMs: msg.durationMs,
+          toolCalls: msg.toolSteps?.length || 0,
+          toolNames: (msg.toolSteps || []).map(s => s.name),
+          usage: msg.usage || null,
+        });
+      }
     }
-  } catch (e) {
-    if (current === commentRequest) {
-      pollFailures++;
-      const { delay, blocked } = commentPollBackoff(pollFailures, e);
-      pollBlocked = blocked;
-      nextCommentPollAt = Date.now() + delay;
-      const message = e instanceof Error ? e.message : '评论加载失败';
-      commentsError.value = comments.value.length ? `${message} 已保留现有内容；${blocked ? '请检查连接设置。' : '自动检查已放慢。'}` : message;
+  } else if (service.value === 'deepseek' && byokCurrent.value) {
+    let lastUser = '';
+    let turnNum = 0;
+    for (const msg of byokCurrent.value.messages) {
+      if (msg.role === 'user') lastUser = msg.content;
+      else if (msg.role === 'assistant' && !msg.incomplete) {
+        turnNum++;
+        turns.push({
+          turn: turnNum,
+          model: byokCurrent.value.model,
+          userPreview: lastUser,
+          durationMs: msg.durationMs,
+          toolCalls: 0,
+          toolNames: [],
+        });
+      }
     }
-  } finally { if (current === commentRequest && !silent) commentsLoading.value = false; }
+  }
+  return buildSessionTelemetry({
+    modelName: activeModelLabelForHud.value,
+    maxContext: activeMaxContextForHud.value,
+    draftText: draft.value.text,
+    turns,
+  });
+});
+function fillCompactCommand() {
+  draft.value.text = '/compact';
+  hudOpen.value = false;
+  void nextTick(() => composerInput.value?.focus());
 }
-let pollingComments = false;
-const commentPollTimer = setInterval(async () => {
-  if (!active.value || document.visibilityState !== 'visible' || !selected.value || commentsLoading.value || pollingComments || sending.value || switchingAgent.value || pollBlocked || Date.now() < nextCommentPollAt) return;
-  pollingComments = true;
-  try { await loadComments(selected.value, true); } finally { pollingComments = false; }
-}, 20000);
-function selectIssue(issue: MulticaIssue) {
-  if (sending.value || switchingAgent.value) return;
-  replacementAgentId.value = issue.assignee_id || '';
-  pollFailures = 0; pollBlocked = false; nextCommentPollAt = 0;
-  selected.value = issue; comments.value = []; uncertain.value = false; notice.value = "";
-  void loadComments(issue);
+function createAutomationWithPrompt() {
+  newConversation();
+  draft.value.text = '';
+  void nextTick(() => {
+    resizeComposer();
+    composerInput.value?.focus();
+  });
 }
-function startNew() {
-  if (sending.value || switchingAgent.value) return;
-  replacementAgentId.value = '';
-  selected.value = null; ++commentRequest; comments.value = []; commentsLoading.value = false; uncertain.value = false; notice.value = "";
-}
-async function switchAgent() {
-  const issue = selected.value, target = replacementAgentId.value;
-  if (!issue || !target || target === issue.assignee_id || switchingAgent.value || sending.value || uncertain.value || !onlineAgents.value.some(agent => agent.id === target)) return;
-  switchingAgent.value = true; notice.value = '';
-  try {
-    const updated = await multicaService.switchIssueAgent(issue.id, issue.assignee_id || null, target);
-    if (selected.value?.id === issue.id) selected.value = { ...issue, ...updated };
-    issues.value = issues.value.map(item => item.id === issue.id ? { ...item, ...updated } : item);
-    notice.value = `已将会话交给 ${agentName(target)}；切换不等于重试，请检查运行记录后继续。`;
-  } catch (e) {
-    uncertain.value = true;
-    notice.value = `${e instanceof Error ? e.message : '切换结果未确认'} 请先到 Multica 核对结果，避免重复操作。`;
-  } finally { switchingAgent.value = false; }
+function onConnectionChanged() {
+  void nativeAgent.refreshStatus();
 }
 function toggleArticle(article: AiHotFeedArticle) {
   if (anySending.value) return;
@@ -320,92 +422,56 @@ function onComposerKeydown(event: KeyboardEvent) {
   void send();
 }
 async function send() {
-  if (service.value === 'deepseek') {
+  if (service.value === 'native') {
     if (anySending.value || !draft.value.text.trim()) return;
     const currentDraft = draft.value, text = currentDraft.text.trim();
     const content = messageWithResources(messageWithArticles(text, currentDraft.articles), currentDraft.resources);
-    await byok.send(text, content, () => { currentDraft.text = ''; currentDraft.articles = []; currentDraft.resources = []; });
+    await nativeAgent.send(text, content, () => { currentDraft.text = ''; currentDraft.articles = []; currentDraft.resources = []; });
     return;
   }
-  if (sending.value || switchingAgent.value || uncertain.value || (selected.value && replacementAgentId.value !== (selected.value.assignee_id || '')) || !draft.value.text.trim()) return;
-  const issue = selected.value, currentDraft = draft.value;
-  const text = currentDraft.text.trim(), title = sessionTitle(text), content = messageWithResources(messageWithArticles(text, currentDraft.articles), currentDraft.resources, { multicaBridge:true });
-  if (!connected.value || (!issue && (!agentId.value || agentsLoading.value || Boolean(agentsError.value)))) return;
-  sending.value = true; notice.value = "";
-  let workspaceId = '', knownRunIds: string[] = [];
-  try {
-    workspaceId = await multicaService.activeWorkspaceId() || '';
-    if (!workspaceId) throw new Error('当前 Multica 工作区不可用');
-    if (issue) knownRunIds = (await multicaService.issueRuns(issue.id, workspaceId)).map(run => run.id);
-  } catch (e) {
-    notice.value = `无法建立执行记录基线，消息未发送：${e instanceof Error ? e.message : '请稍后重试'}`;
-    sending.value = false; return;
-  }
-  async function trackSent(issueId: string) {
-    try {
-      const reply = await chrome.runtime.sendMessage({ type:'ai-workspace:track-multica', issueId, title, knownRunIds, workspaceId });
-      if (!reply?.ok) throw new Error(reply?.error || '后台未确认');
-    } catch (e) { notice.value = `消息已发送，但完成提醒未启用：${e instanceof Error ? e.message : '请手动查看进度'}。请勿重复发送。`; }
-  }
-  try {
-    if (!issue) {
-      const result = await multicaService.createIssue(title, content, agentId.value, workspaceId);
-      currentDraft.text = ""; currentDraft.articles = []; currentDraft.resources = [];
-      const created = issues.value.find(i => i.id === result.id) || { id: result.id, identifier: result.identifier, title, description: content, assignee_id: agentId.value };
-      if (!issues.value.some(i => i.id === created.id)) issues.value = [created, ...issues.value];
-      selectIssueAfterSend(created);
-      notice.value = `会话 ${result.identifier || result.id} 已创建`;
-      await trackSent(result.id);
-      void refresh();
-    } else {
-      await multicaService.addIssueComment(issue.id, content, workspaceId);
-      currentDraft.text = ""; currentDraft.articles = []; currentDraft.resources = [];
-      // A successful comment must never be retried just because renaming failed.
-      try {
-        await multicaService.renameIssue(issue.id, title, workspaceId);
-        issue.title = title;
-        issues.value = issues.value.map(item => item.id === issue.id ? { ...item, title } : item);
-      } catch { notice.value = "消息已发送，但会话标题更新失败；请刷新或到 Multica 核对。"; }
-      await trackSent(issue.id);
-      await loadComments(issue);
-    }
-  } catch (e) { uncertain.value = true; notice.value = `${e instanceof Error ? e.message : "发送失败"} 请先到 Multica 核对是否已发送，避免重复。`; }
-  finally { sending.value = false; }
+  if (anySending.value || !draft.value.text.trim()) return;
+  const currentDraft = draft.value, text = currentDraft.text.trim();
+  const content = messageWithResources(messageWithArticles(text, currentDraft.articles), currentDraft.resources);
+  await byok.send(text, content, () => { currentDraft.text = ''; currentDraft.articles = []; currentDraft.resources = []; });
 }
-function selectIssueAfterSend(issue: MulticaIssue) { replacementAgentId.value = issue.assignee_id || ''; selected.value = issue; comments.value = []; uncertain.value = false; void loadComments(issue); }
 </script>
 <template>
   <section v-show="workspaceVisible" id="multica" class="card wide agent-workspace" :class="{ 'card-fullscreen': workspaceVisible, 'workspace-hidden': !workspaceVisible }">
     <div class="workspace-body">
-      <button v-if="workspaceSection === 'chat'" type="button" class="workspace-settings-button" :disabled="anySending" aria-label="AI 设置" title="设置" @click="openSettings()">⚙ <span>设置</span></button>
-      <ConversationSidebar :section="workspaceSection" :service="service" :selected-id="service === 'deepseek' ? byokCurrentId : selected?.id || ''" :issues="issues" :agents="agents" :conversations="localConversations" :disabled="anySending || switchingAgent" :connected="connected" :loading="issuesLoading" :error="issuesError" :comments-loading="commentsLoading || commentsShown < comments.length" @new="newConversation" @navigate="navigateWorkspace" @select-issue="openIssue" @select-conversation="openLocalConversation" @delete-conversation="byok.removeChat" @retry="refresh" />
+      <ConversationSidebar :section="workspaceSection" :service="service" :selected-id="service === 'native' ? nativeCurrentId : byokCurrentId" :conversations="localConversations" :native-conversations="nativeConversations" :disabled="anySending" @new="newConversation" @navigate="navigateWorkspace" @select-conversation="openLocalConversation" @delete-conversation="byok.removeChat" @select-native-conversation="openNativeConversation" @delete-native-conversation="nativeAgent.removeChat" @open-settings="openSettings()" />
       <main class="workspace-main" :class="{'new-view':workspaceSection === 'chat' && !currentConversation, 'embedded-view':workspaceSection !== 'chat', 'browsing-resources':resourceBrowserOpen}">
+        <nav v-if="workspaceSection === 'chat' && railAnchors.length > 1" class="turn-rail" aria-label="对话轮次导航">
+          <button v-for="anchor in railAnchors" :key="anchor.idx" type="button" class="rail-dot" :class="{ active: activeRailIndex === anchor.idx }" :title="anchor.label" :aria-label="`跳转到：${anchor.label}`" @click="scrollToTurn(anchor.idx)" />
+        </nav>
         <template v-if="workspaceSection === 'chat'">
-        <p v-if="service === 'multica' && error" class="alert" role="alert">{{ error }}</p>
         <p v-if="notice" class="notice" role="status">{{ notice }}</p>
         <p v-if="service === 'deepseek' && byokError" class="alert" role="alert">{{ byokError }}</p>
-        <template v-if="service === 'multica' && selected">
-          <div class="conversation-header"><div><small>{{ selected.identifier || '会话' }} · {{ statusName(selected) }}</small><h2>{{ selected.title }}</h2><p>{{ agentName(selected.assignee_id) }} · {{ agentModel(selected.assignee_id) }}</p></div></div>
-          <div class="conversation"><div class="day-divider">任务开始</div><article class="bubble-row"><div class="avatar person">你</div><div class="bubble-content"><div class="bubble-meta"><strong>任务说明</strong></div><div class="bubble human-bubble"><MessageMarkdown :content="selected.description || '暂无任务说明'" /></div></div></article><article v-for="comment in visibleComments" :key="comment.id" class="bubble-row"><div class="avatar" :class="comment.author_type === 'agent' ? 'bot' : 'person'">{{ comment.author_type === 'agent' ? '✦' : '你' }}</div><div class="bubble-content"><div class="bubble-meta"><strong>{{ comment.author_type === 'agent' ? (comment.author_id ? agentName(comment.author_id) : '助手') : '成员' }}</strong><span>{{ dateLabel(comment.created_at) }}</span></div><div class="bubble" :class="comment.author_type === 'agent' ? 'bot-bubble' : 'human-bubble'"><MessageMarkdown :content="comment.content" /></div></div></article><p v-if="commentsLoading || commentsShown < comments.length" class="muted"><LoadingIndicator label="正在加载会话内容" /></p><p v-else-if="commentsError" class="alert">{{ commentsError }} <button type="button" @click="loadComments(selected)">重试</button></p><p v-else-if="!comments.length" class="muted">还没有评论，助手的汇报会出现在这里。</p><RunTrace :issue-id="selected.id" :active="active" /></div>
+        <CipherRippleCanvas v-if="workspaceSection === 'chat' && !currentConversation && !resourceBrowserOpen" />
+        <HomeUsageCard v-if="workspaceSection === 'chat' && !currentConversation && !resourceBrowserOpen" :native-conversations="nativeConversations" :local-conversations="localConversations" />
+        <template v-if="service === 'deepseek' && byokCurrent">
+          <header class="conversation-header"><h2 class="conv-title">{{ byokCurrent.title }}</h2><span class="conv-meta">{{ byokCurrent.model }}</span></header>
+          <div ref="conversationEl" class="conversation"><article v-for="(message,index) in byokCurrent.messages" :key="index" :data-turn-anchor="index" class="msg-row" :class="message.role === 'assistant' ? 'is-assistant' : 'is-user'"><template v-if="message.role === 'user'"><div class="msg-user-meta"><span v-if="message.createdAt">{{ relativeTimeLabel(message.createdAt) }}</span><button type="button" class="copy-btn" :title="copiedKey === `ds-${index}` ? '已复制' : '复制'" aria-label="复制" @click="copyMessage(message.content, `ds-${index}`)"><svg v-if="copiedKey === `ds-${index}`" class="copied-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 8.5l3 3 6-6.5"/></svg><svg v-else viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5.5" y="5.5" width="7.5" height="8.5" rx="1.4"/><path d="M10.5 5.5V3.6A1.4 1.4 0 0 0 9.1 2.2H4.2a1.4 1.4 0 0 0-1.4 1.4v6.7a1.4 1.4 0 0 0 1.4 1.4h1.3"/></svg></button></div><div class="bubble human-bubble"><MessageMarkdown :content="message.content" /></div></template><template v-else><details v-if="message.reasoning || message.durationMs" class="run-summary"><summary>{{ message.reasoning ? '已思考' : '已完成' }}<template v-if="message.durationMs"> · 已运行 {{ durationLabel(message.durationMs) }}</template></summary><pre v-if="message.reasoning">{{ message.reasoning }}</pre></details><div class="assistant-body"><MessageMarkdown v-if="message.content" :content="message.content" /><span v-else class="muted">{{ byokSending && index === byokCurrent.messages.length - 1 ? '正在生成…' : '没有回复内容' }}</span></div><small v-if="message.incomplete && !(byokSending && index >= byokCurrent.messages.length - 2)" class="incomplete">未完成 · 不会作为后续上下文</small><template v-if="message.content && !message.incomplete"><div class="turn-telemetry"><span class="telemetry-turn">#T{{ turnIndexOf(byokCurrent.messages, index) }}</span><span class="telemetry-model">{{ byokCurrent.model }}</span><template v-if="message.durationMs"><span class="telemetry-sep">·</span><span>{{ durationLabel(message.durationMs) }}</span></template></div><div class="msg-actions"><span v-if="message.createdAt">{{ relativeTimeLabel(message.createdAt) }}</span><button type="button" class="copy-btn" :title="copiedKey === `ds-${index}` ? '已复制' : '复制回复'" aria-label="复制回复" @click="copyMessage(message.content, `ds-${index}`)"><svg v-if="copiedKey === `ds-${index}`" class="copied-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 8.5l3 3 6-6.5"/></svg><svg v-else viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5.5" y="5.5" width="7.5" height="8.5" rx="1.4"/><path d="M10.5 5.5V3.6A1.4 1.4 0 0 0 9.1 2.2H4.2a1.4 1.4 0 0 0-1.4 1.4v6.7a1.4 1.4 0 0 0 1.4 1.4h1.3"/></svg></button></div></template></template></article></div>
         </template>
-        <template v-else-if="service === 'deepseek' && byokCurrent">
-          <div class="conversation-header"><div><h2>{{ byokCurrent.title }}</h2><p>{{ byokCurrent.model }}</p></div></div>
-          <div class="conversation"><article v-for="(message,index) in byokCurrent.messages" :key="index" class="bubble-row"><div class="avatar" :class="message.role === 'assistant' ? 'bot' : 'person'">{{ message.role === 'assistant' ? '✦' : '你' }}</div><div class="bubble-content"><div class="bubble-meta"><strong>{{ message.role === 'assistant' ? '助手' : '你' }}</strong></div><details v-if="message.reasoning" class="reasoning"><summary>思考过程</summary><pre>{{ message.reasoning }}</pre></details><div class="bubble" :class="message.role === 'assistant' ? 'bot-bubble' : 'human-bubble'"><MessageMarkdown v-if="message.content" :content="message.content" /><span v-else class="muted">{{ byokSending && index === byokCurrent.messages.length - 1 ? '正在生成…' : '没有回复内容' }}</span></div><small v-if="message.incomplete && !(byokSending && index >= byokCurrent.messages.length - 2)" class="incomplete">未完成 · 不会作为后续上下文</small></div></article></div>
+        <template v-else-if="service === 'native' && nativeCurrent">
+          <header class="conversation-header"><h2 class="conv-title">{{ nativeCurrent.title }}</h2><span class="conv-meta">{{ nativeActiveAgentLabel }}{{ nativeActiveAgentId === 'pi' ? ` (${nativeCurrent.model || nativeActiveModel || '默认模型'})` : '' }} · {{ shortCwdLabel(nativeCurrent.cwd || '默认目录') }}</span></header>
+          <div ref="conversationEl" class="conversation"><article v-for="(message,index) in nativeCurrent.messages" :key="index" :data-turn-anchor="index" class="msg-row" :class="message.role === 'user' ? 'is-user' : 'is-assistant'"><template v-if="message.role === 'user'"><div class="msg-user-meta"><span v-if="message.createdAt">{{ relativeTimeLabel(message.createdAt) }}</span><button type="button" class="copy-btn" :title="copiedKey === `na-${index}` ? '已复制' : '复制'" aria-label="复制" @click="copyMessage(message.content, `na-${index}`)"><svg v-if="copiedKey === `na-${index}`" class="copied-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 8.5l3 3 6-6.5"/></svg><svg v-else viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5.5" y="5.5" width="7.5" height="8.5" rx="1.4"/><path d="M10.5 5.5V3.6A1.4 1.4 0 0 0 9.1 2.2H4.2a1.4 1.4 0 0 0-1.4 1.4v6.7a1.4 1.4 0 0 0 1.4 1.4h1.3"/></svg></button></div><div class="bubble human-bubble"><MessageMarkdown :content="message.content" /></div></template><template v-else><details v-if="message.reasoning" class="run-summary"><summary>已思考<template v-if="message.durationMs"> · 已运行 {{ durationLabel(message.durationMs) }}</template></summary><pre>{{ message.reasoning }}</pre></details><div class="assistant-body"><MessageMarkdown :content="message.content" /></div><template v-for="changes in [extractChangedFiles(message.toolSteps)]" :key="`chg-${index}`"><details v-if="changes.files.length || message.toolSteps?.length || message.toolSummary" class="turn-steps-card"><summary><span class="steps-summary-left"><template v-if="changes.files.length"><span class="steps-count">{{ changes.files.length }}个文件已更改</span><span v-if="changes.totalAdded" class="diff-add">+{{ changes.totalAdded }}</span><span v-if="changes.totalRemoved" class="diff-del">-{{ changes.totalRemoved }}</span></template><template v-else><span class="steps-count">{{ message.toolSteps?.length ? `${message.toolSteps.length} 步工具操作` : '工具执行' }}</span><span v-if="message.toolSummary" class="steps-summary-text">{{ message.toolSummary }}</span></template><span class="steps-chev">›</span></span><span class="steps-action-pill"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="2" width="10" height="12" rx="1.6"/><path d="M5.5 5.5h5M5.5 8h5M5.5 10.5h3"/></svg><span>{{ changes.files.length ? '审阅' : '详情' }}</span></span></summary><div v-if="changes.files.length" class="changed-files-list"><div v-for="f in changes.files" :key="f.path" class="changed-file-row" :title="f.path"><span class="changed-file-name">{{ f.name }}</span><span class="changed-file-path">{{ f.path }}</span><span class="changed-file-diff"><span v-if="f.added" class="diff-add">+{{ f.added }}</span><span v-if="f.removed" class="diff-del">-{{ f.removed }}</span></span></div></div><div v-if="message.toolSteps?.length" class="tool-step-list"><span v-for="(step, si) in message.toolSteps" :key="si" class="tool-step-pill">{{ step.name }}</span></div></details></template><div v-for="u in [usageDetail(message.usage, message.durationMs, message.toolSteps?.length)]" :key="index" class="turn-telemetry"><span class="telemetry-turn">#T{{ turnIndexOf(nativeCurrent.messages, index) }}</span><span class="telemetry-model">{{ message.modelLabel || nativeActiveAgentLabel }}</span><template v-if="u.ctxLabel"><span class="telemetry-sep">·</span><span>上下文 <strong class="telemetry-val">{{ u.ctxLabel }}</strong></span></template><span v-if="u.deltaLabel" class="telemetry-delta">{{ u.deltaLabel }}</span><template v-if="u.outLabel"><span class="telemetry-sep">·</span><span>输出 <strong class="telemetry-val">{{ u.outLabel }}</strong></span></template><span v-if="u.reasoningLabel" class="telemetry-thinking">思考 {{ u.reasoningLabel }}</span><span v-if="u.stepsCount" class="telemetry-steps"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.8 2.3a3.3 3.3 0 0 0-3.7 4.9L2.5 10.8a1.2 1.2 0 0 0 1.7 1.7l3.6-3.6a3.3 3.3 0 0 0 4.9-3.7l-1.9 1.9-1.9-1.9 1.9-1.9Z"/></svg><strong>×{{ u.stepsCount }}</strong></span><span v-if="u.speed" class="telemetry-speed"><svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M9.2 1.5L3.6 8.8h4L6.8 14.5l5.6-7.3h-4l.8-5.7Z"/></svg>{{ u.speed }} tok/s</span><span v-if="u.cachePct">缓存 {{ u.cachePct }}%</span><template v-if="!u.ctxLabel && message.durationMs"><span class="telemetry-sep">·</span><span>{{ durationLabel(message.durationMs) }}</span></template></div><div class="msg-actions"><span v-if="message.createdAt">{{ relativeTimeLabel(message.createdAt) }}</span><button type="button" class="copy-btn" :title="copiedKey === `na-${index}` ? '已复制' : '复制回复'" aria-label="复制回复" @click="copyMessage(message.content, `na-${index}`)"><svg v-if="copiedKey === `na-${index}`" class="copied-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 8.5l3 3 6-6.5"/></svg><svg v-else viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5.5" y="5.5" width="7.5" height="8.5" rx="1.4"/><path d="M10.5 5.5V3.6A1.4 1.4 0 0 0 9.1 2.2H4.2a1.4 1.4 0 0 0-1.4 1.4v6.7a1.4 1.4 0 0 0 1.4 1.4h1.3"/></svg></button></div></template></article><p v-if="nativeSending" class="muted"><LoadingIndicator :label="`本机 ${nativeActiveAgentLabel} 正在处理`" /></p></div>
         </template>
         <div v-else class="welcome"><h1>需要我为你做些什么？</h1><p>把问题交给你的助手，开启一段新会话。</p></div>
         <div ref="composerWrap" class="composer-wrap" :class="{centered:!currentConversation, 'drag-over-available':Boolean(dragged) || todoistDragOver}" @dragover="acceptDrag" @dragleave="leaveComposer" @drop="dropResource">
-          <section v-if="service === 'multica' && selected && replacementAgentId && replacementAgentId !== (selected.assignee_id || '')" class="switch-agent-panel" aria-label="确认切换会话助手"><div><strong>切换到 {{ agentName(replacementAgentId) }} · {{ agentModel(replacementAgentId) }}</strong><p>会话负责人将改变，可能使用不同账号；不更改助手全局模型，不停止已有运行。请求不自动启动新运行，实际行为取决于 Multica 版本。</p></div><div class="switch-agent-actions"><button type="button" class="subtle" :disabled="switchingAgent" @click="replacementAgentId = selected.assignee_id || ''">取消</button><button type="button" class="subtle" :disabled="switchingAgent || uncertain || !onlineAgents.some(agent => agent.id === replacementAgentId)" @click="switchAgent">{{ switchingAgent ? '切换中…' : '确认切换' }}</button></div></section>
-          <div v-if="draft.resources.length" class="resource-attachments"><ResourceAttachmentCard v-for="resource in draft.resources" :key="`${draftKey}:${resource.kind}:${resource.id}`" :resource="resource" :disabled="anySending" :multica="service === 'multica'" @update="updateResource" @remove="toggleResource(resource)" /></div>
+          <TokenHudPopover v-if="hudOpen" :telemetry="sessionTelemetry" :can-compact="service === 'native' && nativeActiveAgentId === 'pi'" :service="service" :pi-models="nativePiModels" :deepseek-models="deepseekModels" :anchor-rect="hudAnchorRect" :align="hudAlign" @close="hudOpen = false" @compact="fillCompactCommand" @refresh="refreshHudTelemetry" />
+          <p v-if="service === 'native' && nativeError" class="alert" role="alert">{{ nativeError }}</p>
+          <div v-if="draft.resources.length" class="resource-attachments"><ResourceAttachmentCard v-for="resource in draft.resources" :key="`${draftKey}:${resource.kind}:${resource.id}`" :resource="resource" :disabled="anySending" @update="updateResource" @remove="toggleResource(resource)" /></div>
           <div v-if="draft.articles.length" class="attachments"><span v-for="article in draft.articles" :key="article.url + article.title" class="attachment"><span class="attachment-title" :title="article.title">✦ {{ article.title }}</span><button type="button" class="attachment-remove" :disabled="anySending" :aria-label="`移除 ${article.title}`" title="移除文章" @click="toggleArticle(article)">×</button></span></div>
-          <div class="composer"><ComposerTools :panel-open="Boolean(activePanel)" :selected="activePanel" :open-up="currentConversation" @select="activePanel=$event" /><textarea ref="composerInput" v-model="draft.text" :disabled="anySending" rows="1" :placeholder="currentConversation ? '继续输入你的问题…' : '输入你的问题…'" @input="resizeComposer" @keydown="onComposerKeydown" /><ProviderPicker :service="service" :selected-id="service === 'deepseek' ? byokCurrent?.model || byokModel : selected ? replacementAgentId : agentId" :effort="byokCurrent?.reasoningEffort || byokEffort" :agents="onlineAgents" :runtimes="runtimes" :models="deepseekModels" :disabled="anySending || switchingAgent || (service === 'multica' && uncertain)" :loading="agentsLoading" :error="agentsError" :fallback-name="selected && service === 'multica' ? agentName(selected.assignee_id) : undefined" @choose-agent="chooseAgent" @choose-model="service === 'deepseek' ? byok.chooseModel($event) : chooseDeepseek($event)" @choose-effort="byok.chooseEffort" @open-settings="openSettings('deepseek')" @retry="refresh" /><button v-if="byokSending" type="button" class="send-button stop-button" aria-label="停止生成" @click="byok.stop">■</button><button v-else type="button" class="send-button" :disabled="sending || switchingAgent || !draft.text.trim() || (service === 'deepseek' ? !byokConfigured : uncertain || (selected && replacementAgentId !== (selected.assignee_id || '')) || !connected || (!selected && (!agentId || agentsLoading || Boolean(agentsError))))" aria-label="发送消息" @click="send">{{ sending ? '…' : '↑' }}</button></div>
-          <p class="composer-hint"><template v-if="service === 'multica' && !connected && !loading">请先<button class="inline-setting" type="button" @click="openSettings('multica')">连接服务</button>，或选择其他模型。</template><template v-else-if="service === 'deepseek' && !byokConfigured">请先<button class="inline-setting" type="button" @click="openSettings('deepseek')">配置 API Key</button>。</template><template v-else-if="draft.articles.length || draft.resources.length">所选资源将随消息发送，请检查敏感内容。</template><span>Enter 发送 · Shift + Enter 换行</span></p>
+          <div class="composer"><ClawdMascot :is-running="anySending" :is-thinking="isPetThinking" :has-error="activePetError" :hidden="Boolean(activePanel)" /><div class="composer-input-row"><textarea ref="composerInput" v-model="draft.text" :disabled="anySending" rows="1" :placeholder="service === 'native' ? `描述任务或提出问题（${nativeActiveAgentLabel} · ! 开头直跑命令）…` : '描述任务或提出问题…'" @input="resizeComposer" @keydown="onComposerKeydown" /><button v-if="byokSending" type="button" class="send-button stop-button" aria-label="停止生成" @click="byok.stop">■</button><button v-else type="button" class="send-button" :class="{ ready: Boolean(draft.text.trim()) }" :disabled="nativeSending || !draft.text.trim() || (service === 'native' ? !nativeConnected : !byokConfigured)" aria-label="发送消息" @click="send">{{ nativeSending ? '…' : '↵' }}</button></div><div class="composer-toolbar"><div class="composer-left"><button v-if="service === 'native'" type="button" class="turbo-btn" :class="{ active: nativeToolsEnabled }" :disabled="anySending" :title="nativeToolsEnabled ? 'Turbo 已开启：允许本机 Agent 自动调用读写/终端工具（点击切换只读）' : '只读模式：禁止工具修改（点击开启 Turbo）'" @click="nativeAgent.toggleToolsEnabled()"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 1.6L13 3.5V7.7C13 10.9 10.8 13.3 8 14.4C5.2 13.3 3 10.9 3 7.7V3.5L8 1.6Z"/><path d="M6.4 8.2L7.6 9.4L10 6.8"/></svg><span>{{ nativeToolsEnabled ? 'Turbo' : '只读' }}</span></button><ComposerTools :panel-open="Boolean(activePanel)" :selected="activePanel" :open-up="currentConversation" @select="activePanel=$event" /><span v-if="service === 'native'" class="composer-chip" :title="nativeCurrent?.cwd || nativeAgent.defaultCwd.value">{{ shortCwdLabel(nativeCurrent?.cwd || nativeAgent.defaultCwd.value) }}</span><button type="button" class="hud-stats-trigger" data-hud-trigger="1" :aria-expanded="hudOpen" title="查看上下文窗口与 Token 监控" @click="toggleHud($event, 'left')"><template v-if="sessionTelemetry.hasTelemetry">{{ sessionTelemetry.turnCount }} 轮 {{ sessionTelemetry.totalToolCalls }} 步<template v-if="sessionTelemetry.lastSpeed"> · {{ sessionTelemetry.lastSpeed }} tok/s</template> · {{ formatCompactK(sessionTelemetry.totalTokens) }} tok<template v-if="sessionTelemetry.cacheHitPct > 0"> · {{ sessionTelemetry.cacheHitPct.toFixed(0) }}% 缓存</template></template><template v-else-if="turnCountLabel">{{ turnCountLabel }} · 0 步</template><template v-else>0 轮 · 0 步</template></button></div><div class="composer-right"><ProviderPicker :service="service" :selected-id="service === 'native' ? (nativeActiveModel || 'native') : byokCurrent?.model || byokModel" :effort="byokCurrent?.reasoningEffort || byokEffort" :pi-thinking="nativeActiveThinking" :models="deepseekModels" :byok-label="byokLabel" :byok-configured="byokConfigured" :pi-models="nativePiModels" :native-agents="nativeDiscoveredAgents" :acp-profiles="nativeAcpProfiles" :native-agent-id="nativeActiveAgentId" :native-agent-label="nativeActiveAgentLabel" :native-connected="nativeConnected" :pi-available="Boolean(nativeHostInfo?.piAvailable)" :disabled="anySending" @choose-model="service === 'deepseek' ? byok.chooseModel($event) : chooseDeepseek($event)" @choose-native="chooseNative" @choose-effort="byok.chooseEffort" @choose-pi-thinking="nativeAgent.chooseThinking" @open-settings="openSettings('deepseek')" @open-native-settings="openSettings('native')" /><button type="button" class="hud-ring-btn" data-hud-trigger="1" :aria-expanded="hudOpen" title="上下文剩余容量与 Token 监控" @click="toggleHud($event, 'right')"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="5.6" fill="none" stroke="var(--border,#dce3ec)" stroke-width="2.1"/><circle cx="8" cy="8" r="5.6" fill="none" :stroke="sessionTelemetry.ringColor" stroke-width="2.1" :stroke-dasharray="`${((sessionTelemetry.remainingPct / 100) * 35.19).toFixed(2)} 35.19`" stroke-linecap="round"/></svg><span>{{ sessionTelemetry.hasTelemetry ? `${Math.round(sessionTelemetry.remainingPct)}%` : '--%' }}</span></button></div></div></div>
+          <p class="composer-hint"><template v-if="service === 'deepseek' && !byokConfigured">请先<button class="inline-setting" type="button" @click="openSettings('deepseek')">配置模型服务（或本机 Ollama）</button>。</template><template v-else-if="service === 'native' && !nativeConnected">请先<button class="inline-setting" type="button" @click="openSettings('native')">一键开启本机终端</button>（或切换右上角模型服务使用云端/Ollama）。</template><template v-else-if="service === 'native'">本机 {{ nativeActiveAgentLabel }} 已就绪{{ nativeActiveAgentId === 'pi' ? `（${nativeActiveModel || '默认模型'}）` : '' }} · 零端口直连</template><template v-else-if="draft.articles.length || draft.resources.length">所选资源将随消息发送，请检查敏感内容。</template><span>Enter 发送 · Shift + Enter 换行</span></p>
         </div>
         <AiHotPanel v-if="activePanel === 'aihot'" class="tool-resource-enter" :selected="draft.articles" :disabled="anySending" @close="activePanel=null" @select="selectArticle" @drag-start="dragged={kind:'article',value:$event}" @drag-end="dragged=null" />
         <ResourcePanel v-else-if="activePanel === 'bilibili' || activePanel === 'github'" class="tool-resource-enter" :key="activePanel" :kind="activePanel" :selected-resources="draft.resources" :disabled="anySending" @select="toggleResource" @close="activePanel=null" @drag-start="dragged={kind:'resource',value:$event}" @drag-end="dragged=null" />
         </template>
         <Transition name="tool-panel"><TodoistPanel v-if="todoistPanelOpened" v-show="workspaceSection === 'chat' && activePanel === 'todoist'" :active="workspaceVisible && workspaceSection === 'chat' && activePanel === 'todoist'" @close="activePanel=null" /></Transition>
         <BackpackLibrary v-if="libraryOpened" v-show="workspaceSection === 'library'" embedded />
-        <AiSchedulePanel v-if="scheduleOpened" v-show="workspaceSection === 'schedule'" embedded :active="workspaceVisible && workspaceSection === 'schedule'" :provider="service" :model="byokCurrent?.model || byokModel" :agents="onlineAgents" :workspace-id="workspaceIdForAgents" :agent-id="selected?.assignee_id || agentId" />
+        <EmployeesPanel v-if="agentsOpened" v-show="workspaceSection === 'agents'" :active="workspaceVisible && workspaceSection === 'agents'" @open-library="navigateWorkspace('library')" />
+        <AiSchedulePanel v-if="scheduleOpened" v-show="workspaceSection === 'schedule'" embedded :active="workspaceVisible && workspaceSection === 'schedule'" :model="byokCurrent?.model || byokModel" :native-connected="nativeConnected" :native-agent-label="nativeActiveAgentLabel" @create-with-prompt="createAutomationWithPrompt" @open-settings="openSettings" />
       </main>
     </div>
     <AiSettings v-if="settingsOpen" :initial-tab="settingsTab" @close="!settingsBusy && (settingsOpen=false)" @connection-changed="onConnectionChanged" @config-changed="refreshByokConfig" @busy-changed="settingsBusy=$event" />
@@ -417,9 +483,64 @@ function selectIssueAfterSend(issue: MulticaIssue) { replacementAgentId.value = 
 /* Override the shared fullscreen inset while preserving space for the Dock. */
 #multica.card.card-fullscreen { padding:0 0 74px !important; }
 .agent-workspace.workspace-hidden { display:none !important; }
-.agent-workspace { display:flex!important; flex-direction:column!important; padding:0!important; background:var(--panel,#fff)!important; color:var(--text,#26334b); font:13px/1.5 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; overflow:hidden!important; }.agent-workspace * { box-sizing:border-box; }.agent-workspace button,.agent-workspace textarea,.agent-workspace select { font:inherit; }.agent-workspace button { cursor:pointer; }.agent-workspace button:disabled { opacity:.5; cursor:not-allowed; }.agent-topbar { min-height:68px; padding:0 26px; display:flex; align-items:center; justify-content:space-between; gap:18px; border-bottom:1px solid var(--border,#e9edf4); background:var(--panel,#fff); }.brand,.top-actions { display:flex; align-items:center; gap:12px; }.brand strong,.brand small { display:block; }.brand strong { font-size:15px; }.brand small { color:#9aa6bc; font-size:9px; letter-spacing:.13em; }.logo { width:36px; height:36px; display:grid; place-items:center; border-radius:12px; color:#fff; font-size:24px; background:linear-gradient(145deg,#736af0,#6abcec); }.top-actions { gap:8px; }.top-actions button,.top-actions a,.subtle { color:var(--text,#52627a); background:var(--surface,#fff); border:1px solid var(--border,#e4e9f1); border-radius:8px; padding:7px 11px; text-decoration:none; font-size:12px; }.connection { color:#8492a8; font-size:11px; white-space:nowrap; }.connection i { display:inline-block; width:7px; height:7px; border-radius:50%; background:#cbd5e1; margin-right:6px; }.connection i.online { background:#43c893; }.workspace-body { flex:1; min-height:0; display:flex; position:relative; background:var(--background,#f7f8fc); padding:12px; gap:12px; }.side-panel { width:248px; flex:none; min-height:0; padding:14px; display:flex; flex-direction:column; border:1px solid var(--border,#e4e9f1); border-radius:16px; background:var(--panel,#fff); box-shadow:0 4px 20px rgba(0,0,0,.04); }.new-button { width:100%; padding:12px; border:1px solid #a5d9ef; border-radius:10px; text-align:left; color:var(--text,#26334b); font-weight:650!important; background:linear-gradient(110deg,rgba(99,190,238,.16),rgba(157,139,244,.09)); }.new-button span { color:#6999e6; font-size:18px; margin-right:6px; }.session-header { display:flex; justify-content:space-between; align-items:center; margin:16px 4px 8px; }.session-header small { color:#a2aec0; font-size:10px; }.session-list { flex:1; overflow:auto; min-height:0; display:flex; flex-direction:column; gap:4px; }.session-item { display:flex; flex-direction:column; gap:4px; text-align:left; background:transparent; border:1px solid transparent; border-radius:8px; padding:9px; color:var(--text,#26334b); }.session-item:hover { background:var(--surface,#f4f6fb); }.session-item.chosen { background:rgba(111,103,232,.09); border-color:rgba(111,103,232,.14); }.session-top { display:flex; justify-content:space-between; color:#998ff1; font-size:10px; }.session-top span:last-child,.session-item small { color:#9aa7ba; }.session-top .session-status.review:last-child { color:#b77912; }.session-top .session-status.done:last-child { color:#16835a; }.session-top .session-status.pending:last-child { color:#d34545; }.session-item strong { font-size:12px; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }.session-item small { font-size:10px; }.side-footer { padding:11px; border-radius:9px; background:linear-gradient(115deg,rgba(129,112,244,.1),rgba(80,197,225,.09)); font-size:11px; }.side-footer small { display:block; margin-left:22px; color:#9caac0; font-size:10px; }
-.workspace-main { flex:1; min-width:0; min-height:0; display:flex; flex-direction:column; overflow:auto; padding:24px clamp(16px,3.5vw,48px) 16px; border:1px solid var(--border,#e4e9f1); border-radius:16px; background:var(--panel,#fff); box-shadow:0 4px 20px rgba(0,0,0,.03); }.workspace-main.new-view { background:radial-gradient(ellipse at 50% 50%,rgba(128,193,248,.14),transparent 65%),var(--panel,#fff); }.conversation-header { display:flex; justify-content:space-between; align-items:center; gap:18px; width:100%; max-width:920px; margin:0 auto; padding-bottom:18px; border-bottom:1px solid var(--border,#e8ebf3); }.conversation-header small { color:#8f83e9; }.conversation-header h2 { margin:6px 0; font-size:20px; }.conversation-header p { margin:0; color:#98a5b9; font-size:12px; }.conversation { flex:1; min-height:0; overflow:auto; width:100%; max-width:920px; margin:0 auto; padding:20px 8px 16px; }.day-divider { text-align:center; color:#b1bbca; font-size:10px; margin-bottom:22px; }.bubble-row { display:flex; gap:10px; align-items:flex-start; margin-bottom:21px; }.avatar { flex:none; width:32px; height:32px; display:grid; place-items:center; border-radius:11px; font-size:12px; font-weight:700; }.avatar.bot { color:#fff; background:linear-gradient(140deg,#8577f1,#69b9e9); }.avatar.person { color:#8a78e4; background:#ece9fc; }.bubble-content { max-width:min(720px,90%); min-width:0; }.bubble-meta { display:flex; gap:10px; margin-bottom:6px; font-size:11px; }.bubble-meta span { color:#b1bdcd; }.bubble { white-space:pre-wrap; overflow-wrap:anywhere; line-height:1.75; padding:13px 16px; border-radius:4px 14px 14px 14px; }.bot-bubble { background:var(--panel,#fff); border:1px solid var(--border,#e9edf4); }.human-bubble { background:rgba(118,106,232,.08); border:1px solid rgba(118,106,232,.10); }.welcome { margin:auto auto 25px; text-align:center; }.welcome h1 { font-size:clamp(26px,3vw,36px); font-weight:500; margin:0 0 12px; }.welcome p { color:#98a5b9; }.composer-wrap { width:100%; max-width:920px; margin:12px auto 0; }.composer-wrap.centered { max-width:760px; margin:0 auto auto; }.composer { display:flex; align-items:center; gap:8px; padding:10px 12px; border:1px solid var(--border,#e1e6f0); border-radius:20px; background:var(--panel,#fff); box-shadow:0 7px 28px #5d6c8b18; }.centered .composer { border-radius:32px; padding:11px 14px; }.composer textarea { flex:1; min-width:0; max-height:160px; border:0; outline:0; resize:vertical; background:transparent; color:var(--text,#26334b); padding:8px 2px; }.composer select { max-width:180px; border:0; outline:0; background:transparent; color:var(--text,#52627a); font-size:12px; }.add-button,.send-button { flex:none; width:34px; height:34px; border:0; border-radius:50%; font-size:21px!important; background:transparent; color:var(--text,#52627a); }.add-button.on { background:#ebedff; color:#7569ec; }.send-button { background:#7569ec; color:white; }.composer-hint { color:#9caabd; font-size:10px; margin:8px 12px; }.composer-hint span { float:right; }.attachments { display:flex; flex-wrap:wrap; gap:6px; margin:0 8px 8px; }.attachment { max-width:270px; padding:5px 8px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; background:rgba(92,177,230,.12); border-radius:8px; color:var(--text,#456582); font-size:11px; }.attachment button { border:0; background:transparent; color:inherit; }.muted { color:#9ba8bc; font-size:12px; }.alert { color:#b45309; background:rgba(245,158,11,.12); padding:9px; border-radius:7px; }.notice { color:#a05b14; font-size:12px; }.disconnected { margin:auto; text-align:center; }.disconnected p { color:#9ba8bc; }.primary { border:0; border-radius:8px; padding:9px 15px; background:#7668e9; color:white; }
-.conversation-actions,.switch-agent-actions { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }.switch-agent-panel { width:100%; max-width:920px; box-sizing:border-box; margin:10px auto; padding:12px 14px; border:1px solid var(--border,#dfe5ed); border-radius:10px; background:var(--panel,#fff); }.switch-agent-panel p { margin:4px 0 8px; font-size:11px; color:var(--muted,#64748b); line-height:1.5; }
+.agent-workspace { display:flex!important; flex-direction:column!important; padding:0!important; background:color-mix(in srgb,var(--panel,#f4f6fa) 80%,transparent)!important; backdrop-filter:blur(26px) saturate(1.25); -webkit-backdrop-filter:blur(26px) saturate(1.25); color:var(--text,#26334b); font:13.5px/1.55 Inter,-apple-system,BlinkMacSystemFont,"PingFang SC","Noto Sans SC","Segoe UI",sans-serif; -webkit-font-smoothing:antialiased; overflow:hidden!important; }.agent-workspace * { box-sizing:border-box; }.agent-workspace button,.agent-workspace textarea,.agent-workspace select { font:inherit; }.agent-workspace button { cursor:pointer; }.agent-workspace button:disabled { opacity:.5; cursor:not-allowed; }.subtle { color:var(--text,#52627a); background:var(--surface,#fff); border:1px solid var(--border,#e4e9f1); border-radius:8px; padding:7px 11px; text-decoration:none; font-size:12px; }.workspace-body { flex:1; min-height:0; display:flex; position:relative; background:transparent; padding:0; gap:0; }
+.workspace-main { position:relative; flex:1; min-width:0; min-height:0; display:flex; flex-direction:column; overflow:auto; padding:0 clamp(20px,4vw,48px) 12px; border:0; border-radius:0; background:color-mix(in srgb,var(--panel,#ffffff) 58%,var(--surface,#eef2f7)); }
+.turn-rail { position:absolute; left:12px; top:50%; transform:translateY(-50%); z-index:5; display:flex; flex-direction:column; gap:8px; padding:4px 2px; }
+.rail-dot { width:6px; height:6px; padding:0; border:0; border-radius:50%; background:var(--muted,#cbd5e1); opacity:.45; transition:background-color .15s,opacity .15s; }
+.rail-dot:hover { background:var(--muted,#6b7280); opacity:.78; }
+.rail-dot.active { background:var(--muted,#6b7280); opacity:1; }.workspace-main.new-view { background:color-mix(in srgb,var(--panel,#ffffff) 58%,var(--surface,#eef2f7)); padding-top:24px; }.conversation-header { display:flex; justify-content:space-between; align-items:center; gap:14px; width:100%; max-width:800px; min-height:44px; margin:0 auto; padding:10px 4px; border-bottom:1px solid var(--border,#e4e8f0); flex:none; }.conv-title { margin:0; font-size:13.5px; font-weight:500; color:var(--muted,#526075); min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }.conv-meta { flex:none; font-size:11px; color:var(--muted,#94a3b8); white-space:nowrap; }.conversation { flex:1; min-height:0; overflow:auto; width:100%; max-width:800px; margin:0 auto; padding:22px 4px 56px; display:flex; flex-direction:column; gap:24px; }.day-divider { text-align:center; color:var(--muted,#94a3b8); font-size:10px; margin-bottom:2px; }
+.msg-row { display:flex; flex-direction:column; min-width:0; }
+.msg-row.is-user { align-items:flex-end; align-self:flex-end; max-width:min(540px,84%); }
+.msg-row.is-assistant { align-items:flex-start; width:100%; }
+.msg-user-meta { display:flex; align-items:center; gap:6px; margin-bottom:4px; font-size:11px; color:var(--muted,#94a3b8); opacity:.78; transition:opacity .14s; }
+.msg-row.is-user:hover .msg-user-meta { opacity:1; }
+.human-bubble { padding:9px 14px; border-radius:12px; background:color-mix(in srgb,var(--panel,#ffffff) 74%,var(--surface,#eef2f7)); border:1px solid var(--border,#e2e7f0); color:var(--text,#26334b); overflow-wrap:anywhere; }
+.run-summary { margin-bottom:8px; font-size:12px; color:var(--muted,#8492a8); width:100%; }
+.run-summary summary { cursor:pointer; user-select:none; list-style:none; display:inline-flex; align-items:center; gap:5px; padding:2px 0; }
+.run-summary summary::-webkit-details-marker { display:none; }
+.run-summary summary::after { content:'›'; font-size:13px; transition:transform .15s; opacity:.75; }
+.run-summary[open] summary::after { transform:rotate(90deg); }
+.run-summary pre { margin:6px 0 0; padding:10px 12px; border-radius:9px; border:1px solid var(--border,#e4e9f1); background:var(--surface,#f7f8fb); white-space:pre-wrap; overflow-wrap:anywhere; max-height:220px; overflow:auto; font:11.5px/1.6 ui-monospace,SFMono-Regular,Menlo,monospace; color:var(--text,#475569); }
+.tool-step-list { display:flex; flex-wrap:wrap; gap:6px; margin-top:6px; }
+.tool-step-pill { padding:2px 8px; border-radius:6px; border:1px solid var(--border,#dce3ed); background:var(--surface,#f5f7fb); font:11px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace; color:var(--text,#475569); }
+.turn-steps-card { width:100%; margin-top:10px; border:1px solid var(--border,#e2e6ef); border-radius:11px; background:color-mix(in srgb,var(--panel,#ffffff) 86%,transparent); }
+.turn-steps-card summary { cursor:pointer; user-select:none; list-style:none; display:flex; align-items:center; justify-content:space-between; gap:10px; padding:8px 10px 8px 14px; font-size:12.5px; color:var(--text,#334155); }
+.turn-steps-card summary::-webkit-details-marker { display:none; }
+.steps-summary-left { display:inline-flex; align-items:center; gap:7px; min-width:0; font-variant-numeric:tabular-nums; }
+.steps-count { font-weight:500; white-space:nowrap; }
+.diff-add { color:#16a34a; font-weight:600; font-size:12px; }
+.diff-del { color:#dc2626; font-weight:600; font-size:12px; }
+.steps-summary-text { color:var(--muted,#64748b); font-size:12px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.steps-chev { color:var(--muted,#94a3b8); font-size:14px; transition:transform .15s; }
+.turn-steps-card[open] .steps-chev { transform:rotate(90deg); }
+.steps-action-pill { flex:none; display:inline-flex; align-items:center; gap:4px; padding:3px 9px; border-radius:7px; border:1px solid var(--border,#e4e8f0); background:var(--surface,#f8fafc); font-size:12px; color:var(--text,#475569); }
+.steps-action-pill svg { width:13px; height:13px; color:var(--muted,#64748b); }
+.changed-files-list { display:flex; flex-direction:column; gap:4px; padding:2px 14px 8px; }
+.changed-file-row { display:flex; align-items:center; gap:8px; padding:4px 8px; border-radius:7px; background:var(--surface,#f5f7fb); font-size:12px; }
+.changed-file-name { font-weight:550; color:var(--text,#26334b); white-space:nowrap; }
+.changed-file-path { min-width:0; flex:1; font:11px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace; color:var(--muted,#94a3b8); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.changed-file-diff { display:inline-flex; gap:5px; font-variant-numeric:tabular-nums; white-space:nowrap; }
+.turn-steps-card .tool-step-list { padding:0 14px 10px; margin-top:0; }
+.assistant-body { width:100%; color:var(--text,#1f2937); padding:2px 0; }
+.turn-telemetry { width:fit-content; max-width:100%; display:inline-flex; flex-wrap:wrap; align-items:center; gap:6px; margin-top:10px; padding:4px 12px; border-radius:999px; border:1px solid var(--border,#e2e6ef); background:color-mix(in srgb,var(--panel,#ffffff) 86%,transparent); font-size:11.5px; color:var(--muted,#64748b); font-variant-numeric:tabular-nums; }
+.telemetry-turn { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:11px; font-weight:650; color:#4f6ef7; }
+.telemetry-model { color:var(--text,#1f2937); font-weight:600; }
+.telemetry-sep { opacity:.45; }
+.telemetry-val { color:var(--text,#1f2937); font-weight:600; }
+.telemetry-delta { padding:1px 6px; border-radius:5px; background:rgba(245,158,11,.14); color:#b45309; font-weight:600; font-size:11px; }
+.telemetry-thinking { color:#7c3aed; font-weight:500; }
+.telemetry-steps { display:inline-flex; align-items:center; gap:3px; color:var(--muted,#64748b); }
+.telemetry-steps svg { width:12px; height:12px; color:#64748b; }
+.telemetry-steps strong { color:var(--text,#334155); font-weight:600; }
+.telemetry-speed { display:inline-flex; align-items:center; gap:2px; color:var(--muted,#64748b); }
+.telemetry-speed svg { width:12px; height:12px; color:#f59e0b; }
+.msg-actions { width:100%; display:flex; align-items:center; justify-content:flex-end; gap:6px; margin-top:4px; font-size:11px; color:var(--muted,#94a3b8); }
+.copy-btn { width:24px; height:24px; display:inline-grid; place-items:center; border:0; background:transparent; color:var(--muted,#94a3b8); padding:0; border-radius:6px; cursor:pointer; transition:background-color .14s,color .14s; }
+.copy-btn svg { width:13.5px; height:13.5px; }
+.copy-btn .copied-icon { color:#16a34a; }
+.copy-btn:hover { background:var(--surface,#f2f4f8); color:var(--text,#26334b); }
+.welcome { position:relative; z-index:1; margin:auto auto 22px; text-align:center; }.welcome h1 { font-size:clamp(26px,3vw,34px); font-weight:500; letter-spacing:-.015em; margin:0 0 10px; color:var(--text,#1f2937); }.welcome p { color:var(--muted,#94a3b8); margin:0; }.composer-wrap { position:relative; z-index:2; width:100%; max-width:800px; margin:6px auto 0; will-change:transform; }.composer-wrap.centered { max-width:800px; margin:0 auto auto; }.composer { position:relative; display:flex; flex-direction:column; gap:6px; padding:11px 14px 8px; border:1px solid var(--border,#dce2ec); border-radius:14px; background:color-mix(in srgb,var(--panel,#ffffff) 90%,transparent); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); box-shadow:0 4px 18px rgba(15,23,42,.06); }.composer-input-row { display:flex; align-items:flex-end; gap:8px; }.composer textarea { flex:1; width:100%; min-width:0; min-height:24px; max-height:160px; border:0; outline:0; resize:none; background:transparent; color:var(--text,#26334b); padding:2px; line-height:1.55; overflow-y:auto; }.composer-toolbar { display:flex; align-items:center; justify-content:space-between; gap:8px; padding-top:2px; }.composer-left,.composer-right { display:flex; align-items:center; gap:6px; min-width:0; }.composer-chip { max-width:170px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; padding:3px 6px; border-radius:6px; background:transparent; font:11px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace; color:var(--muted,#64748b); }.composer-chip:hover { background:var(--surface,#f2f4f8); }.turbo-btn { display:inline-flex; align-items:center; gap:4px; border:0; background:transparent; padding:3px 6px; border-radius:6px; font-size:11.5px; color:var(--muted,#64748b); white-space:nowrap; cursor:pointer; transition:background .15s,color .15s; }.turbo-btn svg { width:13px; height:13px; flex:none; }.turbo-btn:hover:not(:disabled) { background:var(--surface,#f2f4f8); color:var(--text,#26334b); }.turbo-btn.active { color:var(--text,#26334b); font-weight:500; }.turbo-btn.active svg { color:#16a34a; }.turbo-btn:disabled { opacity:.5; cursor:not-allowed; }.hud-stats-trigger { border:0; background:transparent; padding:3px 6px; border-radius:6px; font-size:11px; color:var(--muted,#64748b); white-space:nowrap; font-variant-numeric:tabular-nums; cursor:pointer; }.hud-stats-trigger:hover { background:var(--surface,#f2f4f8); color:var(--text,#26334b); }.hud-ring-btn { display:inline-flex; align-items:center; gap:5px; border:0; background:transparent; padding:4px 6px; border-radius:7px; font-size:11.5px; font-weight:550; color:var(--text,#35445d); font-variant-numeric:tabular-nums; cursor:pointer; }.hud-ring-btn:hover { background:var(--surface,#f2f4f8); }.hud-ring-btn svg { width:15px; height:15px; transform:rotate(-90deg); flex:none; }.send-button { flex:none; width:28px; height:28px; border:0; border-radius:7px; font-size:14px!important; font-weight:600; background:transparent; color:var(--muted,#94a3b8); display:grid; place-items:center; padding:0; line-height:1; transition:background .15s,color .15s; }.send-button.ready:not(:disabled) { background:rgba(99,102,241,.11); color:#5b5bd6; }.send-button.ready:not(:disabled):hover { background:#5b5bd6; color:#fff; }.stop-button { background:rgba(239,68,68,.12); color:#dc2626; }.composer-hint { color:var(--muted,#9aa6b8); font-size:10.5px; margin:7px 6px 0; opacity:.88; }.composer-hint span { float:right; }.attachments { display:flex; flex-wrap:wrap; gap:6px; margin:0 8px 8px; }.attachment { max-width:270px; padding:5px 8px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; background:rgba(92,177,230,.12); border-radius:8px; color:var(--text,#456582); font-size:11px; }.attachment button { border:0; background:transparent; color:inherit; }.muted { color:var(--muted,#94a3b8); font-size:12px; }.alert { color:#b45309; background:rgba(245,158,11,.12); padding:9px; border-radius:7px; }.notice { color:#a05b14; font-size:12px; }.disconnected { margin:auto; text-align:center; }.disconnected p { color:#9ba8bc; }.primary { border:0; border-radius:8px; padding:9px 15px; background:#7668e9; color:white; }
+.conversation-actions { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
 .resource-attachments { display:flex; flex-wrap:wrap; gap:8px; max-height:40vh; overflow:auto; margin:0 8px 8px; }
 .attachment { display:inline-flex; align-items:center; gap:6px; max-width:min(320px,100%); overflow:visible; }
 .attachment-title { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
@@ -430,23 +551,15 @@ function selectIssueAfterSend(issue: MulticaIssue) { replacementAgentId.value = 
 .workspace-main.embedded-view { padding:0; overflow:hidden; }
 .workspace-main.browsing-resources { overflow:hidden; padding-top:18px; }
 .workspace-main.browsing-resources .welcome,.workspace-main.browsing-resources .conversation,.workspace-main.browsing-resources .conversation-header { display:none; }
-.workspace-main.browsing-resources .composer-wrap,.workspace-main.browsing-resources .composer-wrap.centered { flex:none; max-width:none; margin:0 auto 12px; padding-right:80px; }
+.workspace-main.browsing-resources .composer-wrap,.workspace-main.browsing-resources .composer-wrap.centered { flex:none; max-width:800px; margin:0 auto 12px; padding-right:0; }
 .workspace-main.browsing-resources .resource-attachments { max-height:18vh; }
-.tool-resource-enter { animation:tool-resource-in .22s cubic-bezier(.2,.8,.2,1); }
-.tool-panel-enter-active { transition:opacity .18s ease,transform .22s cubic-bezier(.2,.8,.2,1); }
-.tool-panel-enter-from { opacity:0; transform:translateY(8px); }
-@keyframes tool-resource-in { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+.tool-resource-enter { animation:tool-resource-in .56s cubic-bezier(.22,1,.36,1); }
+.tool-panel-enter-active { transition:opacity .44s ease,transform .56s cubic-bezier(.22,1,.36,1); }
+.tool-panel-enter-from { opacity:0; transform:translateY(22px); }
+@keyframes tool-resource-in { from { opacity:0; transform:translateY(22px); } to { opacity:1; transform:translateY(0); } }
 @media(prefers-reduced-motion:reduce) { .tool-resource-enter { animation:none; } .tool-panel-enter-active { transition:none; } }
 .composer-wrap.drag-over-available .composer { outline:2px dashed #7569ec; outline-offset:3px; }
-@media(max-width:850px) { .workspace-main.browsing-resources .composer-wrap,.workspace-main.browsing-resources .composer-wrap.centered { padding-right:0; margin-top:40px; } }
-.conversation-header { padding-right:82px; }
-.multica-settings-overlay { position:absolute; inset:0; z-index:40; display:flex; align-items:flex-start; justify-content:flex-end; padding:60px 20px 20px; background:rgba(15,23,42,.25); }
-.multica-settings-dialog { width:min(480px,100%); max-height:100%; overflow:auto; padding:18px; border:1px solid var(--border,#e4e9f1); border-radius:12px; background:var(--panel,#fff); box-shadow:0 15px 40px #0f172a30; }
-.multica-settings-dialog > header { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:16px; }.multica-settings-dialog h2 { margin:0; font-size:16px; }.multica-settings-dialog > header button { border:1px solid var(--border,#e4e9f1); border-radius:7px; padding:5px 9px; background:var(--surface,#fff); color:var(--text,#52627a); }
+@media(max-width:850px) { .workspace-main.browsing-resources .composer-wrap,.workspace-main.browsing-resources .composer-wrap.centered { margin-top:12px; } }
 .side-loading { padding:4px 9px; }.side-error { padding:5px 9px; color:#b45309; font-size:11px; overflow-wrap:anywhere; }.side-error button { padding:2px 5px; border:0; background:transparent; color:#7569ec; }
-.composer { min-height:58px; padding:8px 12px; }
-.centered .composer { padding:8px 12px; }
-.composer textarea { display:block; width:0; min-height:22px; max-height:160px; padding:0 2px; line-height:22px; resize:none; overflow-y:auto; }
-.add-button,.send-button { display:grid; place-items:center; padding:0; line-height:1; }
-@media(max-width:850px) { .side-panel { width:190px; }.connection { display:none; }.workspace-main { padding:20px; }.composer-hint span { display:none; } }
+@media(max-width:850px) { .side-panel { width:190px; }.connection,.composer-chip,.composer-stat { display:none; }.workspace-main { padding:20px; }.composer-hint span { display:none; }.msg-row.is-user { max-width:92%; } }
 </style>

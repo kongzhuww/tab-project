@@ -73,8 +73,8 @@ const VIEW_METAS: Record<string, ViewMeta> = {
   },
   "multica": {
     title: "AI 工作区",
-    icon: "assets/nav-multica.png",
-    iconType: "image/png"
+    icon: "assets/nav-ai.svg",
+    iconType: "image/svg+xml"
   },
   "daily-aihot": {
     title: "AI Hot · 今日热榜",
