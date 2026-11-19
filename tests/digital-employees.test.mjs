@@ -181,7 +181,14 @@ test('workspace organizer builds partition/folder/bookmark proposals in pending 
   assert.ok(orgEmp.skills.includes('bookmarks.read') && orgEmp.skills.includes('launcher.read'));
 
   const beforeChrome = globalThis.chrome;
-  t.after(() => { globalThis.chrome = beforeChrome; });
+  const locks = globalThis.navigator?.locks;
+  if (globalThis.navigator && !locks) Object.defineProperty(globalThis.navigator, 'locks', {
+    value: { request: async (_name, fn) => fn() }, configurable: true
+  });
+  t.after(() => {
+    globalThis.chrome = beforeChrome;
+    if (globalThis.navigator && !locks) delete globalThis.navigator.locks;
+  });
 
   const store = {
     launcherPages: ['常用网站'],

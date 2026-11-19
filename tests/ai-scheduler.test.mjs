@@ -264,8 +264,14 @@ test('scheduler executes keyless OpenAI-compatible preset (Ollama) cleanly', asy
 });
 
 test('auto provider migrates untouched preset, produces fallback GitHub briefing without LLM, and routes to configured API when present', async t => {
-  const before = { chrome: globalThis.chrome, fetch: globalThis.fetch, now: Date.now };
-  t.after(() => { globalThis.chrome = before.chrome; globalThis.fetch = before.fetch; Date.now = before.now; });
+  const before = { chrome: globalThis.chrome, fetch: globalThis.fetch, now: Date.now, locks: globalThis.navigator?.locks };
+  if (globalThis.navigator && !before.locks) Object.defineProperty(globalThis.navigator, 'locks', {
+    value: { request: async (_name, fn) => fn() }, configurable: true
+  });
+  t.after(() => {
+    globalThis.chrome = before.chrome; globalThis.fetch = before.fetch; Date.now = before.now;
+    if (globalThis.navigator && !before.locks) delete globalThis.navigator.locks;
+  });
   let now = Date.now();
   Date.now = () => now;
   const alarms = new Map();

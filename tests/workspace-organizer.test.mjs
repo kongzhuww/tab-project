@@ -8,6 +8,10 @@ const contract = await loadTsModule('src/agents/employee-contract.ts');
 
 function fixture(t) {
   const old = globalThis.chrome;
+  const locks = globalThis.navigator?.locks;
+  if (globalThis.navigator && !locks) Object.defineProperty(globalThis.navigator, 'locks', {
+    value: { request: async (_name, fn) => fn() }, configurable: true
+  });
   const store = {
     launcherPages: ['常用网站', '工作'], launcherPageLabels: {}, launcherFolders: {}, quickLinkGroupSizes: {},
     quickLinks: [{ id: 'l1', title: 'Vite', url: 'https://vite.dev/docs?token=secret#private', page: '常用网站', group: '常用网站' }],
@@ -68,7 +72,10 @@ function fixture(t) {
       },
     },
   };
-  t.after(() => { globalThis.chrome = old; });
+  t.after(() => {
+    globalThis.chrome = old;
+    if (globalThis.navigator && !locks) delete globalThis.navigator.locks;
+  });
   return { store, tree, all, set reorderStorageKeys(v) { reorderStorageKeys = v; }, get writes() { return writes; }, set failWrite(v) { failWrite = v; }, set uncertainBusinessWrite(v) { uncertainBusinessWrite = v; },
     snapshot: () => org.buildSnapshotFromRaw(store, tree),
     request: (action, args) => new Promise(resolve => listener({ type: `employee:${action}`, ...args }, { id: 'fixture', url: 'chrome-extension://fixture/newtab.html' }, resolve)),
