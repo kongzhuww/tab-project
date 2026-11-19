@@ -33,7 +33,7 @@
 >
 > Store installations do not require Developer mode and benefit from browser-managed automated updates. Each new release requires store review; store updates may lag slightly behind GitHub commits and releases.
 
-> **Repository Version**: **1.0.24**, adding universal OpenAI-compatible & local Ollama presets, Digital Employees, a default GitHub Trending Digest automation with Live Peek & replay, and zero-config graceful fallback. Store versions may lag behind GitHub Releases. See the [Changelog](CHANGELOG.md).
+> **Repository Version**: **1.0.25**, improving the home page and quick search, website and bookmark organization, Bilibili radio, music playback, and Todoist tasks. Store versions may lag behind GitHub Releases. See the [Changelog](CHANGELOG.md).
 
 ---
 

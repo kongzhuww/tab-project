@@ -5,9 +5,9 @@ export const MAX_SAFE_SYNC_PAYLOAD_BYTES = 58 * 1024;
 export class SyncBackupError extends Error {}
 
 const booleanKeys = new Set([
-  "showWeather", "showSites", "showBili", "showTodo",
+  "showWeather", "showSites", "showHomeNews", "showHomePlayer", "showQuickSearchWallpaper", "showBili", "showTodo",
   "showLeftNavigation", "showNavBall", "showBookmarkPanel", "showBookmarkFoldersTop",
-  "showStartupAnimation", "singleNewTab", "showHomeMusicVisualizer"
+  "showStartupAnimation", "singleNewTab", "enableQuickSearch", "showHomeMusicVisualizer"
 ]);
 const arrayKeys = new Set([
   "searchIgnoredBookmarkFolders", "wereadSortIds",

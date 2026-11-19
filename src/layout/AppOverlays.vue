@@ -6,7 +6,6 @@ import NotificationHost from "../notifications/NotificationHost.vue";
 import DockModuleHost from "../modules/DockModuleHost.vue";
 import { useRetainedMount } from "../core/useRetainedMount";
 import { folderState } from "../launcher/folder-store";
-import { notificationHistoryState } from "../notifications/history-store";
 import { tabManagerState } from "../profile/tab-manager-store";
 import { clockSettingsController } from "../clock/settings-store";
 import { aihotViewerState } from "../viewers/store";
@@ -22,7 +21,6 @@ import { sideDrawerState, bindSideDrawerMessages } from "../sidepanel/drawer-sto
 import BiliUpPreview from "../bilibili/BiliUpPreview.vue";
 
 const mountMarket = useRetainedMount(() => pluginMarketController.state.isOpen);
-const mountNotificationCenter = useRetainedMount(() => notificationHistoryState.isOpen);
 const mountTabManager = useRetainedMount(() => tabManagerState.isOpen);
 const mountClockSettings = useRetainedMount(() => clockSettingsController.state.isOpen);
 const mountAihotViewer = useRetainedMount(() => aihotViewerState.open);
@@ -52,7 +50,6 @@ const BookmarkNoteMenu = defineAsyncComponent(() => import("../bookmarks/Bookmar
 const BookmarkPanel = defineAsyncComponent(() => import("../bookmarks/BookmarkPanel.vue"));
 const ClockSettingsMenu = defineAsyncComponent(() => import("../clock/ClockSettingsMenu.vue"));
 
-const NotificationCenter = defineAsyncComponent(() => import("../notifications/NotificationCenter.vue"));
 const TabManagerPanel = defineAsyncComponent(() => import("../profile/TabManagerPanel.vue"));
 const LauncherDialogs = defineAsyncComponent(() => import("../launcher/LauncherDialogs.vue"));
 const LauncherFolderDialog = defineAsyncComponent(() => import("../launcher/LauncherFolderDialog.vue"));
@@ -104,7 +101,6 @@ const PluginMarketDialog = defineAsyncComponent(async () => {
     </div>
 
     <!-- 顶栏通知历史与独立标签页管理 -->
-    <div id="vue-notification-center-root"><NotificationCenter v-if="mountNotificationCenter" /></div>
     <div id="vue-tab-manager-root"><TabManagerPanel v-if="mountTabManager" /></div>
 
     <!-- 书签上下文操作与备注菜单 -->

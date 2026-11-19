@@ -79,6 +79,47 @@
               <small>LAYOUT & BEHAVIOR</small>
             </div>
 
+            <div class="module-toggles" style="margin-bottom: 12px;">
+              <label v-for="item in homeModuleOptions" :key="item.key" class="toggle-card">
+                <span class="toggle-copy"><b>{{ item.label }}</b></span>
+                <input v-model="form[item.key]" type="checkbox" @change="saveImmediate(item.key)" />
+                <i class="switch"></i>
+              </label>
+              <label class="toggle-card">
+                <span class="toggle-copy"><b>极速搜索显示壁纸</b><small>默认使用山景壁纸</small></span>
+                <input v-model="form.showQuickSearchWallpaper" type="checkbox" @change="saveImmediate('showQuickSearchWallpaper')" />
+                <i class="switch"></i>
+              </label>
+            </div>
+            <div class="settings-subgroup-title">
+              <span>背景透明度</span>
+              <div class="transparency-actions">
+                <button type="button" class="btn-secondary" :disabled="!settingsReady || settingsSaving" @click="openTransparencyBatch">批量设置</button>
+                <button type="button" class="btn-secondary" :disabled="!settingsReady || settingsSaving" @click="resetHomeTransparency">恢复默认</button>
+              </div>
+            </div>
+            <div v-if="transparencyBatchOpen" class="transparency-batch">
+              <div class="transparency-batch-options">
+                <label v-for="item in homeCardTransparencyOptions" :key="item.key"><input v-model="transparencyBatchSelected" type="checkbox" :value="item.key" /> {{ item.label }}</label>
+              </div>
+              <div class="transparency-batch-controls">
+                <input v-model.number="transparencyBatchValue" type="range" min="0" max="80" step="1" aria-label="批量背景透明度" />
+                <input v-model.number="transparencyBatchValue" type="number" min="0" max="80" step="1" aria-label="批量背景透明度数值" /><span>%</span>
+                <button type="button" class="btn-secondary" @click="transparencyBatchOpen = false">取消</button>
+                <button type="button" class="btn-secondary" :disabled="!transparencyBatchSelected.length || settingsSaving" @click="applyTransparencyBatch">应用</button>
+              </div>
+            </div>
+            <div class="field full-width" v-for="item in homeCardTransparencyOptions" :key="item.key">
+              <label :for="item.key">{{ item.label }}背景透明度 <span class="transparency-value"><input type="number" min="0" max="80" step="1" :value="form[item.key]" :aria-label="`${item.label}背景透明度百分比`" @change="setTransparency(item.key, $event)" />%</span></label>
+              <input :id="item.key" v-model.number="form[item.key]" type="range" min="0" max="80" step="1" @change="saveImmediate(item.key)" />
+            </div>
+            <div class="field full-width">
+              <label>首页默认显示 <em>DEFAULT VIEW</em></label>
+              <select v-model="form.defaultSitesView" @change="saveImmediate('defaultSitesView')">
+                <option value="bookmarks">书签</option>
+                <option value="sites">常用网站</option>
+              </select>
+            </div>
             <div class="field full-width">
               <label>{{ t('settings.dockPos.label') }} <em>DOCK POSITION</em></label>
               <CustomSelect
@@ -129,8 +170,8 @@
                 <i class="switch"></i>
               </label>
               <label class="toggle-card">
-                <span class="toggle-copy"><b>{{ t('settings.toggle.singleTab') }}</b><small>{{ t('settings.toggle.singleTabSub') }}</small></span>
-                <input v-model="form.singleNewTab" type="checkbox" @change="saveImmediate('singleNewTab')" />
+                <span class="toggle-copy"><b>{{ t('settings.toggle.singleTab') }} <span class="settings-quick-help" tabindex="0" :title="t('settings.toggle.quickSearchHelp')" :aria-label="t('settings.toggle.quickSearchHelp')" @click.prevent.stop @keydown.space.prevent>?</span></b><small>{{ t('settings.toggle.singleTabSub') }}</small></span>
+                <input v-model="form.enableQuickSearch" type="checkbox" @change="saveImmediate('enableQuickSearch')" />
                 <i class="switch"></i>
               </label>
             </div>
@@ -663,10 +704,11 @@
                     />
                     <!-- 图片缩略图预览 -->
                     <img
-                      v-else-if="item.previewUrl || wallpaperPreviewMap[item.id] || (item as any).thumb"
-                      :src="item.previewUrl || wallpaperPreviewMap[item.id] || (item as any).thumb"
+                      v-else-if="getWallpaperHistoryPreview(item)"
+                      :src="getWallpaperHistoryPreview(item)"
                       alt=""
                       loading="lazy"
+                      @error="onWallpaperPreviewError(item, $event)"
                       style="width: 100%; height: 100%; object-fit: cover;"
                     />
                     <div v-else style="font-size: 20px; color: var(--muted);">
@@ -996,6 +1038,7 @@ import {
   type WorkshopItemInfo
 } from "../wallpaper/workshop-scanner";
 import { applyWorkshopWallpaper } from "../wallpaper/workshop-applier";
+import { selectHistoryPreview } from "../wallpaper/history-preview";
 import { macDockController, macDockState, isValidDockPosition, type DockPosition } from "../dock/store";
 import { appDialog } from "../core/app-dialog.store";
 import {
@@ -1450,6 +1493,14 @@ const defaultForm: SettingsConfig = {
   city: "",
   showWeather: true,
   showSites: true,
+  showHomeNews: true,
+  showHomePlayer: true,
+  showQuickSearchWallpaper: true,
+  defaultSitesView: "bookmarks",
+  sitesTransparency: 6,
+  weatherTransparency: 6,
+  newsTransparency: 6,
+  playerTransparency: 6,
   showBili: true,
   showTodo: true,
   showLeftNavigation: true,
@@ -1460,10 +1511,53 @@ const defaultForm: SettingsConfig = {
   startupAnimationStyle: "endfield",
   searchEngine: "bing",
   singleNewTab: false,
+  enableQuickSearch: false,
   showHomeMusicVisualizer: true,
   dockPosition: "bottom"
 };
 const form = reactive<SettingsConfig>({ ...defaultForm });
+const homeModuleOptions = [
+  { key: 'showWeather', label: '天气' },
+  { key: 'showSites', label: '常用网站和书签' },
+  { key: 'showHomeNews', label: 'AI HOT 资讯' },
+  { key: 'showHomePlayer', label: '音乐播放器' },
+] as const;
+const homeCardTransparencyOptions = [
+  { key: 'sitesTransparency', label: '常用网站' },
+  { key: 'weatherTransparency', label: '天气' },
+  { key: 'newsTransparency', label: '资讯' },
+  { key: 'playerTransparency', label: '播放器' },
+] as const;
+
+const transparencyBatchOpen = ref(false);
+const transparencyBatchValue = ref<number | string>(6);
+const transparencyBatchSelected = ref<Array<typeof homeCardTransparencyOptions[number]['key']>>([]);
+function openTransparencyBatch() {
+  transparencyBatchSelected.value = homeCardTransparencyOptions.map(item => item.key);
+  transparencyBatchValue.value = 6;
+  transparencyBatchOpen.value = true;
+}
+async function applyTransparencyBatch() {
+  const keys = [...transparencyBatchSelected.value];
+  if (!keys.length) return;
+  const value = Math.max(0, Math.min(80, Math.round(Number(transparencyBatchValue.value) || 0)));
+  for (const key of keys) form[key] = value;
+  if (await handleSave(false, true, keys)) transparencyBatchOpen.value = false;
+}
+
+async function resetHomeTransparency() {
+  const keys = homeCardTransparencyOptions.map(item => item.key);
+  for (const key of keys) form[key] = defaultForm[key];
+  await handleSave(false, true, keys);
+}
+
+function setTransparency(key: typeof homeCardTransparencyOptions[number]['key'], event: Event) {
+  const input = event.target as HTMLInputElement;
+  const value = input.value === '' ? form[key] : Math.max(0, Math.min(80, Math.round(Number(input.value))));
+  form[key] = value;
+  input.value = String(value);
+  void saveImmediate(key);
+}
 
 // 快捷键状态
 const shortcutTools = computed(() => AVAILABLE_SHORTCUT_TOOLS.filter(tool => isShortcutToolAvailable(tool.id)));
@@ -1631,6 +1725,8 @@ const currentWallpaperValue = ref<any>(null);
 const wallpaperLoading = ref(false);
 const wallpaperStatusMsg = ref("");
 const wallpaperPreviewMap = reactive<Record<string, string>>({});
+const failedWallpaperPreviews = reactive<Record<string, string[]>>({});
+const loadingWallpaperPreviews = new Set<string>();
 const wallpaperCurrentPage = ref(1);
 const WALLPAPER_PAGE_SIZE = 8;
 const editingWallpaperId = ref<string | null>(null);
@@ -1761,22 +1857,31 @@ async function loadWallpaperData() {
   }
 }
 
+function getWallpaperHistoryPreview(item: WallpaperHistoryItem): string {
+  const workshop = settingsWorkshopItems.value.find(entry => entry.id === String(item.value?.workshopId || ''));
+  return selectHistoryPreview(workshop, [item.previewUrl, item.value?.previewBase64, item.value?.previewUrl, (item as any).thumb], wallpaperPreviewMap[item.id], failedWallpaperPreviews[item.id]);
+}
+
+function onWallpaperPreviewError(item: WallpaperHistoryItem, event: Event) {
+  const url = (event.target as HTMLImageElement).getAttribute('src');
+  if (url) failedWallpaperPreviews[item.id] = [...(failedWallpaperPreviews[item.id] || []), url];
+  void preloadWallpaperPreviews();
+}
+
 async function preloadWallpaperPreviews() {
-  const items = [...paginatedUserWallpapers.value];
-  for (const item of items) {
-    if (item.previewUrl) {
-      wallpaperPreviewMap[item.id] = item.previewUrl;
-      continue;
-    }
-    if ((item as any).thumb || (item as any).style || wallpaperPreviewMap[item.id]) continue;
+  for (const item of paginatedUserWallpapers.value) {
     const key = item.value?.storageKey;
-    if (!key) continue;
+    if (!key || wallpaperPreviewMap[item.id] || loadingWallpaperPreviews.has(item.id)) continue;
+    if (item.kind !== '视频' && getWallpaperHistoryPreview(item)) continue;
+    loadingWallpaperPreviews.add(item.id);
     try {
       const url = await WallpaperService.createLibraryPreviewUrl(key);
-      if (url) wallpaperPreviewMap[item.id] = url;
-    } catch {}
+      if (url && alive) wallpaperPreviewMap[item.id] = url;
+      else if (url) URL.revokeObjectURL(url);
+    } catch {} finally { loadingWallpaperPreviews.delete(item.id); }
   }
 }
+watch(paginatedUserWallpapers, () => { void preloadWallpaperPreviews(); });
 
 async function handleSelectWallpaper(item: any) {
   try {
@@ -2196,6 +2301,7 @@ async function loadAll() {
         (form as any)[key] = cfg[key];
       }
     }
+    if (cfg.enableQuickSearch === undefined && cfg.singleNewTab === true) form.enableQuickSearch = true;
     // 同步到 localStorage 确保首绘脚本即时生效
     if (cfg.showStartupAnimation !== undefined) {
       const val = cfg.showStartupAnimation ? "1" : "0";
@@ -2271,5 +2377,6 @@ onUnmounted(() => {
   window.removeEventListener("keydown", handleGlobalKeyDown, true);
   window.removeEventListener('focus', refreshBrowserShortcuts);
   if (saveTimer) clearTimeout(saveTimer);
+  for (const url of Object.values(wallpaperPreviewMap)) URL.revokeObjectURL(url);
 });
 </script>

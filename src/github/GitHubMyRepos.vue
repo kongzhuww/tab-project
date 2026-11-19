@@ -174,17 +174,7 @@ const activeGroupColumns = computed(() => {
 });
 
 // 过滤后的仓库列表
-const filteredRepos = computed(() => {
-  const q = myReposState.searchQuery.trim().toLowerCase();
-  if (!q) return myReposState.repos;
-  return myReposState.repos.filter(r =>
-    r.name.toLowerCase().includes(q) ||
-    r.description.toLowerCase().includes(q) ||
-    r.localGroups.some(g => g.toLowerCase().includes(q)) ||
-    r.topics.some(t => t.toLowerCase().includes(q)) ||
-    (r.language && r.language.toLowerCase().includes(q))
-  );
-});
+const filteredRepos = computed(() => myReposState.repos);
 
 // 左侧“未分类”中的仓库：没有被赋予任何本地分组的仓库
 const defaultColumnRepos = computed(() => {
@@ -443,35 +433,6 @@ onUnmounted(() => {
         </div>
 
         <div class="shelf-right">
-          <!-- 搜索框 -->
-          <div class="shelf-search-wrap">
-            <span class="search-icon">🔍</span>
-            <input
-              v-model="myReposState.searchQuery"
-              type="text"
-              class="shelf-search-input"
-              placeholder="搜索我的仓库名称、简介或语言…"
-            />
-            <button
-              v-if="myReposState.searchQuery"
-              type="button"
-              class="clear-search-btn"
-              @click="myReposState.searchQuery = ''"
-            >✕</button>
-          </div>
-
-          <!-- 紧凑刷新按钮 -->
-          <button
-            type="button"
-            class="shelf-btn-refresh"
-            :disabled="myReposState.loading"
-            :title="t('github.myRepos.refreshBtnTitle')"
-            @click="myReposController.load(true)"
-          >
-            <span :class="{ spinning: myReposState.loading }">🔄</span>
-            <span>{{ myReposState.loading ? t('github.myRepos.refreshing') : t('common.refresh') }}</span>
-          </button>
-
           <!-- 折叠切换 -->
           <button
             v-if="defaultColumnRepos.length"

@@ -1,6 +1,6 @@
 {
   "name": "tab-project",
-  "version": "1.0.24",
+  "version": "1.0.25",
   "private": true,
   "type": "module",
   "description": "tab-project-next desktop Chromium browser extension with Vue UI",

@@ -135,6 +135,8 @@ export interface BiliOrganizerView {
   sort: "fav_time" | "view" | "pubtime";
   query: string;
   page: number;
+  pageSize: number;
+  loadedFolderId: string;
   totalPages: number;
   totalItems: number;
   batchMode: boolean;
@@ -233,6 +235,8 @@ export const biliFavoritesState = reactive<BiliFavoritesState>({
     sort: "fav_time",
     query: "",
     page: 1,
+    pageSize: 21,
+    loadedFolderId: "",
     totalPages: 1,
     totalItems: 0,
     batchMode: false,
@@ -436,6 +440,18 @@ function mapBiliVideoToView(item: BiliVideoData): BiliOrganizerVideoView {
   };
 }
 
+let organizerPageSize = 21;
+let folderRequest = 0;
+
+export function favoriteGridColumns(width: number, minimumWidth: number): number {
+  return Math.max(1, Math.min(7, Math.floor((width + 14) / (minimumWidth + 14))));
+}
+
+function organizerLoadError(error: { status?: number; code?: number; message?: string } | undefined, fallback: string): string {
+  if (error?.status === 412 || error?.code === -412) return "B 站暂时加载失败，请稍后再试。";
+  return error?.message || fallback;
+}
+
 export async function loadFolderVideos(
   folderId: string | number,
   page = 1,
@@ -452,13 +468,19 @@ export async function loadFolderVideos(
     pubtime: "pubtime"
   };
   const order = orderMap[sort] || "mtime";
+  const request = ++folderRequest;
+  const size = organizerPageSize;
 
   try {
-    const res = await bilibiliService.getFolderVideos(folderId, page, 21, order, query);
+    const res = await bilibiliService.getFolderVideos(folderId, page, size, order, query);
+    if (request !== folderRequest) return;
     org.videos = res.medias.map(mapBiliVideoToView);
+    org.selectedCount = 0;
+    org.loadedFolderId = String(folderId);
     org.page = page;
+    org.pageSize = size;
     org.totalItems = res.total;
-    org.totalPages = Math.max(1, Math.ceil(res.total / 21));
+    org.totalPages = Math.max(1, Math.ceil(res.total / size));
     org.sort = sort;
     org.query = query;
 
@@ -466,10 +488,9 @@ export async function loadFolderVideos(
     org.folderTitle = matchedFolder?.title || res.info?.title || "收藏夹";
     org.folderSubtitle = `共 ${res.total} 个内容`;
   } catch (err: any) {
-    org.error = err.message || "加载视频列表失败";
-    org.folderSubtitle = "加载失败，请重试";
+    if (request === folderRequest) org.error = organizerLoadError(err, "加载视频列表失败");
   } finally {
-    org.loading = false;
+    if (request === folderRequest) org.loading = false;
   }
 }
 
@@ -527,8 +548,7 @@ export async function loadOrganizer(forceReload = false): Promise<void> {
       org.folderSubtitle = "暂无可用收藏夹";
     }
   } catch (err: any) {
-    org.error = err.message || "读取 B站 收藏夹失败";
-    org.folderSubtitle = "读取失败，请检查网络或重试";
+    org.error = organizerLoadError(err, "读取 B 站收藏夹失败");
   } finally {
     org.loading = false;
   }
@@ -555,6 +575,13 @@ export const biliFavoritesController = {
   },
   loadOrganizer,
   loadFolderVideos,
+  setOrganizerColumns(columns: number) {
+    organizerPageSize = columns * 3;
+    const { organizer: org, activeFolderId } = biliFavoritesState;
+    if (org.loading || org.error || !activeFolderId || org.loadedFolderId !== activeFolderId || org.pageSize === organizerPageSize) return;
+    const firstIndex = (org.page - 1) * org.pageSize;
+    void loadFolderVideos(activeFolderId, Math.floor(firstIndex / organizerPageSize) + 1, org.sort, org.query);
+  },
 
   switchTab(tab: BiliFavoritesState["currentTab"]) {
     biliFavoritesState.currentTab = tab;

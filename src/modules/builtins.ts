@@ -10,12 +10,10 @@ import { stickersDockModule } from "../stickers/module";
 import { musicDockModule } from "../music/module";
 import { todoistDockModule } from "../todoist/module";
 import { chatDockModule } from "../chat/module";
-import { backpackDockModule } from "../backpack/module";
 import { multicaDockModule } from "../multica/module";
 
 // Registration imports only lightweight state/settings declarations, not the Vue view.
 registerDockModule(chatDockModule);
-registerDockModule(backpackDockModule);
 registerDockModule(multicaDockModule);
 // Register card insertion targets before their dependents to preserve the original Dock order.
 registerDockModule(todoistDockModule);

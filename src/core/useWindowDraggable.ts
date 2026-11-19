@@ -106,7 +106,7 @@ export function useWindowDraggable(options: UseWindowDraggableOptions) {
     w = Math.max(1, Math.min(winW - 16, Math.max(minWidth, w)));
     h = Math.max(1, Math.min(winH - 16, Math.max(minHeight, h)));
 
-    const minTop = 64; // 顶栏避让安全高度，杜绝浮窗标题栏滑入顶栏发生按键被遮挡/重叠
+    const minTop = 8;
     if (typeof l !== "number" || typeof t !== "number") {
       const preferredLeft = options.defaultLeft !== undefined
         ? Math.min(options.defaultLeft, winW - w - 16)
@@ -220,7 +220,7 @@ export function useWindowDraggable(options: UseWindowDraggableOptions) {
     const rect = panel.getBoundingClientRect();
     const offsetX = event.clientX - rect.left;
     const offsetY = event.clientY - rect.top;
-    const minTop = 64;
+    const minTop = 8;
     const maxLeft = Math.max(8, window.innerWidth - rect.width - 8);
     const maxTop = Math.max(minTop, window.innerHeight - 50);
 
@@ -313,7 +313,7 @@ export function useWindowDraggable(options: UseWindowDraggableOptions) {
     const rect = panel.getBoundingClientRect();
     const startX = event.clientX;
     const startY = event.clientY;
-    const minTop = 64;
+    const minTop = 8;
 
     panel.style.width = `${rect.width}px`;
     panel.style.height = `${rect.height}px`;

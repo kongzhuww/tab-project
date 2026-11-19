@@ -47,19 +47,6 @@ export const PLUGIN_CATALOG: readonly PluginMarketItem[] = [
     builtIn: true
   },
   {
-    id: "backpack",
-    title: "提示词背包",
-    version: "v1.0.0",
-    kind: "module",
-    category: "productivity",
-    categoryLabel: "独立模块 · 提示词",
-    emoji: "🎒",
-    desc: "提示词收纳与快速填充背包，支持 Prompt 收藏、分类标签管理、一键带参数变量复制与全量导入导出备份。",
-    author: "tab-project Lab",
-    tags: ["Prompt管理", "变量填充", "一键复制", "独立小窗"],
-    builtIn: true
-  },
-  {
     id: "todoist",
     title: "todoist",
     version: "v3.0.0",
@@ -189,7 +176,7 @@ function loadInstalledIds(): string[] {
   } catch {
     installedReadFailed = true;
   }
-  return ["backpack"];
+  return ["music"];
 }
 
 function persistInstalledIds(ids: string[]): boolean {
@@ -294,7 +281,7 @@ export const pluginMarketController = {
   isInstalled(id: string): boolean {
     // Core entries are available by default, not necessarily mounted or running.
     if (CORE_PLUGIN_IDS.includes(id)) {
-      return true;
+      return !state.installedIds.includes(`disabled:${id}`);
     }
     return state.installedIds.includes(id);
   },
@@ -340,41 +327,33 @@ export const pluginMarketController = {
       state.errorMessage = "该组件不可启用。";
       return Promise.resolve(false);
     }
-    if (CORE_PLUGIN_IDS.includes(id)) return Promise.resolve(true);
-    return commitInstalledIds(latest => [...latest, id]);
+    return commitInstalledIds(latest => [...latest.filter(entry => entry !== `disabled:${id}`), id]);
   },
 
   uninstall(id: string): Promise<boolean> {
-    if (this.isCorePlugin(id)) {
-      state.errorMessage = "核心入口默认可用，不支持在商店停用。";
-      return Promise.resolve(false);
-    }
     if (!PLUGIN_CATALOG.some(item => item.id === id)) {
       state.errorMessage = "该入口不由当前商店管理，未删除旧偏好。";
       return Promise.resolve(false);
     }
-    return commitInstalledIds(latest => latest.filter(entry => entry !== id));
+    return commitInstalledIds(latest => CORE_PLUGIN_IDS.includes(id)
+      ? [...latest.filter(entry => entry !== id), `disabled:${id}`]
+      : latest.filter(entry => entry !== id));
   },
 
   toggle(id: string): Promise<boolean> {
     const item = PLUGIN_CATALOG.find(item => item.id === id);
-    if (!item || CORE_PLUGIN_IDS.includes(id)) return Promise.resolve(false);
-    return commitInstalledIds(latest => {
-      if (latest.includes(id)) return latest.filter(entry => entry !== id);
-      // This per-item action is explicit opt-in; installAll still excludes isDev.
-      return [...latest, id];
-    });
+    if (!item) return Promise.resolve(false);
+    return this.isInstalled(id) ? this.uninstall(id) : this.install(id);
   },
 
   installAll(): Promise<boolean> {
     // Bulk enable never silently opts into experimental components.
     const moduleIds = PLUGIN_CATALOG.filter(p => !p.isDev && !this.isCorePlugin(p.id)).map(p => p.id);
-    return commitInstalledIds(latest => [...latest, ...moduleIds]);
+    return commitInstalledIds(latest => [...latest.filter(id => !CORE_PLUGIN_IDS.some(core => id === `disabled:${core}`)), ...moduleIds]);
   },
 
   uninstallAll(): Promise<boolean> {
-    const managed = new Set(PLUGIN_CATALOG.filter(p => !this.isCorePlugin(p.id)).map(p => p.id));
-    // Unknown/old IDs and stored core preferences are outside the shop's deletion scope.
-    return commitInstalledIds(latest => latest.filter(id => !managed.has(id)));
+    const managed = new Set(PLUGIN_CATALOG.map(p => p.id));
+    return commitInstalledIds(latest => [...latest.filter(id => !managed.has(id)), ...CORE_PLUGIN_IDS.map(id => `disabled:${id}`)]);
   }
 };

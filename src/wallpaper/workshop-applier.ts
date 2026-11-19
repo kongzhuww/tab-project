@@ -79,7 +79,7 @@ export async function applyWorkshopWallpaper(item: WorkshopItemInfo): Promise<bo
       files,
     };
 
-    const previewImage = item.previewUrl || item.previewBase64;
+    const previewImage = [item.previewBase64, item.previewUrl].find(url => url && !url.startsWith('blob:'));
     const wallpaperVal = {
       type: pack.type,
       name: item.title,

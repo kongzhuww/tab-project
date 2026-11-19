@@ -24,6 +24,14 @@ export interface GlobalSettingsConfig {
   city: string;
   showWeather: boolean;
   showSites: boolean;
+  showHomeNews: boolean;
+  showHomePlayer: boolean;
+  showQuickSearchWallpaper: boolean;
+  defaultSitesView?: "sites" | "bookmarks";
+  sitesTransparency: number;
+  weatherTransparency: number;
+  newsTransparency: number;
+  playerTransparency: number;
   showBili: boolean;
   showTodo: boolean;
   showLeftNavigation: boolean;
@@ -34,6 +42,7 @@ export interface GlobalSettingsConfig {
   startupAnimationStyle: string;
   searchEngine?: string;
   singleNewTab: boolean;
+  enableQuickSearch: boolean;
   showHomeMusicVisualizer: boolean;
   dockPosition?: "bottom" | "left" | "right" | "top";
   customAvatarUrl?: string;
@@ -49,16 +58,16 @@ export interface IgnoredBookmarkFolder {
 
 // Explicit allowlist: global UI must never read or overwrite module credentials.
 export const GLOBAL_SETTINGS_KEYS: (keyof GlobalSettingsConfig)[] = [
-  "displaySize", "city", "showWeather", "showSites", "showBili", "showTodo",
+  "displaySize", "city", "showWeather", "showSites", "showHomeNews", "showHomePlayer", "showQuickSearchWallpaper", "defaultSitesView", "sitesTransparency", "weatherTransparency", "newsTransparency", "playerTransparency", "showBili", "showTodo",
   "showLeftNavigation", "showNavBall", "showBookmarkPanel", "showBookmarkFoldersTop",
-  "showStartupAnimation", "startupAnimationStyle", "searchEngine", "singleNewTab",
+  "showStartupAnimation", "startupAnimationStyle", "searchEngine", "singleNewTab", "enableQuickSearch",
   "showHomeMusicVisualizer", "dockPosition"
 ];
 
 export const SETTINGS_TOGGLE_KEYS: (keyof GlobalSettingsConfig)[] = [
-  "showStartupAnimation", "showWeather", "showSites", "showBili",
+  "showStartupAnimation", "showWeather", "showSites", "showHomeNews", "showHomePlayer", "showQuickSearchWallpaper", "showBili",
   "showTodo", "showLeftNavigation", "showNavBall", "showBookmarkPanel",
-  "showBookmarkFoldersTop", "singleNewTab", "showHomeMusicVisualizer"
+  "showBookmarkFoldersTop", "singleNewTab", "enableQuickSearch", "showHomeMusicVisualizer"
 ];
 
 export const SHORTCUT_STORAGE_KEY = "customShortcuts";

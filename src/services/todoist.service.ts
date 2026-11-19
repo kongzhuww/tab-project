@@ -367,6 +367,7 @@ export class TodoistService {
     view: "inbox" | "today" | "projects" = "inbox",
     targetProjectId?: string
   ): TodoistWorkspaceData | null {
+    if (this.workspaceCacheInvalidated) return null;
     const key = this.getWorkspaceCacheKey(view, targetProjectId);
     const mem = this.workspaceMemoryCache.get(key);
     if (mem?.data?.columns && Array.isArray(mem.data.columns) && mem.data.columns.length > 0) {

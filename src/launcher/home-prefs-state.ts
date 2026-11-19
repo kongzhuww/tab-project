@@ -4,6 +4,8 @@ import { reactive } from "vue";
 export const homePrefsState = reactive({
   showWeather: true,
   showSites: true,
+  showHomeNews: true,
+  showHomePlayer: true,
   showBili: true,
   showTodo: true,
   showBookmarkPanel: true

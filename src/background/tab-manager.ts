@@ -42,51 +42,33 @@ export async function focusHomeTab(tab: any): Promise<boolean> {
   return true;
 }
 
+function tabHasPage(tab: any, page: string): boolean {
+  const expected = chrome.runtime.getURL(page);
+  return [tab.url, tab.pendingUrl].some(url => typeof url === 'string' && url.split(/[?#]/, 1)[0] === expected);
+}
+
+async function focusMainPage(tab: any): Promise<void> {
+  if (tabHasPage(tab, 'newtab-search.html') && !tabHasPage(tab, 'newtab.html')) {
+    await chrome.tabs.update(tab.id, { url: chrome.runtime.getURL('newtab.html') });
+  }
+  await focusHomeTab(tab);
+}
+
 export async function openOrFocusNewTab(): Promise<void> {
-  const existing = chooseExistingHomeTab(await chrome.tabs.query({}));
+  const tabs = await chrome.tabs.query({});
+  const existing = chooseExistingHomeTab(tabs.filter((tab: any) => tabHasPage(tab, 'newtab.html'))) || chooseExistingHomeTab(tabs);
   if (existing) {
-    await focusHomeTab(existing);
+    await focusMainPage(existing);
     return;
   }
   await chrome.tabs.create({ url: chrome.runtime.getURL("newtab.html"), active: true });
 }
 
-export function dedupeLogicWeaverNewTab(sender: any, sendResponse: (res: any) => void): void {
-  const senderTab = sender?.tab;
-  if (senderTab?.id == null || senderTab.windowId == null) {
-    sendResponse({ action: "open-home" });
-    return;
-  }
-  chrome.storage.local.get(["singleNewTab"], (stored: any) => {
-    const enabled = stored.singleNewTab === true;
-    if (!enabled) {
-      sendResponse({ action: "open-home" });
-      return;
-    }
-    chrome.tabs.query({ windowId: senderTab.windowId }, (tabs: any[]) => {
-      if (chrome.runtime.lastError) {
-        sendResponse({ action: "open-home" });
-        return;
-      }
-      const homeTabs = (tabs || []).filter((tab) => {
-        if (!tab || tab.id === senderTab.id) return false;
-        const u = tab.url || tab.pendingUrl || "";
-        if (u.includes("newtab-bootstrap.html") || u.includes("newtab-search.html")) return false;
-        return (
-          u.includes("newtab.html") ||
-          u.startsWith("chrome://newtab") ||
-          u.startsWith("edge://newtab") ||
-          u.startsWith("chrome://new-tab-page")
-        );
-      });
-
-      if (homeTabs.length === 0) {
-        sendResponse({ action: "open-home" });
-      } else {
-        sendResponse({ action: "open-search", existingTabId: homeTabs[0].id });
-      }
-    });
-  });
+export function routeNewTab(sendResponse: (res: any) => void): void {
+  void chrome.storage.local.get(['singleNewTab', 'enableQuickSearch']).then((stored: any) => {
+    const quick = stored.enableQuickSearch ?? stored.singleNewTab;
+    sendResponse({ action: quick === true ? 'open-search' : 'open-home' });
+  }, () => sendResponse({ action: 'open-home' }));
 }
 
 function normalizeUrl(value: string): string {
@@ -208,51 +190,23 @@ export async function cleanupOrReplaceBrowserDefaultNewTabs(): Promise<void> {
   if (typeof chrome === "undefined" || !chrome.tabs?.query) return;
   try {
     const tabs = await chrome.tabs.query({});
-    const myId = chrome.runtime.id;
-    const ownTabs = tabs.filter((t: any) => {
-      const u = t.url || t.pendingUrl || "";
-      return u.includes(myId) && u.includes("newtab.html");
+    const ownTabs = tabs.filter((tab: any) => {
+      const url = String(tab.url || tab.pendingUrl || '').split(/[?#]/, 1)[0];
+      return ['newtab.html', 'newtab-search.html', 'newtab-bootstrap.html'].some(path => url === chrome.runtime.getURL(path));
     });
 
-    const strayTabs = tabs.filter(isBrowserDefaultNewTab);
+    const ownIds = new Set(ownTabs.map((tab: any) => tab.id));
+    const strayTabs = tabs.filter((tab: any) => {
+      if (ownIds.has(tab.id)) return false;
+      const url = String(tab.pendingUrl || tab.url || '');
+      return /^(?:chrome|edge):\/\/(?:newtab|new-tab-page)\/?(?:[?#].*)?$/.test(url);
+    });
     if (!strayTabs.length) return;
 
-    // 检查用户是否开启了“仅保留一个主界面（后续标签打开大号搜索）”
-    let singleNewTab = false;
-    try {
-      const stored = await chrome.storage?.local?.get(["singleNewTab"]);
-      singleNewTab = stored?.singleNewTab === true;
-    } catch {}
-
-    const homeUrl = chrome.runtime.getURL("newtab.html");
-    const searchUrl = chrome.runtime.getURL("newtab-search.html");
-
-    if (ownTabs.length > 0) {
-      // 已经存在主界面
-      const targetUrl = singleNewTab ? searchUrl : homeUrl;
-      for (const st of strayTabs) {
-        if (st.id != null) {
-          try {
-            await chrome.tabs.update(st.id, { url: targetUrl });
-          } catch {}
-        }
-      }
-    } else {
-      // 尚无主界面
-      const [first, ...rest] = strayTabs;
-      if (first?.id != null) {
-        try {
-          await chrome.tabs.update(first.id, { url: homeUrl });
-        } catch {}
-      }
-      for (const r of rest) {
-        if (r.id != null) {
-          try {
-            await chrome.tabs.update(r.id, { url: singleNewTab ? searchUrl : homeUrl });
-          } catch {}
-        }
-      }
-    }
+    const stored = await chrome.storage.local.get(['singleNewTab', 'enableQuickSearch']);
+    const quick = stored.enableQuickSearch ?? stored.singleNewTab;
+    const targetUrl = chrome.runtime.getURL(quick === true ? 'newtab-search.html' : 'newtab.html');
+    for (const tab of strayTabs) if (tab.id != null) await chrome.tabs.update(tab.id, { url: targetUrl });
   } catch {}
 }
 

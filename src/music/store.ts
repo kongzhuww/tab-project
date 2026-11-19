@@ -1,5 +1,5 @@
 import { reactive, readonly, type DeepReadonly } from "vue";
-import { musicService } from "../services/music.service";
+import { musicService, toNeteaseMusicSong } from "../services/music.service";
 import { neteaseService, type NeteaseUser, type NeteasePlaylist, type NeteaseSong } from "../services/netease.service";
 import { musicModuleState } from "./module-state";
 import { CACHED_FAVORITES_KEY, CACHED_PLAYLISTS_KEY, readPlaylistCache } from "./playlist-cache";
@@ -107,7 +107,7 @@ export interface HomeMusicController {
   loadNeteaseData(): Promise<void>;
   selectNeteasePlaylist(playlist: NeteasePlaylist | null): Promise<void>;
   searchNetease(query: string): Promise<void>;
-  playNeteaseTrack(rawSong: any): void;
+  playNeteaseTrack(rawSong: any, songs?: NeteaseSong[]): void;
   syncFromBiliRadio(payload: { playing: boolean; title: string; artist: string; coverUrl: string; currentTime: number; duration: number; lyric: string; seriesName?: string }): void;
   startNeteaseQrLogin(): Promise<void>;
   stopNeteaseQrLogin(): void;
@@ -446,7 +446,7 @@ export const homeMusicController: HomeMusicController = {
     const audio = musicService.getAudioElement();
     if (payload.playing && audio && !audio.paused) audio.pause();
   },
-  playNeteaseTrack(rawSong: any) {
+  playNeteaseTrack(rawSong: any, songs?: NeteaseSong[]) {
     homeMusicState.isBiliRadio = false;
     const g = window as any;
     if (g.LogicWeaverBiliRadioPlayer?.getState?.()?.playing) {
@@ -456,6 +456,7 @@ export const homeMusicController: HomeMusicController = {
       neteaseService.recordRecentSong(rawSong);
       homeMusicState.neteaseRecentSongs = neteaseService.getRecentSongs();
     }
+    if (songs?.length) musicService.setQueue(songs.map(toNeteaseMusicSong), -1, false);
     void musicService.playNeteaseSong(rawSong);
   },
   clearNeteaseRecent() {
@@ -570,8 +571,6 @@ export async function initHomeMusicService(): Promise<void> {
     ]);
     if (songs.length > 0 && homeMusicState.songs.length === 0) {
       homeMusicState.songs = songs;
-      // 预置曲库队列，但不自动选中或切歌，保持黑胶唱机默认待机态（点击播放）
-      musicService.setQueue(songs, -1, false);
     }
     if (albums.length > 0 && homeMusicState.albums.length === 0) {
       homeMusicState.albums = albums;

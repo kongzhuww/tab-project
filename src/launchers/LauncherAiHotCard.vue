@@ -226,32 +226,6 @@ async function fetchNews(force = false) {
   }
 }
 
-function rotateNews() {
-  if (!displayedPool.value.length) {
-    isLoading.value = true;
-    void fetchNews(true);
-    return;
-  }
-  pageOffset.value += pageSize;
-  if (pageOffset.value >= displayedPool.value.length) {
-    pageOffset.value = 0;
-  }
-}
-
-function scrollToDiscovery() {
-  const win = window as any;
-  if (typeof win.enterFullscreenCard === "function") {
-    win.enterFullscreenCard("daily-aihot");
-    return;
-  }
-  const target = document.querySelector("#daily-aihot, [data-dock-id='daily-aihot']");
-  if (target) {
-    target.scrollIntoView({ behavior: "smooth", block: "start" });
-  } else {
-    window.open("https://aihot.virxact.com", "_blank", "noreferrer");
-  }
-}
-
 function handleOpenArticle(item: AiHotNewsItem, event: MouseEvent) {
   if (event.ctrlKey || event.metaKey || event.shiftKey || event.button === 1) return;
   event.preventDefault();
@@ -279,13 +253,6 @@ onMounted(() => {
     <header class="card-head aihot-home-head">
       <span class="bar cyan"></span>
       <strong class="title">{{ t('aihot.card.title') }}</strong>
-      <span class="grow"></span>
-      <button class="aihot-home-btn" type="button" :title="t('aihot.card.refreshBtnTip')" @click="rotateNews">
-        {{ t('aihot.card.refreshBtn') }}
-      </button>
-      <button class="aihot-home-btn aihot-home-more-btn" type="button" :title="t('aihot.card.hotlistBtnTip')" @click="scrollToDiscovery">
-        {{ t('aihot.card.hotlistBtn') }}
-      </button>
     </header>
 
     <!-- 原版纯粹的 AI HOT 资讯视图 -->

@@ -17,6 +17,7 @@ export class BiliRecommendations {
   private active = false;
   private request: AbortController | null = null;
   private timeout: ReturnType<typeof setTimeout> | undefined;
+  private pages = new Map<number, { videos: BiliRecentVideo[]; nextFreshIdx: number; pageSize: number }>();
 
   constructor(private readonly dependencies: RecommendationDependencies) {}
 
@@ -36,6 +37,7 @@ export class BiliRecommendations {
   }
 
   public loadRecommendations(reset = false): Promise<void> {
+    if (reset) this.pages.clear();
     return this.load(reset ? 1 : this.state.page, reset ? 1 : this.state.freshIdx, false);
   }
 
@@ -48,7 +50,13 @@ export class BiliRecommendations {
     // No queued clicks and no mutation of committed pagination while busy.
     if (this.state.loading || !Number.isFinite(value)) return Promise.resolve();
     const page = Math.max(1, Math.floor(value));
-    return this.load(page, Math.max(1, this.state.freshIdx + page - this.state.page), true);
+    const cached = this.pages.get(page);
+    if (cached && cached.pageSize === this.state.pageSize && this.active) {
+      Object.assign(this.state, { videos: cached.videos, page, freshIdx: cached.nextFreshIdx, pendingScroll: true });
+      this.publishRecommendationSnapshot();
+      return Promise.resolve();
+    }
+    return this.load(page, this.state.freshIdx, true);
   }
 
   private async load(page: number, freshIdx: number, scroll: boolean): Promise<void> {
@@ -109,6 +117,7 @@ export class BiliRecommendations {
       }));
       if (!current()) return;
       controller.signal.throwIfAborted();
+      this.pages.set(page, { videos, nextFreshIdx: curFreshIdx, pageSize: targetCount });
       Object.assign(this.state, { videos, page, freshIdx: curFreshIdx, pendingScroll: scroll });
       this.publishRecommendationSnapshot();
     } catch (error) {
@@ -139,7 +148,7 @@ export class BiliRecommendations {
     }));
     this.dependencies.publish({
       specialLoading: false, specialError: "", specialTitle: "个性推荐",
-      specialSubtitle: "根据您的喜好与全站热门为您推荐 · 点击右上刷新换一批",
+      specialSubtitle: "根据您的喜好与全站热门为您推荐",
       specialBadge: `第 ${this.state.page} 批`, specialPage: this.state.page, specialVideos
     });
     if (this.state.pendingScroll) {

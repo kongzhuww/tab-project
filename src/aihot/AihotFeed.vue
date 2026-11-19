@@ -12,54 +12,8 @@ import {
 import { aihotViewerController } from "../viewers/store";
 import { aiHotService } from "../services/aihot.service";
 import { fullscreenCardState } from "../core/fullscreen-card-state";
-import { chatService } from "../chat/chat.service";
-import ChatShareMenu from "../chat/ChatShareMenu.vue";
-import type { ChatShareTarget } from "../chat/private-chat-client";
-import { windowManagerController } from "../core/window-manager.store";
-import { useContextMenu } from "../sdk/interactions";
 import { notifications } from "../sdk/notifications";
 import { t, currentLanguage } from "../i18n";
-
-const aihotContextMenu = ref<{
-  visible: boolean;
-  x: number;
-  y: number;
-  item: AiHotFeedArticle | null;
-}>({
-  visible: false,
-  x: 0,
-  y: 0,
-  item: null
-});
-
-function handleOpenContextMenu(e: MouseEvent, item: AiHotFeedArticle) {
-  e.preventDefault();
-  e.stopPropagation();
-  aihotContextMenu.value = {
-    visible: true,
-    x: e.clientX,
-    y: e.clientY,
-    item
-  };
-}
-
-import { chatModuleState } from "../chat/chat-state";
-
-function handleShareToRoom(target: ChatShareTarget) {
-  if (aihotContextMenu.value.item) {
-    chatService.sendAiHotShare(aihotContextMenu.value.item, target);
-  }
-  aihotContextMenu.value.visible = false;
-}
-
-function closeArticleMenu() {
-  aihotContextMenu.value.visible = false;
-}
-const { menuRef: articleMenuRef, style: articleMenuStyle } = useContextMenu({
-  visible: () => aihotContextMenu.value.visible,
-  anchor: () => ({ x: aihotContextMenu.value.x, y: aihotContextMenu.value.y }),
-  dismiss: closeArticleMenu
-});
 
 const state = aihotFeedState;
 
@@ -67,7 +21,7 @@ const { active, standalone } = useCardActivity("daily-aihot", "/aihot.html");
 const owner = Symbol("aihot-feed-view");
 let initialized = false;
 watch(active, visible => {
-  if (!visible) { closeArticleMenu(); aiHotService.pause(owner); return; }
+  if (!visible) { aiHotService.pause(owner); return; }
   if (!initialized) {
     initialized = true;
     state.currentView = standalone ? "leaderboard" : "feed";
@@ -465,7 +419,6 @@ function handleSelectDailyDate(date: string) {
             rel="noreferrer"
             class="aihot-item"
             @click.prevent="handleOpenFeedArticle(item)"
-            @contextmenu="handleOpenContextMenu($event, item)"
           >
             <span class="aihot-rank" :class="{ top: itemIdx < 3 }">
               {{ itemIdx + 1 }}
@@ -553,7 +506,6 @@ function handleSelectDailyDate(date: string) {
                 rel="noreferrer"
                 class="aihot-item"
                 @click.prevent="handleOpenFeedArticle(it)"
-                @contextmenu="handleOpenContextMenu($event, it)"
               >
                 <div style="min-width:0;flex:1">
                   <div class="aihot-t">{{ it.title }}</div>
@@ -574,71 +526,4 @@ function handleSelectDailyDate(date: string) {
     </section>
   </div>
 
-  <!-- AI HOT 右键菜单 -->
-  <Teleport to="body">
-    <div
-      v-if="aihotContextMenu.visible"
-      ref="articleMenuRef"
-      class="aihot-context-menu"
-      :style="articleMenuStyle"
-      role="menu"
-      @click.stop
-    >
-      <div class="menu-head">{{ aihotContextMenu.item?.title }}</div>
-      <ChatShareMenu
-        label="💬 发送到聊天室"
-        match-menu-item
-        :visible="aihotContextMenu.visible"
-        @select="handleShareToRoom"
-      />
-    </div>
-  </Teleport>
 </template>
-
-<style scoped>
-.aihot-context-menu {
-  position: fixed;
-  z-index: 99999;
-  min-width: 180px;
-  max-width: 260px;
-  background: var(--panel);
-  color: var(--text);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 6px;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-}
-.menu-head {
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--muted);
-  padding: 4px 6px 6px;
-  border-bottom: 1px solid var(--border);
-  margin-bottom: 4px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.menu-item {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  background: transparent;
-  border: none;
-  border-radius: 6px;
-  padding: 7px 10px;
-  font-size: 11.5px;
-  font-weight: 500;
-  color: var(--text);
-  cursor: pointer;
-  text-align: left;
-}
-.menu-item:hover {
-  background: var(--surface-hover);
-  color: var(--primary);
-}
-.menu-icon { font-size: 13px; opacity: .8; flex-shrink: 0; }
-.menu-item:disabled { opacity: .5; cursor: default; }
-.menu-item:focus-visible { outline: 2px solid var(--heading); outline-offset: -2px; }
-</style>

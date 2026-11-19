@@ -26,10 +26,6 @@ function handleSwitchRange(days: number, text: string) {
   void gitHubTrendingController.switchRange(days, text);
 }
 
-function handleRefresh() {
-  void gitHubTrendingController.refresh();
-}
-
 function handleSelectRepo(repo: GitHubTrendingRepo) {
   gitHubTrendingController.selectRepo(repo);
 }
@@ -91,16 +87,6 @@ function formatStars(count?: number): string {
           </button>
         </div>
 
-        <button
-          class="gh-trend-refresh-btn"
-          type="button"
-          :disabled="state.isLoading"
-          title="重新读取公开数据源，不使用 GitHub 账号或 Token"
-          @click="handleRefresh"
-        >
-          <span :class="{ spinning: state.isLoading }">↻</span>
-          <b>刷新</b>
-        </button>
       </div>
     </header>
 
@@ -149,7 +135,7 @@ function formatStars(count?: number): string {
       </div>
 
       <div v-else class="gh-trend-empty">
-        <span>{{ state.hasLoaded ? "当前数据源在所选范围内未返回仓库" : state.errorMessage ? "尚无可展示的数据" : "打开后读取，或点击刷新" }}</span>
+        <span>{{ state.hasLoaded ? "当前数据源在所选范围内未返回仓库" : state.errorMessage ? "尚无可展示的数据" : "打开后读取" }}</span>
       </div>
     </div>
   </div>

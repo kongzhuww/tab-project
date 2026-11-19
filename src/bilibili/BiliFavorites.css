@@ -906,6 +906,10 @@
 .fo-bili-count,.fo-bili-duration { position:absolute;bottom:5px;padding:2px 5px;border-radius:4px;background:rgba(0,0,0,.62);color:#fff;font-size:9px;line-height:1.2;pointer-events:none; }
 .fo-bili-count { left:5px; }
 .fo-bili-duration { right:5px;font-variant-numeric:tabular-nums; }
+.fo-bili-main { --favorite-card-min: 168px; }
+@media (max-width: 900px) { .fo-bili-main { --favorite-card-min: 145px; } }
+.fo-bili-main .fo-favorites-grid { grid-template-columns: repeat(var(--favorite-columns, 7), minmax(0, 1fr)); }
+.fo-favorites-grid > .fo-bili-empty { grid-column: 1 / -1; }
 .fo-bili-title-row { position:relative;display:grid;grid-template-columns:minmax(0,1fr) 22px;align-items:start;gap:3px;margin-top:7px; }
 .fo-card-more { display:grid;width:22px;height:22px;place-items:center;padding:0;border:0;border-radius:5px;background:transparent;color:var(--dim);cursor:pointer;font-size:17px;line-height:1; }
 .fo-card-more:hover,.fo-card-more[aria-expanded="true"] { background:var(--surface-hover);color:#00aeec; }
@@ -1056,7 +1060,7 @@
   flex-direction: column;
 }
 
-/* B站收藏夹侧边栏：订阅视频（刹那观察室）入口按钮 */
+/* B站收藏夹侧边栏：订阅视频入口按钮 */
 .fo-sidebar-sub-btn { border:1px solid rgba(0,174,236,.28);background:linear-gradient(135deg,rgba(0,174,236,.12),rgba(0,174,236,.04));color:var(--heading); }
 .fo-sidebar-sub-btn:hover { background:linear-gradient(135deg,rgba(0,174,236,.22),rgba(0,174,236,.08));border-color:#00aeec;transform:translateY(-1px);box-shadow:0 4px 12px rgba(0,174,236,.15); }
 .fo-sidebar-sub-badge { background:#00aeec; }
@@ -1202,6 +1206,7 @@
 .bili-mini-player.subscription-comments-view .bili-mini-head>button:hover { background:var(--surface-hover);color:#00aeec; }
 .bili-mini-main-body { display:flex;flex-direction:row;flex:1 1 0;min-height:0;min-width:0;overflow:hidden;position:relative; }
 .bili-mini-player-pane { display:flex;flex-direction:column;flex:1 1 0;min-width:260px;min-height:0;overflow:hidden;position:relative; }
+.bili-mini-lyric { flex:none; padding:6px 10px; overflow:hidden; text-align:center; text-overflow:ellipsis; white-space:nowrap; color:var(--text); background:var(--panel); font-size:12px; }
 .bili-mini-player-pane .bili-mini-screen { flex:1 1 0;min-height:0;position:relative;background:#000; }
 .bili-mini-video-meta { position:relative;display:none;padding:9px 12px 8px;border-top:1px solid var(--border);background:var(--panel);color:var(--text);user-select:text!important;-webkit-user-select:text!important;max-height:120px;overflow-y:auto;flex-shrink:0; }
 .bili-mini-video-meta p,.bili-mini-video-meta h4,.bili-mini-video-meta span { user-select:text!important;-webkit-user-select:text!important; }
@@ -1461,7 +1466,7 @@
 .bili-mini-comments-body::-webkit-scrollbar-thumb:hover { background:#94a3b8; }
 @media(max-width:1100px){ .fo-bili-hero.fo-hero-persistent{grid-template-columns:1fr auto;row-gap:12px} .fo-hero-center-stage{grid-column:1/-1;order:3} }
 
-/* 订阅视频 · 刹那观察室 双栏界面 */
+/* 订阅视频双栏界面 */
 .bili-local-playback-layout .bili-sub-date-tabs { display:none; }
 .bili-local-playback-layout .bili-sub-head-btn { display:inline-flex;align-items:center;justify-content:center;text-decoration:none; }
 .fo-bili-main:has(.bili-sub-layout),
@@ -2208,6 +2213,9 @@ html[data-theme="dark"] .bili-mini-desc-divider { background: rgba(255,255,255,.
 
 /* UP主关注分组与视频聚合 */
 .fo-up-groups-bar { display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 0 6px;border-bottom:1px solid var(--border);flex-wrap:wrap; }
+.fo-following-hero .fo-bili-cover, .fo-following-hero .fo-bili-heading, .fo-following-hero .fo-bili-actions { flex-shrink:0; }
+.fo-following-hero .fo-up-groups-bar { flex:1;min-width:0;padding:0;border:0;flex-wrap:nowrap; }
+@media (max-width: 900px) { .fo-following-hero { flex-wrap:wrap; } .fo-following-hero .fo-up-groups-bar { order:2;flex-basis:100%; } }
 .fo-up-groups-list { display:flex;align-items:center;gap:7px;overflow-x:auto;padding-bottom:4px;flex:1;min-width:0; }
 .fo-up-group-chip { display:inline-flex;align-items:center;gap:6px;padding:5px 13px;border-radius:999px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:11.5px;font-weight:500;cursor:pointer;white-space:nowrap;transition:all .15s;flex:none; }
 .fo-up-group-chip:hover { border-color:#00aeec;color:#00aeec; }

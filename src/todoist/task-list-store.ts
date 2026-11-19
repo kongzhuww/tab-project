@@ -609,21 +609,23 @@ export const todoistTaskListController = {
         if (foundIndex >= 0) {
           const found = col.tasks[foundIndex];
           const nextCompleted = !found.completed;
+          cancelTodoistWorkspaceReads();
+          todoistService.invalidateWorkspaceSnapshots();
           found.completed = nextCompleted;
-
-          if (todoistService.getToken()) {
-            void todoistService.toggleTaskCompletion(taskId, nextCompleted);
-          }
-          // 0ms 联动日历待办完成状态与历史记录
+          if (nextCompleted) col.tasks.splice(foundIndex, 1);
           void withTodoistWrite(async () => {
             const { todoistCalendarSidebarController } = await import("./calendar-sidebar-store");
             todoistCalendarSidebarController.recordTaskCompletion(found, nextCompleted);
-          }).catch(() => { todoistTaskListState.emptyText = "本地完成记录未确认，请核对；没有自动重试。"; });
-
-          // 完成后看板不再留存占位：立即从看板列表中移除，交由左侧日历作为历史流兜底
-          if (nextCompleted) {
-            col.tasks.splice(foundIndex, 1);
-          }
+            if (todoistService.getToken()) await todoistService.toggleTaskCompletion(taskId, nextCompleted);
+          }).catch(async () => {
+            found.completed = !nextCompleted;
+            if (nextCompleted && todoistTaskListState.columns.includes(col) && !col.tasks.some(t => t.id === taskId)) {
+              col.tasks.splice(Math.min(foundIndex, col.tasks.length), 0, found);
+            }
+            const { todoistCalendarSidebarController } = await import("./calendar-sidebar-store");
+            todoistCalendarSidebarController.recordTaskCompletion(found, !nextCompleted);
+            todoistTaskListState.emptyText = "任务完成状态保存失败，请重试。";
+          });
           break;
         }
       }

@@ -1,7 +1,5 @@
 import { shallowReactive } from "vue";
 import type { SearchSuggestionItem } from "../search/store";
-import type { CubeFaceDefinition } from "../cube/cube-registry.store";
-import { cubeRegistryStore } from "../cube/cube-registry.store";
 
 // ============================================================================
 // 1. 搜索建议挂载槽位 (Search Suggestion Slot Provider)
@@ -169,14 +167,5 @@ export const pluginSlots = {
       }
     }
     return list;
-  },
-
-  // --- C. 顶栏信息立方体挂载槽 (Cube Face Slot) ---
-  registerCubeFace(face: CubeFaceDefinition, autoEnable = true): () => void {
-    return cubeRegistryStore.registerFace(face, autoEnable);
-  },
-
-  unregisterCubeFace(faceId: string): void {
-    cubeRegistryStore.unregisterFace(faceId);
   }
 };

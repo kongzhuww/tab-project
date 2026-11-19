@@ -1,8 +1,8 @@
-import { d as w, o as b, e as f, i as o, m, l as v, n as y, A as U, t as x, f as B, b as l, c as D } from "./chunks/vendor-vue-BrDsOMg2.js";
+import { d as w, f as b, g as f, h as o, m, p as v, v as y, s as U, t as x, j as B, b as l, c as D } from "./chunks/vendor-vue-BbmU9NUg.js";
 const I = { class: "card" }, C = {
   class: "step-box",
   style: { background: "rgba(99,102,241,.06)", "border-color": "rgba(99,102,241,.25)" }
-}, $ = { class: "bridge-form" }, A = ["disabled"], V = ["disabled"], j = /* @__PURE__ */ w({
+}, $ = { class: "bridge-form" }, j = ["disabled"], V = ["disabled"], A = /* @__PURE__ */ w({
   __name: "SyncBridgeApp",
   setup(M) {
     const r = l(""), a = l(""), i = l(!1), u = l(""), d = l("");
@@ -93,7 +93,7 @@ B站 UID: ${e.biliUserMid || "未配置"}
             type: "button",
             disabled: i.value,
             onClick: g
-          }, "🚀 立即直推到手机端", 8, A)
+          }, "🚀 立即直推到手机端", 8, j)
         ])
       ]),
       o("button", {
@@ -111,4 +111,4 @@ B站 UID: ${e.biliUserMid || "未配置"}
     ]));
   }
 }), k = document.getElementById("vue-sync-bridge-root");
-k && D(j).mount(k);
+k && D(A).mount(k);

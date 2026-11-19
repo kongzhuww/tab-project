@@ -1,4 +1,3 @@
-import { notificationHistoryOperation } from "../notifications/history-repository";
 declare const chrome: any;
 const PREFIX = 'todoist_reminder_v2:';
 export const REMINDER_ALARM = 'todoist_remind_';
@@ -27,13 +26,6 @@ export async function deliverReminder(taskId: string): Promise<void> {
   const when = new Date(reminder.time).getTime();
   if (!Number.isFinite(when)) return;
   if (when > Date.now() + 1000) { await chrome.alarms.create(REMINDER_ALARM + taskId, { when }); return; }
-  try {
-    await notificationHistoryOperation('append', {
-      id: 'reminder_' + taskId + '_' + when, appType: 'todoist', appName: 'Todoist',
-      title: '任务提醒', subtitle: '', message: reminder.title || '任务时间已到',
-      level: 'info', createdAt: Date.now(), read: false, target: { type: 'todoist-task', taskId }
-    });
-  } catch { console.warn('[Todoist Alarm] Notification history was not confirmed.'); }
   await chrome.notifications.create(REMINDER_ALARM + taskId, { type: 'basic', iconUrl: chrome.runtime.getURL('assets/icon-128.png'), title: '待办提醒', message: reminder.title || '任务时间已到', priority: 2 });
   await chrome.storage.local.set({ [PREFIX + taskId]: null });
 }

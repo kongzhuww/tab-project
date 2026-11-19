@@ -16,10 +16,10 @@ export type { SyncPayloadResult } from "./sync-payload";
 declare const chrome: any;
 
 export const BASE_KEYS = [
-  "displaySize", "city", "showWeather", "showSites", "showBili",
+  "displaySize", "city", "showWeather", "showSites", "showHomeNews", "showHomePlayer", "showQuickSearchWallpaper", "showBili",
   "showTodo", "showLeftNavigation", "showNavBall", "showBookmarkPanel",
   "showBookmarkFoldersTop", "showStartupAnimation", "startupAnimationStyle",
-  "singleNewTab", "showHomeMusicVisualizer"
+  "singleNewTab", "enableQuickSearch", "showHomeMusicVisualizer"
 ];
 export const SHORTCUT_KEY = "customShortcuts";
 export const SEARCH_IGNORED_BOOKMARK_FOLDERS_KEY = "searchIgnoredBookmarkFolders";

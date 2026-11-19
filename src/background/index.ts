@@ -19,7 +19,7 @@ import {
   flashBadge
 } from "./notifications";
 import {
-  dedupeLogicWeaverNewTab,
+  routeNewTab,
   bookmarkCurrentTab,
   cleanupOrReplaceBrowserDefaultNewTabs,
   initTabWatcher,
@@ -31,6 +31,7 @@ import { initTodoistBackgroundSync, syncTodoistInBackground } from "./todoist-sy
 import { initWebSideDrawer, toggleWebSideDrawer } from "./web-side-drawer";
 import { initAiScheduler } from "./ai-scheduler";
 import { initEmployeeWorker } from "./employee-worker";
+import { saveContextSticker } from "./context-sticker";
 
 declare const chrome: any;
 
@@ -55,7 +56,7 @@ function toggleSidePanelForTab(tab: { id?: number; url?: string; pendingUrl?: st
     console.warn("[SidePanel] Could not toggle the requested panel.");
   };
   const url = tab.pendingUrl || tab.url || "";
-  const isHome = ["newtab.html", "newtab-bootstrap.html"].some(
+  const isHome = ["newtab.html", "newtab-bootstrap.html", "newtab-search.html"].some(
     path => url.split(/[?#]/, 1)[0] === chrome.runtime.getURL(path)
   ) || url === "edge://newtab/" || url === "chrome://newtab/";
   if (isHome) {
@@ -226,6 +227,11 @@ function initContextMenu(): void {
         title: "📥 保存图片到「收藏夹」",
         contexts: ["image"]
       });
+      chrome.contextMenus.create({
+        id: "lw-save-image-to-stickers",
+        title: "保存图片到表情包",
+        contexts: ["image"]
+      });
     });
   } catch {}
 }
@@ -233,14 +239,40 @@ function initContextMenu(): void {
 chrome.contextMenus?.onClicked?.addListener?.(async (info: any) => {
   if (info.menuItemId === "lw-save-image-to-fav") {
     await saveImageToFavoritesFolder({ url: info.srcUrl });
+  } else if (info.menuItemId === "lw-save-image-to-stickers") {
+    let release: (() => void) | undefined;
+    try {
+      release = acquireImageSlot();
+      const url = String(info.srcUrl || '');
+      let buffer: ArrayBuffer;
+      if (url.startsWith('data:')) {
+        if (url.length > Math.ceil(MAX_IMAGE_BYTES / 3) * 4 + 128 || !/^data:image\/(?:png|jpeg|gif|webp|avif);base64,/i.test(url)) throw new Error('不支持的图片格式');
+        const raw = atob(url.slice(url.indexOf(',') + 1));
+        if (raw.length > MAX_IMAGE_BYTES) throw new Error('图片超过 12 MiB');
+        buffer = Uint8Array.from(raw, char => char.charCodeAt(0)).buffer;
+      } else {
+        buffer = await fetchImageBytes(cleanBiliImageUrl(url));
+      }
+      const format = detectImageFormatByMagic(new Uint8Array(buffer));
+      const mime = format.ext === 'jpg' ? 'image/jpeg' : `image/${format.ext}`;
+      await validateImagePixels(buffer, mime);
+      const blob = format.isAvif ? await (await fetch(await convertAvifToPngDataUrl(buffer))).blob() : new Blob([buffer], { type: mime });
+      await saveContextSticker(blob, format.isAvif ? 'png' : format.ext);
+      void flashBadge('✓', '#10b981');
+      void chrome.notifications?.create({ type: 'basic', iconUrl: 'assets/icon-128.png', title: '表情包', message: '已保存到 Agent 资料库' });
+    } catch (error) {
+      void flashBadge('ERR', '#ef4444');
+      const message = error instanceof Error ? error.message : '图片保存失败';
+      void chrome.notifications?.create({ type: 'basic', iconUrl: 'assets/icon-128.png', title: '表情包保存失败', message });
+    } finally { release?.(); }
   }
 });
 
 // 2. 统一全局消息分发路由
 chrome.runtime.onMessage.addListener((message: any, sender: any, sendResponse: (res: any) => void) => {
   // A. 新标签页智能单例去重
-  if (message?.type === "dedupeLogicWeaverNewTab") {
-    dedupeLogicWeaverNewTab(sender, sendResponse);
+  if (message?.type === "routeNewTab") {
+    routeNewTab(sendResponse);
     return true;
   }
 

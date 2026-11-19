@@ -10,6 +10,7 @@ import { attachBiliPlaybackSync, detachBiliPlaybackSync } from "./playback-sync"
 import { bilibiliChannelService } from "../services/bilibili-channel.service";
 import { formatBiliCompactNumber } from "./channel-format";
 import BiliRichText from "./BiliRichText.vue";
+import { biliFavoritesState } from "./bili-favorites-store";
 import { images } from "../sdk/images";
 import { useVideoFailover } from "./use-video-failover";
 import { t } from "../i18n";
@@ -1064,6 +1065,7 @@ onUnmounted(() => {
               <button type="button" style="padding: 5px 14px; background: #00aeec; color: #fff; border: 0; border-radius: 5px; cursor: pointer; font-size: 12px; font-weight: 600;" @click.stop="controller.retryCurrentVideo()">重新获取视频流</button>
             </div>
           </div>
+          <div class="bili-mini-lyric" :title="biliFavoritesState.organizer.heroLyricText">{{ biliFavoritesState.organizer.heroLyricText || '暂无台词' }}</div>
         </div>
 
         <!-- 4. 右侧评论区抽屉 (其顶部控制栏与视频顶部高度完全对齐，评论内容在正下方) -->

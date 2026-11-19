@@ -1,12 +1,13 @@
 import type { PiThinkingLevel } from '../services/native-bridge.service';
 
 export const DIGITAL_EMPLOYEES_KEY = 'digitalEmployeesV1';
+export const DIGITAL_EMPLOYEE_ORGANIZER_SEEDED_KEY = 'digitalEmployeeOrganizerSeededV1';
 export const EMPLOYEE_RUN_LOG_KEY = 'digitalEmployeeRunsV1';
 export const EMPLOYEE_LIVE_PEEK_KEY = 'digitalEmployeeLivePeekV1';
 export const EMPLOYEE_SHARE_FORMAT = 'tab-project-employee-v1';
-export const EMPLOYEE_WORKER_STAMP = 'live-peek-session-v4';
+export const EMPLOYEE_WORKER_STAMP = 'organizer-approval-safe-v6';
 
-export type EmployeeSourceKind = 'bili-toview' | 'bili-fav' | 'bili-history';
+export type EmployeeSourceKind = 'bili-toview' | 'bili-fav' | 'bili-history' | 'workspace-organizer';
 export type EmployeeAnalyzer = 'native-pi' | 'deepseek';
 export type EmployeeDecisionMode = 'llm-fast' | 'jev-http';
 export type EmployeeSkillId =
@@ -16,7 +17,10 @@ export type EmployeeSkillId =
   | 'bili.subtitle'
   | 'jev.triage'
   | 'library.save'
-  | 'notify.high_value';
+  | 'notify.high_value'
+  | 'bookmarks.read'
+  | 'launcher.read'
+  | 'organizer.plan';
 
 export interface EmployeeSkillDescriptor {
   id: EmployeeSkillId;
@@ -32,6 +36,9 @@ export const AVAILABLE_EMPLOYEE_SKILLS: readonly EmployeeSkillDescriptor[] = [
   { id: 'jev.triage', name: '双层快筛路由', description: '先用 Jev / 轻模型做 Noul · Score · Choice 快速分拣' },
   { id: 'library.save', name: '沉淀至资料库', description: '将通过阈值的高价值拆解按分类写入「资料库 → 文章」' },
   { id: 'notify.high_value', name: '高价值静默通知', description: '生成深度笔记后向工作区通知中心追加提醒' },
+  { id: 'bookmarks.read', name: '浏览器书签树读取', description: '只读读取 Chrome 书签栏与其他书签目录树用于分类盘点' },
+  { id: 'launcher.read', name: '桌面分区与网站读取', description: '只读读取新标签页分区、大/小文件夹、嵌套层级与网站卡片' },
+  { id: 'organizer.plan', name: '整理提案（审批后生效）', description: '输出分步桌面/书签整理提案，每一步需用户点击审核后才写入' },
 ];
 
 export interface EmployeeFeedbackExample {
@@ -107,9 +114,86 @@ export type PeekCursorTarget =
   | 'tab-subtitle'
   | 'subtitle-lines'
   | 'decision-badge'
-  | 'library-save';
+  | 'library-save'
+  | 'org-partitions'
+  | 'org-folders'
+  | 'org-links'
+  | 'org-bookmarks'
+  | 'org-approval';
 
 export type PeekPhase = 'source' | 'info' | 'comments' | 'subtitle' | 'analyzing' | 'done' | 'skipped' | 'error';
+
+export type OrganizerActionType =
+  | 'create_partition'
+  | 'create_launcher_folder'
+  | 'move_quick_link'
+  | 'promote_bookmark_to_launcher'
+  | 'create_bookmark_folder'
+  | 'move_bookmark'
+  | 'rename_folder'
+  | 'rename_link'
+  | 'remove_folder'
+  | 'merge_folders';
+
+export type OrganizerFolderSize = 'small' | 'medium' | 'large';
+export type OrganizerStepStatus = 'pending' | 'applying' | 'applied' | 'skipped' | 'error' | 'undoing' | 'undone';
+
+export interface OrganizerUndoReceipt {
+  kind: 'launcher' | 'launcher-link' | 'bookmark-move' | 'bookmark-folder' | 'bookmark-rename';
+  before?: Record<string, unknown>;
+  after?: Record<string, unknown>;
+  bookmarkId?: string;
+  parentId?: string;
+  index?: number;
+  title?: string;
+}
+
+
+export interface OrganizerPlanStep {
+  id: string;
+  order: number;
+  type: OrganizerActionType;
+  title: string;
+  reason?: string;
+  status: OrganizerStepStatus;
+  appliedAt?: number;
+  errorMessage?: string;
+  dependsOn?: string[];
+  refs?: Partial<Record<'partition' | 'folder' | 'parentFolder' | 'bookmarkParent' | 'bookmarkTarget', string>>;
+  result?: { bookmarkFolderId?: string };
+  undo?: OrganizerUndoReceipt;
+  expected?: { url: string; title: string; page?: string; group?: string; parentId?: string };
+  params: {
+    scope?: 'desktop' | 'bookmarks';
+    sourceFolder?: string;
+    sourceLabel?: string;
+    newName?: string;
+    partitionName?: string;
+    folderName?: string;
+    parentFolderName?: string;
+    parentBookmarkId?: string;
+    parentBookmarkPath?: string;
+    targetBookmarkPath?: string;
+    folderSize?: OrganizerFolderSize;
+    linkId?: string;
+    linkTitle?: string;
+    linkUrl?: string;
+    bookmarkId?: string;
+    bookmarkTitle?: string;
+    bookmarkUrl?: string;
+    targetPartition?: string;
+    targetFolder?: string;
+  };
+}
+
+export interface OrganizerWorkspaceSnapshot {
+  capturedAt: number;
+  partitions: Array<{ id: string; label: string; linkCount: number; folderCount: number }>;
+  folders: Array<{ name: string; page: string; parent?: string; size: OrganizerFolderSize; linkCount: number }>;
+  links: Array<{ id: string; title: string; url: string; page: string; group: string }>;
+  bookmarkFolders: Array<{ id: string; title: string; parentId?: string; path: string; childCount: number }>;
+  bookmarks: Array<{ id: string; title: string; url: string; parentId?: string; folderPath: string }>;
+}
 
 export interface EmployeePeekVideoItem {
   bvid: string;
@@ -129,6 +213,7 @@ export interface EmployeePeekCommentItem {
 export interface EmployeePeekSnapshot {
   employeeId: string;
   employeeName: string;
+  mode?: 'bili' | 'organizer';
   bvid: string;
   active: boolean;
   phase: PeekPhase;
@@ -152,12 +237,16 @@ export interface EmployeePeekSnapshot {
   verdict?: { worth: boolean; score: number; category: string; reason: string };
   toolHistory: EmployeeToolTraceStep[];
   timelineSteps?: string[];
+  organizerSnapshot?: OrganizerWorkspaceSnapshot;
+  organizerSteps?: OrganizerPlanStep[];
   updatedAt: number;
 }
 
 export interface EmployeeRunRecord {
   id: string;
   employeeId: string;
+  kind?: 'bili' | 'organizer';
+  organizerRevision?: number;
   bvid: string;
   title: string;
   author: string;
@@ -168,6 +257,9 @@ export interface EmployeeRunRecord {
   score: number;
   category: string;
   reason: string;
+  planSummary?: string;
+  planSteps?: OrganizerPlanStep[];
+  organizerSnapshot?: OrganizerWorkspaceSnapshot;
   toolTrace?: EmployeeToolTraceStep[];
   peekFrames?: EmployeePeekSnapshot[];
   articleId?: string;
@@ -230,6 +322,58 @@ export function createDefaultBiliEmployee(now = Date.now()): DigitalEmployee {
   };
 }
 
+export function createDefaultOrganizerEmployee(now = Date.now()): DigitalEmployee {
+  return {
+    id: 'emp-workspace-organizer-default',
+    name: '桌面与书签整理专员',
+    role: '盘点书签与本地网站 · 提案逐条审批',
+    description: '只读盘点桌面分区、大文件夹/小文件夹、嵌套层级、常用网站与浏览器书签；每一步在右侧点击确认后才生效，不自动修改。',
+    accentColor: '#0ea5e9',
+    enabled: false,
+    source: {
+      kind: 'workspace-organizer',
+      folderId: '',
+      folderTitle: '本地桌面网站 + 浏览器书签',
+    },
+    runtime: {
+      analyzer: 'deepseek',
+      piThinking: 'medium',
+      decisionMode: 'llm-fast',
+      jevEndpoint: '',
+    },
+    prompt: {
+      systemPrompt: [
+        '你是主人的「桌面网站与浏览器书签整理专员」。必须先分清三类核心对象：',
+        '1. 桌面分区（Partition / launcherPages）：新标签页顶部的场景分页（最多 12 个字，如「默认」「AI 工具」「开发工作」）。',
+        '2. 桌面文件夹（Folder）：建在指定分区下，也可嵌套在已有文件夹（parentFolderName）里。只有两档尺寸：',
+        '   - large（大文件夹）：2x2 展示区（可直览最多 9 个网站小图标），放高频常用组；',
+        '   - small（小文件夹）：1x1 紧凑图标（内含 2x2 缩略图标），可放在分区根层或嵌套在父文件夹内部。',
+        '3. 浏览器原生书签（Chrome Bookmarks）：适合长尾资料、参考文章与归档链接；仅把每天高频直达的优质书签推荐提升到桌面分区（promote_bookmark_to_launcher），其余散落书签在书签栏文件夹里归类（create_bookmark_folder / move_bookmark）。',
+        '所有操作先提交提案。优先利用已有文件夹；允许改名、移除目录层和合并目录，保留其中的网站、书签和子文件夹。',
+      ].join('\n'),
+      reportTemplate: '先说明整体规划思路，再输出有序 JSON 步骤供主人在右侧待办清单逐一点击确认。',
+    },
+    skills: ['bookmarks.read', 'launcher.read', 'organizer.plan'],
+    customSkillInstructions: '',
+    decisionGate: {
+      worthQuestion: '哪些散落网站和书签需要归类到清晰的新分区、大文件夹或小文件夹？',
+      minScore: 0.5,
+      categories: ['桌面分区', '桌面文件夹与层级', '常用网站归类', '书签归档'],
+      skipCategories: [],
+      skipWithoutSubtitle: false,
+      retryOnSkip: false,
+    },
+    schedulePolicy: {
+      intervalMinutes: 1440,
+      dailyLimit: 10,
+      maxFetchItems: 40,
+    },
+    ownerFeedback: [],
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
 const VALID_SKILL_IDS = new Set<EmployeeSkillId>([
   'bili.source',
   'bili.info',
@@ -238,6 +382,9 @@ const VALID_SKILL_IDS = new Set<EmployeeSkillId>([
   'jev.triage',
   'library.save',
   'notify.high_value',
+  'bookmarks.read',
+  'launcher.read',
+  'organizer.plan',
 ]);
 
 function clampNumber(value: unknown, min: number, max: number, fallback: number): number {
@@ -268,13 +415,15 @@ export function normalizeEmployee(input: unknown, now = Date.now()): DigitalEmpl
     throw new Error('员工配置格式无效。');
   }
   const raw = input as Record<string, any>;
-  const defaults = createDefaultBiliEmployee(now);
+  const defaults = raw.source?.kind === 'workspace-organizer' ? createDefaultOrganizerEmployee(now) : createDefaultBiliEmployee(now);
   const name = cleanString(raw.name, 48);
   if (!name) throw new Error('请输入员工名称。');
 
   const sourceRaw = (raw.source && typeof raw.source === 'object' ? raw.source : {}) as Record<string, any>;
   const sourceKind: EmployeeSourceKind =
-    sourceRaw.kind === 'bili-fav' || sourceRaw.kind === 'bili-history' ? sourceRaw.kind : 'bili-toview';
+    sourceRaw.kind === 'bili-fav' || sourceRaw.kind === 'bili-history' || sourceRaw.kind === 'workspace-organizer'
+      ? sourceRaw.kind
+      : 'bili-toview';
 
   const runtimeRaw = (raw.runtime && typeof raw.runtime === 'object' ? raw.runtime : {}) as Record<string, any>;
   const analyzer: EmployeeAnalyzer = runtimeRaw.analyzer === 'native-pi' ? 'native-pi' : 'deepseek';
@@ -287,7 +436,10 @@ export function normalizeEmployee(input: unknown, now = Date.now()): DigitalEmpl
 
   const rawSkills = Array.isArray(raw.skills) ? raw.skills : defaults.skills;
   const skills = Array.from(new Set(rawSkills.filter((s: unknown): s is EmployeeSkillId => VALID_SKILL_IDS.has(s as EmployeeSkillId))));
-  if (!skills.length) skills.push('bili.source', 'bili.subtitle');
+  if (!skills.length) {
+    if (sourceKind === 'workspace-organizer') skills.push(...defaults.skills);
+    else skills.push('bili.source', 'bili.subtitle');
+  }
 
   const gateRaw = (raw.decisionGate && typeof raw.decisionGate === 'object' ? raw.decisionGate : {}) as Record<string, any>;
   const categories = Array.isArray(gateRaw.categories)
@@ -329,7 +481,9 @@ export function normalizeEmployee(input: unknown, now = Date.now()): DigitalEmpl
         ? cleanString(sourceRaw.folderTitle, 64)
         : sourceKind === 'bili-history'
           ? '播放历史'
-          : '稍后再看',
+          : sourceKind === 'workspace-organizer'
+            ? '本地桌面网站 + 浏览器书签'
+            : '稍后再看',
     },
     runtime: {
       analyzer,
@@ -382,9 +536,17 @@ export function exportEmployeeBlueprint(
       description: employee.description,
       accentColor: employee.accentColor,
       source: {
-        kind: employee.source.kind === 'bili-history' ? 'bili-history' : 'bili-toview',
+        kind: employee.source.kind === 'workspace-organizer'
+          ? 'workspace-organizer'
+          : employee.source.kind === 'bili-history'
+            ? 'bili-history'
+            : 'bili-toview',
         folderId: '',
-        folderTitle: employee.source.kind === 'bili-history' ? '播放历史' : '稍后再看',
+        folderTitle: employee.source.kind === 'workspace-organizer'
+          ? '本地桌面网站 + 浏览器书签'
+          : employee.source.kind === 'bili-history'
+            ? '播放历史'
+            : '稍后再看',
       },
       runtime: {
         analyzer: employee.runtime.analyzer,

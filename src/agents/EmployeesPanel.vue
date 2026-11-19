@@ -6,6 +6,7 @@ import {
   EMPLOYEE_RUN_LOG_KEY,
   EMPLOYEE_WORKER_STAMP,
   createDefaultBiliEmployee,
+  createDefaultOrganizerEmployee,
   exportEmployeeBlueprint,
   localDayKey,
   normalizeEmployee,
@@ -18,6 +19,7 @@ import {
 import { callEmployeeBackend, type EmployeeSnapshotResult } from './employee-client';
 import { bilibiliService } from '../services/bilibili.service';
 import LivePeekModal from './LivePeekModal.vue';
+import OrganizerPeekModal from './OrganizerPeekModal.vue';
 
 declare const chrome: any;
 
@@ -58,7 +60,38 @@ const peekModal = ref<{
   replayFrames?: EmployeePeekSnapshot[];
 }>({ open: false, mode: 'live' });
 
+const organizerGenerationError = ref('');
+const organizerModal = ref<{
+  open: boolean;
+  employeeId: string;
+  employeeName: string;
+  runId?: string;
+}>({ open: false, employeeId: '', employeeName: '' });
+
+const activeOrganizerRun = computed<EmployeeRunRecord | null>(() => {
+  if (!organizerModal.value.open || !organizerModal.value.employeeId) return null;
+  if (organizerModal.value.runId) {
+    const exact = runs.value.find(r => r.id === organizerModal.value.runId);
+    if (exact) return exact;
+  }
+  return runs.value.find(r => r.employeeId === organizerModal.value.employeeId && r.kind === 'organizer') || null;
+});
+
+function openOrganizerModal(emp: { id: string; name: string }, runId?: string) {
+  if (organizerModal.value.employeeId !== emp.id) organizerGenerationError.value = '';
+  organizerModal.value = {
+    open: true,
+    employeeId: emp.id,
+    employeeName: emp.name,
+    runId,
+  };
+}
+
 function openLivePeek(emp: DigitalEmployee) {
+  if (emp.source.kind === 'workspace-organizer') {
+    openOrganizerModal(emp);
+    return;
+  }
   peekModal.value = {
     open: true,
     mode: 'live',
@@ -68,6 +101,10 @@ function openLivePeek(emp: DigitalEmployee) {
 }
 
 function openReplayPeek(run: EmployeeRunRecord, empName?: string) {
+  if (run.kind === 'organizer') {
+    openOrganizerModal({ id: run.employeeId, name: empName || '整理专员' }, run.id);
+    return;
+  }
   peekModal.value = {
     open: true,
     mode: 'replay',
@@ -147,6 +184,13 @@ function openEmployeeDrawer(emp: DigitalEmployee, tab: 'runtime' | 'skills' | 'p
   drawerTab.value = tab;
   drawerOpen.value = true;
   if (!biliFolders.value.length) void loadBiliFolders();
+}
+
+function createNewOrganizerEmployee() {
+  const fresh = createDefaultOrganizerEmployee();
+  fresh.id = `emp-org-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+  fresh.name = `桌面书签整理员 #${employees.value.filter(e => e.source.kind === 'workspace-organizer').length + 1}`;
+  openEmployeeDrawer(fresh, 'runtime');
 }
 
 function createNewEmployee() {
@@ -231,23 +275,34 @@ async function togglePatrol(emp: DigitalEmployee) {
 
 async function runOneNow(emp: DigitalEmployee) {
   if (busyId.value) return;
+  const isOrg = emp.source.kind === 'workspace-organizer';
   busyId.value = emp.id;
   errorText.value = '';
-  notice.value = `「${emp.name}」正在抓取并分拣 1 条视频…`;
+  if (isOrg) organizerGenerationError.value = '';
+  notice.value = isOrg
+    ? `「${emp.name}」正在盘点桌面网站与书签，生成待审批提案…`
+    : `「${emp.name}」正在抓取并分拣 1 条视频…`;
+  if (isOrg) {
+    openOrganizerModal(emp);
+  }
   try {
     const res = await callEmployeeBackend<{ message: string; record?: EmployeeRunRecord }>(
       typeof chrome === 'undefined' ? null : chrome.runtime,
       'run-one',
-      { id: emp.id }
+      { id: emp.id, organizerConsent: true }
     );
     notice.value = res?.message || '试跑完成。';
     await refresh();
+    if (isOrg && res?.record?.id && organizerModal.value.open && organizerModal.value.employeeId === emp.id) {
+      openOrganizerModal(emp, res.record.id);
+    }
     if (drawerOpen.value && draft.value?.id === emp.id) {
       const updated = employees.value.find(e => e.id === emp.id);
       if (updated) draft.value = JSON.parse(JSON.stringify(updated));
     }
   } catch (err) {
     errorText.value = err instanceof Error ? err.message : '试跑执行失败。';
+    if (isOrg) organizerGenerationError.value = errorText.value;
     notice.value = '';
     await refresh();
   } finally {
@@ -348,12 +403,23 @@ async function clearRunLogs(employeeId: string) {
 }
 
 function sourceLabel(emp: DigitalEmployee): string {
+  if (emp.source.kind === 'workspace-organizer') return '桌面网站 + 书签';
   if (emp.source.kind === 'bili-history') return '播放历史';
   if (emp.source.kind === 'bili-fav') return emp.source.folderTitle || '指定收藏夹';
   return '稍后再看';
 }
 
-function statusBadge(status: EmployeeRunRecord['status']): string {
+function organizerRunStats(employeeId: string): { pending: number; applied: number } {
+  const latest = runs.value.find(r => r.employeeId === employeeId && r.kind === 'organizer');
+  const steps = latest?.planSteps || [];
+  return {
+    pending: steps.filter(s => s.status === 'pending').length,
+    applied: steps.filter(s => s.status === 'applied').length,
+  };
+}
+
+function statusBadge(status: EmployeeRunRecord['status'], kind?: EmployeeRunRecord['kind']): string {
+  if (kind === 'organizer') return '整理提案';
   if (status === 'analyzed') return '已精读';
   if (status === 'skipped-gate') return '快筛跳过';
   if (status === 'skipped-no-sub') return '无字幕';
@@ -405,6 +471,9 @@ onBeforeUnmount(() => {
           <span>导入员工</span>
         </button>
         <input ref="importFileInput" type="file" accept=".json" style="display:none" @change="onImportFile" />
+        <button type="button" class="emp-pill-btn subtle" @click="createNewOrganizerEmployee">
+          <span>+ 桌面书签专员</span>
+        </button>
         <button type="button" class="emp-pill-btn primary" @click="createNewEmployee">
           <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M8 3v10M3 8h10"/></svg>
           <span>新建员工</span>
@@ -448,7 +517,8 @@ onBeforeUnmount(() => {
                 :class="{ on: emp.enabled }"
                 role="switch"
                 :aria-checked="emp.enabled"
-                :title="emp.enabled ? '已启用后台巡检（点击暂停）' : '已暂停（点击开启后台自动巡检）'"
+                :aria-label="`${emp.name}后台巡检`"
+                :title="emp.enabled ? '已启用后台巡检（点击暂停）' : emp.source.kind === 'workspace-organizer' ? '开启后台巡检：按间隔将网站和书签样本交给配置的模型生成待审批提案' : '已暂停（点击开启后台自动巡检）'"
                 :disabled="busyId === emp.id"
                 @click.stop="togglePatrol(emp)"
               >
@@ -470,19 +540,29 @@ onBeforeUnmount(() => {
             <div class="emp-card-foot" @click.stop>
               <div class="emp-card-stat">
                 <i class="emp-dot" :class="{ on: emp.enabled, err: Boolean(emp.lastError) }"></i>
-                <span>今日 {{ employeeTodayStats(emp.id).analyzed }} 精读 / {{ employeeTodayStats(emp.id).skipped }} 跳过</span>
+                <span v-if="emp.source.kind === 'workspace-organizer'">
+                  提案 {{ organizerRunStats(emp.id).pending }} 待批 / {{ organizerRunStats(emp.id).applied }} 已生效
+                </span>
+                <span v-else>今日 {{ employeeTodayStats(emp.id).analyzed }} 精读 / {{ employeeTodayStats(emp.id).skipped }} 跳过</span>
               </div>
               <div class="emp-card-btns">
                 <button
                   type="button"
                   class="emp-mini-btn"
                   :disabled="Boolean(busyId)"
-                  title="立即抓取 1 条未处理视频试跑"
+                  :title="emp.source.kind === 'workspace-organizer' ? '只读盘点桌面网站与书签并生成提案' : '立即抓取 1 条未处理视频试跑'"
                   @click="runOneNow(emp)"
                 >
-                  {{ busyId === emp.id ? '运行中…' : '试跑 1 条' }}
+                  {{ busyId === emp.id ? '运行中…' : (emp.source.kind === 'workspace-organizer' ? '生成提案' : '试跑 1 条') }}
                 </button>
-                <button type="button" class="emp-mini-btn ghost" title="打开仿真实况窥屏窗口" @click="openLivePeek(emp)">窥屏</button>
+                <button
+                  type="button"
+                  class="emp-mini-btn ghost"
+                  :title="emp.source.kind === 'workspace-organizer' ? '打开整理预览与逐条审批清单' : '打开仿真实况窥屏窗口'"
+                  @click="openLivePeek(emp)"
+                >
+                  {{ emp.source.kind === 'workspace-organizer' ? '预览审批' : '窥屏' }}
+                </button>
                 <button type="button" class="emp-mini-btn ghost" title="导出脱敏员工包分享给别人" @click="exportEmployee(emp)">导出</button>
                 <button type="button" class="emp-mini-btn ghost" title="编辑配置与查看运行记录" @click="openEmployeeDrawer(emp, 'runtime')">配置</button>
               </div>
@@ -526,8 +606,9 @@ onBeforeUnmount(() => {
 
             <div class="emp-row-2">
               <div class="emp-field">
-                <label>B 站数据源</label>
+                <label>工作数据源</label>
                 <select v-model="draft.source.kind">
+                  <option value="workspace-organizer">桌面网站 + 浏览器书签（整理审批）</option>
                   <option value="bili-toview">稍后再看</option>
                   <option value="bili-fav">指定 B 站收藏夹</option>
                   <option value="bili-history">播放历史</option>
@@ -571,16 +652,17 @@ onBeforeUnmount(() => {
               </div>
             </div>
 
+            <p v-if="draft.source.kind === 'workspace-organizer'" class="emp-field">整理专员采用「提案 preview + 右侧逐条点击生效」模式，不自动改动任何数据。</p>
             <div class="emp-row-3">
               <div class="emp-field">
                 <label>巡检间隔 (分)</label>
                 <input v-model.number="draft.schedulePolicy.intervalMinutes" type="number" min="5" max="1440" />
               </div>
               <div class="emp-field">
-                <label>每日上限 (条)</label>
+                <label>{{ draft.source.kind === 'workspace-organizer' ? '每日提案上限' : '每日上限 (条)' }}</label>
                 <input v-model.number="draft.schedulePolicy.dailyLimit" type="number" min="1" max="50" />
               </div>
-              <div class="emp-field">
+              <div v-if="draft.source.kind !== 'workspace-organizer'" class="emp-field">
                 <label>每次扫前 N 条</label>
                 <input v-model.number="draft.schedulePolicy.maxFetchItems" type="number" min="1" max="40" />
               </div>
@@ -588,7 +670,7 @@ onBeforeUnmount(() => {
 
             <label class="emp-check-row">
               <input v-model="draft.enabled" type="checkbox" />
-              <span>启用后台自动巡检（每次仅温柔处理 1 条未读视频，不主动弹窗打扰）</span>
+              <span>{{ draft.source.kind === 'workspace-organizer' ? '启用后台巡检（用配置的模型生成提案，审批后才修改）' : '启用后台自动巡检（每次仅温柔处理 1 条未读视频，不主动弹窗打扰）' }}</span>
             </label>
           </template>
 
@@ -698,7 +780,8 @@ onBeforeUnmount(() => {
           <!-- Tab 4: 运行记录 -->
           <template v-else>
             <div class="emp-logs-head">
-              <span>仅展示最近执行轨迹，已分析/跳过的 BV 号不会重复处理。</span>
+              <span v-if="draft.source.kind === 'workspace-organizer'">记录包含审批与撤销凭据；清空或被历史上限淘汰后无法从此处撤销。</span>
+              <span v-else>仅展示最近执行轨迹，已分析/跳过的 BV 号不会重复处理。</span>
               <button
                 v-if="runsForEmployee(draft.id).length"
                 type="button"
@@ -709,12 +792,12 @@ onBeforeUnmount(() => {
               </button>
             </div>
             <div v-if="!runsForEmployee(draft.id).length" class="emp-sub-empty">
-              还没有运行流水。你可以点击卡片上的「试跑 1 条」立刻体验，或开启巡检开关。
+              {{ draft.source.kind === 'workspace-organizer' ? '还没有整理提案。点击卡片上的「生成提案」或「预览审批」即可开始。' : '还没有运行流水。你可以点击卡片上的「试跑 1 条」立刻体验，或开启巡检开关。' }}
             </div>
             <div v-else class="emp-run-list">
               <article v-for="r in runsForEmployee(draft.id)" :key="r.id" class="emp-run-card">
                 <div class="emp-run-top">
-                  <span class="emp-run-badge" :class="r.status">{{ statusBadge(r.status) }}</span>
+                  <span class="emp-run-badge" :class="r.status">{{ statusBadge(r.status, r.kind) }}</span>
                   <span class="emp-run-cat">{{ r.category }} · {{ Math.round(r.score * 100) }}分</span>
                   <span class="emp-run-time">{{ formatShortTime(r.createdAt) }}</span>
                 </div>
@@ -728,12 +811,12 @@ onBeforeUnmount(() => {
                 <div class="emp-run-foot">
                   <div class="emp-run-links">
                     <button
-                      v-if="r.peekFrames?.length"
+                      v-if="r.kind === 'organizer' || r.peekFrames?.length"
                       type="button"
                       class="emp-link-btn"
                       @click="openReplayPeek(r, draft.name)"
                     >
-                      ▶ 回放窥屏
+                      {{ r.kind === 'organizer' ? '👀 预览与逐条审批' : '▶ 回放窥屏' }}
                     </button>
                     <a v-if="r.url" :href="r.url" target="_blank" rel="noreferrer">原视频 ↗</a>
                     <button v-if="r.articleId" type="button" class="emp-link-btn" @click="emit('openLibrary')">去资料库看笔记 →</button>
@@ -769,6 +852,19 @@ onBeforeUnmount(() => {
       :backend-stale="backendStale"
       @close="peekModal.open = false"
       @run-now="id => { const target = employees.find(e => e.id === id); if (target) void runOneNow(target); }"
+      @reload-extension="reloadExtensionWorker"
+    />
+    <OrganizerPeekModal
+      v-if="organizerModal.open"
+      :employee-id="organizerModal.employeeId"
+      :employee-name="organizerModal.employeeName"
+      :latest-run="activeOrganizerRun"
+      :running="busyId === organizerModal.employeeId"
+      :generation-error="organizerGenerationError"
+      :backend-stale="backendStale"
+      @close="organizerModal.open = false"
+      @run-now="id => { const target = employees.find(e => e.id === id); if (target) void runOneNow(target); }"
+      @updated="void refresh()"
       @reload-extension="reloadExtensionWorker"
     />
   </section>

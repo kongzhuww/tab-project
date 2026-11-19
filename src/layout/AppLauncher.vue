@@ -1,40 +1,55 @@
 <script setup lang="ts">
-import { defineAsyncComponent, onMounted } from "vue";
+import { onMounted, onUnmounted, reactive } from "vue";
 import WeatherWidget from "../weather/WeatherWidget.vue";
 import HeroMotto from "../clock/HeroMotto.vue";
 import HeroClock from "../clock/HeroClock.vue";
 import SearchBox from "../search/SearchBox.vue";
 import HomeMusicCard from "../music/HomeMusicCard.vue";
 import FavoriteSites from "../launchers/FavoriteSites.vue";
-import { launcherGroupsState } from "../launchers/store";
 import { homePrefsState } from "../launcher/home-prefs.store";
-import { homeMusicState } from "../music/store";
-import { windowManagerController } from "../core/window-manager.store";
 import { WallpaperService } from "../services/wallpaper.service";
 import { t } from "../i18n";
 
+const transparency = reactive({ sitesTransparency: 6, weatherTransparency: 6, newsTransparency: 6, playerTransparency: 6 });
+const keys = Object.keys(transparency) as Array<keyof typeof transparency>;
+function setTransparency(key: keyof typeof transparency, value: unknown) {
+  transparency[key] = typeof value === 'number' && Number.isFinite(value) ? Math.max(0, Math.min(80, value)) : 6;
+}
+function onStorageChanged(changes: Record<string, { newValue?: unknown }>, area: string) {
+  if (area === 'local') for (const key of keys) if (changes[key]) setTransparency(key, changes[key].newValue);
+}
 onMounted(() => {
   void WallpaperService.initWallpaper();
+  if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+    void chrome.storage.local.get(keys).then((values: Record<string, unknown>) => {
+      for (const key of keys) setTransparency(key, values[key]);
+    });
+    chrome.storage.onChanged.addListener(onStorageChanged);
+  }
 });
-
-function openNeteaseWorkspace() {
-  windowManagerController.handleToolClick("music");
-}
+onUnmounted(() => {
+  if (typeof chrome !== 'undefined' && chrome.storage?.onChanged) chrome.storage.onChanged.removeListener(onStorageChanged);
+});
 </script>
 
 <template>
-  <section id="launcher" class="launcher" aria-label="快捷入口">
+  <section id="launcher" class="launcher" aria-label="快捷入口" :style="{
+    '--sites-opacity': (100 - transparency.sitesTransparency) / 100,
+    '--weather-opacity': (100 - transparency.weatherTransparency) / 100,
+    '--news-opacity': (100 - transparency.newsTransparency) / 100,
+    '--player-opacity': (100 - transparency.playerTransparency) / 100,
+  }">
     <div id="hero-background-media" class="hero-background-media" aria-hidden="true"></div>
 
     <div class="launcher-inner">
       <div class="launcher-overview">
-        <section v-show="homePrefsState.showWeather" class="launcher-widget launcher-weather" data-home-module="weather" :title="t('weather.widgetSwitchTip')">
+        <section class="launcher-widget launcher-weather" :class="{ 'home-module-hidden': !homePrefsState.showWeather }" :aria-hidden="!homePrefsState.showWeather" :inert="!homePrefsState.showWeather" data-home-module="weather" :title="t('weather.widgetSwitchTip')">
           <header class="card-head">
             <span class="bar" style="background: linear-gradient(180deg,#38bdf8,#818cf8)"></span>
             <h2 id="wx-title">{{ t('weather.widgetTitle') }}</h2>
           </header>
           <div id="weather-body">
-            <WeatherWidget />
+            <WeatherWidget v-if="homePrefsState.showWeather" />
           </div>
         </section>
 
@@ -49,20 +64,18 @@ function openNeteaseWorkspace() {
           </form>
         </div>
 
-        <section class="launcher-widget launcher-task-threads launcher-music-card" data-home-module="taskThreads">
+        <section class="launcher-widget launcher-task-threads launcher-music-card" :class="{ 'home-module-hidden': !homePrefsState.showHomePlayer }" :aria-hidden="!homePrefsState.showHomePlayer" :inert="!homePrefsState.showHomePlayer" data-home-module="taskThreads">
           <header class="card-head">
             <span class="bar music-purple"></span>
             <h2>{{ t('home.music.player') }}</h2>
-            <span class="grow"></span>
-            <button id="home-music-open-panel" class="home-music-head-btn" type="button" :title="t('home.music.openNeteaseTip')" @click="openNeteaseWorkspace">{{ t('home.music.openNetease') }}</button>
           </header>
           <div id="task-thread-home" class="task-thread-home home-music-body">
-            <HomeMusicCard />
+            <HomeMusicCard v-if="homePrefsState.showHomePlayer" />
           </div>
         </section>
       </div>
 
-      <div id="launcher-groups" class="launcher-groups" :class="{ 'has-sites': launcherGroupsState.showSites, 'has-todoist': launcherGroupsState.hasTodo, 'has-bili': launcherGroupsState.hasBili, 'has-media': launcherGroupsState.hasTodo || launcherGroupsState.hasBili }">
+      <div id="launcher-groups" class="launcher-groups has-sites has-media">
         <FavoriteSites />
       </div>
     </div>

@@ -3,24 +3,7 @@ import { ref, computed } from "vue";
 import { AWESOME_LISTS, AWESOME_CATEGORIES, type AwesomeItem } from "./awesome-data";
 
 const activeCategory = ref<string>("all");
-const searchQuery = ref<string>("");
-
-const filteredItems = computed(() => {
-  const q = searchQuery.value.trim().toLowerCase();
-  const cat = activeCategory.value;
-
-  return AWESOME_LISTS.filter((item) => {
-    const matchCat = cat === "all" || item.category === cat;
-    if (!matchCat) return false;
-    if (!q) return true;
-    return (
-      item.name.toLowerCase().includes(q) ||
-      item.title.toLowerCase().includes(q) ||
-      item.desc.toLowerCase().includes(q) ||
-      item.tags.some((t) => t.toLowerCase().includes(q))
-    );
-  });
-});
+const filteredItems = computed(() => AWESOME_LISTS.filter(item => activeCategory.value === 'all' || item.category === activeCategory.value));
 
 function handleOpenUrl(url: string) {
   window.open(url, "_blank", "noreferrer");
@@ -37,15 +20,6 @@ function handleOpenUrl(url: string) {
             <h3>Awesome 优质资源宝库</h3>
             <small>全球顶级开源清单索引 · 点击卡片即可快速直达探索</small>
           </div>
-        </div>
-        <div class="gh-awesome-search-box">
-          <input
-            v-model="searchQuery"
-            type="search"
-            placeholder="搜索 Awesome 清单、技术栈或关键词…"
-            aria-label="搜索 Awesome 清单"
-          />
-          <span v-if="searchQuery" class="gh-awesome-clear" @click="searchQuery = ''">✕</span>
         </div>
       </div>
 

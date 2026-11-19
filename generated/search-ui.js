@@ -1,81 +1,84 @@
-import { d as w, b as d, B as b, E as _, x as k, o as y, e as S, i as t, t as a, m as E, h as x, p as D, G as $, F as B, s as c, c as C } from "./chunks/vendor-vue-BrDsOMg2.js";
-import { S as L, i as T } from "./chunks/SearchBox-CQuHmaXd.js";
-import { s as H } from "./chunks/search.service-Cpqvf4pp.js";
-const I = { class: "sub-newtab-topbar" }, M = { class: "sub-newtab-center" }, N = { class: "hero-clock" }, V = { id: "greeting" }, F = {
+import { d as V, w as $, o as x, y as g, e as M, f as h, g as w, j as k, h as o, t as c, m as N, k as I, C as Q, u as S, l as T, F, E as P, b as y, x as l, c as j } from "./chunks/vendor-vue-BbmU9NUg.js";
+import { u as A, g as H, j as K, S as q, s as O, i as R } from "./chunks/drawer-store-BfI-AFt0.js";
+import { s as U } from "./chunks/search.service-B3Axreqn.js";
+const Y = {
+  key: 0,
+  id: "hero-background-media",
+  class: "quick-wallpaper",
+  "aria-hidden": "true"
+}, z = { class: "sub-newtab-center" }, G = { class: "hero-clock" }, J = { id: "greeting" }, X = {
   id: "clock",
   class: "clock"
-}, A = { id: "secs" }, K = {
+}, Z = { id: "secs" }, ee = {
   id: "date",
   class: "date"
-}, P = /* @__PURE__ */ w({
+}, ae = /* @__PURE__ */ V({
   __name: "SearchLauncher",
-  setup(G) {
-    const o = d(/* @__PURE__ */ new Date()), n = d(document.documentElement.dataset.theme || "light");
-    let l = 0;
-    const m = c(() => {
-      const e = o.value.getHours();
+  setup(te) {
+    const D = P(() => import("./chunks/InPageSideDrawer-DzgEeQEQ.js")), b = A(() => O.isOpen);
+    let p;
+    const a = y(/* @__PURE__ */ new Date());
+    let m = 0;
+    const t = y(!0);
+    let r = !1, d = 0;
+    async function s(e) {
+      const n = ++d;
+      if (!e) return;
+      await g();
+      const { WallpaperService: i } = await import("./chunks/wallpaper.service-BubE3Pw2.js").then((E) => E.w);
+      r && t.value && n === d && await i.initWallpaper({ fallbackWhenNone: !0 });
+    }
+    function v(e, n) {
+      if (n !== "local") return;
+      e.showQuickSearchWallpaper && (t.value = e.showQuickSearchWallpaper.newValue !== !1);
+      const i = e.heroBackground?.newValue;
+      t.value && (i === "none" || i?.type === "none") && s(!0);
+    }
+    $(t, (e) => {
+      r && s(e);
+    });
+    const C = l(() => {
+      const e = a.value.getHours();
       return e >= 5 && e < 9 ? "早上好" : e >= 9 && e < 12 ? "上午好" : e >= 12 && e < 14 ? "中午好" : e >= 14 && e < 18 ? "下午好" : e >= 18 && e < 23 ? "晚上好" : e >= 23 || e < 5 ? "夜深了" : "你好";
-    }), h = c(() => `${String(o.value.getHours()).padStart(2, "0")}:${String(o.value.getMinutes()).padStart(2, "0")}`), v = c(() => `:${String(o.value.getSeconds()).padStart(2, "0")}`), p = c(() => `${o.value.getFullYear()}年${o.value.getMonth() + 1}月${o.value.getDate()}日 · ${["周日", "周一", "周二", "周三", "周四", "周五", "周六"][o.value.getDay()]}`);
-    function i() {
-      document.hidden || (o.value = /* @__PURE__ */ new Date());
+    }), W = l(() => `${String(a.value.getHours()).padStart(2, "0")}:${String(a.value.getMinutes()).padStart(2, "0")}`), L = l(() => `:${String(a.value.getSeconds()).padStart(2, "0")}`), B = l(() => `${a.value.getFullYear()}年${a.value.getMonth() + 1}月${a.value.getDate()}日 · ${["周日", "周一", "周二", "周三", "周四", "周五", "周六"][a.value.getDay()]}`);
+    function u() {
+      document.hidden || (a.value = /* @__PURE__ */ new Date());
     }
-    function g() {
-      n.value = n.value === "light" ? "dark" : "light", document.documentElement.dataset.theme = n.value, localStorage.setItem("theme", n.value);
-    }
-    function r(e) {
+    function f(e) {
       e.altKey && e.key.toLowerCase() === "h" && (e.preventDefault(), location.href = "newtab.html");
     }
-    function f() {
-      location.href = "newtab.html";
-    }
-    return b(() => {
-      l = window.setInterval(i, 1e3), document.addEventListener("visibilitychange", i), window.addEventListener("keydown", r), _(() => {
-        H.focus();
+    return x(() => {
+      r = !0, p = H(), typeof chrome < "u" && chrome.storage?.local ? (chrome.storage.onChanged.addListener(v), chrome.storage.local.get("showQuickSearchWallpaper").then((e) => {
+        r && (t.value = e.showQuickSearchWallpaper !== !1, t.value && s(!0));
+      })) : s(!0), m = window.setInterval(u, 1e3), document.addEventListener("visibilitychange", u), window.addEventListener("keydown", f), g(() => {
+        U.focus();
       });
-    }), k(() => {
-      clearInterval(l), document.removeEventListener("visibilitychange", i), window.removeEventListener("keydown", r);
-    }), (e, s) => (y(), S(B, null, [
-      t("div", I, [
-        t("button", {
-          id: "theme-toggle",
-          class: "sub-theme-toggle",
-          type: "button",
-          title: "切换主题",
-          onClick: g
-        }, a(n.value === "light" ? "☀" : "🌙"), 1)
-      ]),
-      t("div", M, [
-        t("div", N, [
-          t("p", V, a(m.value), 1),
-          t("p", F, [
-            E(a(h.value), 1),
-            t("span", A, a(v.value), 1)
+    }), M(() => {
+      r = !1, p?.(), K.close(), d++, typeof chrome < "u" && chrome.storage?.onChanged && chrome.storage.onChanged.removeListener(v), clearInterval(m), document.removeEventListener("visibilitychange", u), window.removeEventListener("keydown", f);
+    }), (e, n) => (h(), w(F, null, [
+      t.value ? (h(), w("div", Y)) : k("", !0),
+      o("div", z, [
+        o("div", G, [
+          o("p", J, c(C.value), 1),
+          o("p", X, [
+            N(c(W.value), 1),
+            o("span", Z, c(L.value), 1)
           ]),
-          t("p", K, a(p.value), 1)
+          o("p", ee, c(B.value), 1)
         ]),
-        t("form", {
+        o("form", {
           id: "search",
           class: "search",
-          onSubmit: s[0] || (s[0] = x(() => {
+          onSubmit: n[0] || (n[0] = I(() => {
           }, ["prevent"]))
         }, [
-          D(L)
+          Q(q)
         ], 32)
       ]),
-      t("aside", { class: "enter-home-dock" }, [
-        t("button", {
-          id: "enter-home-btn",
-          class: "enter-home-btn",
-          type: "button",
-          title: "进入主标签页（或按 Alt+H）",
-          onClick: f
-        }, [...s[1] || (s[1] = [
-          $('<div class="enter-home-icon">⚡</div><div class="enter-home-text"><span class="enter-home-title">进入主标签页</span><span class="enter-home-desc">播放开屏动画 ➔</span></div><span class="enter-home-arrow">➔</span>', 3)
-        ])])
-      ])
+      S(b) ? (h(), T(S(D), { key: 1 })) : k("", !0)
     ], 64));
   }
 });
-T();
-const u = document.getElementById("vue-search-launcher-root");
-u && C(P).mount(u);
+R();
+const _ = document.getElementById("vue-search-launcher-root");
+_ && j(ae).mount(_);

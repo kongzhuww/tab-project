@@ -101,8 +101,7 @@ function saveCustomOrder(order: { cards?: string[]; tools?: string[] }) {
 }
 
 export function getVisibleDockTools(): DockToolItem[] {
-  // Preserve access for profiles that have not enabled AI Workspace yet.
-  const visible = DOCK_TOOLS.filter(tool => !(tool.id === 'backpack' && pluginMarketController.isInstalled('multica')) && pluginMarketController.isInstalled(tool.id));
+  const visible = DOCK_TOOLS.filter(tool => pluginMarketController.isInstalled(tool.id));
   const saved = loadCustomOrder().tools;
   if (Array.isArray(saved) && saved.length > 0) {
     const map = new Map(visible.map(t => [t.id, t]));
@@ -159,6 +158,9 @@ export const macDockState = reactive<MacDockSnapshot>(initialState());
 
 if (typeof window !== "undefined") {
   window.addEventListener("logicweaver:dock-modules-changed", () => {
+    for (const item of [...macDockState.tools, ...macDockState.cards]) {
+      if (!pluginMarketController.isInstalled(item.id)) getDockModule(item.id)?.lifecycle.hide();
+    }
     macDockState.tools = getVisibleDockTools();
     macDockState.cards = getVisibleDockCards();
   });
@@ -345,7 +347,7 @@ export const macDockController: MacDockController = {
       }
 
       // 桌面级轻量浮层工具窗口，绝不退出当前全屏卡片，允许在 B站收藏夹、GitHub 等任意视图中就地打开伴随！
-      const keepCurrentViewTools = ["todoist", "music", "siren", "wallpaper", "stickers", "sync", "chat", "backpack", "multica"];
+      const keepCurrentViewTools = ["todoist", "music", "siren", "wallpaper", "stickers", "sync", "chat", "multica"];
       if (!keepCurrentViewTools.includes(id) && typeof window !== "undefined") {
         const win = window as any;
         if (typeof win.exitFullscreenCard === "function") {

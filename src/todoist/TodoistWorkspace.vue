@@ -151,10 +151,6 @@ function handleToggleCalendar() {
   todoistMainWorkspaceController.toggleCalendar();
 }
 
-function handleRefresh() {
-  todoistMainWorkspaceController.refresh();
-}
-
 function handleAccountSaved() {
   todoistTaskListController.updateState({ accountConfigured: true });
   if (active.value) void todoistTaskListController.loadWorkspace(undefined, undefined, true);
@@ -219,15 +215,6 @@ function handleClose() {
         </button>
         <TodoistAccountSettings v-if="accountSettingsMounted" :visible="active && accountSettingsOpen" :anchor="accountSettingsButton" @close="accountSettingsOpen = false" @account-saved="handleAccountSaved" />
 
-
-        <button
-          id="todoist-workspace-refresh"
-          type="button"
-          :title="t('common.refresh')"
-          @click="handleRefresh"
-        >
-          ↻
-        </button>
 
         <button
           id="todoist-workspace-minimize"

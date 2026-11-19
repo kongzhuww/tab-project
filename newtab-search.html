@@ -11,6 +11,22 @@
       --bg: #060911;
       --border-focus: rgba(236, 72, 153, 0.6);
       --accent-grad: linear-gradient(135deg, #ec4899, #8b5cf6);
+      --heading: #fff;
+      --text: #dbe4ee;
+      --muted: #94a3b8;
+      --border: rgba(255, 255, 255, 0.09);
+      --surface: rgba(255, 255, 255, 0.04);
+      --surface-hover: rgba(255, 255, 255, 0.08);
+      --panel: #0a121c;
+    }
+    html[data-theme="light"] {
+      --heading: #0f172a;
+      --text: #334155;
+      --muted: #64748b;
+      --border: rgba(15, 23, 42, 0.10);
+      --surface: rgba(15, 23, 42, 0.04);
+      --surface-hover: rgba(15, 23, 42, 0.08);
+      --panel: #fff;
     }
     html, body {
       margin: 0;
@@ -102,6 +118,19 @@
     }
 
 
+    .quick-wallpaper {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+    }
+    .quick-wallpaper img, .quick-wallpaper video, .quick-wallpaper iframe {
+      width: 100%;
+      height: 100%;
+      display: block;
+      object-fit: cover;
+      border: 0;
+    }
     .sub-newtab-center {
       position: relative;
       z-index: 10;

@@ -7,6 +7,7 @@ import { getDockModule } from "../modules/registry";
 import { pluginMarketController } from "../modules/market-store";
 import { privateChatConfigured } from "../chat/private-chat-config";
 import { t } from "../i18n";
+import { settingsController } from "../settings/store";
 
 const snapshot = computed(() => macDockState);
 const contextTarget = ref<ContextTarget | null>(null);
@@ -19,7 +20,8 @@ function onMarketClick(event: MouseEvent) {
   event.stopPropagation();
   contextTarget.value = null;
   bounceElement(event.currentTarget as HTMLElement);
-  pluginMarketController.open();
+  if (pluginMarketController.state.isOpen) pluginMarketController.close();
+  else pluginMarketController.open();
 }
 
 function onCardClick(id: string, event: MouseEvent) {
@@ -332,6 +334,9 @@ onBeforeUnmount(() => {
       </button>
     </TransitionGroup>
 
+    <button class="mac-dock-item" type="button" title="设置" aria-label="设置" @click.stop="settingsController.toggle()">
+      <span class="mac-dock-emoji" aria-hidden="true">⚙️</span>
+    </button>
     <!-- 🧩 模块管理入口 -->
     <button
       class="mac-dock-item mac-dock-market-btn"

@@ -126,13 +126,14 @@ async function saveSettings() {
     <!-- 头部 -->
     <header class="gh-popover-head">
       <div class="gh-popover-title-wrap">
-        <span class="gh-popover-badge">⚙️ GitHub 设置</span>
+        <span class="gh-popover-icon" aria-hidden="true">GH</span>
+        <div><h2 class="gh-popover-badge">GitHub 设置</h2><p class="gh-popover-subtitle">管理账号与访问凭据</p></div>
       </div>
       <button type="button" class="gh-popover-close-btn" title="关闭" @click="emit('close')">✕</button>
     </header>
 
     <!-- 内容区 -->
-    <p class="gh-settings-message">隐藏面板或离开卡片会保留草稿；关闭整个标签页仍会丢失。</p>
+    <p class="gh-draft-hint">更改会保留在草稿中，关闭标签页前请保存。</p>
     <button v-if="!ready" type="button" :disabled="loading || !visible" @click="readSettings">{{ loading ? "正在读取…" : "重试读取" }}</button>
     <p v-if="message" class="gh-settings-message" role="status">{{ message }}</p>
     <fieldset class="gh-settings-fields" :disabled="!ready || isSaving || isTesting">
@@ -140,11 +141,12 @@ async function saveSettings() {
       <!-- 账号与连接 -->
       <section class="gh-field-list">
         <div class="gh-field-item">
-          <label class="gh-field-label">
+          <label class="gh-field-label" for="gh-settings-user">
             <span>用户名</span>
             <small class="optional">Token 可单独使用</small>
           </label>
           <input
+            id="gh-settings-user"
             v-model="form.ghUser"
             type="text"
             class="gh-input"
@@ -154,12 +156,13 @@ async function saveSettings() {
         </div>
 
         <div class="gh-field-item">
-          <label class="gh-field-label">
-            <span>个人访问令牌 (Token)</span>
-            <small class="optional">5000次/h</small>
+          <label class="gh-field-label" for="gh-settings-token">
+            <span>个人访问令牌</span>
+            <small class="optional">Token</small>
           </label>
           <div class="gh-input-action-wrap">
             <input
+              id="gh-settings-token"
               v-model="form.ghToken"
               :type="showToken ? 'text' : 'password'"
               class="gh-input"
@@ -169,18 +172,15 @@ async function saveSettings() {
             <button
               type="button"
               class="gh-toggle-pwd"
-              :title="showToken ? '隐藏' : '显示'"
+              :aria-label="showToken ? '隐藏令牌' : '显示令牌'"
+              :aria-pressed="showToken"
               @click="showToken = !showToken"
             >
-              {{ showToken ? '👁️' : '🔒' }}
+              {{ showToken ? '隐藏' : '显示' }}
             </button>
           </div>
-          <div class="gh-hint-row">
-            <a href="https://github.com/settings/tokens" target="_blank" rel="noopener" class="gh-link">
-              管理 GitHub Token ↗
-            </a>
-            <span style="font-size: 11px; color: var(--muted); margin-left: 8px;">（用于读取收藏、提高请求额度；本地分类不需要 Lists 写权限）</span>
-          </div>
+          <p class="gh-token-hint">用于读取收藏和提高请求额度，本地分类无需 Lists 写权限。</p>
+          <a href="https://github.com/settings/tokens" target="_blank" rel="noopener" class="gh-link">管理 GitHub Token ↗</a>
         </div>
 
         <!-- 连通性测试 -->
@@ -191,7 +191,7 @@ async function saveSettings() {
             :disabled="isTesting"
             @click="testConnection"
           >
-            <span>{{ isTesting ? '验证中…' : '⚡ 测试连接' }}</span>
+            <span>{{ isTesting ? '验证中…' : '测试连接' }}</span>
           </button>
           <div v-if="testResult" class="gh-test-pill" :class="{ success: testResult.success, error: !testResult.success }">
             <span>{{ testResult.message }}</span>
@@ -213,32 +213,38 @@ async function saveSettings() {
 </template>
 
 <style scoped>
-.gh-popover-head, .gh-popover-foot { display:flex; align-items:center; justify-content:space-between; padding:10px 14px; }
+.gh-popover-head, .gh-popover-foot { display:flex; align-items:center; justify-content:space-between; padding:14px 16px; }
 .gh-popover-head { border-bottom:1px solid var(--border, #ddd); }
-.gh-popover-badge { font-weight:600; font-size:13px; }
-.gh-popover-tabs { display:flex; gap:4px; padding:6px 10px; }
-.gh-popover-tab { flex:1; }
-.gh-popover-tab.active { color:var(--accent, #0284c7); border-color:var(--accent, #0284c7); }
-.gh-popover-body { padding:14px; }
-.gh-field-list { display:flex; flex-direction:column; gap:12px; }
-.gh-field-item { display:flex; flex-direction:column; gap:4px; }
-.gh-field-label { display:flex; justify-content:space-between; font-size:12px; }
-.gh-input { width:100%; box-sizing:border-box; padding:7px 10px; border:1px solid var(--border, #ddd); border-radius:6px; background:var(--panel, #fff); color:inherit; }
+.gh-popover-title-wrap { display:flex; align-items:center; gap:10px; }
+.gh-popover-icon { display:grid; place-items:center; width:36px; height:36px; border-radius:11px; background:var(--surface, #f1f5f9); color:var(--heading, #172033); font-size:11px; font-weight:800; letter-spacing:.02em; }
+.gh-popover-badge { margin:0; font-weight:700; font-size:14px; line-height:1.3; color:var(--heading, #172033); }
+.gh-popover-subtitle { margin:3px 0 0; font-size:11px; color:var(--muted, #64748b); }
+.gh-popover-close-btn { width:30px; height:30px; padding:0; font-size:14px; }
+.gh-draft-hint { margin:12px 16px 0; padding:8px 10px; border-radius:7px; background:var(--surface, #f1f5f9); color:var(--muted, #64748b); font-size:11px; line-height:1.5; }
+.gh-popover-body { padding:16px; }
+.gh-field-list { display:flex; flex-direction:column; gap:16px; }
+.gh-field-item { display:flex; flex-direction:column; gap:6px; }
+.gh-field-label { display:flex; justify-content:space-between; align-items:center; font-size:12px; font-weight:600; }
+.gh-input { width:100%; height:36px; box-sizing:border-box; padding:0 11px; border:1px solid var(--border, #ddd); border-radius:8px; background:var(--panel, #fff); color:inherit; font:inherit; font-size:12px; }
 .gh-input:focus { outline:2px solid var(--accent, #0284c7); outline-offset:1px; }
 .gh-input-action-wrap { position:relative; }
-.gh-input-action-wrap .gh-input { padding-right:40px; }
-.gh-toggle-pwd { position:absolute; right:4px; top:3px; }
-.gh-hint-row { text-align:right; }
-.gh-link, .optional { color:var(--accent, #0284c7); font-size:11px; }
-.gh-test-block { display:flex; flex-direction:column; gap:6px; }
-.gh-test-pill { padding:6px; font-size:12px; overflow-wrap:anywhere; }
-.gh-test-pill.error { color:#dc2626; }
-.gh-test-pill.success { color:#15803d; }
-.gh-radio-bar { display:flex; gap:12px; font-size:12px; }
-.gh-cache-desc, .gh-settings-message { font-size:12px; line-height:1.5; margin:8px 14px; overflow-wrap:anywhere; }
+.gh-input-action-wrap .gh-input { padding-right:58px; }
+.gh-toggle-pwd { position:absolute; right:4px; top:4px; height:28px; padding:0 8px; border:0; background:transparent; color:var(--muted, #64748b); font-size:11px; }
+.gh-token-hint { margin:1px 0 0; color:var(--muted, #64748b); font-size:11px; line-height:1.5; }
+.gh-link { align-self:flex-start; color:var(--accent, #0284c7); font-size:11px; text-decoration:none; }
+.gh-link:hover { text-decoration:underline; }
+.optional { color:var(--muted, #64748b); font-size:11px; font-weight:400; }
+.gh-test-block { display:flex; flex-direction:column; gap:8px; }
+.gh-test-btn { width:100%; min-height:36px; font-weight:600; }
+.gh-test-pill { display:flex; flex-wrap:wrap; gap:4px; padding:8px 10px; border-radius:7px; font-size:12px; overflow-wrap:anywhere; }
+.gh-test-pill.error { color:#dc2626; background:rgba(220,38,38,.08); }
+.gh-test-pill.success { color:#15803d; background:rgba(22,163,74,.09); }
+.gh-settings-message { font-size:12px; line-height:1.5; margin:8px 16px; overflow-wrap:anywhere; }
 .gh-settings-fields { border:0; padding:0; margin:0; min-width:0; }
 .gh-popover-foot { justify-content:flex-end; gap:8px; border-top:1px solid var(--border, #ddd); }
-button { padding:5px 10px; border:1px solid var(--border, #ddd); border-radius:6px; background:var(--panel, #fff); color:inherit; cursor:pointer; }
+button { padding:7px 12px; border:1px solid var(--border, #ddd); border-radius:8px; background:var(--panel, #fff); color:inherit; cursor:pointer; font:inherit; font-size:12px; }
+button:hover:not(:disabled) { filter:brightness(.96); }
+button:focus-visible, .gh-link:focus-visible { outline:2px solid var(--accent, #0284c7); outline-offset:2px; }
 button:disabled { opacity:.5; cursor:default; }
-.gh-btn-save { background:var(--accent, #0284c7); color:#fff; }
+.gh-btn-save { border-color:transparent; background:var(--accent, #0284c7); color:#fff; font-weight:600; }
 </style>

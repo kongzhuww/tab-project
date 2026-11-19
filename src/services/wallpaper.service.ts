@@ -616,10 +616,7 @@ export const WallpaperService = {
       value = { type: "db", name: file.name, mediaType: file.type || "application/octet-stream" };
     }
     value = await this.addHistory(value, payload);
-    if (apply) {
-      await storageSet({ heroBackground: value });
-      await this.applyWallpaper(value);
-    }
+    if (apply) await this.setWallpaper(value);
     return value;
   },
 
@@ -637,11 +634,12 @@ export const WallpaperService = {
     if (typeof document === "undefined") return;
     const launcher = document.getElementById("launcher");
     const host = document.getElementById("hero-background-media");
-    if (!launcher || !host) return;
+    if (!host) return;
+    currentAppliedWallpaperValue = value;
 
     clearActiveWallpaperUrls();
     host.replaceChildren();
-    launcher.style.removeProperty("--launcher-image");
+    launcher?.style.removeProperty("--launcher-image");
 
     if (!value) return;
     if (typeof value === "string") {
@@ -700,7 +698,6 @@ export const WallpaperService = {
       }
     }
 
-    currentAppliedWallpaperValue = value;
     if (value.type === "web") {
       // 若提供了即时包 (例如刚点击工坊壁纸) 或内存中有缓存，直接零延迟秒开
       let pack = instantPayload || activeWebPackCache;
@@ -823,28 +820,24 @@ export const WallpaperService = {
     await storageSet({ [BACKGROUND_HISTORY_KEY]: next });
   },
 
-  async initWallpaper(): Promise<void> {
+  async initWallpaper(options: { fallbackWhenNone?: boolean } = {}): Promise<void> {
     try {
-      // 1. 优先尝试从同步 localStorage 极速恢复用户之前选择的壁纸
+      // The shared setting is authoritative; the local cache may be older after imports or sync.
       let current: any = null;
       try {
-        const cached = localStorage.getItem("lw-current-wallpaper");
-        if (cached !== null) {
-          current = JSON.parse(cached);
-        }
-      } catch {}
-
-      // 2. 若同步缓存不存在，读取 chrome.storage.local
-      if (current === null) {
         const stored = await storageGet(["heroBackground"]);
-        if (stored.heroBackground !== undefined) {
-          current = stored.heroBackground;
-        }
+        if (stored.heroBackground !== undefined) current = stored.heroBackground;
+      } catch {}
+      if (current === null) {
+        try {
+          const cached = localStorage.getItem("lw-current-wallpaper");
+          if (cached !== null) current = JSON.parse(cached);
+        } catch {}
       }
 
       // 3. 用户如果明确选择了纯色背景/无壁纸 ({ type: "none" })，严格保持纯色，绝不覆盖回雪山默认图
       if (current && (current === "none" || current.type === "none")) {
-        await this.applyWallpaper(null);
+        await this.applyWallpaper(options.fallbackWhenNone ? DEFAULT_MOUNTAIN_VALUE : null);
         return;
       }
 

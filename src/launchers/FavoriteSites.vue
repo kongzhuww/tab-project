@@ -18,6 +18,7 @@ import LauncherFavicon from "./LauncherFavicon.vue";
 import LauncherTileContent from "./LauncherTileContent.vue";
 import { TILE_DRAG_THRESHOLD, TILE_SWAP_COOLDOWN, inFolderDropCore, inTileSwapCore } from './tile-drag-geometry';
 import LauncherAiHotCard from "./LauncherAiHotCard.vue";
+import { homePrefsState } from "../launcher/home-prefs-state";
 import {
   launcherGroupsState,
   launcherGroupsController,
@@ -39,6 +40,11 @@ function onWindowBlurOrHide() {
 }
 
 onMounted(() => {
+  if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+    void chrome.storage.local.get('defaultSitesView').then((data: Record<string, unknown>) => {
+      sitesView.value = data.defaultSitesView === 'sites' ? 'sites' : 'bookmarks';
+    });
+  } else sitesView.value = 'bookmarks';
   launcherGroupsController.setExternalDragHandler(onExternalDragHover);
   launcherGroupsController.setExternalDropHandler(onExternalDrop);
   window.addEventListener("blur", onWindowBlurOrHide);
@@ -886,8 +892,10 @@ async function onFolderDrop(targetGroupName: string, event: DragEvent) {
 
 <template>
   <section
-    v-if="launcherGroupsState.showSites"
     class="launcher-group launcher-sites size-large"
+    :class="{ 'home-module-hidden': !homePrefsState.showSites }"
+    :aria-hidden="!homePrefsState.showSites"
+    :inert="!homePrefsState.showSites"
     @wheel="onWheel"
   >
     <header
@@ -1047,12 +1055,8 @@ async function onFolderDrop(targetGroupName: string, event: DragEvent) {
   </section>
 
   <!-- 媒体卡片宿主区 -->
-  <div
-    v-if="launcherGroupsState.hasTodo || launcherGroupsState.hasBili"
-    class="launcher-media-stack"
-  >
-    <LauncherAiHotCard v-if="launcherGroupsState.hasTodo" />
-    <div v-else-if="launcherGroupsState.hasBili" id="launcher-bili"></div>
+  <div class="launcher-media-stack">
+    <LauncherAiHotCard v-if="homePrefsState.showHomeNews" />
   </div>
 
   <!-- 挂在手上的超跟手浮动拖拽镜像 (Teleport 到 body，绝对跟手不被裁剪) -->
@@ -1096,6 +1100,6 @@ async function onFolderDrop(targetGroupName: string, event: DragEvent) {
 .sites-view-switch { display: flex; gap: 3px; flex-shrink: 0; padding: 3px; background: var(--surface); border: 1px solid var(--border); border-radius: 9px; }
 .sites-view-switch button { padding: 5px 9px; border: 0; border-radius: 6px; background: transparent; color: var(--muted); font-size: 13px; font-weight: 600; cursor: pointer; }
 .sites-view-switch button[aria-pressed="true"] { background: var(--panel); color: var(--heading); }
-.launcher-sites { background: var(--panel) !important; border-color: var(--border) !important; }
+.launcher-sites { background: color-mix(in srgb, var(--panel) calc(var(--sites-opacity, .94) * 100%), transparent) !important; backdrop-filter: blur(8px) !important; -webkit-backdrop-filter: blur(8px) !important; border-color: var(--border) !important; }
 .launcher-sites-head { flex-wrap: wrap; border-color: var(--border); }
 </style>

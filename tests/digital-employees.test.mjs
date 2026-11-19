@@ -173,3 +173,146 @@ test('Pi tool loop reuses one sessionId across turns for a single video while is
   assert.equal(outcome.toolTrace.length, 1);
   assert.equal(outcome.toolTrace[0].tool, 'bili_get_video_info');
 });
+
+test('workspace organizer builds partition/folder/bookmark proposals in pending state and applies only clicked steps', async t => {
+  const organizer = await loadTsModule('src/agents/workspace-organizer.ts');
+  const orgEmp = contract.createDefaultOrganizerEmployee(1000);
+  assert.equal(orgEmp.source.kind, 'workspace-organizer');
+  assert.ok(orgEmp.skills.includes('bookmarks.read') && orgEmp.skills.includes('launcher.read'));
+
+  const beforeChrome = globalThis.chrome;
+  t.after(() => { globalThis.chrome = beforeChrome; });
+
+  const store = {
+    launcherPages: ['常用网站'],
+    launcherPageLabels: { 常用网站: '默认' },
+    launcherFolders: {},
+    quickLinkGroupSizes: {},
+    quickLinks: [
+      { id: 'link-ai-1', title: 'DeepSeek', url: 'https://chat.deepseek.com/', page: '常用网站', group: '常用网站' },
+      { id: 'link-dev-1', title: 'GitHub', url: 'https://github.com/', page: '常用网站', group: '常用网站' },
+    ],
+  };
+  const bookmarksTree = [
+    {
+      id: '0',
+      children: [
+        {
+          id: '1',
+          parentId: '0',
+          title: '书签栏',
+          children: [
+            { id: 'bm-1', parentId: '1', title: 'Vite 官方文档', url: 'https://vite.dev/' },
+          ],
+        },
+      ],
+    },
+  ];
+  let createdBookmarkId = 100;
+  const bookmarkFolderNodes = [{ id: '1', title: '书签栏', parentId: '0' }];
+  globalThis.chrome = {
+    storage: {
+      local: {
+        get: (keys, cb) => {
+          const arr = Array.isArray(keys) ? keys : [keys];
+          const out = {};
+          for (const k of arr) out[k] = structuredClone(store[k]);
+          cb(out);
+        },
+        set: (values, cb) => { Object.assign(store, structuredClone(values)); cb(); },
+      },
+    },
+    bookmarks: {
+      getTree: cb => cb(structuredClone(bookmarksTree)),
+      getChildren: (parentId, cb) => {
+        const list = bookmarksTree[0].children.find(c => c.id === parentId)?.children || [];
+        cb(structuredClone(list));
+      },
+      create: ({ parentId, title }, cb) => {
+        const id = `bm-dir-${++createdBookmarkId}`;
+        const node = { id, parentId, title, children: [] };
+        const parent = bookmarksTree[0].children.find(c => c.id === parentId);
+        if (parent) parent.children.push(node);
+        bookmarkFolderNodes.push(node);
+        cb(structuredClone(node));
+      },
+      move: (id, { parentId }, cb) => {
+        const root = bookmarksTree[0].children[0];
+        const idx = root.children.findIndex(c => c.id === id);
+        if (idx >= 0) {
+          const [moved] = root.children.splice(idx, 1);
+          moved.parentId = parentId;
+          const dest = bookmarkFolderNodes.find(f => f.id === parentId);
+          if (dest) dest.children.push(moved);
+          cb(structuredClone(moved));
+          return;
+        }
+        cb({ id, parentId });
+      },
+    },
+  };
+
+  const snap = await organizer.readOrganizerWorkspaceSnapshot();
+  assert.equal(snap.partitions.length, 1);
+  assert.equal(snap.links.length, 2);
+  assert.equal(snap.bookmarks.length, 1);
+
+  const parsed = organizer.parseOrganizerPlanResponse(
+    JSON.stringify({
+      summary: '建议按 AI 与开发分类，建大/中文件夹并归档书签',
+      steps: [
+        { type: 'create_partition', title: '新建分区「AI工作」', params: { partitionName: 'AI工作' } },
+        { type: 'create_launcher_folder', title: '在「AI工作」新建大文件夹「大模型」', params: { partitionName: 'AI工作', folderName: '大模型', folderSize: 'large' } },
+        { type: 'create_launcher_folder', title: '在「大模型」下新建小文件夹「提示词」', params: { partitionName: 'AI工作', parentFolderName: '大模型', folderName: '提示词', folderSize: 'small' } },
+        { type: 'move_quick_link', title: '移动 DeepSeek 到大模型', params: { linkId: 'link-ai-1', targetPartition: 'AI工作', targetFolder: '大模型' } },
+        { type: 'create_bookmark_folder', title: '新建书签目录「开发参考」', params: { parentBookmarkId: '1', folderName: '开发参考' } },
+        { type: 'move_bookmark', title: '移动 Vite 文档到开发参考', params: { bookmarkId: 'bm-1', targetFolder: '开发参考' } },
+      ],
+    }),
+    snap
+  );
+
+  // Proposal stage must NOT touch storage or bookmarks
+  assert.equal(parsed.steps.length, 6);
+  assert.ok(parsed.steps.every(s => s.status === 'pending'));
+  assert.equal(store.launcherPages.length, 1);
+
+  // Preview stage shows simulated result cleanly
+  const sim = organizer.computeOrganizerPreview(snap, parsed.steps);
+  assert.ok(sim.partitions.some(p => p.label === 'AI工作' && p.badge === 'new'));
+
+  // Dependency check: trying to move link into uncreated folder before approving step #2 must fail cleanly
+  const context = { steps: parsed.steps, snapshot: snap };
+  await assert.rejects(organizer.applyOrganizerPlanStep(parsed.steps[3], context), /前置步骤尚未生效/);
+  async function approve(step) {
+    const result = await organizer.applyOrganizerPlanStep(step, context);
+    step.status = 'applied';
+    step.result = result.result;
+    step.undo = result.undo;
+  }
+
+  // Step-by-step approval executes ONLY each clicked step
+  await approve(parsed.steps[0]);
+  assert.ok(store.launcherPages.includes('AI工作'));
+  assert.equal(Object.keys(store.launcherFolders).length, 0);
+
+  await approve(parsed.steps[1]);
+  assert.equal(store.quickLinkGroupSizes['大模型'], 'large');
+  await approve(parsed.steps[2]);
+  assert.equal(store.launcherFolders['提示词'].parent, '大模型');
+  assert.equal(store.quickLinkGroupSizes['提示词'], 'small');
+
+  await approve(parsed.steps[3]);
+  assert.equal(store.quickLinks.find(l => l.id === 'link-ai-1').group, '大模型');
+  assert.equal(store.quickLinks.find(l => l.id === 'link-dev-1').group, '常用网站'); // untouched!
+
+  await approve(parsed.steps[4]);
+  await approve(parsed.steps[5]);
+  const createdFolder = bookmarksTree[0].children[0].children.find(c => c.title === '开发参考');
+  assert.equal(createdFolder.children[0].id, 'bm-1');
+
+  const orgModal = await readFile(new URL('../src/agents/OrganizerPeekModal.vue', import.meta.url), 'utf8');
+  for (const target of ['org-partitions', 'org-folders', 'org-links', 'org-bookmarks', 'org-approval']) {
+    assert.ok(orgModal.includes(`data-peek-target="${target}"`), `Missing organizer peek target ${target}`);
+  }
+});

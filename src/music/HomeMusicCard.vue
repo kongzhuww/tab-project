@@ -78,6 +78,7 @@ function onCoverError() {
             {{ displayTitle || t('home.music.standby') }}
           </h3>
           <p class="degraded-track-artist">{{ displayArtist }}</p>
+          <p class="home-music-current-lyric" :title="homeMusicState.currentLyric || ''">{{ homeMusicState.currentLyric || '暂无歌词' }}</p>
         </div>
 
         <!-- 纯百分比驱动轻量进度条 (无复杂计算，纯 CSS 宽度平滑过渡) -->
@@ -162,6 +163,7 @@ function onCoverError() {
           {{ displayTitle }}
         </h3>
         <p id="home-music-artist" class="home-music-meta-artist">{{ displayArtist }}</p>
+        <p class="home-music-current-lyric" :title="homeMusicState.currentLyric || ''">{{ homeMusicState.currentLyric || '暂无歌词' }}</p>
 
         <div class="home-music-seek-row">
           <span id="home-music-cur" class="home-music-time">{{ homeMusicState.formattedCurrent }}</span>
@@ -206,16 +208,6 @@ function onCoverError() {
             ⏭
           </button>
           <button
-            id="home-music-like"
-            class="home-music-btn like-btn"
-            :class="{ liked: homeMusicState.liked }"
-            type="button"
-            :title="t('home.music.favorite')"
-            @click="homeMusicController.toggleLike()"
-          >
-            {{ homeMusicState.liked ? "♥" : "♡" }}
-          </button>
-          <button
             id="home-music-mode"
             class="home-music-btn"
             type="button"
@@ -231,6 +223,7 @@ function onCoverError() {
 </template>
 
 <style scoped>
+.home-music-current-lyric { margin: 3px 0; overflow: hidden; color: var(--muted); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
 .home-music-lyric-bar {
   display: flex;
   align-items: center;

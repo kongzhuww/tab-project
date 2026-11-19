@@ -1,7 +1,6 @@
 import { pluginSlots } from "./slots";
 import { notifications } from "./notifications";
 import { images } from "./images";
-import type { CubeFaceDefinition } from "../cube/cube-registry.store";
 import type { SearchSuggestionItem } from "../search/store";
 import type { MenuSlotAction } from "./slots";
 
@@ -87,16 +86,6 @@ export class PluginContext {
         message: options.message,
         duration: options.duration
       });
-    }
-  };
-
-  // ==================== 3. 顶栏信息立方体挂载 (Cube Slot) ====================
-  public readonly cube = {
-    register: (face: Omit<CubeFaceDefinition, "builtIn">) => {
-      this.ensureActive();
-      const fullFace: CubeFaceDefinition = { ...face, id: `${this.manifest.id}:${face.id}`, builtIn: false };
-      const unregister = pluginSlots.registerCubeFace(fullFace);
-      return this.track(unregister);
     }
   };
 

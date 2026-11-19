@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import { biliFavoritesController, biliFavoritesState, type BiliOrganizerFolderView, type BiliOrganizerVideoView } from "./bili-favorites-store";
+import { biliFavoritesController, biliFavoritesState, favoriteGridColumns, type BiliOrganizerFolderView, type BiliOrganizerVideoView } from "./bili-favorites-store";
 import { biliMiniPlayerController, biliMiniPlayerState } from "./mini-player-store";
 import { subtitleModalController } from "./subtitle-modal-store";
 import { fullscreenCardState } from "../core/fullscreen-cards.store";
@@ -12,8 +12,10 @@ import BiliOrganizerDialogs from "./BiliOrganizerDialogs.vue";
 import BiliCacheSettingsView from "./BiliCacheSettingsView.vue";
 import BiliUpGroupManager from "./BiliUpGroupManager.vue";
 import BiliRadioTapePlayer from "./BiliRadioTapePlayer.vue";
-import BiliVideoLyricDockBar from "./BiliVideoLyricDockBar.vue";
 import { radioTapeState } from "./radio-tape-store";
+import { biliRadioController } from "./radio-store";
+import { parseDurationToSeconds } from "./channel-format";
+import { onFollowingGroupsWheel } from "./horizontal-wheel";
 import { biliMessagePanelController, biliMessagePanelState } from "./message-panel-store";
 import { bilibiliChannelService } from "../services/bilibili-channel.service";
 import { useContextMenu } from "../sdk/interactions";
@@ -132,8 +134,14 @@ watch(() => recommendationHostActive.value && organizer.value.mode === "cache", 
   if (!active) cacheSettingsOpen.value = false;
 });
 const searchQuery = ref(organizer.value.query);
-const initialOrganizerRetryDone = ref(false);
-const vueOrganizerMounted = ref(false);
+const organizerMain = ref<HTMLElement | null>(null);
+const gridColumns = ref(7);
+const cachePage = ref(1);
+const gridPageSize = computed(() => gridColumns.value * 3);
+const cacheTotalPages = computed(() => Math.max(1, Math.ceil(organizer.value.cachedVideos.length / gridPageSize.value)));
+const pagedCachedVideos = computed(() => organizer.value.cachedVideos.slice((cachePage.value - 1) * gridPageSize.value, cachePage.value * gridPageSize.value));
+watch(cacheTotalPages, total => { cachePage.value = Math.min(cachePage.value, total); });
+const hasCurrentFolderPage = computed(() => Boolean(organizer.value.loadedFolderId) && organizer.value.loadedFolderId === biliFavoritesState.activeFolderId);
 const openMenuId = ref("");
 const contextMenu = ref<{
   visible: boolean; x: number; y: number;
@@ -317,7 +325,7 @@ let searchPageRequestId = 0;
 let suggestRequestId = 0;
 
 watch(() => organizer.value.mode, mode => {
-  if (mode !== "organizer") closeSearchPage();
+  if (mode !== "recommendations") closeSearchPage();
 });
 
 const cachedRecommendations = ref<any[]>([]);
@@ -527,7 +535,7 @@ watch(() => [recommendationHostActive.value, workspaceSearchRequests.bilibili?.i
   if (!active || !id) return;
   const request = consumeWorkspaceSearch("bilibili");
   if (!request) return;
-  dispatch("organizer-open");
+  dispatch("open-recommendations");
   biliSearchQuery.value = request.keyword;
   onSearchSubmit();
 }, { immediate: true });
@@ -578,23 +586,47 @@ function closeVideoMenu(event: PointerEvent | KeyboardEvent): void {
 
 const isStandalone = typeof document !== "undefined" && document.body.classList.contains("bili-standalone-body");
 
-function retryOrganizerAfterMount(): void {
-  if (!vueOrganizerMounted.value || initialOrganizerRetryDone.value || organizer.value.loading) return;
-  // 确保在主页挂载后直接加载收藏夹数据
-  initialOrganizerRetryDone.value = true;
-  dispatch("organizer-open");
+function updateFavoriteColumns() {
+  const main = organizerMain.value;
+  if (!main || !main.clientWidth) return;
+  const style = getComputedStyle(main);
+  const width = main.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+  const minWidth = parseFloat(style.getPropertyValue('--favorite-card-min')) || 168;
+  const columns = favoriteGridColumns(width, minWidth);
+  if (columns !== gridColumns.value) {
+    const firstCachedIndex = (cachePage.value - 1) * gridPageSize.value;
+    gridColumns.value = columns;
+    cachePage.value = Math.floor(firstCachedIndex / gridPageSize.value) + 1;
+  }
+  if (organizer.value.mode === 'organizer') biliFavoritesController.setOrganizerColumns(columns);
+  const size = columns * 3;
+  if (organizer.value.mode === 'recommendations' && bilibiliChannelService.rcmdState.pageSize !== size) {
+    bilibiliChannelService.rcmdState.pageSize = size;
+    void bilibiliChannelService.loadRecommendations(true);
+  }
+  if (organizer.value.mode === 'following' && bilibiliChannelService.feedState.pageSize !== size) {
+    bilibiliChannelService.feedState.pageSize = size;
+    void bilibiliChannelService.loadFollowing(true);
+  }
 }
 
-watch(() => organizer.value.loading, (loading) => {
-  if (!loading && !organizer.value.folders.length) retryOrganizerAfterMount();
-});
+watch(organizerMain, (main, _old, cleanup) => {
+  if (!main) return;
+  let timer: ReturnType<typeof setTimeout>;
+  const observer = new ResizeObserver(() => {
+    clearTimeout(timer);
+    timer = setTimeout(updateFavoriteColumns, 180);
+  });
+  observer.observe(main);
+  cleanup(() => { clearTimeout(timer); observer.disconnect(); });
+}, { flush: 'post' });
+watch(() => organizer.value.loading, loading => { if (!loading) updateFavoriteColumns(); });
 
 onMounted(() => {
   void import("../services/bilibili-channel.service").catch((error) =>
     console.error("[Bilibili] 频道动作服务加载失败", error));
-  vueOrganizerMounted.value = true;
+  updateFavoriteColumns();
   void biliFavoritesController.loadOrganizer();
-  retryOrganizerAfterMount();
   document.addEventListener("pointerdown", closeVideoMenu, true);
   document.addEventListener("pointerdown", handleGlobalPointer);
   window.addEventListener("keydown", closeVideoMenu);
@@ -614,7 +646,6 @@ onBeforeUnmount(() => {
   bilibiliChannelService.setRecommendationsActive(false);
   bilibiliChannelService.setFollowingActive(false);
   bilibiliChannelService.setSubscriptionActive(false);
-  vueOrganizerMounted.value = false;
   document.removeEventListener("pointerdown", closeVideoMenu, true);
   document.removeEventListener("pointerdown", handleGlobalPointer);
   window.removeEventListener("keydown", closeVideoMenu);
@@ -631,6 +662,19 @@ function runVideoAction(idOrVideo: any, action: string): void {
 async function runContextMenuAction(action: string): Promise<void> {
   const { video, folder } = contextMenu.value;
   contextMenu.value.visible = false;
+  if (action === 'add-radio' && video) {
+    try {
+      const added = await biliRadioController.addToDefaultSeries({
+        bvid: video.bvid || (video.id.startsWith('BV') ? video.id : ''),
+        title: video.title, author: video.author, cover: video.cover,
+        duration: parseDurationToSeconds(video.duration)
+      });
+      notifications.fetch('B站电台', added ? '已添加到默认系列' : '已在默认系列中');
+    } catch {
+      notifications.fetch('B站电台', '添加失败，请重试');
+    }
+    return;
+  }
   if (action === "share-chat") {
     if (!video) return;
     try {
@@ -951,8 +995,8 @@ function onRadioVideoDragStart(event: DragEvent, video: { bvid: string; title: s
             </nav>
           </aside>
 
-          <section v-if="organizer.mode === 'organizer'" id="fo-vue-main" class="fo-bili-main">
-            <div v-if="organizer.loading && !searchPageOpen" class="fo-bili-loading"><i></i><span>正在读取 B站收藏内容…</span></div>
+          <section v-if="organizer.mode === 'organizer'" id="fo-vue-main" ref="organizerMain" class="fo-bili-main">
+            <div v-if="organizer.loading && !searchPageOpen && !hasCurrentFolderPage" class="fo-bili-loading"><i></i><span>正在读取 B站收藏内容…</span></div>
             <div v-else-if="!searchPageOpen && organizer.error && organizer.error.includes('未登录')" class="fo-bili-empty fo-bili-login-guide">
               <div class="fo-bili-login-card">
                 <span class="fo-bili-login-icon">📺</span>
@@ -964,7 +1008,7 @@ function onRadioVideoDragStart(event: DragEvent, video: { bvid: string; title: s
                 </div>
               </div>
             </div>
-            <p v-else-if="!searchPageOpen && organizer.error" class="fo-bili-empty">{{ organizer.error }}</p>
+            <p v-else-if="!searchPageOpen && organizer.error && !hasCurrentFolderPage" class="fo-bili-empty">{{ organizer.error }}</p>
             <template v-else>
               <header class="fo-bili-hero fo-hero-persistent">
                 <div class="fo-hero-left">
@@ -973,55 +1017,6 @@ function onRadioVideoDragStart(event: DragEvent, video: { bvid: string; title: s
                     <i v-else class="fo-folder-icon"></i>
                   </div>
                   <div class="fo-hero-folder-info"><h3>{{ organizer.folderTitle }}</h3><p>{{ organizer.folderSubtitle }}</p></div>
-                </div>
-
-                <!-- 🌟 居中放置的 B站搜索（带热门推荐与实时视频联想下拉浮层） -->
-                <div class="card-fullscreen-bili-search fo-hero-bili-search" ref="searchHostRef">
-                  <form class="card-fullscreen-bili-searchbar" role="search" @submit.prevent="onSearchSubmit">
-                    <input
-                      v-model="biliSearchQuery"
-                      type="search"
-                      autocomplete="off"
-                      :placeholder="t('bili.workspace.searchPlaceholder')"
-                      :aria-label="t('bili.workspace.searchAria')"
-                      @focus="onSearchFocus"
-                      @input="onSearchInputChange"
-                    />
-                    <button type="submit" :title="t('bili.workspace.searchBtnTip')">⌕</button>
-                  </form>
-
-                  <div
-                    v-if="isSearchSuggestVisible"
-                    class="card-fullscreen-bili-suggestions"
-                    role="listbox"
-                  >
-                    <div class="card-fullscreen-bili-suggest-head">
-                      <span>{{ searchSuggestHeadTitle }}</span>
-                      <small>{{ searchSuggestHeadSubtitle }}</small>
-                    </div>
-                    <p v-if="isSearchLoading" class="card-fullscreen-bili-suggest-status">正在获取推荐 / 搜索中…</p>
-                    <p v-else-if="!searchSuggestResults.length && !isSearchLoading" class="card-fullscreen-bili-suggest-status">暂无联想结果，按回车在插件内搜索</p>
-                    <template v-else>
-                      <button
-                        v-for="item in searchSuggestResults"
-                        :key="item.bvid || item.aid"
-                        type="button"
-                        class="card-fullscreen-bili-video-row"
-                        role="option"
-                        @click="openVideoItem(item)"
-                        @contextmenu.prevent="openSuggestContextMenu($event, item)"
-                      >
-                        <span class="card-fullscreen-bili-thumb">
-                          <img :src="item.cover" alt="" referrerpolicy="no-referrer" loading="lazy" />
-                          <i v-if="item.durationText">{{ item.durationText }}</i>
-                        </span>
-                        <span class="card-fullscreen-bili-video-copy">
-                          <strong>{{ item.title }}</strong>
-                          <small>{{ item.upper }} · {{ item.playText }}播放</small>
-                        </span>
-                      </button>
-                    </template>
-                  </div>
                 </div>
 
                 <div class="fo-bili-actions">
@@ -1050,40 +1045,9 @@ function onRadioVideoDragStart(event: DragEvent, video: { bvid: string; title: s
                   </button>
 
                   <button type="button" class="primary hero-action-btn" :disabled="!organizer.videos.length" @click="dispatch('organizer-batch-toggle')">{{ organizer.batchMode ? t('bili.workspace.batchBack') : t('bili.workspace.batch') }}</button>
-                  <button type="button" class="hero-action-btn btn-refresh" :title="t('bili.workspace.refreshFolderTip')" @click="dispatch('organizer-refresh')">↻</button>
                 </div>
               </header>
 
-              <template v-if="searchPageOpen">
-                <div class="fo-bili-toolbar">
-                  <div class="fo-bili-sort"><span class="fo-vue-feed-label">搜索结果：{{ searchPageKeyword }}</span></div>
-                  <div class="fo-bili-actions"><button type="button" @click="closeSearchPage">返回收藏夹</button></div>
-                </div>
-                <div v-if="searchPageLoading" class="fo-bili-loading" role="status"><i></i><span>正在搜索 B站视频…</span></div>
-                <div v-else-if="searchPageError" class="fo-bili-empty" role="alert">
-                  <p>{{ searchPageError }}</p>
-                  <button type="button" class="fo-btn" @click="loadSearchPage(searchPageKeyword, searchPageNumber)">重试</button>
-                </div>
-                <template v-else>
-                  <div class="fo-bili-grid">
-                    <p v-if="!searchPageResults.length" class="fo-bili-empty">没有找到相关视频，换个关键词试试。</p>
-                    <article v-for="item in searchPageResults" :key="item.bvid || item.aid" class="fo-bili-card" @contextmenu.prevent.stop="openSuggestContextMenu($event, item)">
-                      <div class="fo-bili-thumb">
-                        <a class="fo-cover-link" :href="`https://www.bilibili.com/video/${item.bvid || `av${item.aid}`}`" @click.prevent="openVideoItem(item)"><img loading="lazy" decoding="async" referrerpolicy="no-referrer" :src="item.cover" alt="" /></a>
-                        <span class="fo-bili-count">▣ {{ item.playText }}</span><span class="fo-bili-duration">{{ item.durationText }}</span>
-                      </div>
-                      <div class="fo-bili-title-row"><a class="fo-title-link fo-bili-title" :href="`https://www.bilibili.com/video/${item.bvid || `av${item.aid}`}`" @click.prevent="openVideoItem(item)">{{ item.title }}</a></div>
-                      <div class="fo-bili-meta"><span>{{ item.upper }}</span></div>
-                    </article>
-                  </div>
-                  <div v-if="searchPageNumber > 1 || searchPageHasNext" class="fo-pager">
-                    <button type="button" class="fo-btn" :disabled="searchPageNumber <= 1" @click="loadSearchPage(searchPageKeyword, searchPageNumber - 1)">‹ 上一页</button>
-                    <span class="fo-page-num">{{ searchPageNumber }}{{ searchPageTotal ? ` / ${searchPageTotal}` : '' }}</span>
-                    <button type="button" class="fo-btn" :disabled="!searchPageHasNext" @click="loadSearchPage(searchPageKeyword, searchPageNumber + 1)">下一页 ›</button>
-                  </div>
-                </template>
-              </template>
-              <template v-else>
               <div class="fo-bili-toolbar">
                 <div v-if="!organizer.batchMode" class="fo-bili-sort">
                   <button v-for="item in [{ id: 'fav_time', text: t('bili.sort.favTime') }, { id: 'view', text: t('bili.sort.view') }, { id: 'pubtime', text: t('bili.sort.pubTime') }]" :key="item.id" type="button" :class="{ on: organizer.sort === item.id }" @click="dispatch('organizer-sort', item.id)">{{ item.text }}</button>
@@ -1152,7 +1116,8 @@ function onRadioVideoDragStart(event: DragEvent, video: { bvid: string; title: s
                 </div>
               </div>
 
-              <div class="fo-bili-grid">
+              <p v-if="organizer.error" class="muted small" role="status">{{ organizer.error }}</p>
+              <div class="fo-bili-grid fo-favorites-grid" :style="{ '--favorite-columns': organizer.pageSize / 3 }" :aria-busy="organizer.loading">
                 <p v-if="!organizer.videos.length" class="fo-bili-empty">{{ organizer.query ? '没有找到匹配的视频。' : '这个收藏夹是空的。' }}</p>
                 <article v-for="video in organizer.videos" :key="video.id" class="fo-bili-card" :class="{ 'batch-selected': video.selected, 'fo-single-moving': organizer.movingVideoId === video.id }" :data-batch-id="video.id" draggable="true" @dragstart="beginVideoDrag($event, video)" @contextmenu.prevent.stop="openVideoContextMenu($event, video)">
                   <div class="fo-bili-thumb">
@@ -1182,14 +1147,13 @@ function onRadioVideoDragStart(event: DragEvent, video: { bvid: string; title: s
 
               <!-- 底部纯净居中翻页器 (图 2 标准样式，居中纯净排布) -->
               <div v-if="organizer.totalPages > 1" class="fo-pager">
-                <button type="button" class="fo-btn" :disabled="organizer.page <= 1" @click="dispatch('organizer-page', organizer.page - 1)">‹ 上一页</button>
+                <button type="button" class="fo-btn" :disabled="organizer.loading || organizer.page <= 1" @click="dispatch('organizer-page', organizer.page - 1)">‹ 上一页</button>
                 <span class="fo-page-num">{{ organizer.page }} / {{ organizer.totalPages }}</span>
-                <button type="button" class="fo-btn" :disabled="organizer.page >= organizer.totalPages" @click="dispatch('organizer-page', organizer.page + 1)">下一页 ›</button>
+                <button type="button" class="fo-btn" :disabled="organizer.loading || organizer.page >= organizer.totalPages" @click="dispatch('organizer-page', organizer.page + 1)">下一页 ›</button>
               </div>
-              </template>
             </template>
           </section>
-          <section v-else-if="organizer.mode === 'cache'" id="fo-vue-cache-main" class="fo-bili-main">
+          <section v-else-if="organizer.mode === 'cache'" id="fo-vue-cache-main" ref="organizerMain" class="fo-bili-main">
             <BiliCacheSettingsView v-if="cacheSettingsOpen" :active="recommendationHostActive" @back="cacheSettingsOpen = false" />
             <template v-else>
             <header class="fo-bili-hero fo-hero-persistent fo-cached-hero">
@@ -1197,26 +1161,106 @@ function onRadioVideoDragStart(event: DragEvent, video: { bvid: string; title: s
               <div class="fo-bili-actions"><button type="button" class="primary" @click="dispatch('organizer-open')">返回收藏夹</button><button type="button" @click="cacheSettingsOpen = true">缓存设置</button></div>
             </header>
             <div v-if="organizer.cacheLoading" class="fo-bili-loading"><i></i><span>正在读取本地缓存…</span></div>
-            <div v-else class="fo-bili-grid fo-cached-video-grid">
+            <div v-else class="fo-bili-grid fo-favorites-grid fo-cached-video-grid" :style="{ '--favorite-columns': gridColumns }">
               <p v-if="!organizer.cachedVideos.length" class="fo-bili-empty">还没有缓存视频。可从视频卡片的“更多操作”中选择“缓存视频”。</p>
-              <article v-for="item in organizer.cachedVideos" :key="item.id" class="fo-bili-card fo-cached-video-card">
+              <article v-for="item in pagedCachedVideos" :key="item.id" class="fo-bili-card fo-cached-video-card">
                 <div class="fo-bili-thumb"><button class="fo-cached-play" type="button" @click="dispatch('cache-play', item.id)"><img loading="lazy" referrerpolicy="no-referrer" :src="item.cover" alt="" /><span class="fo-cached-local-badge">LOCAL</span></button></div>
                 <div class="fo-bili-title-row"><button class="fo-title-link fo-bili-title fo-cached-title" type="button" @click="dispatch('cache-play', item.id)">{{ item.title }}</button><button class="fo-card-more" type="button" aria-label="删除缓存" @click="dispatch('cache-delete', item.id)">×</button></div>
                 <div class="fo-bili-meta"><span>{{ item.sizeText }}</span><span>缓存于 {{ item.cachedDate }}</span></div>
               </article>
             </div>
+            <div v-if="cacheTotalPages > 1" class="fo-pager"><button type="button" class="fo-btn" :disabled="cachePage <= 1" @click="cachePage--">‹ 上一页</button><span class="fo-page-num">{{ cachePage }} / {{ cacheTotalPages }}</span><button type="button" class="fo-btn" :disabled="cachePage >= cacheTotalPages" @click="cachePage++">下一页 ›</button></div>
             </template>
           </section>
-          <section v-else-if="organizer.mode === 'recommendations'" id="fo-vue-recommend-main" class="fo-bili-main">
+          <section v-else-if="organizer.mode === 'recommendations'" id="fo-vue-recommend-main" ref="organizerMain" class="fo-bili-main">
             <header class="fo-bili-hero">
               <div class="fo-bili-cover fo-vue-recommend-cover"><span>✨</span></div>
-              <div class="fo-bili-heading"><div class="fo-feed-hero-title"><h3>{{ organizer.specialTitle }}</h3><span class="fo-feed-badge">{{ organizer.specialBadge }}</span></div><p>{{ organizer.specialSubtitle }}</p></div>
-              <div class="fo-bili-actions"><button type="button" class="primary" :disabled="!organizer.specialVideos.length" @click="dispatch('special-play-page')">▶ 播放本页</button><button type="button" @click="dispatch('recommendations-refresh')">↻ 换一批</button><button type="button" @click="dispatch('organizer-open')">返回收藏夹</button></div>
+              <div class="fo-bili-heading"><div class="fo-feed-hero-title"><h3>{{ organizer.specialTitle }}</h3></div><p>{{ organizer.specialSubtitle }}</p></div>
+                <!-- 🌟 居中放置的 B站搜索（带热门推荐与实时视频联想下拉浮层） -->
+                <div class="card-fullscreen-bili-search fo-hero-bili-search" ref="searchHostRef">
+                  <form class="card-fullscreen-bili-searchbar" role="search" @submit.prevent="onSearchSubmit">
+                    <input
+                      v-model="biliSearchQuery"
+                      type="search"
+                      autocomplete="off"
+                      :placeholder="t('bili.workspace.searchPlaceholder')"
+                      :aria-label="t('bili.workspace.searchAria')"
+                      @focus="onSearchFocus"
+                      @input="onSearchInputChange"
+                    />
+                    <button type="submit" :title="t('bili.workspace.searchBtnTip')">⌕</button>
+                  </form>
+
+                  <div
+                    v-if="isSearchSuggestVisible"
+                    class="card-fullscreen-bili-suggestions"
+                    role="listbox"
+                  >
+                    <div class="card-fullscreen-bili-suggest-head">
+                      <span>{{ searchSuggestHeadTitle }}</span>
+                      <small>{{ searchSuggestHeadSubtitle }}</small>
+                    </div>
+                    <p v-if="isSearchLoading" class="card-fullscreen-bili-suggest-status">正在获取推荐 / 搜索中…</p>
+                    <p v-else-if="!searchSuggestResults.length && !isSearchLoading" class="card-fullscreen-bili-suggest-status">暂无联想结果，按回车在插件内搜索</p>
+                    <template v-else>
+                      <button
+                        v-for="item in searchSuggestResults"
+                        :key="item.bvid || item.aid"
+                        type="button"
+                        class="card-fullscreen-bili-video-row"
+                        role="option"
+                        @click="openVideoItem(item)"
+                        @contextmenu.prevent="openSuggestContextMenu($event, item)"
+                      >
+                        <span class="card-fullscreen-bili-thumb">
+                          <img :src="item.cover" alt="" referrerpolicy="no-referrer" loading="lazy" />
+                          <i v-if="item.durationText">{{ item.durationText }}</i>
+                        </span>
+                        <span class="card-fullscreen-bili-video-copy">
+                          <strong>{{ item.title }}</strong>
+                          <small>{{ item.upper }} · {{ item.playText }}播放</small>
+                        </span>
+                      </button>
+                    </template>
+                  </div>
+                </div>
+
+              <div class="fo-bili-actions"><button type="button" @click="dispatch('organizer-open')">返回收藏夹</button></div>
             </header>
+              <template v-if="searchPageOpen">
+                <div class="fo-bili-toolbar">
+                  <div class="fo-bili-sort"><span class="fo-vue-feed-label">搜索结果：{{ searchPageKeyword }}</span></div>
+                  <div class="fo-bili-actions"><button type="button" @click="closeSearchPage">返回个性推荐</button></div>
+                </div>
+                <div v-if="searchPageLoading" class="fo-bili-loading" role="status"><i></i><span>正在搜索 B站视频…</span></div>
+                <div v-else-if="searchPageError" class="fo-bili-empty" role="alert">
+                  <p>{{ searchPageError }}</p>
+                  <button type="button" class="fo-btn" @click="loadSearchPage(searchPageKeyword, searchPageNumber)">重试</button>
+                </div>
+                <template v-else>
+                  <div class="fo-bili-grid">
+                    <p v-if="!searchPageResults.length" class="fo-bili-empty">没有找到相关视频，换个关键词试试。</p>
+                    <article v-for="item in searchPageResults" :key="item.bvid || item.aid" class="fo-bili-card" @contextmenu.prevent.stop="openSuggestContextMenu($event, item)">
+                      <div class="fo-bili-thumb">
+                        <a class="fo-cover-link" :href="`https://www.bilibili.com/video/${item.bvid || `av${item.aid}`}`" @click.prevent="openVideoItem(item)"><img loading="lazy" decoding="async" referrerpolicy="no-referrer" :src="item.cover" alt="" /></a>
+                        <span class="fo-bili-count">▣ {{ item.playText }}</span><span class="fo-bili-duration">{{ item.durationText }}</span>
+                      </div>
+                      <div class="fo-bili-title-row"><a class="fo-title-link fo-bili-title" :href="`https://www.bilibili.com/video/${item.bvid || `av${item.aid}`}`" @click.prevent="openVideoItem(item)">{{ item.title }}</a></div>
+                      <div class="fo-bili-meta"><span>{{ item.upper }}</span></div>
+                    </article>
+                  </div>
+                  <div v-if="searchPageNumber > 1 || searchPageHasNext" class="fo-pager">
+                    <button type="button" class="fo-btn" :disabled="searchPageNumber <= 1" @click="loadSearchPage(searchPageKeyword, searchPageNumber - 1)">‹ 上一页</button>
+                    <span class="fo-page-num">{{ searchPageNumber }}{{ searchPageTotal ? ` / ${searchPageTotal}` : '' }}</span>
+                    <button type="button" class="fo-btn" :disabled="!searchPageHasNext" @click="loadSearchPage(searchPageKeyword, searchPageNumber + 1)">下一页 ›</button>
+                  </div>
+                </template>
+              </template>
+              <template v-else>
             <div class="fo-bili-toolbar"><div class="fo-bili-sort"><span class="fo-vue-feed-label">🔥 猜你喜欢与热门精选</span></div><div class="fo-feed-count-tag">本页共 {{ organizer.specialVideos.length }} 个视频</div></div>
             <div v-if="organizer.specialLoading" class="fo-bili-loading"><i></i><span>正在加载个性化推荐视频…</span></div>
             <p v-else-if="organizer.specialError" class="fo-bili-empty">{{ organizer.specialError }}</p>
-            <div v-else class="fo-bili-grid">
+            <div v-else class="fo-bili-grid fo-favorites-grid" :style="{ '--favorite-columns': gridColumns }">
               <p v-if="!organizer.specialVideos.length" class="fo-bili-empty">暂无推荐视频。</p>
               <article v-for="video in organizer.specialVideos" :key="video.id" class="fo-bili-card" draggable="true" @dragstart="beginVideoDrag($event, video)">
                 <div class="fo-bili-thumb"><a class="fo-cover-link" :href="video.url" target="_blank" rel="noreferrer" @click.prevent="dispatch('special-play-video', video)"><img loading="lazy" decoding="async" referrerpolicy="no-referrer" :src="video.cover ? video.cover.replace(/^http:/, 'https:') : ''" alt="" /></a><span class="fo-bili-count">▣ {{ video.playCount }}</span><span class="fo-bili-duration">{{ video.duration }}</span></div>
@@ -1237,17 +1281,19 @@ function onRadioVideoDragStart(event: DragEvent, video: { bvid: string; title: s
                 </div>
               </article>
             </div>
+            <div class="fo-pager"><button type="button" class="fo-btn" :disabled="organizer.specialLoading || organizer.specialPage <= 1" @click="dispatch('recommendations-page', organizer.specialPage - 1)">‹ 上一页</button><span class="fo-page-num">第 {{ organizer.specialPage }} 页</span><button type="button" class="fo-btn" :disabled="organizer.specialLoading" @click="dispatch('recommendations-page', organizer.specialPage + 1)">下一页 ›</button></div>
+            </template>
           </section>
-          <section v-else-if="organizer.mode === 'following'" id="fo-vue-following-main" class="fo-bili-main">
-            <header class="fo-bili-hero">
+          <section v-else-if="organizer.mode === 'following'" id="fo-vue-following-main" ref="organizerMain" class="fo-bili-main">
+            <header class="fo-bili-hero fo-following-hero">
               <div class="fo-bili-cover fo-vue-following-cover"><span>📺</span></div>
-              <div class="fo-bili-heading"><div class="fo-feed-hero-title"><h3>{{ organizer.specialTitle }}</h3><span class="fo-feed-badge">{{ organizer.specialBadge }}</span></div><p>{{ organizer.specialSubtitle }}</p></div>
-              <div class="fo-bili-actions"><button type="button" class="primary" :disabled="!organizer.specialVideos.length" @click="dispatch('special-play-page')">▶ 播放本页</button><button type="button" @click="dispatch('following-refresh')">↻</button><button type="button" @click="dispatch('organizer-open')">返回收藏夹</button></div>
+              <div class="fo-bili-heading"><div class="fo-feed-hero-title"><h3>{{ organizer.specialTitle }}</h3><span v-if="organizer.specialBadge !== `第 ${organizer.specialPage} 页`" class="fo-feed-badge">{{ organizer.specialBadge }}</span></div><p>{{ organizer.specialSubtitle }}</p></div>
+              <div class="fo-up-groups-bar">
+                <div class="fo-up-groups-list" @wheel="onFollowingGroupsWheel"><button v-for="group in organizer.followingGroups" :key="group.id" type="button" class="fo-up-group-chip" :class="{ active: group.active }" @click="dispatch('following-group', group.id)">{{ group.child ? '↳ ' : '' }}{{ group.name }} <small class="count">{{ group.count }}</small></button></div>
+                <div class="fo-up-groups-actions"><button type="button" @click="dispatch('following-manage-groups', 'create')">＋ 新建分组</button><button type="button" @click="dispatch('following-manage-groups', 'manage')">⚙️ 管理分组</button></div>
+              </div>
+              <div class="fo-bili-actions"><button type="button" @click="dispatch('organizer-open')">返回收藏夹</button></div>
             </header>
-            <div class="fo-up-groups-bar">
-              <div class="fo-up-groups-list"><button v-for="group in organizer.followingGroups" :key="group.id" type="button" class="fo-up-group-chip" :class="{ active: group.active }" @click="dispatch('following-group', group.id)">{{ group.child ? '↳ ' : '' }}{{ group.name }} <small class="count">{{ group.count }}</small></button></div>
-              <div class="fo-up-groups-actions"><button type="button" @click="dispatch('following-manage-groups', 'create')">＋ 新建分组</button><button type="button" @click="dispatch('following-manage-groups', 'manage')">⚙️ 管理分组</button></div>
-            </div>
             <div v-if="organizer.followingMembers.length" class="fo-up-members-strip">
               <div class="fo-up-members-label"><b>{{ organizer.specialBadge }}</b><small>共 {{ organizer.followingMembers.length }} 位 UP 主</small></div>
               <div class="fo-up-members-list"><button type="button" class="fo-up-member-chip" :class="{ active: !organizer.followingMembers.some(item => item.active) }" @click="dispatch('following-member', '')">全部UP</button><button v-for="member in organizer.followingMembers" :key="member.id" type="button" class="fo-up-member-chip" :class="{ active: member.active }" :title="`左键筛选「${member.name}」，右键预览近期投稿`" @click="dispatch('following-member', member.id)" @contextmenu.prevent="dispatch('following-preview-member', { id: member.id, clientX: $event.clientX, clientY: $event.clientY })"><img v-if="member.face" loading="lazy" referrerpolicy="no-referrer" :src="member.face" alt="" /><span>{{ member.name }}</span></button></div>
@@ -1256,7 +1302,7 @@ function onRadioVideoDragStart(event: DragEvent, video: { bvid: string; title: s
             <div class="fo-bili-toolbar"><div class="fo-bili-sort"><span class="fo-vue-feed-label">⚡ UP 主最新投稿动态</span></div><div class="fo-feed-count-tag">本页共 {{ organizer.specialVideos.length }} 个视频</div></div>
             <div v-if="organizer.specialLoading" class="fo-bili-loading"><i></i><span>正在读取关注 UP 主更新…</span></div>
             <p v-else-if="organizer.specialError" class="fo-bili-empty">{{ organizer.specialError }}</p>
-            <div v-else class="fo-bili-grid">
+            <div v-else class="fo-bili-grid fo-favorites-grid" :style="{ '--favorite-columns': gridColumns }">
               <p v-if="!organizer.specialVideos.length" class="fo-bili-empty">暂无最新关注视频动态。</p>
               <article v-for="video in organizer.specialVideos" :key="video.id" class="fo-bili-card" draggable="true" @dragstart="beginVideoDrag($event, video)">
                 <div class="fo-bili-thumb"><a class="fo-cover-link" :href="video.url" target="_blank" rel="noreferrer" @click.prevent="dispatch('special-play-video', video)"><img loading="lazy" decoding="async" referrerpolicy="no-referrer" :src="video.cover" alt="" /></a><span class="fo-bili-count">▣ {{ video.playCount }}</span><span class="fo-bili-duration">{{ video.duration }}</span></div>
@@ -1278,6 +1324,7 @@ function onRadioVideoDragStart(event: DragEvent, video: { bvid: string; title: s
               <BiliSubscriptionHeader show-back />
               <div v-if="organizer.subscriptionLoading" class="fo-bili-loading"><i></i><span>正在读取订阅视频与 AI 字幕稿…</span></div>
               <p v-else-if="organizer.subscriptionError" class="fo-bili-empty">读取失败：{{ organizer.subscriptionError }}</p>
+              <div v-else-if="!organizer.subscriptionChannels.length" class="fo-bili-empty">还没有订阅的 UP 主。 <button type="button" class="fo-btn" @click="dispatch('subscription-add-channel')">添加 UP 主</button></div>
               <div v-else class="bili-sub-layout bili-sub-vue-layout">
                 <BiliSubscriptionPlayer />
                 <BiliSubscriptionTranscript />
@@ -1294,7 +1341,6 @@ function onRadioVideoDragStart(event: DragEvent, video: { bvid: string; title: s
                 </div>
               </div>
               <div class="fo-bili-actions">
-                <button type="button" class="primary" @click="dispatch('radio-refresh')">↻ 刷新电台</button>
                 <button type="button" @click="dispatch('organizer-open')">返回收藏夹</button>
               </div>
             </header>
@@ -1469,6 +1515,9 @@ function onRadioVideoDragStart(event: DragEvent, video: { bvid: string; title: s
       <button type="button" class="fo-context-item" @click="runContextMenuAction('cache')">
         <span class="fo-context-icon">💾</span> 缓存视频
       </button>
+      <button type="button" class="fo-context-item" @click="runContextMenuAction('add-radio')">
+        <span class="fo-context-icon">📻</span> 添加到电台
+      </button>
       <div class="fo-context-divider"></div>
       <button type="button" class="fo-context-item" @click="runContextMenuAction('create-task')">
         <span class="fo-context-icon">📋</span> 创建任务
@@ -1478,10 +1527,7 @@ function onRadioVideoDragStart(event: DragEvent, video: { bvid: string; title: s
       </button>
     </div>
 
-    <!-- 🌟 全局独立自由浮动台词胶囊栏 (支持用户任意拖拽摆放) -->
-    <Teleport to="body">
-      <BiliVideoLyricDockBar />
-    </Teleport>
+
   </section>
 </template>
 

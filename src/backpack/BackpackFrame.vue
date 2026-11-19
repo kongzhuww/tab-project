@@ -1,11 +1,5 @@
-<script setup lang="ts">
-import AppWindowFrame from '../core/AppWindowFrame.vue';
-defineOptions({ inheritAttrs:false });
-defineProps<{ embedded?:boolean; windowId:string; title:string }>();
-const emit=defineEmits<{close:[];minimize:[]}>();
-</script>
 <template>
-  <section v-if="embedded" class="backpack-embedded" aria-label="AI 工作区资料库">
+  <section class="backpack-embedded" aria-label="AI 工作区资料库">
     <header class="backpack-embedded-header">
       <div class="backpack-embedded-brand">
         <h2>资料库</h2>
@@ -15,10 +9,6 @@ const emit=defineEmits<{close:[];minimize:[]}>();
     </header>
     <slot />
   </section>
-  <AppWindowFrame v-else v-bind="$attrs" :window-id="windowId" :title="title" @close="emit('close')" @minimize="emit('minimize')">
-    <template #header-actions><slot name="header-actions" /></template>
-    <slot />
-  </AppWindowFrame>
 </template>
 <style scoped>
 .backpack-embedded{height:100%;min-height:0;display:flex;flex-direction:column;overflow:hidden;background:transparent;color:var(--text,#1e293b)}

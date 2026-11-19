@@ -533,19 +533,6 @@ onUnmounted(() => {
             >›</button>
           </div>
 
-          <!-- 刷新按钮 -->
-          <button
-            type="button"
-            class="shelf-btn-refresh"
-            title="刷新 Star 列表"
-            :disabled="isLoading"
-            :aria-busy="isLoading"
-            @click="gitHubService.refreshRepositories()"
-          >
-            <span :class="{ spinning: isLoading }">🔄</span>
-            <span>{{ isLoading ? '读取中…' : '刷新' }}</span>
-          </button>
-
           <!-- 折叠切换 -->
           <button
             v-if="controller.filteredUncatRepos.length"

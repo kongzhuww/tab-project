@@ -203,7 +203,7 @@ async function extractPreviewData(
             base64 = await blobToBase64(file);
           } catch (_) {}
         }
-        return { previewUrl: url, previewBase64: base64 || url };
+        return { previewUrl: url, previewBase64: base64 || undefined };
       }
     } catch (_) {
       // 当前候选名不存在，继续尝试下一个

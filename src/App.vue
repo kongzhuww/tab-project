@@ -3,7 +3,6 @@
   <div id="logicweaver-spa-root" class="logicweaver-spa-root" :data-active-workspace="activeWorkspaceId || ''">
     <!-- 纯血 SPA 统一单根声明式布局树 (Declarative Layout Architecture) -->
     <!-- 1. 顶部状态与工作区工具条 -->
-    <AppTopBar />
 
     <!-- 2. 首屏启动器、时钟、搜索与常用分组架 -->
     <AppLauncher />
@@ -24,7 +23,6 @@
 
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, watch } from "vue";
-import AppTopBar from "./layout/AppTopBar.vue";
 import AppLauncher from "./layout/AppLauncher.vue";
 import AppWorkspaces from "./layout/AppWorkspaces.vue";
 import MacDock from "./dock/MacDock.vue";

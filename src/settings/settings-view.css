@@ -314,6 +314,7 @@
 }
 
 /* 表单网格 */
+.settings-view-root .settings-quick-help { display:inline-grid; width:15px; height:15px; place-items:center; border:1px solid var(--border); border-radius:50%; color:var(--muted); font-size:10px; font-weight:600; cursor:help; }
 .settings-view-root .module-toggles {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
@@ -461,6 +462,18 @@ html[data-theme="dark"] .settings-view-root .switch {
   padding: 2px 6px;
   border-radius: 999px;
 }
+
+.settings-view-root .transparency-actions { display:flex; gap:6px; }
+.settings-view-root .transparency-batch { padding:12px; margin-bottom:10px; border:1px solid var(--border); border-radius:10px; background:var(--surface); }
+.settings-view-root .transparency-batch-options { display:flex; flex-wrap:wrap; gap:10px 16px; margin-bottom:10px; }
+.settings-view-root .transparency-batch-options label { display:flex; align-items:center; gap:4px; font-size:11px; }
+.settings-view-root .transparency-batch-controls { display:flex; align-items:center; flex-wrap:wrap; gap:7px; }
+.settings-view-root .transparency-batch-controls input[type="range"] { width:130px; }
+.settings-view-root .transparency-batch-controls input[type="number"] { width:48px; padding:4px; border:1px solid var(--border); border-radius:5px; color:var(--text); background:var(--panel); }
+.settings-view-root .transparency-value { display: inline-flex; align-items: center; gap: 1px; color: #8b5cf6; background: rgba(167, 139, 250, .1); padding: 2px 6px; border-radius: 999px; font-size: 10px; }
+.settings-view-root .transparency-value input { width: 32px; padding: 0; border: 0; outline: none; background: transparent; color: inherit; font: inherit; text-align: right; }
+.settings-view-root .transparency-value input:focus { outline: 1px solid #8b5cf6; border-radius: 2px; }
+.settings-view-root .transparency-value input::-webkit-inner-spin-button { appearance: none; }
 
 .settings-view-root .field input[type="text"],
 .settings-view-root .field input[type="password"],

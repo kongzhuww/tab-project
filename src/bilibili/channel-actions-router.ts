@@ -138,7 +138,8 @@ export function bindChannelFavoritesActions(target: ChannelActionsTarget): void 
           break;
         case "subscription-load-more": {
           if (target.subState.loading) break;
-          const key = target.subState.channelKey || "shana";
+          const key = target.subState.channelKey;
+          if (!key) break;
           const visibleCount = Math.max(3, Number(target.subState.visibleCounts[key] || 3)) + 3;
           void target.loadSubVideo(true, { visibleCount });
           break;

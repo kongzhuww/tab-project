@@ -1,9 +1,11 @@
 import {
   DIGITAL_EMPLOYEES_KEY,
+  DIGITAL_EMPLOYEE_ORGANIZER_SEEDED_KEY,
   EMPLOYEE_LIVE_PEEK_KEY,
   EMPLOYEE_RUN_LOG_KEY,
   EMPLOYEE_WORKER_STAMP,
   createDefaultBiliEmployee,
+  createDefaultOrganizerEmployee,
   localDayKey,
   normalizeEmployee,
   safeEmployeesList,
@@ -12,12 +14,24 @@ import {
   type EmployeeFeedbackExample,
   type EmployeePeekSnapshot,
   type EmployeeRunRecord,
+  type OrganizerPlanStep,
 } from '../agents/employee-contract';
 import { evaluateWithDecisionGate, passesDecisionGate } from '../agents/decision-engine';
 import { runAutonomousEmployeeAnalysis } from '../agents/employee-tools';
+import {
+  applyOrganizerPlanStep,
+  buildHeuristicOrganizerFallback,
+  buildOrganizerPlanPrompt,
+  parseOrganizerPlanResponse,
+  readOrganizerWorkspaceSnapshot,
+  bindOrganizerPlan,
+  undoOrganizerPlanStep,
+} from '../agents/workspace-organizer';
 import { saveArticleFromBackground } from '../backpack/article.service';
 import { publishAiNotification } from '../multica/ai-notifications';
 import { bilibiliService } from '../services/bilibili.service';
+import { loadConfig, streamOpenAiCompatible } from '../services/byok.service';
+import { pingNativeHost, runLocalAgent } from '../services/native-bridge.service';
 
 declare const chrome: any;
 
@@ -32,13 +46,24 @@ function serial<T>(fn: () => Promise<T>): Promise<T> {
 }
 
 async function readEmployees(): Promise<DigitalEmployee[]> {
-  const stored = await chrome.storage.local.get(DIGITAL_EMPLOYEES_KEY);
+  const stored = await chrome.storage.local.get([DIGITAL_EMPLOYEES_KEY, DIGITAL_EMPLOYEE_ORGANIZER_SEEDED_KEY]);
   if (stored[DIGITAL_EMPLOYEES_KEY] === undefined) {
-    const initial = [createDefaultBiliEmployee()];
-    await chrome.storage.local.set({ [DIGITAL_EMPLOYEES_KEY]: initial });
+    const initial = [createDefaultBiliEmployee(), createDefaultOrganizerEmployee()];
+    await chrome.storage.local.set({
+      [DIGITAL_EMPLOYEES_KEY]: initial,
+      [DIGITAL_EMPLOYEE_ORGANIZER_SEEDED_KEY]: true,
+    });
     return initial;
   }
-  return safeEmployeesList(stored[DIGITAL_EMPLOYEES_KEY]);
+  const list = safeEmployeesList(stored[DIGITAL_EMPLOYEES_KEY]);
+  if (!stored[DIGITAL_EMPLOYEE_ORGANIZER_SEEDED_KEY]) {
+    if (list.length < 40 && !list.some(e => e.source.kind === 'workspace-organizer')) {
+      list.unshift(createDefaultOrganizerEmployee());
+      await writeEmployees(list);
+    }
+    await chrome.storage.local.set({ [DIGITAL_EMPLOYEE_ORGANIZER_SEEDED_KEY]: true });
+  }
+  return list;
 }
 
 async function writeEmployees(items: DigitalEmployee[]): Promise<void> {
@@ -51,6 +76,7 @@ async function readRuns(): Promise<EmployeeRunRecord[]> {
 }
 
 async function writeRuns(runs: EmployeeRunRecord[]): Promise<void> {
+  for (const run of runs) if (run.kind === 'organizer') run.organizerRevision = (run.organizerRevision || 0) + 1;
   const pruned = runs.slice(0, 120).map((item, idx) =>
     idx < 8 ? item : { ...item, peekFrames: undefined }
   );
@@ -91,6 +117,189 @@ function summarizeReportLine(markdown: string, fallback: string): string {
   return (clean || fallback).slice(0, 180);
 }
 
+function organizerDwell(ms: number): Promise<void> {
+  const isBrowser = typeof navigator !== 'undefined' && /Mozilla/i.test(navigator.userAgent || '');
+  if (!isBrowser || ms <= 0) return Promise.resolve();
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function executeOrganizerForEmployee(
+  emp: DigitalEmployee
+): Promise<{ status: 'processed' | 'idle' | 'limit' | 'error'; record?: EmployeeRunRecord; message: string }> {
+  if (!(['launcher.read', 'bookmarks.read', 'organizer.plan'] as const).every(skill => emp.skills.includes(skill))) throw new Error('整理专员需要启用桌面读取、书签读取和整理提案三项能力；未读取或发送工作区数据。');
+  const now = Date.now();
+  const startedAt = now;
+  const peekFrames: EmployeePeekSnapshot[] = [];
+  let peekState: EmployeePeekSnapshot = {
+    employeeId: emp.id,
+    employeeName: emp.name,
+    mode: 'organizer',
+    bvid: `org-${now}`,
+    active: true,
+    phase: 'source',
+    cursorTarget: 'org-partitions',
+    cursorLabel: '只读盘点桌面分区、大/紧凑文件夹与常用网站…',
+    sourceKind: 'workspace-organizer',
+    sourceTitle: '桌面分区 + 浏览器书签',
+    sourceVideos: [],
+    toolHistory: [],
+    timelineSteps: ['只读盘点桌面分区、大/紧凑文件夹与常用网站…'],
+    updatedAt: Date.now(),
+  };
+
+  const emitPeek = async (patch: Partial<EmployeePeekSnapshot>, recordFrame = true, dwellMs = 0) => {
+    const prevSteps = peekState.timelineSteps || [];
+    const nextLabel = patch.cursorLabel || peekState.cursorLabel;
+    const timelineSteps =
+      nextLabel && prevSteps[prevSteps.length - 1] !== nextLabel
+        ? [...prevSteps.slice(-39), nextLabel]
+        : prevSteps;
+    peekState = {
+      ...peekState,
+      ...patch,
+      timelineSteps,
+      updatedAt: Date.now(),
+    };
+    if (recordFrame) {
+      // The organizer run keeps one full baseline; replay frames need only progress metadata.
+      peekFrames.push(JSON.parse(JSON.stringify({ ...peekState, organizerSnapshot: undefined, organizerSteps: undefined })));
+    }
+    await publishLivePeek(peekState);
+    if (dwellMs > 0) await organizerDwell(dwellMs);
+  };
+
+  await emitPeek({}, true, 220);
+
+  const snapshot = await readOrganizerWorkspaceSnapshot();
+  await emitPeek({
+    phase: 'info',
+    cursorTarget: 'org-bookmarks',
+    cursorLabel: `已盘点 ${snapshot.partitions.length} 个分区、${snapshot.folders.length} 个文件夹、${snapshot.links.length} 个网站与 ${snapshot.bookmarks.length} 条书签`,
+    organizerSnapshot: snapshot,
+    toolHistory: [
+      { tool: 'launcher_read_tree', summary: `读取 ${snapshot.partitions.length} 分区 · ${snapshot.links.length} 网站`, ok: true },
+      { tool: 'bookmarks_read_tree', summary: `读取 ${snapshot.bookmarkFolders.length} 目录 · ${snapshot.bookmarks.length} 书签`, ok: true },
+    ],
+  }, true, 260);
+
+  await emitPeek({
+    phase: 'analyzing',
+    cursorTarget: 'org-approval',
+    cursorLabel: '正在生成分步整理提案…',
+  }, true);
+
+  let planSummary = '';
+  let planSteps: OrganizerPlanStep[] = [];
+  let usedEngine: EmployeeRunRecord['engine'] = 'heuristic';
+  const promptText = buildOrganizerPlanPrompt(emp, snapshot);
+
+  const config = await loadConfig();
+  if (emp.runtime.analyzer === 'native-pi') {
+    try {
+      const res = await runLocalAgent({
+        agentId: 'pi',
+        model: emp.runtime.piModel || undefined,
+        thinking: emp.runtime.piThinking || 'medium',
+        toolsEnabled: false,
+        timeoutMs: 180_000,
+        prompt: promptText,
+      });
+      const parsed = parseOrganizerPlanResponse(res.text || '', snapshot);
+      planSummary = parsed.summary;
+      planSteps = parsed.steps;
+      usedEngine = 'pi';
+    } catch {
+      if (config.configured && config.model) {
+        let out = '';
+        await streamOpenAiCompatible(config, config.model, [{ role: 'user', content: promptText }], AbortSignal.timeout(120_000), t => { out += t; });
+        const parsed = parseOrganizerPlanResponse(out, snapshot);
+        planSummary = parsed.summary;
+        planSteps = parsed.steps;
+        usedEngine = 'deepseek';
+      }
+    }
+  } else if (config.configured && config.model) {
+    let out = '';
+    await streamOpenAiCompatible(config, config.model, [{ role: 'user', content: promptText }], AbortSignal.timeout(120_000), t => { out += t; });
+    const parsed = parseOrganizerPlanResponse(out, snapshot);
+    planSummary = parsed.summary;
+    planSteps = parsed.steps;
+    usedEngine = 'deepseek';
+  } else {
+    const ping = await pingNativeHost().catch(() => null);
+    const chosen = ping?.agents?.find(a => a.installed);
+    if (chosen) {
+      const res = await runLocalAgent({
+        agentId: chosen.id,
+        model: emp.runtime.piModel || undefined,
+        thinking: emp.runtime.piThinking || 'medium',
+        toolsEnabled: false,
+        timeoutMs: 180_000,
+        prompt: promptText,
+      });
+      const parsed = parseOrganizerPlanResponse(res.text || '', snapshot);
+      planSummary = parsed.summary;
+      planSteps = parsed.steps;
+      usedEngine = 'pi';
+    }
+  }
+
+  if (!planSummary) {
+    const fallback = buildHeuristicOrganizerFallback(snapshot);
+    planSummary = fallback.summary;
+    planSteps = fallback.steps;
+    usedEngine = 'heuristic';
+  }
+
+  await emitPeek({
+    active: false,
+    phase: 'done',
+    cursorTarget: 'org-approval',
+    cursorLabel: planSteps.length
+      ? `提案已生成（共 ${planSteps.length} 条待审批，点击右侧任务逐条生效）`
+      : '盘点完成：当前桌面与书签结构无需改动',
+    organizerSnapshot: snapshot,
+    organizerSteps: planSteps,
+  }, true);
+
+  const record: EmployeeRunRecord = {
+    id: `run-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    employeeId: emp.id,
+    kind: 'organizer',
+    bvid: `org-${now}`,
+    title: `整理提案（${planSteps.length} 条待审批）`,
+    author: emp.name,
+    url: '',
+    status: 'analyzed',
+    engine: usedEngine,
+    worth: planSteps.length > 0,
+    score: planSteps.length > 0 ? 1 : 0.8,
+    category: '整理提案',
+    reason: planSummary,
+    planSummary,
+    planSteps,
+    organizerSnapshot: snapshot,
+    toolTrace: peekState.toolHistory,
+    peekFrames,
+    durationMs: Date.now() - startedAt,
+    createdAt: Date.now(),
+  };
+
+  if (planSteps.length && emp.skills.includes('notify.high_value')) {
+    try {
+      await publishAiNotification(`emp_org_${record.id}`, emp.name, `新生成 ${planSteps.length} 条桌面/书签整理提案，等待你逐条确认`, 'success');
+    } catch {}
+  }
+
+  return {
+    status: 'processed',
+    record,
+    message: planSteps.length
+      ? `已生成 ${planSteps.length} 条整理建议（尚未改动真实数据），点击「👀 预览审批」即可逐条确认生效。`
+      : '盘点完成，当前桌面与书签暂无需调整。',
+  };
+}
+
 async function executeOneForEmployee(
   emp: DigitalEmployee,
   runs: EmployeeRunRecord[],
@@ -103,6 +312,7 @@ async function executeOneForEmployee(
   if (!options.manual && todayCount >= emp.schedulePolicy.dailyLimit) {
     return { status: 'limit', message: `今日已达处理上限（${emp.schedulePolicy.dailyLimit} 条）。` };
   }
+  if (emp.source.kind === 'workspace-organizer') return executeOrganizerForEmployee(emp);
   if (!emp.skills.includes('bili.source')) {
     throw new Error('该员工未启用「B站数据源读取」Skill。');
   }
@@ -423,7 +633,7 @@ async function executeOneForEmployee(
   };
 }
 
-export async function runPatrolCycle(targetEmployeeId?: string): Promise<{ message: string; record?: EmployeeRunRecord }> {
+export async function runPatrolCycle(targetEmployeeId?: string, _organizerConsent = true): Promise<{ message: string; record?: EmployeeRunRecord }> {
   return serial(async () => {
     const employees = await readEmployees();
     const runs = await readRuns();
@@ -551,10 +761,33 @@ export async function runPatrolCycle(targetEmployeeId?: string): Promise<{ messa
   });
 }
 
+async function recordOrganizerFeedback(run: EmployeeRunRecord, step: OrganizerPlanStep, verdict: 'keep' | 'skip' | null): Promise<void> {
+  const employees = await readEmployees();
+  const emp = employees.find(e => e.id === run.employeeId);
+  if (!emp) return;
+  const id = `org-feedback:${run.id}:${step.id}`;
+  emp.ownerFeedback = emp.ownerFeedback.filter(f => f.id !== id);
+  if (verdict) emp.ownerFeedback.unshift({ id, title: step.title.slice(0, 120), verdict, category: step.type, note: '仅记录本条审批偏好，不代表访问频率或自动学习。', createdAt: Date.now() });
+  emp.ownerFeedback = emp.ownerFeedback.slice(0, 40);
+  await writeEmployees(employees);
+}
+
 async function handleAction(action: string, message: any): Promise<unknown> {
   if (action === 'list') {
     return serial(async () => {
       const [employees, runs] = await Promise.all([readEmployees(), readRuns()]);
+      let corrected = false;
+      for (const run of runs) {
+        if (run.kind !== 'organizer') continue;
+        for (const step of run.planSteps || []) {
+          // This legacy error was emitted only after Chrome confirmed the write.
+          if (step.status !== 'applying' || !step.undo || !step.errorMessage?.startsWith('写入后数据已变化，结果未确认；不会自动重试。')) continue;
+          step.status = 'applied';
+          step.errorMessage = undefined;
+          corrected = true;
+        }
+      }
+      if (corrected) await writeRuns(runs);
       return { employees, runs, workerStamp: EMPLOYEE_WORKER_STAMP };
     });
   }
@@ -605,7 +838,7 @@ async function handleAction(action: string, message: any): Promise<unknown> {
   }
   if (action === 'run-one') {
     if (typeof message.id !== 'string' || !message.id) throw new Error('缺少员工 ID。');
-    return runPatrolCycle(message.id);
+    return runPatrolCycle(message.id, message.organizerConsent === true);
   }
   if (action === 'feedback') {
     return serial(async () => {
@@ -632,6 +865,113 @@ async function handleAction(action: string, message: any): Promise<unknown> {
       const runs = (await readRuns()).filter(r => r.employeeId !== message.id);
       await writeRuns(runs);
       return true;
+    });
+  }
+  if (action === 'apply-plan-step') {
+    return serial(async () => {
+      const runs = await readRuns();
+      const run = runs.find(r => r.id === message.runId);
+      if (!run || run.kind !== 'organizer' || !run.organizerSnapshot || !Array.isArray(run.planSteps)) throw new Error('未找到对应的整理提案记录。');
+      if (run.planSteps.some(s => !Array.isArray(s.dependsOn))) throw new Error('旧版提案缺少安全引用，请重新盘点生成提案。');
+      if (run.planSteps.some(s => s.status === 'applying' || s.status === 'undoing')) throw new Error('这份提案暂不可继续执行。');
+      const step = run.planSteps.find(s => s.id === message.stepId);
+      if (!step) throw new Error('未找到该待审批步骤。');
+      if (step.status === 'applied') {
+        return { run, step, note: '该步骤已生效。' };
+      }
+
+      if (!['pending', 'error'].includes(step.status)) throw new Error('这一步暂不可执行。');
+      // Bindings use step IDs, not edited display names.
+      if (message.patch && typeof message.patch === 'object') {
+        const p = message.patch as Record<string, any>;
+        if (typeof p.partitionName === 'string' && p.partitionName.trim()) {
+          step.params.partitionName = p.partitionName.trim();
+        }
+        if (typeof p.folderName === 'string' && p.folderName.trim()) {
+          step.params.folderName = p.folderName.trim();
+        }
+        if (['small', 'medium', 'large'].includes(p.folderSize)) {
+          step.params.folderSize = p.folderSize === 'large' ? 'large' : 'small';
+        }
+      }
+
+      let issued = false;
+      try {
+        bindOrganizerPlan(run.planSteps, run.organizerSnapshot);
+        const res = await applyOrganizerPlanStep(step, {
+          steps: run.planSteps,
+          snapshot: run.organizerSnapshot,
+          beforeWrite: async undo => {
+            step.undo = undo;
+            step.status = 'applying';
+            await writeRuns(runs); // Journal first. A crash leaves an explicit non-retryable state.
+            issued = true;
+          },
+        });
+        step.undo = res.undo;
+        step.result = res.result;
+        step.status = 'applied';
+        step.appliedAt = Date.now();
+        step.errorMessage = undefined;
+        if (Array.isArray(run.peekFrames) && run.peekFrames.length) {
+          run.peekFrames[run.peekFrames.length - 1].organizerSteps = JSON.parse(JSON.stringify(run.planSteps));
+        }
+        await writeRuns(runs);
+        const feedbackSaved = await recordOrganizerFeedback(run, step, 'keep').then(() => true, () => false);
+        return { run, step, note: res.note + (feedbackSaved ? '' : '（本条偏好保存失败，实际操作已生效。）') };
+      } catch (err) {
+        const errMsg = err instanceof Error ? err.message : '执行该步骤失败。';
+        step.status = issued ? 'applying' : 'error';
+        step.errorMessage = errMsg;
+        await writeRuns(runs);
+        throw new Error(errMsg);
+      }
+    });
+  }
+  if (action === 'undo-plan-step') {
+    return serial(async () => {
+      const runs = await readRuns();
+      const run = runs.find(r => r.id === message.runId && r.kind === 'organizer');
+      const step = run?.planSteps?.find(s => s.id === message.stepId);
+      if (!run || !step) throw new Error('找不到该整理步骤。');
+      if (run.planSteps?.some(s => s.status === 'applying' || s.status === 'undoing')) throw new Error('这份提案暂不可撤销。');
+      if (run.planSteps?.some(s => s.status === 'applied' && s.dependsOn?.includes(step.id))) throw new Error('请先撤销依赖此步的后续步骤。');
+      let issued = false;
+      try {
+        await undoOrganizerPlanStep(step, async () => {
+          step.status = 'undoing';
+          await writeRuns(runs);
+          issued = true;
+        });
+        step.status = 'undone';
+        step.errorMessage = undefined;
+        await writeRuns(runs);
+        await recordOrganizerFeedback(run, step, null).catch(() => {});
+        return { run, step, note: '已撤销。' };
+      } catch (err) {
+        step.status = issued ? 'undoing' : 'applied';
+        step.errorMessage = issued ? '撤销失败。' : (err instanceof Error ? err.message : '无法撤销。');
+        await writeRuns(runs);
+        throw new Error(step.errorMessage);
+      }
+    });
+  }
+  if (action === 'skip-plan-step') {
+    return serial(async () => {
+      const runs = await readRuns();
+      const run = runs.find(r => r.id === message.runId);
+      if (!run || !Array.isArray(run.planSteps)) throw new Error('未找到对应的整理提案记录。');
+      const step = run.planSteps.find(s => s.id === message.stepId);
+      if (!step) throw new Error('未找到该步骤。');
+      if (!['pending', 'error', 'skipped'].includes(step.status)) throw new Error('这一步暂不可跳过。');
+      step.status = step.status === 'skipped' ? 'pending' : 'skipped';
+      step.errorMessage = undefined;
+      if (Array.isArray(run.peekFrames) && run.peekFrames.length) {
+        run.peekFrames[run.peekFrames.length - 1].organizerSteps = JSON.parse(JSON.stringify(run.planSteps));
+      }
+      await writeRuns(runs);
+      const feedbackSaved = await recordOrganizerFeedback(run, step, step.status === 'skipped' ? 'skip' : null).then(() => true, () => false);
+      return { run, step, note: feedbackSaved ? '步骤状态和本条偏好已保存。' : '步骤状态已保存，但偏好保存失败。' };
     });
   }
   throw new Error('未知数字员工操作');

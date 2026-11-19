@@ -80,11 +80,6 @@ const en: Record<TranslationKey, string> = {
   "market.item.multica.author": "tab-project Lab",
   "market.item.multica.desc": "Run local CLI/ACP coding agents and DeepSeek chats with scheduled automations and resource context.",
   "market.item.multica.tags": "Local Agents,DeepSeek,Automations,Fullscreen Workspace",
-  "market.item.backpack.title": "Prompt Backpack",
-  "market.item.backpack.category": "Standalone · Prompts",
-  "market.item.backpack.author": "tab-project Lab",
-  "market.item.backpack.desc": "Prompt storage and dynamic variable filler. Manage custom prompts, tags, one-click copy, and full backup import/export.",
-  "market.item.backpack.tags": "Prompt Library,Variable Fill,Quick Copy,Floating Window",
   "market.item.todoist.title": "Todoist",
   "market.item.todoist.category": "Standalone · Todo",
   "market.item.todoist.author": "Doist / tab-project",
@@ -690,8 +685,9 @@ const en: Record<TranslationKey, string> = {
   "settings.startupStyle.hint": "Switch between Arknights Endfield industrial aesthetic or Rhine Lab terminal animation.",
   "settings.toggle.startupAnim": "Startup Animation",
   "settings.toggle.startupAnimSub": "New tab loading progress and brand animation",
-  "settings.toggle.singleTab": "Keep Single Tab Interface",
-  "settings.toggle.singleTabSub": "Subsequent tabs open standalone search page",
+  "settings.toggle.singleTab": "Enable Quick Search",
+  "settings.toggle.singleTabSub": "Open lightweight search in new tabs",
+  "settings.toggle.quickSearchHelp": "Open a lightweight search page in new tabs. Press Alt+H for the main interface.",
 
   "notifications.unreadCountOnly": "{count} unread",
 

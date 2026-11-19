@@ -5,9 +5,11 @@ import { notificationController } from "../notifications/store";
 
 const SERIES_KEY = "biliRadioSeriesV1";
 const SERIES_BACKUP_KEY = "lw_backup_bili_radio_series";
+const DEFAULT_SERIES_ID = "default-series";
 type RadioTrack = (typeof biliFavoritesState.radioQueue)[number];
 let requestId = 0;
 let initialized = false;
+let defaultSeriesWrites: Promise<void> = Promise.resolve();
 
 function message(error: unknown): string {
   return error instanceof Error ? error.message : "读取电台失败";
@@ -29,7 +31,7 @@ async function storageGet(keys: string[]): Promise<Record<string, unknown>> {
 }
 
 type RadioSeries = (typeof biliFavoritesState.radioSeries)[number];
-async function readSavedSeries(): Promise<unknown[]> {
+async function readSavedSeries(): Promise<unknown[] | null> {
   const stored = await storageGet([SERIES_KEY, SERIES_BACKUP_KEY]);
   for (const key of [SERIES_KEY, SERIES_BACKUP_KEY]) {
     if (stored[key] !== undefined) {
@@ -47,7 +49,7 @@ async function readSavedSeries(): Promise<unknown[]> {
       return parsed;
     }
   }
-  return [];
+  return null;
 }
 
 function normalizeSavedSeries(rawList: unknown[]): RadioSeries[] {
@@ -118,8 +120,11 @@ export const biliRadioController = {
     if (!initialized) {
       initialized = true;
       try {
-        // Existing primary/backup data only. An explicit empty primary stays empty.
-        biliFavoritesState.radioSeries = normalizeSavedSeries(await readSavedSeries());
+        const saved = await readSavedSeries();
+        biliFavoritesState.radioSeries = saved === null
+          ? [{ id: DEFAULT_SERIES_ID, name: '默认系列', count: 0, items: [] }]
+          : normalizeSavedSeries(saved);
+        if (saved === null) biliFavoritesState.radioSeriesName = '默认系列';
       } catch (error) {
         initialized = false;
         console.warn("[BiliRadio] 读取系列失败", error);
@@ -130,7 +135,7 @@ export const biliRadioController = {
 
   /** CLI repair is storage-only: no login, seed injection or inferred remote folder. */
   async repairStoredSeries() {
-    const next = normalizeSavedSeries(await readSavedSeries());
+    const next = normalizeSavedSeries((await readSavedSeries()) ?? []);
     if (next.length) await persistSeries(next);
     biliFavoritesState.radioSeries = next;
     // Do not refresh folders or start audio from a repair command.
@@ -173,6 +178,7 @@ export const biliRadioController = {
   async autoHealEmptySeries(): Promise<void> {
     let changed = false;
     for (const s of biliFavoritesState.radioSeries) {
+      if (s.id === DEFAULT_SERIES_ID) continue;
       if (s.count === 0 || !s.items.length) {
         const match = biliFavoritesState.radioFolders.find(
           (f) => f.title.trim().toLowerCase() === s.name.trim().toLowerCase()
@@ -231,6 +237,27 @@ export const biliRadioController = {
     if (!track.bvid || biliFavoritesState.radioQueue.some((item) => item.bvid === track.bvid)) return;
     biliFavoritesState.radioQueue.push(normalizeTrack(track));
   },
+  addToDefaultSeries(track: RadioTrack): Promise<boolean> {
+    const operation = defaultSeriesWrites.then(async () => {
+      if (!track.bvid) throw new Error('视频缺少 B 站编号');
+      const saved = await readSavedSeries();
+      const series = normalizeSavedSeries(saved ?? []);
+      let target = series.find(item => item.id === DEFAULT_SERIES_ID || item.name === '默认系列');
+      if (!target) {
+        target = { id: DEFAULT_SERIES_ID, name: '默认系列', count: 0, items: [] };
+        series.push(target);
+      }
+      if (target.items.some(item => item.bvid === track.bvid)) return false;
+      target.items.push(normalizeTrack(track));
+      target.count = target.items.length;
+      await persistSeries(series);
+      biliFavoritesState.radioSeries = series;
+      initialized = true;
+      return true;
+    });
+    defaultSeriesWrites = operation.then(() => {}, () => {});
+    return operation;
+  },
   remove(index: number): void {
     if (Number.isInteger(index) && index >= 0 && index < biliFavoritesState.radioQueue.length) {
       biliFavoritesState.radioQueue.splice(index, 1);
@@ -248,7 +275,7 @@ export const biliRadioController = {
   async loadSeries(id: string): Promise<void> {
     const series = biliFavoritesState.radioSeries.find((item) => item.id === id);
     if (!series) return;
-    if (!series.items.length) {
+    if (!series.items.length && series.id !== DEFAULT_SERIES_ID) {
       // 智能自愈：若系列为空，尝试从同名收藏夹中快速补全
       const matchingFolder = biliFavoritesState.radioFolders.find(
         (f) => f.title.trim().toLowerCase() === series.name.trim().toLowerCase()
@@ -270,6 +297,7 @@ export const biliRadioController = {
       }
     }
     if (!series.items.length) {
+      biliFavoritesState.radioSeriesName = series.name;
       notificationController.fetch("哔哩哔哩电台", `系列「${series.name}」暂无可播放曲目，请从左侧添加后保存`);
       return;
     }
@@ -373,7 +401,7 @@ if (typeof window !== "undefined") {
   window.addEventListener("logicweaver:sync-restored", () => {
     void (async () => {
       try {
-        biliFavoritesState.radioSeries = normalizeSavedSeries(await readSavedSeries());
+        biliFavoritesState.radioSeries = normalizeSavedSeries((await readSavedSeries()) ?? []);
       } catch (e) {
         console.warn("[BiliRadio] 云同步恢复系列重载失败", e);
       }

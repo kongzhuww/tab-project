@@ -27,9 +27,7 @@ import GitHubRepositories from "../github/GitHubRepositories.vue";
 import { githubRepositoryController } from "../github/repositories";
 import GitHubBatchBar from "../github/GitHubBatchBar.vue";
 import { githubBatchBarController } from "../github/batch-bar";
-const NotificationCenter = defineAsyncComponent(() => import("../notifications/NotificationCenter.vue"));
 const TabManagerPanel = defineAsyncComponent(() => import("../profile/TabManagerPanel.vue"));
-import { notificationHistoryController } from "../notifications/history-store";
 import { tabManagerController } from "../profile/tab-manager-store";
 const BookmarkNoteMenu = defineAsyncComponent(() => import("../bookmarks/BookmarkNoteMenu.vue"));
 import { bookmarkMenuController } from "../bookmarks/menu-store";
@@ -180,7 +178,6 @@ export function registerUiFeatures(features: FeatureRegistry): void {
   registerIsland(features, { id: "github-hero", title: "GitHub 分类摘要", order: 56, root: "gh-hero", capabilities: ["ui:github-summary", "github:actions"] }, GitHubHero, githubHeroController);
   registerIsland(features, { id: "github-repositories", title: "GitHub 仓库列表", order: 57, root: "vue-github-repositories-root", capabilities: ["ui:github-repositories", "github:repository-actions", "github:paging"] }, GitHubRepositories, githubRepositoryController);
   registerIsland(features, { id: "github-batch-bar", title: "GitHub Star 批量操作工具栏", order: 58, root: "gh-batch-bar", capabilities: ["ui:github-batch-bar", "github:batch-actions"] }, GitHubBatchBar, githubBatchBarController);
-  registerIsland(features, { id: "notification-center", spaOwned: true, title: "持久通知中心", order: 71, root: "vue-notification-center-root", capabilities: ["ui:notification-history", "notification:read"] }, NotificationCenter, notificationHistoryController as any);
   registerIsland(features, { id: "tab-manager", spaOwned: true, title: "独立标签页管理", order: 71, root: "vue-tab-manager-root", capabilities: ["ui:tab-manager", "tabs:explicit"] }, TabManagerPanel, tabManagerController as any);
   registerIsland(features, { id: "bookmark-menu", title: "书签上下文操作与备注菜单", order: 72, root: "vue-bookmark-menu-root", capabilities: ["ui:bookmark-menu", "bookmark:edit"] }, BookmarkNoteMenu, bookmarkMenuController as any);
   registerIsland(features, { id: "launcher-dialogs", title: "快捷启动器管理弹窗族", order: 73, root: "vue-launcher-dialogs-root", capabilities: ["ui:launcher-dialogs", "launcher:manage"] }, LauncherDialogs, launcherDialogsController as any);

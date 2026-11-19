@@ -109,6 +109,12 @@ export async function readFollowingFeed(input: FollowingReadInput): Promise<Foll
   const targetCount = draft.pageSize || 24;
   const parsedVideos: BiliRecentVideo[] = [];
   let currentOffset = draft.offsetHistory[draft.page - 1] || "";
+  let skip = 0;
+  if (currentOffset.startsWith('local-page:')) {
+    const saved = JSON.parse(currentOffset.slice('local-page:'.length)) as { offset: string; skip: number };
+    currentOffset = saved.offset;
+    skip = saved.skip;
+  }
   let loopCount = 0;
 
   while (parsedVideos.length < targetCount && loopCount < 4) {
@@ -121,6 +127,7 @@ export async function readFollowingFeed(input: FollowingReadInput): Promise<Foll
     if (currentOffset) params.set("offset", currentOffset);
     if (draft.updateBaseline) params.set("update_baseline", draft.updateBaseline);
 
+    const requestOffset = currentOffset;
     const res = await bilibiliService.api<any>(`https://api.bilibili.com/x/polymer/web-dynamic/v1/feed/all?${params.toString()}`, { signal });
     check();
     if (!Array.isArray(res?.items)) throw new Error("关注动态返回格式异常");
@@ -130,7 +137,8 @@ export async function readFollowingFeed(input: FollowingReadInput): Promise<Foll
     if (res?.update_baseline) draft.updateBaseline = res.update_baseline;
     currentOffset = draft.nextOffset;
 
-    for (const it of items) {
+    for (let index = skip; index < items.length; index++) {
+      const it = items[index];
       const dyn = it?.modules?.module_dynamic || {};
       const major = dyn.major || {};
       const archive = major.archive || major.ugc_season?.sections?.[0]?.episodes?.[0]?.arc || dyn.major?.archive;
@@ -158,8 +166,15 @@ export async function readFollowingFeed(input: FollowingReadInput): Promise<Foll
         pubTimeDesc
       });
 
-      if (parsedVideos.length >= targetCount) break;
+      if (parsedVideos.length >= targetCount) {
+        if (index + 1 < items.length) {
+          draft.nextOffset = `local-page:${JSON.stringify({ offset: requestOffset, skip: index + 1 })}`;
+          draft.hasMore = true;
+        }
+        break;
+      }
     }
+    skip = 0;
 
     if (!draft.hasMore || !currentOffset) break;
   }

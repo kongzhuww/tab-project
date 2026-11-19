@@ -177,8 +177,6 @@ test("known UI regression points call translations rather than hardcoded labels"
   for (const action of ["closePromptModal", "closeConfirmModal"]) {
     assert.ok(todoist.includes(`@click="${action}">{{ t('common.cancel') }}`));
   }
-  const topbar = await read("src/layout/AppTopBar.vue");
-  assert.ok(topbar.includes("t('topbar.notificationsUnread', { count: notificationUnreadCount })"));
   const wheel = await read("src/nav-wheel/runtime.ts");
   assert.ok(wheel.includes('t("navwheel.editSites")'));
   assert.ok(wheel.includes('t("navwheel.finishEdit")'));

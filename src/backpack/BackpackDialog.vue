@@ -2,8 +2,6 @@
 import { ref, computed, onMounted } from "vue";
 import BackpackFrame from "./BackpackFrame.vue";
 defineProps<{ embedded?: boolean }>();
-import { windowManagerController } from "../core/window-manager.store";
-import { backpackModuleState } from "./module-state";
 import {
   backpackService,
   backpackState,
@@ -127,14 +125,6 @@ function selectArticleCategory(id: string) {
 
 function selectArticleTag(tag: string) {
   articleState.selectedTag = articleState.selectedTag === tag ? null : tag;
-}
-
-function handleClose() {
-  void windowManagerController.close("backpack");
-}
-
-function handleMinimize() {
-  windowManagerController.minimize("backpack");
 }
 
 // ==================== 提示词操作 ====================
@@ -414,21 +404,7 @@ const displayedArticles = computed(() => {
 </script>
 
 <template>
-  <BackpackFrame
-    :embedded="embedded"
-    id="backpack-workspace-dialog"
-    window-id="backpack"
-    title="背包工作台"
-    icon="🎒"
-    :visible="backpackModuleState.visible"
-    :default-width="980"
-    :default-height="660"
-    :min-width="740"
-    :min-height="500"
-    custom-class="lw-backpack-window"
-    @close="handleClose"
-    @minimize="handleMinimize"
-  >
+  <BackpackFrame>
     <!-- 嵌入式顶部频道分段切换 -->
     <template v-if="embedded" #header-tabs>
       <nav class="bp-seg-tabs" role="tablist" aria-label="资料库频道">

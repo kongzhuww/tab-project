@@ -724,7 +724,7 @@ body > .todoist-toast-container {
   .workspace-tab { min-width: 82px; flex-basis: 140px; }
   .tb-brand b { display: none; }
   .ms-top-player { order: 3; flex-basis: 100%; max-width: none; }
-  .launcher-inner { padding: 68px 16px 32px; overflow-y:auto; scrollbar-width: none; -ms-overflow-style: none; }
+  .launcher-inner { padding: 132px 16px 32px; overflow-y:auto; scrollbar-width: none; -ms-overflow-style: none; }
   .launcher-inner::-webkit-scrollbar { display: none !important; width: 0 !important; height: 0 !important; }
   .launcher-toolbar { top: 16px; right: 16px; }
   .launcher-overview { grid-template-columns: 1fr; }

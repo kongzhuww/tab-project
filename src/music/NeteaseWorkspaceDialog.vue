@@ -41,7 +41,6 @@
           </template>
         </div>
         <div style="display: flex; gap: 8px; align-items: center;">
-          <button type="button" class="ms-netease-logout-btn" :disabled="musicModuleState.pendingWrites > 0" @click="refreshNetease">{{ t('netease.refreshList') }}</button>
           <button
             type="button"
             class="ms-netease-logout-btn"
@@ -827,7 +826,7 @@ function clearSearch() {
 }
 
 function playNetease(song: NeteaseSong) {
-  controller.playNeteaseTrack(song);
+  controller.playNeteaseTrack(song, currentSongList.value);
 }
 
 function isCurrentSong(song: any): boolean {
@@ -865,9 +864,6 @@ function onSeek(e: Event) {
   controller.seek(val);
 }
 
-function refreshNetease() {
-  void workspace.refresh();
-}
 
 function pauseView() {
   workspace.pause();

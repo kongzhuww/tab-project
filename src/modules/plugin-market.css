@@ -416,6 +416,11 @@
   gap: 4px;
 }
 
+.plugin-market-window .pm-switch { position: relative; width: 36px; height: 20px; padding: 0; border: 0; border-radius: 999px; background: #cbd5e1; cursor: pointer; transition: background .2s; }
+.plugin-market-window .pm-switch.on { background: #5b66f5; }
+.plugin-market-window .pm-switch span { position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: transform .2s; }
+.plugin-market-window .pm-switch.on span { transform: translateX(16px); }
+.plugin-market-window .pm-switch:disabled { opacity: .6; cursor: wait; }
 .plugin-market-window .pm-footer-right {
   display: inline-flex;
   align-items: center;

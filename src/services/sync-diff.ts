@@ -135,14 +135,17 @@ export function computeConfigDiff(
 
   // 4. 基础设置与模块开关变化
   const basicKeys: Record<string, string> = {
+    enableQuickSearch: "极速搜索",
     theme: "界面主题",
     showWeather: "天气挂件",
-    showSites: "常用网站栏",
+    showSites: "常用网站和书签",
+    showHomeNews: "AI HOT 资讯",
+    showHomePlayer: "音乐播放器",
     showBili: "B站卡片",
     showYouTube: "YouTube卡片",
     showTodo: "待办卡片",
     showBookmarkPanel: "书签栏",
-    singleNewTab: "单标签页模式",
+    singleNewTab: "极速搜索（旧设置）",
     city: "天气城市",
     ghUser: "GitHub 账号",
     todoistToken: "Todoist 授权"
@@ -302,14 +305,17 @@ export function compareLocalAndRemote(
 
   // 4. 设置项差异
   const basicKeys: Record<string, string> = {
+    enableQuickSearch: "极速搜索",
     theme: "界面主题",
     showWeather: "天气挂件",
-    showSites: "常用网站栏",
+    showSites: "常用网站和书签",
+    showHomeNews: "AI HOT 资讯",
+    showHomePlayer: "音乐播放器",
     showBili: "B站卡片",
     showYouTube: "YouTube卡片",
     showTodo: "待办卡片",
     showBookmarkPanel: "书签栏",
-    singleNewTab: "单标签页模式",
+    singleNewTab: "极速搜索（旧设置）",
     city: "天气城市"
   };
 

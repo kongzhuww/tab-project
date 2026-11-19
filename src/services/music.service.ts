@@ -22,6 +22,19 @@ export interface MusicPlaybackState {
   currentLyric?: string;
 }
 
+export function toNeteaseMusicSong(rawSong: any): MusicSong {
+  const artists = (rawSong.ar || rawSong.artists || []).map((a: any) => typeof a === 'string' ? a : a.name);
+  return {
+    cid: `ne_${rawSong.id}`,
+    name: rawSong.name || '网易云音乐',
+    artists: artists.length ? artists : ['网易云音乐'],
+    coverUrl: rawSong.al?.picUrl || rawSong.album?.picUrl || rawSong.picUrl || rawSong.coverUrl || '',
+    isNetease: true,
+    neteaseId: rawSong.id,
+    rawSong
+  };
+}
+
 export type MusicStateListener = (state: MusicPlaybackState) => void;
 export interface MusicPlayOptions { isCurrent?: () => boolean; autoplay?: boolean }
 
@@ -29,6 +42,25 @@ export class MusicService {
   private static instance: MusicService;
   private audio: HTMLAudioElement | null = null;
   private playVersion = 0;
+  private lyrics: Array<{ time: number; text: string }> = [];
+
+  private setLyrics(raw: string): void {
+    this.lyrics = raw.split(/\r?\n/).flatMap(line => {
+      const matches = [...line.matchAll(/\[(\d+):(\d+(?:\.\d+)?)\]/g)];
+      const text = line.replace(/\[[^\]]*\]/g, '').trim();
+      return text ? matches.map(m => ({ time: Number(m[1]) * 60 + Number(m[2]), text })) : [];
+    }).sort((a, b) => a.time - b.time);
+    this.updateLyric();
+  }
+
+  private updateLyric(): void {
+    let text = '';
+    for (const line of this.lyrics) {
+      if (line.time > this.state.currentTime) break;
+      text = line.text;
+    }
+    this.state.currentLyric = text;
+  }
   private state: MusicPlaybackState = {
     playing: false,
     currentSong: null,
@@ -85,6 +117,7 @@ export class MusicService {
       if (now - lastTimeUpdate < 250) return;
       lastTimeUpdate = now;
       this.state.currentTime = this.audio.currentTime || 0;
+      this.updateLyric();
       if (this.audio.duration && !Number.isNaN(this.audio.duration)) {
         this.state.duration = this.audio.duration;
       }
@@ -239,8 +272,12 @@ export class MusicService {
       song.coverUrl = this.albumCoverMap.get(String(song.albumCid)) || "";
     }
     this.state.currentSong = song;
+    this.state.currentTime = 0;
+    this.lyrics = [];
+    this.state.currentLyric = '';
 
-    // 确保队列存在
+    // A directly selected song must not inherit another source's queue.
+    if (this.state.queue.some(s => !!s.isNetease !== !!song.isNetease)) this.state.queue = [];
     if (!this.state.queue.some((s) => String(s.cid) === String(song.cid))) {
       this.state.queue.push(song);
     }
@@ -250,10 +287,18 @@ export class MusicService {
       let playUrl = "";
       if (song.isNetease && song.neteaseId) {
         // 网易云音乐 URL 获取：优先通过 NeteaseService 获取，带外链兜底
+        void neteaseService.getSongLyric(song.neteaseId).then(raw => {
+          if (current()) { this.setLyrics(raw); this.notify(); }
+        });
         playUrl = await neteaseService.getSongAudioUrl(song.neteaseId);
       } else {
         // 塞壬唱片
         const detail = await this.getSirenSongUrl(song.cid);
+        if (detail.lyricUrl) {
+          void fetch(detail.lyricUrl).then(res => res.ok ? res.text() : '').then(raw => {
+            if (current()) { this.setLyrics(raw); this.notify(); }
+          }).catch(() => {});
+        }
         playUrl = detail.sourceUrl;
       }
 
@@ -278,18 +323,7 @@ export class MusicService {
   public async playNeteaseSong(rawSong: any, options: MusicPlayOptions = {}): Promise<boolean> {
     if (!rawSong || options.isCurrent?.() === false) return false;
     neteaseService.addRecentSong(rawSong);
-    const artists = (rawSong.ar || rawSong.artists || []).map((a: any) => (typeof a === "string" ? a : a.name));
-    const coverUrl = rawSong.al?.picUrl || rawSong.album?.picUrl || rawSong.picUrl || rawSong.coverUrl || "";
-    const song: MusicSong = {
-      cid: `ne_${rawSong.id}`,
-      name: rawSong.name || "网易云音乐",
-      artists: artists.length ? artists : ["网易云音乐"],
-      coverUrl,
-      isNetease: true,
-      neteaseId: rawSong.id,
-      rawSong
-    };
-    return this.playSong(song, options);
+    return this.playSong(toNeteaseMusicSong(rawSong), options);
   }
 
   public togglePlay(): void {
@@ -298,9 +332,6 @@ export class MusicService {
       this.audio.pause();
     } else if (this.audio.src) {
       void this.audio.play();
-    } else if (this.state.queue.length > 0) {
-      const target = this.state.queueIndex >= 0 ? this.state.queue[this.state.queueIndex] : this.state.queue[0];
-      if (target) void this.playSong(target);
     }
   }
 

@@ -86,13 +86,20 @@ function projectTasks() {
   const readStart = createTaskStartDateReader();
   const active = activeTasks.filter(t => !isTodoistTaskCompleted(t)).map(t => mapTask(t, readStart));
   const selected = state.selectedDate;
+  const previousOrder = new Map(state.todoItems.map((item, index) => [item.id, index]));
   const local = Object.values(getLocalCompletedMap()).filter(item => !reopenedIds.has(item.id));
   const merged = new Map<string, CalendarTodoItem>();
   for (const item of [...(history.get(selected)?.items || []), ...local]) {
     if (!reopenedIds.has(item.id) && (item.scheduledDate || completedDay(item)) === selected) merged.set(item.id, item);
   }
   for (const item of active) if (item.scheduledDate === selected) merged.set(item.id, item);
-  state.todoItems = [...merged.values()].sort((a, b) => Number(a.completed) - Number(b.completed) || (a.time || "").localeCompare(b.time || ""));
+  state.todoItems = [...merged.values()].sort((a, b) => {
+    const left = previousOrder.get(a.id), right = previousOrder.get(b.id);
+    if (left !== undefined && right !== undefined) return left - right;
+    if (left !== undefined) return -1;
+    if (right !== undefined) return 1;
+    return (a.time || "").localeCompare(b.time || "");
+  });
   state.agendaTitle = selected === getLocalTodayDateStr() ? t("todoist.calendar.todayTasks") : t("todoist.calendar.dateTasks", { date: selected });
   const counts = new Map<string, Set<string>>();
   for (const item of [...Array.from(history.values()).flatMap(entry => entry.items), ...local, ...active]) {

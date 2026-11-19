@@ -70,20 +70,17 @@ export interface SubscriptionCoordinatorOptions {
 }
 
 export class BiliSubscriptionCoordinator {
-  public readonly subChannels: Record<string, BiliSubChannelInfo> = {
-    shana: { mid: "3546795384769164", fallbackName: "刹那观察室", title: "刹那观察室", defaultTitle: "刹那观察室", builtin: true },
-    news: { mid: "3706929260006322", fallbackName: "黑鸦Heya", title: "黑鸦Heya", defaultTitle: "黑鸦Heya", builtin: true }
-  };
+  public readonly subChannels: Record<string, BiliSubChannelInfo> = {};
 
   public readonly subState: BiliSubState = {
-    channelKey: "shana",
+    channelKey: "",
     viewMode: "srt",
     loading: false,
     editions: [],
     activeDate: "",
     activeDocBvid: "",
-    visibleCounts: { shana: 3, news: 3 },
-    cache: { shana: { at: 0, editions: [] }, news: { at: 0, editions: [] } }
+    visibleCounts: {},
+    cache: {}
   };
 
   private subCustomChannelsLoaded = false;
@@ -191,8 +188,8 @@ export class BiliSubscriptionCoordinator {
 
   public publishSubscriptionSnapshot(): void {
     if (!this.subscriptionActive) return;
-    const channelKey = this.subState.channelKey || "shana";
-    const channel = this.subChannels[channelKey] || this.subChannels.shana;
+    const channelKey = this.subState.channelKey;
+    const channel = this.subChannels[channelKey];
     const allDocs = (this.subState.editions || []).flatMap((edition) => edition.documents || []);
     const currentDoc = this.getActiveSubscriptionDocument();
     const chapters = currentDoc ? this.extractChapters(currentDoc) : [];
@@ -200,7 +197,7 @@ export class BiliSubscriptionCoordinator {
     const description = parseTranscriptParagraphs(currentDoc?.desc || currentDoc?.text || "");
 
     biliFavoritesController.updateOrganizer({
-      subscriptionTitle: String(channel.fallbackName || channel.title || "订阅视频"),
+      subscriptionTitle: String(channel?.fallbackName || channel?.title || "订阅视频"),
       subscriptionSubtitle: "订阅视频 · AI 逐字字幕稿 · 点击台词即刻跳转播放",
       subscriptionScriptMode: localStorage.getItem("biliSubScriptMode") === "lyrics" ? "lyrics" : "newspaper",
       subscriptionChannels: Object.entries(this.subChannels).map(([id, item]) => ({
@@ -251,7 +248,7 @@ export class BiliSubscriptionCoordinator {
             bvid: String(currentDoc.bvid || ""),
             aid: String(currentDoc.aid || ""),
             title: String(currentDoc.title || currentDoc.bvid || "未命名视频"),
-            author: String(currentDoc.author || channel.fallbackName || "UP主"),
+            author: String(currentDoc.author || channel?.fallbackName || "UP主"),
             cover: String(currentDoc.cover || "").replace(/^http:/, "https:"),
             description: String(currentDoc.desc || ""),
             playCount: formatBiliCompactNumber(currentDoc.play || 0),
@@ -340,8 +337,7 @@ export class BiliSubscriptionCoordinator {
       signal.throwIfAborted();
       if (!current()) throw new DOMException("Stale subscription read", "AbortError");
     };
-    const channelKey = selection.channelKey || this.subState.channelKey || "shana";
-    const visibleCount = selection.visibleCount ?? Math.max(3, Number(this.subState.visibleCounts[channelKey] || 3));
+    let channelKey = selection.channelKey || this.subState.channelKey;
     this.subState.loading = true;
     biliFavoritesController.updateOrganizer({ subscriptionLoading: true, subscriptionError: "" });
     this.subscriptionTimer = setTimeout(() => {
@@ -352,6 +348,16 @@ export class BiliSubscriptionCoordinator {
     try {
       await this.ensureSubCustomChannels(signal);
       check();
+      if (!this.subChannels[channelKey]) channelKey = Object.keys(this.subChannels)[0] || '';
+      if (!channelKey) {
+        this.subState.channelKey = '';
+        this.subState.editions = [];
+        this.subState.activeDocBvid = '';
+        this.publishSubscriptionSnapshot();
+        return;
+      }
+      if (!this.subState.channelKey) this.subState.channelKey = channelKey;
+      const visibleCount = selection.visibleCount ?? Math.max(3, Number(this.subState.visibleCounts[channelKey] || 3));
       this.publishSubscriptionSnapshot();
       const { editions, cached } = await this.loadSubVideoData(channelKey, visibleCount, force, signal);
       check();
