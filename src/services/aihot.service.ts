@@ -15,7 +15,7 @@ import { storageCache } from "./storage-cache.service";
 import { parseModernLeaderboard } from "../aihot/leaderboard-parser";
 import { parseDailyArchives, parseDailyReport } from "../aihot/daily-parser";
 
-export const DEFAULT_AIHOT_API = "https://aihot.virxact.com/api/v1";
+export const DEFAULT_AIHOT_API = "https://aihot.news/api/v1";
 
 // Keep source-page controls out of every article extraction path, including templates.
 const ARTICLE_NOISE_SELECTORS = [
@@ -210,8 +210,8 @@ export class AiHotService {
           const outputPrice = priceCells[2]?.textContent?.trim() || "-";
           const score = tr.querySelector(".lb-score-cell strong")?.textContent?.trim() || "";
           const href = modelEntry?.getAttribute("href")
-            ? (modelEntry.getAttribute("href")!.startsWith("http") ? modelEntry.getAttribute("href")! : `https://aihot.virxact.com${modelEntry.getAttribute("href")}`)
-            : "https://aihot.virxact.com";
+            ? (modelEntry.getAttribute("href")!.startsWith("http") ? modelEntry.getAttribute("href")! : `https://aihot.news${modelEntry.getAttribute("href")}`)
+            : "https://aihot.news";
           if (model) {
             items.push({ href, rank, model, provider, releaseDate, inputPrice, outputPrice, score });
           }
@@ -235,7 +235,7 @@ export class AiHotService {
 
         if (modelMatch) {
           items.push({
-            href: linkMatch ? (linkMatch[1].startsWith("http") ? linkMatch[1] : `https://aihot.virxact.com${linkMatch[1]}`) : "https://aihot.virxact.com",
+            href: linkMatch ? (linkMatch[1].startsWith("http") ? linkMatch[1] : `https://aihot.news${linkMatch[1]}`) : "https://aihot.news",
             rank: rankMatch ? rankMatch[1].trim() : String(items.length + 1),
             model: modelMatch[1].trim(),
             provider: providerMatch ? providerMatch[1].trim() : "权威厂商",
@@ -331,16 +331,10 @@ export class AiHotService {
       try {
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 6000);
-        let res = await fetch(`https://aihot.virxact.com/items/${itemId}`, {
+        const res = await fetch(`https://aihot.news/items/${itemId}`, {
           headers: { Accept: "text/html,application/xhtml+xml" },
           signal: controller.signal
         });
-        if (!res.ok) {
-          res = await fetch(`https://aihot.news/items/${itemId}`, {
-            headers: { Accept: "text/html,application/xhtml+xml" },
-            signal: controller.signal
-          });
-        }
         clearTimeout(timeout);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const html = await res.text();

@@ -6,6 +6,8 @@ import { notificationController } from "../notifications/store";
 const SERIES_KEY = "biliRadioSeriesV1";
 const SERIES_BACKUP_KEY = "lw_backup_bili_radio_series";
 const DEFAULT_SERIES_ID = "default-series";
+export const LIKED_SERIES_ID = "liked-radio-series";
+export const LIKED_SERIES_NAME = "我喜欢的电台";
 type RadioTrack = (typeof biliFavoritesState.radioQueue)[number];
 let requestId = 0;
 let initialized = false;
@@ -77,9 +79,9 @@ function normalizeSavedSeries(rawList: unknown[]): RadioSeries[] {
   });
 }
 
-async function persistSeries(seriesList: RadioSeries[]): Promise<void> {
+async function persistSeries(seriesList: RadioSeries[], options: { allowEmpty?: boolean } = {}): Promise<void> {
   // Keep the existing protection, but never report a rejected write as successful.
-  if (!seriesList.length) {
+  if (!seriesList.length && !options.allowEmpty) {
     const existing = await storageGet([SERIES_KEY]);
     const current = existing[SERIES_KEY];
     if (Array.isArray(current) && current.length) throw new Error("空列表不能覆盖现有电台系列，未保存");
@@ -116,20 +118,23 @@ if (typeof window !== "undefined") {
 }
 
 export const biliRadioController = {
-  async init(): Promise<void> {
-    if (!initialized) {
-      initialized = true;
-      try {
-        const saved = await readSavedSeries();
-        biliFavoritesState.radioSeries = saved === null
-          ? [{ id: DEFAULT_SERIES_ID, name: '默认系列', count: 0, items: [] }]
-          : normalizeSavedSeries(saved);
-        if (saved === null) biliFavoritesState.radioSeriesName = '默认系列';
-      } catch (error) {
-        initialized = false;
-        console.warn("[BiliRadio] 读取系列失败", error);
-      }
+  async ensureSeriesLoaded(): Promise<void> {
+    if (initialized) return;
+    initialized = true;
+    try {
+      const saved = await readSavedSeries();
+      biliFavoritesState.radioSeries = saved === null
+        ? [{ id: DEFAULT_SERIES_ID, name: '默认系列', count: 0, items: [] }]
+        : normalizeSavedSeries(saved);
+      if (saved === null) biliFavoritesState.radioSeriesName = '默认系列';
+    } catch (error) {
+      initialized = false;
+      console.warn("[BiliRadio] 读取系列失败", error);
     }
+  },
+
+  async init(): Promise<void> {
+    await this.ensureSeriesLoaded();
     await this.refresh();
   },
 
@@ -215,7 +220,7 @@ export const biliRadioController = {
     biliFavoritesState.radioError = "";
     try {
       const videos = new Map<string, RadioTrack>();
-      const maxPages = 4;
+      const maxPages = 15;
       for (let page = 1; page <= maxPages; page++) {
         const result = await bilibiliService.getFolderVideos(targetId, page, 40);
         if (currentRequest !== requestId) return;
@@ -234,7 +239,11 @@ export const biliRadioController = {
   },
 
   add(track: RadioTrack): void {
-    if (!track.bvid || biliFavoritesState.radioQueue.some((item) => item.bvid === track.bvid)) return;
+    if (!track.bvid) return;
+    if (biliFavoritesState.radioQueue.some((item) => item.bvid === track.bvid)) {
+      notificationController.fetch("哔哩哔哩电台", `「${track.title || track.bvid}」已在播放队列中`);
+      return;
+    }
     biliFavoritesState.radioQueue.push(normalizeTrack(track));
   },
   addToDefaultSeries(track: RadioTrack): Promise<boolean> {
@@ -265,12 +274,14 @@ export const biliRadioController = {
   },
   clear(): void { biliFavoritesState.radioQueue = []; },
   play(shuffle = false, startIndex = 0): void {
-    playBiliRadioQueue(startIndex, shuffle);
+    const activeName = biliFavoritesState.radioSeriesName?.trim() || undefined;
+    playBiliRadioQueue(startIndex, shuffle, shuffle && activeName ? `${activeName} · 随机` : activeName);
   },
   playAt(index: number): void {
     if (!biliFavoritesState.radioQueue.length) return;
     const safeIdx = Math.max(0, Math.min(biliFavoritesState.radioQueue.length - 1, Number(index) || 0));
-    playBiliRadioQueue(safeIdx, false);
+    const activeName = biliFavoritesState.radioSeriesName?.trim() || undefined;
+    playBiliRadioQueue(safeIdx, false, activeName);
   },
   async loadSeries(id: string): Promise<void> {
     const series = biliFavoritesState.radioSeries.find((item) => item.id === id);
@@ -312,17 +323,69 @@ export const biliRadioController = {
     playBiliRadioQueue(startIndex, false, series.name);
   },
   async deleteSeries(id: string): Promise<void> {
+    await this.ensureSeriesLoaded();
     const target = biliFavoritesState.radioSeries.find((item) => item.id === id);
-    const targetName = target?.name || "系列";
+    if (!target) return;
+    const targetName = target.name || "系列";
     const next = biliFavoritesState.radioSeries.filter((item) => item.id !== id);
     try {
-      await persistSeries(next);
+      await persistSeries(next, { allowEmpty: true });
       biliFavoritesState.radioSeries = next;
-      notificationController.fetch("哔哩哔哩电台", `已删除电台系列「${targetName}」`);
+      if (biliFavoritesState.radioSeriesName?.trim() === target.name) {
+        biliFavoritesState.radioSeriesName = "";
+      }
+      notificationController.fetch("哔哩哔哩电台", `已删除歌单「${targetName}」`);
     } catch (error) {
-      biliFavoritesState.radioError = `删除系列失败：${message(error)}`;
-      notificationController.fetch("哔哩哔哩电台", `删除系列失败：${message(error)}`);
+      biliFavoritesState.radioError = `删除歌单失败：${message(error)}`;
+      notificationController.fetch("哔哩哔哩电台", `删除歌单失败：${message(error)}`);
     }
+  },
+  isLiked(bvid: string): boolean {
+    if (!bvid) return false;
+    const liked = biliFavoritesState.radioSeries.find(s => s.id === LIKED_SERIES_ID || s.name === LIKED_SERIES_NAME);
+    return Boolean(liked?.items.some(item => item.bvid === bvid));
+  },
+  async toggleLike(track: RadioTrack): Promise<boolean> {
+    if (!track.bvid) return false;
+    await this.ensureSeriesLoaded();
+    const current = [...biliFavoritesState.radioSeries];
+    let idx = current.findIndex(s => s.id === LIKED_SERIES_ID || s.name === LIKED_SERIES_NAME);
+    if (idx === -1) {
+      current.unshift({ id: LIKED_SERIES_ID, name: LIKED_SERIES_NAME, count: 0, items: [] });
+      idx = 0;
+    }
+    const target = { ...current[idx], items: [...current[idx].items] };
+    const existingIdx = target.items.findIndex(item => item.bvid === track.bvid);
+    let nowLiked = false;
+    if (existingIdx >= 0) {
+      target.items.splice(existingIdx, 1);
+      nowLiked = false;
+    } else {
+      target.items.unshift(normalizeTrack(track));
+      nowLiked = true;
+    }
+    target.count = target.items.length;
+    current[idx] = target;
+    try {
+      await persistSeries(current);
+      biliFavoritesState.radioSeries = current;
+      notificationController.fetch("哔哩哔哩电台", nowLiked ? `♥ 已添加到「${LIKED_SERIES_NAME}」` : `已从「${LIKED_SERIES_NAME}」移除`);
+      return nowLiked;
+    } catch (error) {
+      biliFavoritesState.radioError = `喜欢操作失败：${message(error)}`;
+      notificationController.fetch("哔哩哔哩电台", `喜欢操作失败：${message(error)}`);
+      return !nowLiked;
+    }
+  },
+  openLikedSeries(): void {
+    const liked = biliFavoritesState.radioSeries.find(s => s.id === LIKED_SERIES_ID || s.name === LIKED_SERIES_NAME);
+    if (!liked || !liked.items.length) {
+      notificationController.fetch("哔哩哔哩电台", "还没有喜欢的曲目，点击视频旁的 ♡ 即可收藏");
+      return;
+    }
+    biliFavoritesState.radioQueue = liked.items.map(item => ({ ...item }));
+    biliFavoritesState.radioSeriesName = liked.name;
+    notificationController.fetch("哔哩哔哩电台", `已载入「${liked.name}」（共 ${liked.items.length} 首）`);
   },
   async renameSeries(id: string, newName: string): Promise<void> {
     const title = newName.trim();
@@ -384,10 +447,10 @@ export const biliRadioController = {
     try {
       await persistSeries(next);
       biliFavoritesState.radioSeries = next;
-      biliFavoritesState.radioSeriesName = "";
+      biliFavoritesState.radioSeriesName = title;
       notificationController.fetch(
         "哔哩哔哩电台",
-        existingIndex >= 0 ? `✓ 已更新系列「${title}」（共 ${items.length} 首）` : `★ 已保存系列「${title}」（共 ${items.length} 首）`
+        existingIndex >= 0 ? `✓ 已更新歌单「${title}」（共 ${items.length} 首）` : `★ 已保存歌单「${title}」（共 ${items.length} 首）`
       );
     } catch (error) {
       const errText = message(error);

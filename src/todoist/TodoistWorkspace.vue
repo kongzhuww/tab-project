@@ -23,6 +23,9 @@ import { pendingTodoistTask } from "./task-navigation";
 import { notificationController } from "../notifications/store";
 import { getDockModuleTransition } from "../modules/registry";
 import { fullscreenCardState } from "../core/fullscreen-card-state";
+import { useWorkspaceWallpaper } from "../wallpaper/workspace-wallpaper";
+import WorkspaceWallpaperLayer from "../wallpaper/WorkspaceWallpaperLayer.vue";
+const { style: todoistWallpaperStyle, media: todoistWallpaperMedia } = useWorkspaceWallpaper('todoist');
 import { hideRegisteredCard } from "../core/fullscreen-card-state";
 import { useTaskInvalidation } from "./use-task-invalidation";
 import { t } from "../i18n";
@@ -255,7 +258,7 @@ function handleClose() {
           <TodoistCalendarSidebar />
         </div>
         <div class="todoist-workspace-task-area">
-          <TodoistTaskList :embedded="props.embedded" />
+          <TodoistTaskList :embedded="props.embedded" :style="todoistWallpaperStyle" :class="{ 'has-workspace-wallpaper': !!todoistWallpaperStyle }"><template #wallpaper><WorkspaceWallpaperLayer :media="todoistWallpaperMedia" /></template></TodoistTaskList>
         </div>
       </div>
 

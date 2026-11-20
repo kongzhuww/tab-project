@@ -1,0 +1,6 @@
+:root { color-scheme: light dark; font-family: system-ui, sans-serif; }
+body { margin: 0; line-height: 1.7; }
+main { max-width: 900px; margin: 0 auto; padding: 28px 24px 60px; }
+nav { display: flex; gap: 20px; flex-wrap: wrap; border-bottom: 1px solid #8886; padding-bottom: 16px; }
+a { color: light-dark(#1764a4, #8dc7ff); overflow-wrap: anywhere; }
+article { white-space: pre-wrap; overflow-wrap: anywhere; }

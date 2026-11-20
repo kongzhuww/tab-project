@@ -10,19 +10,35 @@ const bundle = await build({ entryPoints: [fileURLToPath(new URL('../src/backgro
 const { routeNewTab, cleanupOrReplaceBrowserDefaultNewTabs, openOrFocusNewTab } = await import(`data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text).toString('base64')}`);
 const base = 'chrome-extension://test/';
 
-test('new tabs route by quick-search setting and ignore retired one-tab setting', async t => {
+test('quick search keeps a main page first, then opens searches without changing the setting', async t => {
   const previous = globalThis.chrome;
   t.after(() => { globalThis.chrome = previous; });
-  let settings = {};
-  globalThis.chrome = { runtime: { getURL: path => base + path }, storage: { local: { get: async () => settings } } };
-  const route = () => new Promise(resolve => routeNewTab(resolve));
-  assert.equal((await route()).action, 'open-home');
-  settings = { singleNewTab: true, oneNewTab: true };
-  assert.equal((await route()).action, 'open-search');
-  settings = { enableQuickSearch: false, oneNewTab: true };
-  assert.equal((await route()).action, 'open-home');
-  settings = { enableQuickSearch: true, oneNewTab: true };
-  assert.deepEqual((await Promise.all([route(), route()])).map(x => x.action), ['open-search', 'open-search']);
+  let settings = { enableQuickSearch: true };
+  let tabs = [{ id: 11, url: base + 'newtab-bootstrap.html' }];
+  globalThis.chrome = { runtime: { getURL: path => base + path }, storage: { local: { get: async () => settings } }, tabs: { query: async () => tabs } };
+  const route = id => new Promise(resolve => routeNewTab(resolve, id));
+  assert.equal((await route(11)).action, 'open-home');
+  tabs = [{ id: 11, url: base + 'newtab.html' }, { id: 12, url: base + 'newtab-bootstrap.html' }];
+  assert.equal((await route(12)).action, 'open-search');
+  settings = { enableQuickSearch: false, singleNewTab: true };
+  assert.equal((await route(12)).action, 'open-home');
+  settings = { singleNewTab: true };
+  assert.equal((await route(12)).action, 'open-search');
+  tabs = [{ id: 12, url: base + 'newtab-search.html' }, { id: 13, url: base + 'newtab-bootstrap.html' }];
+  assert.equal((await route(13)).action, 'open-home');
+  chrome.storage.local.get = async () => { throw new Error('storage unavailable'); };
+  assert.equal((await route(13)).action, 'open-home');
+});
+
+test('simultaneous first tabs reserve one home and release it when closed', async t => {
+  const previous = globalThis.chrome;
+  t.after(() => { globalThis.chrome = previous; });
+  let tabs = [21, 22, 23].map(id => ({ id, url: base + 'newtab-bootstrap.html' }));
+  globalThis.chrome = { runtime: { getURL: path => base + path }, storage: { local: { get: async () => ({ enableQuickSearch: true }) } }, tabs: { query: async () => tabs } };
+  const route = id => new Promise(resolve => routeNewTab(resolve, id));
+  assert.deepEqual((await Promise.all([route(21), route(22), route(23)])).map(x => x.action), ['open-home', 'open-search', 'open-search']);
+  tabs = [{ id: 22, url: base + 'newtab-search.html' }, { id: 23, url: base + 'newtab-bootstrap.html' }];
+  assert.equal((await route(23)).action, 'open-home');
 });
 
 test('home shortcut returns from quick search and prefers an existing main page', async t => {
@@ -57,5 +73,9 @@ test('cleanup redirects browser new tabs without closing tabs, even with retired
     ], update: async (id, change) => actions.push(['update', id, change]), remove: async id => actions.push(['remove', id]) }
   };
   await cleanupOrReplaceBrowserDefaultNewTabs();
-  assert.deepEqual(actions, [['update', 3, { url: base + 'newtab-search.html' }]]);
+  assert.deepEqual(actions, [['update', 3, { url: base + 'newtab-bootstrap.html' }]]);
+  actions.length = 0;
+  chrome.storage.local.get = async () => ({ singleNewTab: true });
+  await cleanupOrReplaceBrowserDefaultNewTabs();
+  assert.deepEqual(actions, [['update', 3, { url: base + 'newtab-bootstrap.html' }]]);
 });

@@ -207,6 +207,16 @@ function releaseCachedObjectUrl(): void {
   cachedObjectUrl = "";
 }
 
+function isBiliStreamExpired(url?: string): boolean {
+  if (!url || url.startsWith("blob:")) return false;
+  try {
+    const deadline = Number(new URL(url).searchParams.get("deadline") || 0);
+    return Number.isFinite(deadline) && deadline > 0 && Date.now() / 1000 >= deadline - 120;
+  } catch {
+    return false;
+  }
+}
+
 export const biliMiniPlayerController = {
   get state() {
     return biliMiniPlayerState;
@@ -252,9 +262,10 @@ export const biliMiniPlayerController = {
 
     this.bringToFront();
 
-    // 如果当前正在播放同一个视频且播放源正常，只需取消折叠并唤醒
+    // 如果当前正在播放同一个视频且播放源未过期，只需取消折叠并唤醒
     const isSameVideo = (Boolean(bvid) && biliMiniPlayerState.bvid === bvid) || (Boolean(aid) && biliMiniPlayerState.aid === aid);
-    if (biliMiniPlayerState.isOpen && isSameVideo && !videoPayload.cachedSourceUrl && (biliMiniPlayerState.videoSrc || biliMiniPlayerState.iframeSrc) && !biliMiniPlayerState.errorMsg) {
+    const hasFreshSource = Boolean((biliMiniPlayerState.videoSrc && !isBiliStreamExpired(biliMiniPlayerState.videoSrc)) || biliMiniPlayerState.iframeSrc);
+    if (biliMiniPlayerState.isOpen && isSameVideo && !videoPayload.cachedSourceUrl && hasFreshSource && !biliMiniPlayerState.errorMsg) {
       miniPlayerMachine.send({ type: "TOGGLE_COLLAPSE", collapsed: false });
       return;
     }
@@ -301,7 +312,7 @@ export const biliMiniPlayerController = {
     }
 
     try {
-      const streamResult = await bilibiliService.resolvePlayStream({
+      const resolveOnce = () => bilibiliService.resolvePlayStream({
         bvid,
         aid,
         cid: videoPayload.cid,
@@ -309,6 +320,16 @@ export const biliMiniPlayerController = {
         cover: videoPayload.cover,
         preferredQuality: biliMiniPlayerState.currentQuality
       }, 1, signal);
+
+      let streamResult: Awaited<ReturnType<typeof bilibiliService.resolvePlayStream>>;
+      try {
+        streamResult = await resolveOnce();
+      } catch (firstErr: any) {
+        signal.throwIfAborted();
+        const isTransient = firstErr?.name === "TimeoutError" || firstErr instanceof TypeError;
+        if (!isTransient) throw firstErr;
+        streamResult = await resolveOnce();
+      }
       signal.throwIfAborted();
 
       biliMiniPlayerState.title = streamResult.title || videoPayload.title || bvid;

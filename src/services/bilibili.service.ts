@@ -1185,15 +1185,32 @@ export class BilibiliService {
     const deadline = playbackDeadline(parentSignal, 18000);
     const signal = deadline.signal;
     const request = async (url: string) => {
-      signal.throwIfAborted();
-      const attempt = playbackDeadline(signal, 5000);
-      try { return await this.api<any>(url, { signal: attempt.signal }); }
-      finally { attempt.dispose(); }
+      for (let round = 0; round < 2; round++) {
+        signal.throwIfAborted();
+        const attempt = playbackDeadline(signal, 6000);
+        try {
+          return await this.api<any>(url, { signal: attempt.signal });
+        } catch (error: any) {
+          signal.throwIfAborted();
+          const transient = error?.name === "TimeoutError" || error instanceof TypeError;
+          if (!transient || round === 1) {
+            if ([-352, -403, -101, -111].includes(error?.code) || [403, 412].includes(error?.status)) {
+              this.wbiKeysCache = null;
+            }
+            throw error;
+          }
+        } finally {
+          attempt.dispose();
+        }
+      }
     };
     const shouldStop = (error: any) => {
       signal.throwIfAborted();
-      if ([401, 403, 412, 429].includes(error?.status) || [-101, -111, -352, -412].includes(error?.code)) throw error;
-      if (error?.name === "TimeoutError" || error?.name === "AbortError" || error instanceof TypeError) throw error;
+      if ([401, 403, 412, 429].includes(error?.status) || [-101, -111, -352, -412].includes(error?.code)) {
+        this.wbiKeysCache = null;
+        throw error;
+      }
+      if (error?.name === "AbortError") throw error;
     };
     try {
       signal.throwIfAborted();
@@ -1292,15 +1309,32 @@ export class BilibiliService {
     const deadline = playbackDeadline(parentSignal, 18000);
     const signal = deadline.signal;
     const request = async (url: string) => {
-      signal.throwIfAborted();
-      const attempt = playbackDeadline(signal, 5000);
-      try { return await this.api<any>(url, { signal: attempt.signal }); }
-      finally { attempt.dispose(); }
+      for (let round = 0; round < 2; round++) {
+        signal.throwIfAborted();
+        const attempt = playbackDeadline(signal, 6000);
+        try {
+          return await this.api<any>(url, { signal: attempt.signal });
+        } catch (error: any) {
+          signal.throwIfAborted();
+          const transient = error?.name === "TimeoutError" || error instanceof TypeError;
+          if (!transient || round === 1) {
+            if ([-352, -403, -101, -111].includes(error?.code) || [403, 412].includes(error?.status)) {
+              this.wbiKeysCache = null;
+            }
+            throw error;
+          }
+        } finally {
+          attempt.dispose();
+        }
+      }
     };
     const shouldStop = (error: any) => {
       signal.throwIfAborted();
-      if ([401, 403, 412, 429].includes(error?.status) || [-101, -111, -352, -412].includes(error?.code)) throw error;
-      if (error?.name === "TimeoutError" || error?.name === "AbortError" || error instanceof TypeError) throw error;
+      if ([401, 403, 412, 429].includes(error?.status) || [-101, -111, -352, -412].includes(error?.code)) {
+        this.wbiKeysCache = null;
+        throw error;
+      }
+      if (error?.name === "AbortError") throw error;
     };
 
     const extractDashAudio = (data: any): string[] => {

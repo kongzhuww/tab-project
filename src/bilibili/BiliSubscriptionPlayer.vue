@@ -4,16 +4,11 @@ import { biliFavoritesController, biliFavoritesState } from "./bili-favorites-st
 import { bilibiliService } from "../services/bilibili.service";
 import { attachBiliPlaybackSync, detachBiliPlaybackSync } from "./playback-sync";
 import BiliRichText from "./BiliRichText.vue";
-
-interface EmoteItem {
-  text: string;
-  url: string;
-}
-
-interface EmotePackage {
-  text: string;
-  emote: EmoteItem[];
-}
+import { subscriptionSubtitleFollow } from "./subtitle-follow";
+import BiliSubscriptionDanmaku from "./BiliSubscriptionDanmaku.vue";
+import { parseCommentEmotePackages, type CommentEmotePackage } from "./comment-emotes";
+import { imageViewerController } from "../viewers/image-viewer-store";
+import BiliSubscriptionTranscript from "./BiliSubscriptionTranscript.vue";
 
 interface CommentToken {
   type: "text" | "emote";
@@ -46,6 +41,7 @@ const videoRef = ref<HTMLVideoElement | null>(null);
 const videoLoading = ref(false);
 const useIframe = ref(false);
 const iframeSrc = ref("");
+const videoCid = ref<string | number | null>(null);
 
 // 评论区状态
 const currentAid = ref<string | number>("");
@@ -66,7 +62,7 @@ const commentTip = ref("");
 const isCommentTipError = ref(false);
 const showEmotePicker = ref(false);
 const loadingEmotes = ref(false);
-const emotePackages = ref<EmotePackage[]>([]);
+const emotePackages = ref<CommentEmotePackage[]>([]);
 
 let tipTimer: ReturnType<typeof setTimeout> | null = null;
 let unsubscribeAction: (() => void) | null = null;
@@ -88,6 +84,18 @@ function toggleDescPanel() {
   biliFavoritesController.dispatch("subscription-toggle-desc-panel");
 }
 
+function copyScript() {
+  biliFavoritesController.dispatch(
+    biliFavoritesState.organizer.showFullDescInRightPanel
+      ? "subscription-copy-description"
+      : "subscription-copy-script"
+  );
+}
+
+function closeFullscreenPlayer() {
+  biliFavoritesController.dispatch("organizer-open");
+}
+
 function onScrollStage(event: Event) {
   const el = event.currentTarget as HTMLElement | null;
   if (!el) return;
@@ -104,7 +112,7 @@ function copyDesc() {
 
 function openLightbox(sources: string[], index: number) {
   const src = sources[index];
-  if (src) window.open(src, "_blank", "noopener,noreferrer");
+  if (src) imageViewerController.open(src, current.value?.title ? `${current.value.title} · 评论图片` : "评论图片");
 }
 
 // 文本分词（将 [doge] 等表情转换为 token）
@@ -295,15 +303,7 @@ async function toggleEmotes() {
       const resp = await fetch("https://api.bilibili.com/x/emote/user/panel/web?business=reply", { credentials: "include" });
       const res = await resp.json();
       if (res?.code === 0 && Array.isArray(res?.data?.packages)) {
-        emotePackages.value = res.data.packages
-          .filter((p: any) => Array.isArray(p.emote) && p.emote.length)
-          .map((p: any) => ({
-            text: p.text || "B站表情",
-            emote: p.emote.map((e: any) => ({
-              text: e.text || "",
-              url: String(e.url || "").replace(/^http:/, "https:")
-            }))
-          }));
+        emotePackages.value = parseCommentEmotePackages(res.data.packages);
       }
     } catch {
       // 忽略表情错误
@@ -417,6 +417,8 @@ async function loadCurrentVideo(videoDoc: any) {
   videoLoading.value = true;
   useIframe.value = false;
   iframeSrc.value = "";
+  videoCid.value = null;
+  lastActiveSrtRow = null;
 
   // 1. 获取 aid
   let aid = videoDoc.aid;
@@ -429,6 +431,7 @@ async function loadCurrentVideo(videoDoc: any) {
       }
     } catch {}
   }
+  if (current.value?.bvid !== videoDoc.bvid) return;
   currentAid.value = aid || "";
 
   // 2. 加载评论
@@ -438,7 +441,9 @@ async function loadCurrentVideo(videoDoc: any) {
   // 3. 解析视频流
   try {
     const track = await bilibiliService.resolvePlayStream(videoDoc);
+    if (current.value?.bvid !== videoDoc.bvid) return;
     if (track?.sources?.length) {
+      videoCid.value = track.cid;
       if (videoRef.value) {
         // 再次确保其它媒体处于暂停状态
         if (typeof document !== "undefined") {
@@ -458,97 +463,37 @@ async function loadCurrentVideo(videoDoc: any) {
   }
 
   // 4. 备用 iframe 播放
+  if (current.value?.bvid !== videoDoc.bvid) return;
   useIframe.value = true;
-  iframeSrc.value = `https://player.bilibili.com/player.html?bvid=${videoDoc.bvid}&autoplay=1&danmaku=0`;
+  iframeSrc.value = `https://player.bilibili.com/player.html?bvid=${encodeURIComponent(videoDoc.bvid)}&autoplay=1&danmaku=1`;
   videoLoading.value = false;
 }
 
 // 视频播放进度与字幕行高亮联动
-let lastActiveCueEl: HTMLElement | null = null;
 let lastActiveSrtRow: HTMLElement | null = null;
-
-function scrollElementToUpperCenter(target: HTMLElement) {
-  const container = (target.closest(".bili-sub-transcript-body") || target.closest(".bili-sub-article-wrap") || target.parentElement) as HTMLElement | null;
-  if (!container) return;
-  const containerRect = container.getBoundingClientRect();
-  const targetRect = target.getBoundingClientRect();
-  const offsetTop = targetRect.top - containerRect.top + container.scrollTop;
-  // 居中上面一点（约 36% 高度，黄金视线位置）
-  const desiredTop = offsetTop - containerRect.height * 0.36;
-  container.scrollTo({
-    top: Math.max(0, desiredTop),
-    behavior: "smooth"
-  });
-}
 
 function onTimeUpdate() {
   if (!videoRef.value) return;
   const cur = videoRef.value.currentTime;
 
-  // 1. 联动高亮报纸分段章节
-  const newspaperSections = document.querySelectorAll(".bili-sub-newspaper-section");
-  newspaperSections.forEach((el) => {
-    const from = Number(el.getAttribute("data-from") || 0);
-    const to = Number(el.getAttribute("data-to") || 0);
-    const active = cur >= from && (to <= 0 || cur < to);
-    el.classList.toggle("active", active);
-  });
-
-  const isNewspaperMode = biliFavoritesState.organizer.subscriptionScriptMode === "newspaper";
-
-  // 2. 联动高亮报纸模式下具体台词句（读到什么地方就蓝色背景什么地方）
-  if (isNewspaperMode) {
-    const newspaperCues = document.querySelectorAll<HTMLElement>(".bili-sub-newspaper-cue");
-    if (newspaperCues.length > 0) {
-      let activeCueEl: HTMLElement | null = null;
-      newspaperCues.forEach((el) => {
-        const from = Number(el.getAttribute("data-from") || 0);
-        const to = Number(el.getAttribute("data-to") || 0);
-        const active = cur >= from && (to <= 0 || cur < to);
-        if (active) {
-          if (!activeCueEl) activeCueEl = el;
-          el.classList.add("cue-reading-active");
-        } else {
-          el.classList.remove("cue-reading-active");
-        }
-      });
-      // 若当前时间处于句子之间微弱空隙，选中最近已播放的那句
-      if (!activeCueEl && cur > 0) {
-        for (let i = newspaperCues.length - 1; i >= 0; i--) {
-          const el = newspaperCues[i];
-          const from = Number(el.getAttribute("data-from") || 0);
-          if (cur >= from) {
-            activeCueEl = el;
-            el.classList.add("cue-reading-active");
-            break;
-          }
-        }
-      }
-      if (activeCueEl && activeCueEl !== lastActiveCueEl) {
-        lastActiveCueEl = activeCueEl;
-        scrollElementToUpperCenter(activeCueEl);
-      }
+  // 联动高亮滚动台词行
+  const srtRows = document.querySelectorAll(".bili-sub-srt-row");
+  let activeFound = false;
+  let activeRowEl: HTMLElement | null = null;
+  for (let i = srtRows.length - 1; i >= 0; i--) {
+    const row = srtRows[i];
+    const from = Number(row.getAttribute("data-from") || 0);
+    if (!activeFound && cur >= from) {
+      row.classList.add("active");
+      activeFound = true;
+      activeRowEl = row as HTMLElement;
+    } else {
+      row.classList.remove("active");
     }
-  } else {
-    // 3. 联动高亮 SRT 字幕行
-    const srtRows = document.querySelectorAll(".bili-sub-srt-row");
-    let activeFound = false;
-    let activeRowEl: HTMLElement | null = null;
-    for (let i = srtRows.length - 1; i >= 0; i--) {
-      const row = srtRows[i];
-      const from = Number(row.getAttribute("data-from") || 0);
-      if (!activeFound && cur >= from) {
-        row.classList.add("active");
-        activeFound = true;
-        activeRowEl = row as HTMLElement;
-      } else {
-        row.classList.remove("active");
-      }
-    }
-    if (activeRowEl && activeRowEl !== lastActiveSrtRow) {
-      lastActiveSrtRow = activeRowEl;
-      scrollElementToUpperCenter(activeRowEl);
-    }
+  }
+  if (activeRowEl && activeRowEl !== lastActiveSrtRow) {
+    lastActiveSrtRow = activeRowEl;
+    subscriptionSubtitleFollow.follow();
   }
 }
 
@@ -599,48 +544,55 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <aside class="bili-sub-player-column">
-    <div v-if="current" class="bili-sub-sticky-player">
-      <div class="bili-sub-player-card">
-        <!-- 兼容性与影院交接挂载点 -->
-        <div class="bili-sub-vue-comment-handoff" hidden style="display:none !important;">
-          <strong>播放器与评论区已统一到 Vue 本地影院</strong>
-          <button type="button" @click="openTheater">打开播放器与评论区</button>
-        </div>
-
-        <!-- 上方：独立的固定视频播放器 (16:9) -->
-        <div class="bili-sub-video-box">
-          <video
-            ref="videoRef"
-            class="bili-sub-native-video"
-            controls
-            playsinline
-            :poster="current.cover"
-            :hidden="useIframe"
-            @timeupdate="onTimeUpdate"
-            @seeked="onSeeked"
-            @play="onPlay"
-          ></video>
-          <iframe
-            v-if="useIframe"
-            class="bili-sub-native-iframe"
-            allowfullscreen="true"
-            allow="autoplay; fullscreen"
-            :src="iframeSrc"
-          ></iframe>
-          <div v-if="videoLoading" class="bili-sub-video-loading">
-            <i></i><span>正在解析登录高清视频流…</span>
+  <div v-if="current" class="bili-sub-layout bili-sub-vue-layout">
+    <!-- 左栏：视频播放器 + 简介 + 滚动字幕 -->
+    <aside class="bili-sub-player-column">
+      <div class="bili-sub-sticky-player">
+        <div class="bili-sub-player-card">
+          <div class="bili-sub-vue-comment-handoff" hidden style="display:none !important;">
+            <strong>播放器与评论区已统一到 Vue 本地影院</strong>
+            <button type="button" @click="openTheater">打开播放器与评论区</button>
           </div>
-        </div>
 
-        <!-- 下方：一体化滚动舞台（囊括简介与评论区） -->
-        <div class="bili-sub-scroll-stage" @scroll.passive="onScrollStage">
+          <!-- 上方：视频播放器 (16:9) -->
+          <div class="bili-sub-video-box">
+            <video
+              ref="videoRef"
+              class="bili-sub-native-video"
+              controls
+              playsinline
+              :poster="current.cover"
+              :hidden="useIframe"
+              @timeupdate="onTimeUpdate"
+              @seeked="onSeeked"
+              @play="onPlay"
+            ></video>
+            <BiliSubscriptionDanmaku v-if="!useIframe && !videoLoading" :bvid="current.bvid" :cid="videoCid" :video="videoRef" />
+            <iframe
+              v-if="useIframe"
+              class="bili-sub-native-iframe"
+              allowfullscreen="true"
+              allow="autoplay; fullscreen"
+              :src="iframeSrc"
+            ></iframe>
+            <div v-if="videoLoading" class="bili-sub-video-loading">
+              <i></i><span>正在解析登录高清视频流…</span>
+            </div>
+          </div>
+
           <div class="bili-sub-video-meta">
             <div class="bili-sub-video-meta-actions">
               <button
                 type="button"
                 class="bili-copy-desc-btn"
-                :title="biliFavoritesState.organizer.showFullDescInRightPanel ? '切回台词展示' : '在右侧大屏展开完整视频简介'"
+                @click="copyScript"
+              >
+                {{ biliFavoritesState.organizer.showFullDescInRightPanel ? '复制简介' : '复制稿子' }}
+              </button>
+              <button
+                type="button"
+                class="bili-copy-desc-btn"
+                :title="biliFavoritesState.organizer.showFullDescInRightPanel ? '切回台词展示' : '展开完整视频简介'"
                 @click="toggleDescPanel"
               >
                 {{ biliFavoritesState.organizer.showFullDescInRightPanel ? '缩小简介' : '放大简介' }}
@@ -655,61 +607,72 @@ onUnmounted(() => {
             <p class="bili-sub-meta-desc"><BiliRichText :text="current.description || '暂无简介'" /></p>
           </div>
 
-          <!-- 下方：原版内嵌评论区 -->
-          <div class="bili-sub-comments-section" id="bili-sub-comments-section">
-          <div class="bili-mini-comments-head">
-            <div class="bili-mini-comments-meta">
-              <span>💬 评论</span>
-              <span class="bili-mini-comments-count bili-sub-comments-count">{{ commentsCountText }}</span>
-            </div>
+          <!-- 左栏下方：滚动台词 / 简介 -->
+          <BiliSubscriptionTranscript class="bili-sub-inline-transcript" />
+        </div>
+      </div>
+    </aside>
+
+    <!-- 右栏：完整评论区（右上角自带关闭 × 按钮） -->
+    <section class="bili-sub-comments-column">
+      <div class="bili-sub-comments-section bili-sub-comments-panel" id="bili-sub-comments-section">
+        <div class="bili-mini-comments-head">
+          <div class="bili-mini-comments-meta">
+            <span>💬 评论</span>
+            <span class="bili-mini-comments-count bili-sub-comments-count">{{ commentsCountText }}</span>
+          </div>
+          <div class="bili-sub-comments-head-right">
             <div class="bili-mini-comments-sort">
               <button type="button" class="bili-mini-sort-btn" :class="{ active: currentSort === 1 }" @click="changeSort(1)">按热度</button>
               <button type="button" class="bili-mini-sort-btn" :class="{ active: currentSort === 0 }" @click="changeSort(0)">按时间</button>
             </div>
+            <button type="button" class="bili-sub-close-btn" title="退出全屏返回" aria-label="关闭全屏播放" @click="closeFullscreenPlayer">✕</button>
           </div>
+        </div>
 
-          <div class="bili-sub-comment-composer">
-            <button type="button" class="bili-sub-emote-button" :class="{ on: showEmotePicker }" title="选择 B站 表情" @click="toggleEmotes">☺</button>
-            <input
-              ref="commentInputRef"
-              v-model="commentInput"
-              type="text"
-              class="bili-sub-comment-input"
-              placeholder="发一条友善的评论吧…（Enter 发送）"
-              maxlength="500"
-              @keydown.enter.prevent="handleSendComment"
-            />
-            <button type="button" class="bili-sub-comment-send-btn" :disabled="sendingComment || !commentInput.trim()" @click="handleSendComment">
-              {{ sendingComment ? '发送中…' : '发送' }}
-            </button>
+        <div class="bili-sub-comment-composer">
+          <button type="button" class="bili-sub-emote-button" :class="{ on: showEmotePicker }" title="选择 B站 表情" @click="toggleEmotes">☺</button>
+          <input
+            ref="commentInputRef"
+            v-model="commentInput"
+            type="text"
+            class="bili-sub-comment-input"
+            placeholder="发一条友善的评论吧…（Enter 发送）"
+            maxlength="500"
+            @keydown.enter.prevent="handleSendComment"
+          />
+          <button type="button" class="bili-sub-comment-send-btn" :disabled="sendingComment || !commentInput.trim()" @click="handleSendComment">
+            {{ sendingComment ? '发送中…' : '发送' }}
+          </button>
+        </div>
+
+        <!-- 表情选择抽屉 -->
+        <div v-if="showEmotePicker" class="bili-sub-emote-picker">
+          <div v-if="loadingEmotes" class="fo-bili-loading"><i></i><span>正在读取 B站 表情包…</span></div>
+          <div v-else>
+            <section v-for="pack in emotePackages" :key="pack.text" class="bili-sub-emote-group">
+              <h5>{{ pack.text || 'B站表情' }}</h5>
+              <div :class="{ 'bili-sub-text-emotes': pack.text.includes('颜文字') }">
+                <button
+                  v-for="emote in pack.emote"
+                  :key="emote.text"
+                  type="button"
+                  class="bili-sub-emote-item"
+                  :title="emote.text"
+                  @click="insertEmote(emote.text)"
+                >
+                  <img v-if="emote.url && !emote.textOnly && !emote.failed" :src="emote.url" :alt="emote.text" referrerpolicy="no-referrer" @error="emote.failed = true" />
+                  <span v-else>{{ emote.text }}</span>
+                </button>
+              </div>
+            </section>
           </div>
+        </div>
 
-          <!-- 表情选择抽屉 -->
-          <div v-if="showEmotePicker" class="bili-sub-emote-picker">
-            <div v-if="loadingEmotes" class="fo-bili-loading"><i></i><span>正在读取 B站 表情包…</span></div>
-            <div v-else>
-              <section v-for="pack in emotePackages" :key="pack.text" class="bili-sub-emote-group">
-                <h5>{{ pack.text || 'B站表情' }}</h5>
-                <div>
-                  <button
-                    v-for="emote in pack.emote"
-                    :key="emote.text"
-                    type="button"
-                    class="bili-sub-emote-item"
-                    :title="emote.text"
-                    @click="insertEmote(emote.text)"
-                  >
-                    <img v-if="emote.url" :src="emote.url" :alt="emote.text" referrerpolicy="no-referrer" />
-                    <span v-else>{{ emote.text }}</span>
-                  </button>
-                </div>
-              </section>
-            </div>
-          </div>
+        <div v-if="commentTip" class="bili-sub-comment-tip" :class="{ error: isCommentTipError }">{{ commentTip }}</div>
 
-          <div v-if="commentTip" class="bili-sub-comment-tip" :class="{ error: isCommentTipError }">{{ commentTip }}</div>
-
-          <!-- 评论列表 -->
+        <!-- 评论列表独立滚动容器 -->
+        <div class="bili-sub-scroll-stage bili-sub-comments-scroll" @scroll.passive="onScrollStage">
           <div class="bili-mini-comments-body bili-sub-comments-body">
             <p v-if="commentsLoading && !comments.length" class="muted small" style="text-align:center;padding:16px 0;">正在加载评论…</p>
             <p v-else-if="commentsError && !comments.length" class="muted small" style="text-align:center;padding:16px 0;">{{ commentsError }}</p>
@@ -738,7 +701,6 @@ onUnmounted(() => {
                     <span class="bili-comment-sub-uname">{{ sub.userName }}:</span>
                     <BiliRichText :text="sub.message" />
                   </div>
-                  <!-- 原地展开 / 点击查看楼中楼控制条 -->
                   <div class="bili-comment-sub-more">
                     <template v-if="!c.subRepliesExpanded && (c.replyCount || 0) > c.replies.length">
                       <span>共 {{ c.replyCount }} 条回复，</span>
@@ -775,17 +737,15 @@ onUnmounted(() => {
             </div>
           </div>
 
-          <!-- 底部无限滚动加载指示器 (下翻自动加载，彻底移除生硬按钮) -->
           <div class="bili-sub-comments-infinite-trigger">
             <p v-if="loadingMore" class="muted small" style="text-align: center; padding: 12px 0;">正在加载更多评论…</p>
             <p v-else-if="!hasMoreComments && comments.length" class="muted small" style="text-align: center; padding: 12px 0; opacity: 0.6;">已显示全部评论</p>
           </div>
         </div>
-        </div>
       </div>
-    </div>
-    <p v-else class="fo-bili-empty">暂无可播放的订阅视频。</p>
-  </aside>
+    </section>
+  </div>
+  <p v-else class="fo-bili-empty">暂无可播放的视频。</p>
 </template>
 
 <style scoped>

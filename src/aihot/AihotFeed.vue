@@ -14,11 +14,13 @@ import { aiHotService } from "../services/aihot.service";
 import { fullscreenCardState } from "../core/fullscreen-card-state";
 import { notifications } from "../sdk/notifications";
 import { t, currentLanguage } from "../i18n";
+import RssChannels from "./RssChannels.vue";
 
 const state = aihotFeedState;
 
 const { active, standalone } = useCardActivity("daily-aihot", "/aihot.html");
 const owner = Symbol("aihot-feed-view");
+const rssActive = ref(false);
 let initialized = false;
 watch(active, visible => {
   if (!visible) { aiHotService.pause(owner); return; }
@@ -33,7 +35,7 @@ watch(active, visible => {
       if (localStorage.getItem("lw-aihot-feed-window") === "7d") state.feedWindow = "7d";
     } catch {}
   }
-  aiHotService.activate(owner);
+  if (state.currentView !== 'feed' || !rssActive.value) aiHotService.activate(owner);
 }, { immediate: true, flush: "sync" });
 onBeforeUnmount(() => {
   aiHotService.pause(owner);
@@ -136,7 +138,18 @@ const hasContent = computed(() => {
 });
 
 function handleSwitchView(view: AiHotViewType) {
+  if (view !== 'feed' && rssActive.value) {
+    rssActive.value = false;
+    aiHotService.activate(owner);
+  }
   void aiHotService.switchView(view);
+}
+
+function handleRssSelected(selected: boolean) {
+  rssActive.value = selected;
+  if (!active.value || state.currentView !== 'feed') return;
+  if (selected) aiHotService.pause(owner);
+  else aiHotService.activate(owner);
 }
 
 function handleRefresh() {
@@ -205,14 +218,15 @@ function handleSelectDailyDate(date: string) {
         <header class="card-head">
           <span class="bar" style="background: linear-gradient(180deg,#34d399,#38bdf8)"></span>
           <h2 id="aihot-title">{{ viewTitle }}</h2>
-          <button id="aihot-refresh" class="icon-btn" :title="t('aihot.refreshTip')" :disabled="!active || state.isLoading" type="button" @click="handleRefresh">↻</button>
+          <button v-if="!rssActive || state.currentView !== 'feed'" id="aihot-refresh" class="icon-btn" :title="t('aihot.refreshTip')" :disabled="!active || state.isLoading" type="button" @click="handleRefresh">↻</button>
         </header>
+        <RssChannels v-if="state.currentView === 'feed'" :active="active" @custom-selected="handleRssSelected" />
 
       <!-- 辅助筛选工具栏 Subbar -->
       <div
         id="aihot-subbar"
         class="aihot-subbar"
-        v-if="state.currentView === 'leaderboard' || state.currentView === 'feed'"
+        v-if="state.currentView === 'leaderboard' || (state.currentView === 'feed' && !rssActive)"
       >
         <!-- 1. 模型榜筛选工具栏 -->
         <template v-if="state.currentView === 'leaderboard'">
@@ -353,9 +367,9 @@ function handleSelectDailyDate(date: string) {
       </div>
 
       <!-- 核心内容展示区 -->
-      <p v-if="state.statusMessage" class="muted small" role="status">{{ displayStatusMessage }}</p>
-      <p v-if="state.errorMessage && hasContent" class="notice" role="status">{{ state.errorMessage }}</p>
-      <div id="aihot-body">
+      <p v-if="!rssActive && state.statusMessage" class="muted small" role="status">{{ displayStatusMessage }}</p>
+      <p v-if="!rssActive && state.errorMessage && hasContent" class="notice" role="status">{{ state.errorMessage }}</p>
+      <div v-if="!rssActive" id="aihot-body">
         <!-- 错误提示（无可用内容时呈现） -->
         <p class="notice" v-if="state.errorMessage && !hasContent">
           {{ state.errorMessage }}

@@ -140,6 +140,8 @@ function applyLiveSnapshot(snap: EmployeePeekSnapshot | undefined) {
     prev.cursorTarget === snap.cursorTarget &&
     prev.cursorLabel === snap.cursorLabel &&
     prev.active === snap.active &&
+    prev.activeVideo?.desc === snap.activeVideo?.desc &&
+    prev.activeVideo?.descStatus === snap.activeVideo?.descStatus &&
     (prev.toolHistory?.length || 0) === (snap.toolHistory?.length || 0) &&
     (prev.timelineSteps?.length || 0) === (snap.timelineSteps?.length || 0)
   ) {
@@ -364,7 +366,7 @@ onBeforeUnmount(() => {
                         P{{ p.page }} {{ p.part || '正片' }}
                       </span>
                     </div>
-                    <p class="sim-desc">{{ currentSnapshot.activeVideo.desc || '正在获取视频简介内容…' }}</p>
+                    <p class="sim-desc">{{ currentSnapshot.activeVideo.desc || (currentSnapshot.activeVideo.descStatus === 'loading' ? '正在获取视频简介内容…' : currentSnapshot.activeVideo.descStatus === 'unavailable' ? '暂时无法获取视频简介。' : '该视频暂无简介。') }}</p>
                   </div>
 
                   <div v-else-if="activeTab === 'comments'" class="sim-comments-panel" data-peek-target="comments-list">

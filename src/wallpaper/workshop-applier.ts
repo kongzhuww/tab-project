@@ -41,7 +41,7 @@ async function collectFolderFiles(
 /**
  * 应用指定的本地 Steam 创意工坊壁纸
  */
-export async function applyWorkshopWallpaper(item: WorkshopItemInfo): Promise<boolean> {
+export async function loadWorkshopWallpaperPack(item: WorkshopItemInfo) {
   let folderHandle = item.folderHandle;
 
   // 若从离线缓存恢复，自动通过已保存的根目录句柄恢复子文件夹引用
@@ -69,7 +69,7 @@ export async function applyWorkshopWallpaper(item: WorkshopItemInfo): Promise<bo
       throw new Error("壁纸文件夹为空或无法读取");
     }
 
-    const isVideo = item.type === "video" || files.some(f => /\.(mp4|webm|mkv)$/i.test(f.path));
+    const isVideo = item.type === "video" || (item.type !== "web" && files.some(f => /\.(mp4|webm|mkv)$/i.test(f.path)));
     const pack = {
       type: isVideo ? ("video" as const) : ("web" as const),
       entry: item.entryFile || (isVideo ? files.find(f => /\.(mp4|webm|mkv)$/i.test(f.path))?.path : "index.html"),
@@ -79,6 +79,16 @@ export async function applyWorkshopWallpaper(item: WorkshopItemInfo): Promise<bo
       files,
     };
 
+    return pack;
+  } catch (err) {
+    console.error("[Workshop Applier] Failed to read wallpaper:", err);
+    throw err;
+  }
+}
+
+export async function applyWorkshopWallpaper(item: WorkshopItemInfo): Promise<boolean> {
+  try {
+    const pack = await loadWorkshopWallpaperPack(item);
     const previewImage = [item.previewBase64, item.previewUrl].find(url => url && !url.startsWith('blob:'));
     const wallpaperVal = {
       type: pack.type,

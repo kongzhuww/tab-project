@@ -1,5 +1,6 @@
 <template>
   <div id="todoist-workspace-body" class="todoist-workspace-body" @click="closeAllPopovers">
+    <slot name="wallpaper" />
     <p v-if="state.moveError && state.moveMessage" class="todoist-move-status error" role="alert">{{ state.moveMessage }}</p>
     <p v-if="state.emptyText && state.columns.length > 0 && !state.loading" class="todoist-move-status error" role="status">{{ t('todoist.tasksRetained', { text: state.emptyText }) }}</p>
     <!-- 加载中或全屏空态提示 -->

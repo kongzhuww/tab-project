@@ -1,4 +1,4 @@
-import { loadConfig, streamOpenAiCompatible } from '../services/byok.service';
+import { loadConfig, loadJevConfig, streamOpenAiCompatible } from '../services/byok.service';
 import { runLocalAgent } from '../services/native-bridge.service';
 import type { DigitalEmployee } from './employee-contract';
 
@@ -84,11 +84,19 @@ function buildTriagePrompt(employee: DigitalEmployee, candidate: TriageCandidate
 }
 
 async function runJevHttp(employee: DigitalEmployee, candidate: TriageCandidate): Promise<DecisionVerdict> {
-  const endpoint = employee.runtime.jevEndpoint;
-  if (!endpoint) throw new Error('尚未配置 Jev HTTP 端点。');
+  const globalJev = await loadJevConfig().catch(() => ({ endpoint: '', key: '', configured: false }));
+  const endpoint = employee.runtime.jevEndpoint || globalJev.endpoint;
+  if (!endpoint) throw new Error('尚未配置 Jev API 接口地址（可在 AI 设置 → Jev 快筛 API 中配置）。');
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    Accept: 'application/json',
+  };
+  if (globalJev.key) {
+    headers.Authorization = `Bearer ${globalJev.key}`;
+  }
   const response = await fetch(endpoint, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    headers,
     signal: AbortSignal.timeout(12_000),
     credentials: 'omit',
     body: JSON.stringify({

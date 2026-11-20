@@ -259,7 +259,7 @@ export const biliFavoritesState = reactive<BiliFavoritesState>({
     subscriptionError: "",
     subscriptionTitle: "订阅视频",
     subscriptionSubtitle: "AI 逐字字幕稿 · 点击台词即刻跳转播放",
-    subscriptionScriptMode: "newspaper",
+    subscriptionScriptMode: "lyrics",
     subscriptionChannels: [],
     subscriptionVideos: [],
     subscriptionChapters: [],

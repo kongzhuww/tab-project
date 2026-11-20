@@ -989,11 +989,30 @@ async function openOrFocusNewTab() {
   }
   await chrome.tabs.create({ url: chrome.runtime.getURL("newtab.html"), active: true });
 }
-function routeNewTab(sendResponse) {
-  void chrome.storage.local.get(["singleNewTab", "enableQuickSearch"]).then((stored) => {
-    const quick = stored.enableQuickSearch ?? stored.singleNewTab;
-    sendResponse({ action: quick === true ? "open-search" : "open-home" });
-  }, () => sendResponse({ action: "open-home" }));
+var routingQueue = Promise.resolve();
+var pendingHomeTabId = null;
+function routeNewTab(sendResponse, senderTabId) {
+  const run = async () => {
+    try {
+      const stored = await chrome.storage.local.get(["enableQuickSearch", "singleNewTab"]);
+      if ((stored.enableQuickSearch ?? stored.singleNewTab) !== true || senderTabId == null) {
+        sendResponse({ action: "open-home" });
+        return;
+      }
+      const tabs = await chrome.tabs.query({});
+      const hasHome = tabs.some((tab) => tab.id !== senderTabId && tabHasPage(tab, "newtab.html"));
+      const reserved = tabs.some((tab) => tab.id === pendingHomeTabId && tab.id !== senderTabId && (tabHasPage(tab, "newtab-bootstrap.html") || tabHasPage(tab, "newtab.html")));
+      if (hasHome || reserved) {
+        sendResponse({ action: "open-search" });
+      } else {
+        pendingHomeTabId = senderTabId;
+        sendResponse({ action: "open-home" });
+      }
+    } catch {
+      sendResponse({ action: "open-home" });
+    }
+  };
+  routingQueue = routingQueue.then(run, run);
 }
 function normalizeUrl(value) {
   try {
@@ -1068,9 +1087,7 @@ async function cleanupOrReplaceBrowserDefaultNewTabs() {
       return /^(?:chrome|edge):\/\/(?:newtab|new-tab-page)\/?(?:[?#].*)?$/.test(url);
     });
     if (!strayTabs.length) return;
-    const stored = await chrome.storage.local.get(["singleNewTab", "enableQuickSearch"]);
-    const quick = stored.enableQuickSearch ?? stored.singleNewTab;
-    const targetUrl = chrome.runtime.getURL(quick === true ? "newtab-search.html" : "newtab.html");
+    const targetUrl = chrome.runtime.getURL("newtab-bootstrap.html");
     for (const tab of strayTabs) if (tab.id != null) await chrome.tabs.update(tab.id, { url: targetUrl });
   } catch {
   }
@@ -4996,13 +5013,21 @@ var TodoistService = class _TodoistService {
     }
     return null;
   }
-  async loadWorkspaceData(view = "inbox", targetProjectId, _force = false, signal) {
+  async loadWorkspaceData(view = "inbox", targetProjectId, force = false, signal) {
     await this.initToken();
     signal?.throwIfAborted();
     if (!this.token) {
       const cached = await this.getCachedWorkspaceData(view, targetProjectId);
       signal?.throwIfAborted();
       return cached || { columns: [], projects: [], activeProjectId: "", activeProjectName: "", availableLabels: [] };
+    }
+    if (!force && !this.workspaceCacheInvalidated) {
+      const key2 = this.getWorkspaceCacheKey(view, targetProjectId);
+      const cached = await this.getCachedWorkspaceData(view, targetProjectId);
+      const mem = this.workspaceMemoryCache.get(key2);
+      if (cached && cached.columns?.length && mem && Date.now() - mem.timestamp < 3 * 60 * 1e3) {
+        return cached;
+      }
     }
     return this.fetchWorkspaceDataOnline(view, targetProjectId, signal);
   }
@@ -6341,6 +6366,27 @@ async function loadConfig() {
     models,
     requiresKey: true,
     configured
+  };
+}
+var JEV_CONFIG_KEY = "jevApiConfigV1";
+async function loadJevConfig() {
+  const root = (await area().get(JEV_CONFIG_KEY))[JEV_CONFIG_KEY];
+  const rawEndpoint = typeof root?.endpoint === "string" ? root.endpoint.trim() : "";
+  let endpoint = "";
+  if (rawEndpoint) {
+    try {
+      const parsed = new URL(rawEndpoint);
+      if (parsed.protocol === "https:" || parsed.protocol === "http:") {
+        endpoint = parsed.href;
+      }
+    } catch {
+    }
+  }
+  const key2 = typeof root?.key === "string" ? root.key : "";
+  return {
+    endpoint,
+    key: key2,
+    configured: Boolean(endpoint)
   };
 }
 async function loadConversations() {
@@ -7863,6 +7909,7 @@ function initAiScheduler() {
 // src/agents/employee-contract.ts
 var DIGITAL_EMPLOYEES_KEY = "digitalEmployeesV1";
 var DIGITAL_EMPLOYEE_ORGANIZER_SEEDED_KEY = "digitalEmployeeOrganizerSeededV1";
+var DIGITAL_EMPLOYEE_SITE_FINDER_SEEDED_KEY = "digitalEmployeeSiteFinderSeededV1";
 var EMPLOYEE_RUN_LOG_KEY = "digitalEmployeeRunsV1";
 var EMPLOYEE_LIVE_PEEK_KEY = "digitalEmployeeLivePeekV1";
 var EMPLOYEE_WORKER_STAMP = "organizer-approval-safe-v6";
@@ -7960,6 +8007,55 @@ function createDefaultOrganizerEmployee(now = Date.now()) {
     updatedAt: now
   };
 }
+function createDefaultSiteFinderEmployee(now = Date.now()) {
+  return {
+    id: "emp-site-finder-default",
+    name: "\u8BB0\u5FC6\u627E\u7AD9\u4E13\u5458",
+    role: "\u6A21\u7CCA\u63CF\u8FF0\u627E\u7AD9 \xB7 \u672A\u679C\u667A\u80FD\u63A8\u8350",
+    description: "\u6839\u636E\u4F60\u7684\u96F6\u788E\u8BB0\u5FC6\u63CF\u8FF0\uFF0C\u5148\u7528 Jev/\u672C\u5730\u53EC\u56DE\u6F0F\u6597\u4ECE\u5E38\u7528\u7F51\u7AD9\u4E0E\u4E66\u7B7E\u4E2D\u5FEB\u901F\u7B5B\u51FA\u5019\u9009\uFF0C\u518D\u7531\u5927\u6A21\u578B\u7CBE\u51C6\u63A8\u7406\u5339\u914D\uFF1B\u82E5\u672A\u627E\u5230\uFF0C\u4E3B\u52A8\u63A8\u8350\u53EF\u9760\u7684\u5916\u90E8\u7F51\u7AD9\u5165\u53E3\u3002",
+    accentColor: "#8b5cf6",
+    enabled: false,
+    source: {
+      kind: "site-finder",
+      folderId: "",
+      folderTitle: "\u672C\u5730\u684C\u9762\u7F51\u7AD9 + \u6D4F\u89C8\u5668\u4E66\u7B7E"
+    },
+    runtime: {
+      analyzer: "deepseek",
+      piThinking: "medium",
+      decisionMode: "llm-fast",
+      jevEndpoint: ""
+    },
+    prompt: {
+      systemPrompt: [
+        "\u4F60\u662F\u4E3B\u4EBA\u7684\u300C\u8BB0\u5FC6\u627E\u7AD9\u4E13\u5458\u300D\u3002\u4E3B\u4EBA\u7ECF\u5E38\u53EA\u8BB0\u5F97\u4E00\u4E2A\u7F51\u7AD9\u7684\u5927\u81F4\u7528\u9014\u3001\u5916\u89C2\u7279\u5F81\u3001\u9886\u57DF\u6216\u96F6\u788E\u82F1\u6587\u5173\u952E\u8BCD\uFF0C\u9700\u8981\u4F60\u5E2E\u4ED6\u4ECE\u5DF2\u6536\u85CF\u7684\u5E38\u7528\u7F51\u7AD9\u548C\u6D4F\u89C8\u5668\u4E66\u7B7E\u91CC\u627E\u56DE\u6765\u3002",
+        "\u5DE5\u4F5C\u65B9\u5F0F\uFF1A",
+        "1. \u7CFB\u7EDF\u4F1A\u5148\u901A\u8FC7 Jev / \u5173\u952E\u8BCD\u591A\u8DEF\u53EC\u56DE\u6F0F\u6597\u521D\u7B5B\u51FA\u6700\u76F8\u5173\u7684\u5019\u9009\u6E05\u5355\uFF1B\u8BF7\u4F60\u7ED3\u5408\u8BED\u4E49\u3001\u57DF\u540D\u8054\u60F3\u548C\u6240\u5728\u6587\u4EF6\u5939\u5206\u7C7B\uFF0C\u627E\u51FA 1~5 \u4E2A\u6700\u53EF\u80FD\u7684\u7AD9\u5185\u547D\u4E2D\uFF08matches\uFF09\uFF0C\u8BF4\u660E\u5339\u914D\u4F9D\u636E\u3002",
+        "2. \u7EDD\u5BF9\u4E0D\u8981\u7F16\u9020\u7AD9\u5185\u539F\u672C\u4E0D\u5B58\u5728\u7684 id \u6216\u94FE\u63A5\u3002",
+        "3. \u5982\u679C\u7AD9\u5185\u5019\u9009\u90FD\u4E0D\u592A\u7B26\u5408\uFF08foundInLibrary = false\uFF09\uFF0C\u6216\u9700\u8981\u8865\u5145\u66F4\u987A\u624B\u7684\u66FF\u4EE3\u5DE5\u5177\uFF0C\u8BF7\u5728 recommendations \u4E2D\u63A8\u8350 2~4 \u4E2A\u771F\u5B9E\u53EF\u9760\u7684\u77E5\u540D\u5B98\u65B9\u7F51\u7AD9/\u5DE5\u5177\u5165\u53E3\uFF08\u5FC5\u987B\u662F\u660E\u786E\u53EF\u8BBF\u95EE\u7684 https \u7F51\u5740\uFF09\u3002"
+      ].join("\n"),
+      reportTemplate: "\u8F93\u51FA\u4E25\u683C JSON\uFF0C\u5305\u542B summary\u3001foundInLibrary\u3001matches \u4E0E recommendations\u3002"
+    },
+    skills: ["bookmarks.read", "launcher.read", "jev.triage", "site.recall"],
+    customSkillInstructions: "",
+    decisionGate: {
+      worthQuestion: "\u54EA\u4E9B\u672C\u5730\u7F51\u7AD9\u6216\u4E66\u7B7E\u6700\u7B26\u5408\u4E3B\u4EBA\u7684\u6A21\u7CCA\u8BB0\u5FC6\u63CF\u8FF0\uFF1F\u82E5\u6CA1\u6709\uFF0C\u63A8\u8350\u54EA\u4E9B\u5916\u90E8\u5165\u53E3\uFF1F",
+      minScore: 0.45,
+      categories: ["\u7AD9\u5185\u7CBE\u51C6\u627E\u56DE", "\u7AD9\u5185\u8FD1\u4F3C\u5019\u9009", "\u5916\u90E8\u63A8\u8350\u5165\u53E3"],
+      skipCategories: [],
+      skipWithoutSubtitle: false,
+      retryOnSkip: false
+    },
+    schedulePolicy: {
+      intervalMinutes: 1440,
+      dailyLimit: 50,
+      maxFetchItems: 45
+    },
+    ownerFeedback: [],
+    createdAt: now,
+    updatedAt: now
+  };
+}
 var VALID_SKILL_IDS = /* @__PURE__ */ new Set([
   "bili.source",
   "bili.info",
@@ -7970,7 +8066,8 @@ var VALID_SKILL_IDS = /* @__PURE__ */ new Set([
   "notify.high_value",
   "bookmarks.read",
   "launcher.read",
-  "organizer.plan"
+  "organizer.plan",
+  "site.recall"
 ]);
 function clampNumber(value, min, max, fallback) {
   const n = Number(value);
@@ -7997,11 +8094,11 @@ function normalizeEmployee(input, now = Date.now()) {
     throw new Error("\u5458\u5DE5\u914D\u7F6E\u683C\u5F0F\u65E0\u6548\u3002");
   }
   const raw = input;
-  const defaults = raw.source?.kind === "workspace-organizer" ? createDefaultOrganizerEmployee(now) : createDefaultBiliEmployee(now);
+  const defaults = raw.source?.kind === "workspace-organizer" ? createDefaultOrganizerEmployee(now) : raw.source?.kind === "site-finder" ? createDefaultSiteFinderEmployee(now) : createDefaultBiliEmployee(now);
   const name = cleanString(raw.name, 48);
   if (!name) throw new Error("\u8BF7\u8F93\u5165\u5458\u5DE5\u540D\u79F0\u3002");
   const sourceRaw = raw.source && typeof raw.source === "object" ? raw.source : {};
-  const sourceKind = sourceRaw.kind === "bili-fav" || sourceRaw.kind === "bili-history" || sourceRaw.kind === "workspace-organizer" ? sourceRaw.kind : "bili-toview";
+  const sourceKind = sourceRaw.kind === "bili-fav" || sourceRaw.kind === "bili-history" || sourceRaw.kind === "workspace-organizer" || sourceRaw.kind === "site-finder" ? sourceRaw.kind : "bili-toview";
   const runtimeRaw = raw.runtime && typeof raw.runtime === "object" ? raw.runtime : {};
   const analyzer = runtimeRaw.analyzer === "native-pi" ? "native-pi" : "deepseek";
   const decisionMode = runtimeRaw.decisionMode === "jev-http" ? "jev-http" : "llm-fast";
@@ -8012,7 +8109,7 @@ function normalizeEmployee(input, now = Date.now()) {
   const rawSkills = Array.isArray(raw.skills) ? raw.skills : defaults.skills;
   const skills = Array.from(new Set(rawSkills.filter((s) => VALID_SKILL_IDS.has(s))));
   if (!skills.length) {
-    if (sourceKind === "workspace-organizer") skills.push(...defaults.skills);
+    if (sourceKind === "workspace-organizer" || sourceKind === "site-finder") skills.push(...defaults.skills);
     else skills.push("bili.source", "bili.subtitle");
   }
   const gateRaw = raw.decisionGate && typeof raw.decisionGate === "object" ? raw.decisionGate : {};
@@ -8142,11 +8239,19 @@ ${candidate.subtitleExcerpt || "\uFF08\u65E0\u5B57\u5E55\u6458\u5F55\uFF09"}`
   ].filter(Boolean).join("\n");
 }
 async function runJevHttp(employee, candidate) {
-  const endpoint = employee.runtime.jevEndpoint;
-  if (!endpoint) throw new Error("\u5C1A\u672A\u914D\u7F6E Jev HTTP \u7AEF\u70B9\u3002");
+  const globalJev = await loadJevConfig().catch(() => ({ endpoint: "", key: "", configured: false }));
+  const endpoint = employee.runtime.jevEndpoint || globalJev.endpoint;
+  if (!endpoint) throw new Error("\u5C1A\u672A\u914D\u7F6E Jev API \u63A5\u53E3\u5730\u5740\uFF08\u53EF\u5728 AI \u8BBE\u7F6E \u2192 Jev \u5FEB\u7B5B API \u4E2D\u914D\u7F6E\uFF09\u3002");
+  const headers = {
+    "Content-Type": "application/json",
+    Accept: "application/json"
+  };
+  if (globalJev.key) {
+    headers.Authorization = `Bearer ${globalJev.key}`;
+  }
   const response = await fetch(endpoint, {
     method: "POST",
-    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    headers,
     signal: AbortSignal.timeout(12e3),
     credentials: "omit",
     body: JSON.stringify({
@@ -9168,18 +9273,32 @@ var BilibiliService = class _BilibiliService {
     const deadline = playbackDeadline(parentSignal, 18e3);
     const signal = deadline.signal;
     const request2 = async (url) => {
-      signal.throwIfAborted();
-      const attempt = playbackDeadline(signal, 5e3);
-      try {
-        return await this.api(url, { signal: attempt.signal });
-      } finally {
-        attempt.dispose();
+      for (let round = 0; round < 2; round++) {
+        signal.throwIfAborted();
+        const attempt = playbackDeadline(signal, 6e3);
+        try {
+          return await this.api(url, { signal: attempt.signal });
+        } catch (error) {
+          signal.throwIfAborted();
+          const transient = error?.name === "TimeoutError" || error instanceof TypeError;
+          if (!transient || round === 1) {
+            if ([-352, -403, -101, -111].includes(error?.code) || [403, 412].includes(error?.status)) {
+              this.wbiKeysCache = null;
+            }
+            throw error;
+          }
+        } finally {
+          attempt.dispose();
+        }
       }
     };
     const shouldStop = (error) => {
       signal.throwIfAborted();
-      if ([401, 403, 412, 429].includes(error?.status) || [-101, -111, -352, -412].includes(error?.code)) throw error;
-      if (error?.name === "TimeoutError" || error?.name === "AbortError" || error instanceof TypeError) throw error;
+      if ([401, 403, 412, 429].includes(error?.status) || [-101, -111, -352, -412].includes(error?.code)) {
+        this.wbiKeysCache = null;
+        throw error;
+      }
+      if (error?.name === "AbortError") throw error;
     };
     try {
       signal.throwIfAborted();
@@ -9274,18 +9393,32 @@ var BilibiliService = class _BilibiliService {
     const deadline = playbackDeadline(parentSignal, 18e3);
     const signal = deadline.signal;
     const request2 = async (url) => {
-      signal.throwIfAborted();
-      const attempt = playbackDeadline(signal, 5e3);
-      try {
-        return await this.api(url, { signal: attempt.signal });
-      } finally {
-        attempt.dispose();
+      for (let round = 0; round < 2; round++) {
+        signal.throwIfAborted();
+        const attempt = playbackDeadline(signal, 6e3);
+        try {
+          return await this.api(url, { signal: attempt.signal });
+        } catch (error) {
+          signal.throwIfAborted();
+          const transient = error?.name === "TimeoutError" || error instanceof TypeError;
+          if (!transient || round === 1) {
+            if ([-352, -403, -101, -111].includes(error?.code) || [403, 412].includes(error?.status)) {
+              this.wbiKeysCache = null;
+            }
+            throw error;
+          }
+        } finally {
+          attempt.dispose();
+        }
       }
     };
     const shouldStop = (error) => {
       signal.throwIfAborted();
-      if ([401, 403, 412, 429].includes(error?.status) || [-101, -111, -352, -412].includes(error?.code)) throw error;
-      if (error?.name === "TimeoutError" || error?.name === "AbortError" || error instanceof TypeError) throw error;
+      if ([401, 403, 412, 429].includes(error?.status) || [-101, -111, -352, -412].includes(error?.code)) {
+        this.wbiKeysCache = null;
+        throw error;
+      }
+      if (error?.name === "AbortError") throw error;
     };
     const extractDashAudio = (data) => {
       const dash = data?.dash || data?.result?.dash;
@@ -9842,6 +9975,7 @@ async function executeEmployeeTool(toolName, rawArgs, employee, ctx) {
           author: data.author,
           cover: String(view.pic || "").replace(/^http:/, "https:"),
           desc: data.desc.slice(0, 600),
+          descStatus: "loaded",
           tname: data.tname,
           pages: pages.slice(0, 8),
           stat: {
@@ -10203,8 +10337,289 @@ async function runAutonomousEmployeeAnalysis(employee, candidate, ctx) {
   return runDeepSeekToolLoop(employee, candidate, tools, ctx);
 }
 
+// src/agents/employee-peek-video.ts
+function peekVideoFromView(current, view) {
+  return {
+    ...current,
+    title: String(view.title || current.title),
+    author: String(view.owner?.name || current.author),
+    cover: String(view.pic || current.cover).replace(/^http:/, "https:"),
+    desc: String(view.desc || "").slice(0, 600),
+    descStatus: "loaded",
+    tname: String(view.tname || ""),
+    pages: Array.isArray(view.pages) ? view.pages.slice(0, 8).map((p) => ({
+      page: Number(p.page || 1),
+      part: String(p.part || ""),
+      durationSec: Number(p.duration || 0)
+    })) : [],
+    stat: {
+      view: Number(view.stat?.view || 0),
+      like: Number(view.stat?.like || 0),
+      coin: Number(view.stat?.coin || 0),
+      favorite: Number(view.stat?.favorite || 0)
+    }
+  };
+}
+
 // src/background/employee-worker.ts
 init_workspace_organizer();
+
+// src/agents/site-finder.ts
+init_workspace_organizer();
+var TOKEN_SYNONYMS = [
+  [/svg|矢量|波浪|背景|渐变|配色|palette|gradient/i, ["svg", "wave", "haikei", "gradient", "color", "css", "design", "ui", "bg"]],
+  [/论文|文献|学术|paper|arxiv/i, ["arxiv", "scholar", "paper", "pdf", "semantic", "huggingface", "research"]],
+  [/机器人|仿真|具身|robot|isaac|mujoco|ros/i, ["robot", "lerobot", "huggingface", "github", "isaac", "mujoco", "ros"]],
+  [/算力|gpu|显卡|租|云主机|容器/i, ["gpu", "autodl", "runpod", "lambda", "modal", "cloud", "console"]],
+  [/ai|大模型|对话|chat|llm|agent/i, ["chat", "gpt", "claude", "gemini", "deepseek", "ai", "agent", "llm"]],
+  [/图标|icon|logo|插画/i, ["icon", "lucide", "heroicons", "iconify", "svg", "unDraw", "figma"]],
+  [/文档|笔记|wiki|markdown|飞书|notion/i, ["docs", "notion", "feishu", "lark", "markdown", "wiki"]],
+  [/视频|剪辑|b站|youtube/i, ["bilibili", "youtube", "video", "clip"]]
+];
+function extractSearchTerms(query) {
+  const lower = query.toLowerCase().trim();
+  const terms = /* @__PURE__ */ new Set();
+  for (const part of lower.split(/[\s,，。！？、；;:/|()（）「」"']+/)) {
+    const clean = part.trim();
+    if (clean.length >= 2) terms.add(clean);
+  }
+  const cjkRuns = lower.match(/[\u4e00-\u9fff]{2,}/g) || [];
+  for (const run of cjkRuns) {
+    terms.add(run);
+    for (let i = 0; i < run.length - 1; i++) {
+      terms.add(run.slice(i, i + 2));
+    }
+  }
+  for (const [pattern, extras] of TOKEN_SYNONYMS) {
+    if (pattern.test(lower)) {
+      for (const extra of extras) terms.add(extra);
+    }
+  }
+  return [...terms];
+}
+function rankSiteCandidates(query, snapshot, limit = 45) {
+  const terms = extractSearchTerms(query);
+  const partitionMap = new Map(snapshot.partitions.map((p) => [p.id, p.label]));
+  const all = [];
+  for (const link of snapshot.links) {
+    const partLabel = partitionMap.get(link.page) || link.page || "\u9ED8\u8BA4";
+    const location = link.group && link.group !== "\u5E38\u7528\u7F51\u7AD9" ? `\u684C\u9762\u300C${partLabel} / ${link.group}\u300D` : `\u684C\u9762\u300C${partLabel}\u300D`;
+    const haystack = `${link.title} ${link.url} ${partLabel} ${link.group}`.toLowerCase();
+    let score = 0;
+    for (const term of terms) {
+      if (link.title.toLowerCase().includes(term)) score += 6;
+      else if (link.url.toLowerCase().includes(term)) score += 4;
+      else if (haystack.includes(term)) score += 2;
+    }
+    all.push({
+      id: `l:${link.id}`,
+      source: "launcher",
+      title: link.title,
+      url: link.url,
+      modelUrl: organizerModelUrl(link.url),
+      location,
+      score
+    });
+  }
+  for (const bm of snapshot.bookmarks) {
+    const location = bm.folderPath ? `\u4E66\u7B7E\u300C${bm.folderPath}\u300D` : "\u4E66\u7B7E\u680F";
+    const haystack = `${bm.title} ${bm.url} ${bm.folderPath}`.toLowerCase();
+    let score = 0;
+    for (const term of terms) {
+      if (bm.title.toLowerCase().includes(term)) score += 6;
+      else if (bm.url.toLowerCase().includes(term)) score += 4;
+      else if (haystack.includes(term)) score += 2;
+    }
+    all.push({
+      id: `b:${bm.id}`,
+      source: "bookmark",
+      title: bm.title,
+      url: bm.url,
+      modelUrl: organizerModelUrl(bm.url),
+      location,
+      score
+    });
+  }
+  const sorted = all.sort((a, b) => b.score - a.score);
+  const matched = sorted.filter((item) => item.score > 0);
+  if (matched.length >= Math.min(12, limit)) {
+    return matched.slice(0, limit);
+  }
+  return sorted.slice(0, limit);
+}
+function buildSiteFinderPrompt(emp, query, candidates) {
+  const list = candidates.map((c) => ({
+    id: c.id,
+    source: c.source,
+    title: c.title,
+    location: c.location,
+    origin: c.modelUrl,
+    score: c.score
+  }));
+  return [
+    emp.prompt.systemPrompt,
+    emp.customSkillInstructions ? `\u8865\u5145\u8981\u6C42\uFF1A${emp.customSkillInstructions}` : "",
+    "",
+    `\u7528\u6237\u6A21\u7CCA\u8BB0\u5FC6\u63CF\u8FF0\uFF1A${query}`,
+    `Jev/\u5173\u952E\u8BCD\u521D\u7B5B\u5019\u9009\uFF08\u5171 ${list.length} \u6761\uFF0C\u6309\u521D\u7B5B\u5206\u6392\u5E8F\uFF1B\u4E0D\u4F20\u9012\u654F\u611F\u8DEF\u5F84\u4E0E\u67E5\u8BE2\u53C2\u6570\uFF09\uFF1A`,
+    JSON.stringify(list),
+    "",
+    "\u8BF7\u4E25\u683C\u8F93\u51FA\u7EAF JSON \u5BF9\u8C61\uFF08\u4E0D\u8981\u8F93\u51FA markdown \u4EE3\u7801\u5757\u4E4B\u5916\u7684\u95F2\u804A\uFF09\uFF1A",
+    "{",
+    '  "summary": "\u4E00\u53E5\u7B80\u660E\u603B\u7ED3\uFF1A\u662F\u5426\u627E\u5230\uFF0C\u6216\u4E3A\u4F55\u63A8\u8350\u66FF\u4EE3\u5165\u53E3",',
+    '  "foundInLibrary": true/false,',
+    '  "matches": [',
+    '    { "id": "\u5019\u9009\u4E2D\u7684\u7CBE\u786Eid", "confidence": "high|medium", "reason": "\u4E3A\u4EC0\u4E48\u7B26\u5408\u7528\u6237\u8BB0\u5FC6" }',
+    "  ],",
+    '  "recommendations": [',
+    '    { "title": "\u63A8\u8350\u7F51\u7AD9\u540D\u79F0", "url": "https://...", "description": "\u4E00\u53E5\u8BDD\u8BF4\u660E\u7528\u9014", "reason": "\u4E3A\u4EC0\u4E48\u9002\u5408\u5F53\u524D\u9700\u6C42" }',
+    "  ]",
+    "}",
+    "\u89C4\u5219\uFF1Amatches \u6700\u591A 5 \u6761\uFF0Cid \u5FC5\u987B\u6765\u81EA\u4E0A\u65B9\u5019\u9009\u5217\u8868\uFF1B\u82E5 foundInLibrary \u4E3A false \u6216\u5019\u9009\u4E0D\u592A\u51C6\uFF0C\u8BF7\u52A1\u5FC5\u7ED9\u51FA 2~4 \u4E2A\u771F\u5B9E\u53EF\u9760\u7684 https \u5916\u90E8\u5165\u53E3 recommendations\u3002"
+  ].filter(Boolean).join("\n");
+}
+function parseSiteFinderResponse(rawText, snapshot, query, shortlistCount) {
+  const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) {
+    throw new Error("\u6A21\u578B\u672A\u8FD4\u56DE\u6709\u6548 JSON \u627E\u7AD9\u7ED3\u679C\u3002");
+  }
+  const parsed = JSON.parse(jsonMatch[0]);
+  const byId = /* @__PURE__ */ new Map();
+  const partitionMap = new Map(snapshot.partitions.map((p) => [p.id, p.label]));
+  for (const l of snapshot.links) {
+    const partLabel = partitionMap.get(l.page) || l.page || "\u9ED8\u8BA4";
+    const location = l.group && l.group !== "\u5E38\u7528\u7F51\u7AD9" ? `\u684C\u9762\u300C${partLabel} / ${l.group}\u300D` : `\u684C\u9762\u300C${partLabel}\u300D`;
+    byId.set(`l:${l.id}`, { source: "launcher", title: l.title, url: l.url, location });
+  }
+  for (const b of snapshot.bookmarks) {
+    byId.set(`b:${b.id}`, {
+      source: "bookmark",
+      title: b.title,
+      url: b.url,
+      location: b.folderPath ? `\u4E66\u7B7E\u300C${b.folderPath}\u300D` : "\u4E66\u7B7E\u680F"
+    });
+  }
+  const matches = [];
+  const seenMatchIds = /* @__PURE__ */ new Set();
+  for (const item of Array.isArray(parsed.matches) ? parsed.matches : []) {
+    const id = String(item?.id || "");
+    if (!id || seenMatchIds.has(id)) continue;
+    const real = byId.get(id);
+    if (!real) continue;
+    seenMatchIds.add(id);
+    matches.push({
+      id,
+      source: real.source,
+      title: real.title,
+      url: real.url,
+      location: real.location,
+      confidence: item?.confidence === "high" ? "high" : "medium",
+      reason: String(item?.reason || "\u8BED\u4E49\u4E0E\u6807\u9898\u7279\u5F81\u5339\u914D").slice(0, 120)
+    });
+    if (matches.length >= 5) break;
+  }
+  const recommendations = [];
+  const seenUrls = /* @__PURE__ */ new Set();
+  for (const rec of Array.isArray(parsed.recommendations) ? parsed.recommendations : []) {
+    const safeUrl = cleanHttpUrl2(rec?.url);
+    if (!safeUrl || seenUrls.has(safeUrl)) continue;
+    seenUrls.add(safeUrl);
+    recommendations.push({
+      title: String(rec?.title || new URL(safeUrl).hostname).slice(0, 60),
+      url: safeUrl,
+      description: String(rec?.description || "").slice(0, 120),
+      reason: String(rec?.reason || "\u6839\u636E\u63CF\u8FF0\u63A8\u8350\u7684\u5E38\u7528\u5165\u53E3").slice(0, 120)
+    });
+    if (recommendations.length >= 5) break;
+  }
+  const foundInLibrary = Boolean(parsed.foundInLibrary ?? matches.length > 0) && matches.length > 0;
+  return {
+    query,
+    summary: String(parsed.summary || (matches.length ? `\u5728\u6536\u85CF\u4E2D\u4E3A\u4F60\u627E\u56DE ${matches.length} \u4E2A\u53EF\u80FD\u5339\u914D\u7684\u7F51\u7AD9\u3002` : "\u672A\u5728\u73B0\u6709\u6536\u85CF\u4E2D\u627E\u5230\u786E\u5207\u5339\u914D\uFF0C\u5DF2\u4E3A\u4F60\u8865\u5145\u63A8\u8350\u5165\u53E3\u3002")).slice(0, 200),
+    foundInLibrary,
+    searchedCount: snapshot.links.length + snapshot.bookmarks.length,
+    shortlistCount,
+    matches,
+    recommendations
+  };
+}
+var FALLBACK_RECOMMENDATION_BANK = [
+  {
+    test: /svg|波浪|背景|渐变|配色|css|设计/i,
+    items: [
+      { title: "Haikei", url: "https://app.haikei.app/", description: "\u514D\u8D39\u5728\u7EBF SVG \u6CE2\u6D6A/\u6E10\u53D8/\u51E0\u4F55\u80CC\u666F\u751F\u6210\u5668", reason: "\u5E38\u7528\u4E8E\u751F\u6210\u7F51\u9875 SVG \u6CE2\u6D6A\u4E0E\u80CC\u666F" },
+      { title: "UI Gradients / CSS Gradient", url: "https://cssgradient.io/", description: "\u53EF\u89C6\u5316 CSS \u6E10\u53D8\u914D\u8272\u751F\u6210\u5DE5\u5177", reason: "\u9002\u5408\u5FEB\u901F\u8C03\u8BD5\u80CC\u666F\u6E10\u53D8\u8272" }
+    ]
+  },
+  {
+    test: /论文|学术|arxiv|文献/i,
+    items: [
+      { title: "arXiv", url: "https://arxiv.org/", description: "\u8BA1\u7B97\u673A\u3001AI \u4E0E\u7269\u7406\u7B49\u524D\u6CBF\u8BBA\u6587\u9884\u5370\u672C\u5E93", reason: "\u67E5 AI \u4E0E\u79D1\u7814\u8BBA\u6587\u6700\u5E38\u7528\u5165\u53E3" },
+      { title: "Semantic Scholar", url: "https://www.semanticscholar.org/", description: "AI \u9A71\u52A8\u7684\u5B66\u672F\u8BBA\u6587\u68C0\u7D22\u4E0E\u5F15\u7528\u56FE\u8C31", reason: "\u652F\u6301\u6309\u6A21\u7CCA\u8BED\u4E49\u627E\u76F8\u5173\u8BBA\u6587" }
+    ]
+  },
+  {
+    test: /图标|icon|logo/i,
+    items: [
+      { title: "Lucide Icons", url: "https://lucide.dev/icons/", description: "\u5F00\u6E90\u7B80\u6D01\u7EBF\u6027\u56FE\u6807\u5E93\uFF0C\u652F\u6301\u76F4\u63A5\u590D\u5236 SVG", reason: "\u524D\u7AEF\u5F00\u53D1\u6700\u5E38\u7528\u7684\u8F7B\u91CF\u56FE\u6807\u5E93" },
+      { title: "Iconify", url: "https://icon-sets.iconify.design/", description: "\u805A\u5408 200+ \u5F00\u6E90\u56FE\u6807\u96C6\u7684\u4E00\u7AD9\u5F0F\u68C0\u7D22\u7AD9", reason: "\u51E0\u4E4E\u80FD\u641C\u5230\u6240\u6709\u5E38\u89C1\u56FE\u6807\u98CE\u683C" }
+    ]
+  },
+  {
+    test: /算力|gpu|机器人|模型|ai/i,
+    items: [
+      { title: "Hugging Face", url: "https://huggingface.co/", description: "\u5F00\u6E90\u6A21\u578B\u3001\u6570\u636E\u96C6\u4E0E\u673A\u5668\u4EBA Spaces \u5E73\u53F0", reason: "\u67E5\u627E\u5F00\u6E90\u6A21\u578B\u4E0E\u5177\u8EAB\u9879\u76EE\u7684\u6838\u5FC3\u793E\u533A" },
+      { title: "GitHub Explore", url: "https://github.com/explore", description: "\u5F00\u6E90\u9879\u76EE\u4E0E\u70ED\u95E8\u4EE3\u7801\u4ED3\u5E93\u53D1\u73B0\u9875", reason: "\u9002\u5408\u987A\u7740\u5173\u952E\u8BCD\u627E\u56DE\u5F00\u6E90\u9879\u76EE" }
+    ]
+  }
+];
+function buildHeuristicSiteFinderFallback(query, snapshot, candidates) {
+  const strong = candidates.filter((c) => c.score >= 4).slice(0, 5);
+  const matches = strong.map((c) => ({
+    id: c.id,
+    source: c.source,
+    title: c.title,
+    url: c.url,
+    location: c.location,
+    confidence: c.score >= 8 ? "high" : "medium",
+    reason: "\u672C\u5730\u5173\u952E\u8BCD\u4E0E\u57DF\u540D\u7279\u5F81\u53EC\u56DE\u547D\u4E2D\uFF08\u514D\u6A21\u578B\u89C4\u5219\u6A21\u5F0F\uFF09"
+  }));
+  const recommendations = [];
+  if (!matches.length) {
+    for (const group of FALLBACK_RECOMMENDATION_BANK) {
+      if (group.test.test(query)) {
+        for (const item of group.items) {
+          if (recommendations.length < 4) recommendations.push(item);
+        }
+      }
+    }
+    if (!recommendations.length) {
+      recommendations.push(
+        {
+          title: "GitHub Search",
+          url: `https://github.com/search?q=${encodeURIComponent(query)}`,
+          description: "\u5728 GitHub \u4ED3\u5E93\u4E0E\u9879\u76EE\u4ECB\u7ECD\u4E2D\u6309\u8BB0\u5FC6\u5173\u952E\u8BCD\u68C0\u7D22",
+          reason: "\u9002\u5408\u627E\u56DE\u5F00\u6E90\u5DE5\u5177\u4E0E\u6280\u672F\u9879\u76EE"
+        },
+        {
+          title: "Bing / Google \u7AD9\u5916\u641C\u5BFB",
+          url: `https://www.bing.com/search?q=${encodeURIComponent(query)}`,
+          description: "\u4F7F\u7528\u5F53\u524D\u8BB0\u5FC6\u63CF\u8FF0\u76F4\u63A5\u8FDB\u884C\u7F51\u9875\u68C0\u7D22",
+          reason: "\u672A\u547D\u4E2D\u672C\u5730\u6536\u85CF\u65F6\u7684\u5FEB\u901F\u515C\u5E95\u5165\u53E3"
+        }
+      );
+    }
+  }
+  return {
+    query,
+    summary: matches.length ? `\u514D\u6A21\u578B\u672C\u5730\u53EC\u56DE\uFF1A\u4ECE ${snapshot.links.length + snapshot.bookmarks.length} \u4E2A\u6536\u85CF\u4E2D\u627E\u5230 ${matches.length} \u4E2A\u8FD1\u4F3C\u7AD9\u70B9\u3002` : "\u672A\u914D\u7F6E\u5927\u6A21\u578B Key\uFF0C\u4E14\u672C\u5730\u5173\u952E\u8BCD\u672A\u76F4\u63A5\u547D\u4E2D\uFF1B\u5DF2\u4E3A\u4F60\u751F\u6210\u63A8\u8350\u5165\u53E3\uFF08\u914D\u7F6E\u6A21\u578B\u540E\u53EF\u542F\u7528\u8BED\u4E49\u63A8\u7406\u627E\u7AD9\uFF09\u3002",
+    foundInLibrary: matches.length > 0,
+    searchedCount: snapshot.links.length + snapshot.bookmarks.length,
+    shortlistCount: candidates.length,
+    matches,
+    recommendations
+  };
+}
 
 // src/backpack/article.service.ts
 var articleState = reactive({
@@ -10264,12 +10679,17 @@ function serial2(fn) {
   return result;
 }
 async function readEmployees() {
-  const stored = await chrome.storage.local.get([DIGITAL_EMPLOYEES_KEY, DIGITAL_EMPLOYEE_ORGANIZER_SEEDED_KEY]);
+  const stored = await chrome.storage.local.get([
+    DIGITAL_EMPLOYEES_KEY,
+    DIGITAL_EMPLOYEE_ORGANIZER_SEEDED_KEY,
+    DIGITAL_EMPLOYEE_SITE_FINDER_SEEDED_KEY
+  ]);
   if (stored[DIGITAL_EMPLOYEES_KEY] === void 0) {
-    const initial = [createDefaultBiliEmployee(), createDefaultOrganizerEmployee()];
+    const initial = [createDefaultBiliEmployee(), createDefaultOrganizerEmployee(), createDefaultSiteFinderEmployee()];
     await chrome.storage.local.set({
       [DIGITAL_EMPLOYEES_KEY]: initial,
-      [DIGITAL_EMPLOYEE_ORGANIZER_SEEDED_KEY]: true
+      [DIGITAL_EMPLOYEE_ORGANIZER_SEEDED_KEY]: true,
+      [DIGITAL_EMPLOYEE_SITE_FINDER_SEEDED_KEY]: true
     });
     return initial;
   }
@@ -10280,6 +10700,13 @@ async function readEmployees() {
       await writeEmployees(list);
     }
     await chrome.storage.local.set({ [DIGITAL_EMPLOYEE_ORGANIZER_SEEDED_KEY]: true });
+  }
+  if (!stored[DIGITAL_EMPLOYEE_SITE_FINDER_SEEDED_KEY]) {
+    if (list.length < 40 && !list.some((e) => e.source.kind === "site-finder")) {
+      list.push(createDefaultSiteFinderEmployee());
+      await writeEmployees(list);
+    }
+    await chrome.storage.local.set({ [DIGITAL_EMPLOYEE_SITE_FINDER_SEEDED_KEY]: true });
   }
   return list;
 }
@@ -10500,6 +10927,7 @@ async function executeOneForEmployee(emp, runs, options = {}) {
     return { status: "limit", message: `\u4ECA\u65E5\u5DF2\u8FBE\u5904\u7406\u4E0A\u9650\uFF08${emp.schedulePolicy.dailyLimit} \u6761\uFF09\u3002` };
   }
   if (emp.source.kind === "workspace-organizer") return executeOrganizerForEmployee(emp);
+  if (emp.source.kind === "site-finder") return { status: "idle", message: "\u8BF7\u5728\u300C\u627E\u7AD9\u9762\u677F\u300D\u8F93\u5165\u4F60\u7684\u8BB0\u5FC6\u63CF\u8FF0\u540E\u518D\u5F00\u59CB\u627E\u7AD9\u3002" };
   if (!emp.skills.includes("bili.source")) {
     throw new Error("\u8BE5\u5458\u5DE5\u672A\u542F\u7528\u300CB\u7AD9\u6570\u636E\u6E90\u8BFB\u53D6\u300DSkill\u3002");
   }
@@ -10573,18 +11001,22 @@ async function executeOneForEmployee(emp, runs, options = {}) {
     cursorTarget: "video-card",
     cursorLabel: `\u9009\u4E2D\u89C6\u9891\uFF1A${title.slice(0, 20)}`,
     sourceVideos,
-    activeVideo: { bvid, title, author, cover }
+    activeVideo: { bvid, title, author, cover, descStatus: "loading" }
   }, true);
   await new Promise((resolve) => setTimeout(resolve, 420));
   const viewCache = /* @__PURE__ */ new Map();
   let descSnippet = "";
   try {
     const view = await bilibiliService.getVideoView(bvid);
-    if (view?.cid) {
-      viewCache.set(bvid, view);
+    if (view) {
+      if (view.cid) viewCache.set(bvid, view);
       descSnippet = String(view.desc || "").slice(0, 800);
+      await emitPeek({ activeVideo: peekVideoFromView(peekState.activeVideo, view) });
+    } else {
+      await emitPeek({ activeVideo: { ...peekState.activeVideo, descStatus: "unavailable" } });
     }
   } catch {
+    await emitPeek({ activeVideo: { ...peekState.activeVideo, descStatus: "unavailable" } });
   }
   if (emp.decisionGate.skipWithoutSubtitle) {
     const cachedView = viewCache.get(bvid);
@@ -10618,7 +11050,8 @@ async function executeOneForEmployee(emp, runs, options = {}) {
     }
   }
   let preTriageNote = "";
-  if (emp.skills.includes("jev.triage") && emp.runtime.decisionMode === "jev-http" && emp.runtime.jevEndpoint) {
+  const globalJevEndpoint = emp.skills.includes("jev.triage") && emp.runtime.decisionMode === "jev-http" && !emp.runtime.jevEndpoint ? (await loadJevConfig().catch(() => ({ endpoint: "" }))).endpoint : "";
+  if (emp.skills.includes("jev.triage") && emp.runtime.decisionMode === "jev-http" && (emp.runtime.jevEndpoint || globalJevEndpoint)) {
     const verdict = await evaluateWithDecisionGate(emp, {
       bvid,
       title,
@@ -10786,7 +11219,9 @@ async function runPatrolCycle(targetEmployeeId, _organizerConsent = true) {
     const employees = await readEmployees();
     const runs = await readRuns();
     const now = Date.now();
-    const targets = targetEmployeeId ? employees.filter((e) => e.id === targetEmployeeId) : employees.filter((e) => e.enabled && (!e.nextEligibleAt || e.nextEligibleAt <= now));
+    const targets = targetEmployeeId ? employees.filter((e) => e.id === targetEmployeeId) : employees.filter(
+      (e) => e.enabled && e.source.kind !== "site-finder" && (!e.nextEligibleAt || e.nextEligibleAt <= now)
+    );
     if (!targets.length) {
       await armPatrolAlarm(employees);
       return { message: "\u5F53\u524D\u6CA1\u6709\u5230\u70B9\u9700\u8981\u5DE1\u68C0\u7684\u6570\u5B57\u5458\u5DE5\u3002" };
@@ -11110,6 +11545,86 @@ async function handleAction(action, message) {
       await writeRuns(runs);
       const feedbackSaved = await recordOrganizerFeedback(run, step, step.status === "skipped" ? "skip" : null).then(() => true, () => false);
       return { run, step, note: feedbackSaved ? "\u6B65\u9AA4\u72B6\u6001\u548C\u672C\u6761\u504F\u597D\u5DF2\u4FDD\u5B58\u3002" : "\u6B65\u9AA4\u72B6\u6001\u5DF2\u4FDD\u5B58\uFF0C\u4F46\u504F\u597D\u4FDD\u5B58\u5931\u8D25\u3002" };
+    });
+  }
+  if (action === "run-site-finder") {
+    const query = String(message?.query || "").trim().slice(0, 500);
+    if (!query) throw new Error("\u8BF7\u8F93\u5165\u8BB0\u5FC6\u63CF\u8FF0\u6216\u5173\u952E\u8BCD\u3002");
+    return serial2(async () => {
+      const startedAt = Date.now();
+      const employees = await readEmployees();
+      const runs = await readRuns();
+      const emp = employees.find((e) => e.id === String(message?.employeeId || "")) || employees.find((e) => e.source.kind === "site-finder");
+      if (!emp) throw new Error("\u672A\u627E\u5230\u8BB0\u5FC6\u627E\u7AD9\u4E13\u5458\u3002");
+      const snapshot = await readOrganizerWorkspaceSnapshot();
+      const candidates = rankSiteCandidates(query, snapshot, emp.schedulePolicy.maxFetchItems || 45);
+      let result = buildHeuristicSiteFinderFallback(query, snapshot, candidates);
+      let engine = "heuristic";
+      const cfg = await loadConfig().catch(() => ({ configured: false, model: "" }));
+      const prompt = buildSiteFinderPrompt(emp, query, candidates);
+      if (emp.runtime.analyzer === "native-pi") {
+        try {
+          const res = await runLocalAgent({
+            agentId: "pi",
+            model: emp.runtime.piModel || void 0,
+            thinking: emp.runtime.piThinking || "medium",
+            toolsEnabled: false,
+            timeoutMs: 12e4,
+            prompt
+          });
+          if (res.text) {
+            result = parseSiteFinderResponse(res.text, snapshot, query, candidates.length);
+            engine = "pi";
+          }
+        } catch (err) {
+          console.warn("[SiteFinder] Pi \u63A8\u7406\u5931\u8D25\uFF0C\u5C1D\u8BD5\u4E91\u7AEF\u6A21\u578B\u6216\u56DE\u9000\u672C\u5730\u53EC\u56DE", err);
+        }
+      }
+      if (engine === "heuristic" && cfg.configured && cfg.model) {
+        try {
+          let out = "";
+          await streamOpenAiCompatible(
+            cfg,
+            cfg.model,
+            [{ role: "user", content: prompt }],
+            AbortSignal.timeout(9e4),
+            (chunk) => {
+              out += chunk;
+            }
+          );
+          if (out) {
+            result = parseSiteFinderResponse(out, snapshot, query, candidates.length);
+            engine = "deepseek";
+          }
+        } catch (err) {
+          console.warn("[SiteFinder] LLM \u63A8\u7406\u5931\u8D25\uFF0C\u56DE\u9000\u672C\u5730\u53EC\u56DE", err);
+        }
+      }
+      const record = {
+        id: `run-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        employeeId: emp.id,
+        kind: "site-finder",
+        bvid: `sf-${Date.now()}`,
+        title: `\u627E\u7AD9\uFF1A${query.slice(0, 36)}`,
+        author: emp.name,
+        url: result.matches[0]?.url || result.recommendations[0]?.url || "",
+        status: "analyzed",
+        engine,
+        worth: true,
+        score: result.foundInLibrary ? 0.92 : 0.65,
+        category: result.foundInLibrary ? "\u7AD9\u5185\u627E\u56DE" : "\u5916\u90E8\u63A8\u8350",
+        reason: result.summary,
+        siteFinderQuery: query,
+        siteFinderResult: result,
+        durationMs: Date.now() - startedAt,
+        createdAt: Date.now()
+      };
+      emp.lastRunAt = Date.now();
+      emp.lastError = void 0;
+      runs.unshift(record);
+      await writeEmployees(employees);
+      await writeRuns(runs);
+      return { message: result.summary, record };
     });
   }
   throw new Error("\u672A\u77E5\u6570\u5B57\u5458\u5DE5\u64CD\u4F5C");
@@ -11811,9 +12326,122 @@ chrome.contextMenus?.onClicked?.addListener?.(async (info) => {
     }
   }
 });
+var OFFSCREEN_AUDIO_PATH = "offscreen-audio.html";
+var OFFSCREEN_CLOSE_GRACE_MS = 1800;
+var creatingOffscreenAudio = null;
+var activeAudioClients = /* @__PURE__ */ new Set();
+var audioStopGraceTimer = null;
+function cancelAudioStopGraceTimer() {
+  if (audioStopGraceTimer !== null) {
+    clearTimeout(audioStopGraceTimer);
+    audioStopGraceTimer = null;
+  }
+}
+async function stopAndCloseOffscreenAudio() {
+  if (!await hasOffscreenAudioDocument()) return;
+  try {
+    await Promise.all([
+      new Promise((resolve) => {
+        chrome.runtime.sendMessage({ type: "offscreen-audio:command", target: "music", action: "pause" }, () => resolve());
+      }),
+      new Promise((resolve) => {
+        chrome.runtime.sendMessage({ type: "offscreen-audio:command", target: "bili", action: "pause" }, () => resolve());
+      })
+    ]);
+  } catch {
+  }
+  try {
+    if (typeof chrome.offscreen?.closeDocument === "function") {
+      await chrome.offscreen.closeDocument();
+    }
+  } catch {
+  }
+}
+chrome.runtime.onConnect?.addListener?.((port) => {
+  if (port?.name !== "offscreen-audio-keepalive") return;
+  cancelAudioStopGraceTimer();
+  activeAudioClients.add(port);
+  port.onDisconnect?.addListener?.(() => {
+    activeAudioClients.delete(port);
+    if (activeAudioClients.size > 0) return;
+    cancelAudioStopGraceTimer();
+    audioStopGraceTimer = setTimeout(() => {
+      audioStopGraceTimer = null;
+      if (activeAudioClients.size === 0) {
+        void stopAndCloseOffscreenAudio();
+      }
+    }, OFFSCREEN_CLOSE_GRACE_MS);
+  });
+});
+async function hasOffscreenAudioDocument() {
+  if (typeof chrome.runtime?.getContexts === "function") {
+    const offscreenUrl = chrome.runtime.getURL(OFFSCREEN_AUDIO_PATH);
+    const contexts = await chrome.runtime.getContexts({
+      contextTypes: ["OFFSCREEN_DOCUMENT"],
+      documentUrls: [offscreenUrl]
+    });
+    return contexts.length > 0;
+  }
+  return false;
+}
+async function ensureOffscreenAudioDocument() {
+  if (await hasOffscreenAudioDocument()) return;
+  if (creatingOffscreenAudio) {
+    await creatingOffscreenAudio;
+    return;
+  }
+  creatingOffscreenAudio = chrome.offscreen.createDocument({
+    url: OFFSCREEN_AUDIO_PATH,
+    reasons: ["AUDIO_PLAYBACK"],
+    justification: "Keep music and Bilibili radio playing seamlessly across page refreshes"
+  }).finally(() => {
+    creatingOffscreenAudio = null;
+  });
+  await creatingOffscreenAudio;
+}
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message?.type === "audio-bg:get-state") {
+    (async () => {
+      if (!await hasOffscreenAudioDocument()) {
+        return { ok: true, music: null, bili: null };
+      }
+      return new Promise((resolve) => {
+        chrome.runtime.sendMessage({ type: "offscreen-audio:get-state" }, (reply) => {
+          if (chrome.runtime?.lastError || !reply?.ok) {
+            resolve({ ok: true, music: null, bili: null });
+            return;
+          }
+          resolve(reply);
+        });
+      });
+    })().then(sendResponse).catch(() => sendResponse({ ok: true, music: null, bili: null }));
+    return true;
+  }
+  if (message?.type === "audio-bg:command") {
+    (async () => {
+      await ensureOffscreenAudioDocument();
+      return new Promise((resolve) => {
+        chrome.runtime.sendMessage(
+          {
+            type: "offscreen-audio:command",
+            target: message.target,
+            action: message.action,
+            payload: message.payload
+          },
+          (reply) => {
+            if (chrome.runtime?.lastError) {
+              resolve({ ok: false });
+              return;
+            }
+            resolve(reply || { ok: true });
+          }
+        );
+      });
+    })().then(sendResponse).catch(() => sendResponse({ ok: false }));
+    return true;
+  }
   if (message?.type === "routeNewTab") {
-    routeNewTab(sendResponse);
+    routeNewTab(sendResponse, sender.tab?.id);
     return true;
   }
   if (message?.type === "saveToFavorites") {

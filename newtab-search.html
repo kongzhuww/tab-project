@@ -256,10 +256,9 @@
 
     .enter-home-dock {
       position: fixed;
-      right: 32px;
-      top: 50%;
-      transform: translateY(-50%);
-      z-index: 100;
+      right: 28px;
+      top: 24px;
+      z-index: 120;
     }
     .enter-home-btn {
       display: flex;
@@ -273,9 +272,10 @@
       backdrop-filter: blur(16px);
       color: #ffffff;
       cursor: pointer;
-      outline: none;
+      text-decoration: none;
       transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
     }
+    .enter-home-btn:focus-visible { outline: 3px solid #ec4899; outline-offset: 3px; }
     .enter-home-btn:hover {
       background: rgba(30, 41, 59, 0.95);
       border-color: rgba(236, 72, 153, 0.7);
@@ -393,6 +393,13 @@ html[data-theme="lonetrail"] body.sub-newtab {
 </style>
 </head>
 <body class="sub-newtab">
+  <nav class="enter-home-dock" aria-label="主界面">
+    <a id="enter-home-btn" class="enter-home-btn" href="newtab.html">
+      <span class="enter-home-icon" aria-hidden="true">⌂</span>
+      <span class="enter-home-text"><span class="enter-home-title">进入主界面</span><span class="enter-home-desc">Alt + H</span></span>
+      <span class="enter-home-arrow" aria-hidden="true">→</span>
+    </a>
+  </nav>
   <div id="vue-search-launcher-root">正在加载搜索…</div>
   <script type="module" src="generated/search-ui.js"></script>
 </body>

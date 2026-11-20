@@ -3,7 +3,7 @@
   "minimum_chrome_version": "120",
   "default_locale": "zh_CN",
   "name": "__MSG_extName__",
-  "version": "1.0.26",
+  "version": "1.0.27",
   "description": "__MSG_extDescription__",
   "chrome_url_overrides": {
     "newtab": "newtab-bootstrap.html"
@@ -30,7 +30,8 @@
     "downloads",
     "contextMenus",
     "clipboardWrite",
-    "nativeMessaging"
+    "nativeMessaging",
+    "offscreen"
   ],
   "host_permissions": [
     "https://*/*",
@@ -50,7 +51,6 @@
     "https://api.deepseek.com/*",
     "https://api.open-meteo.com/*",
     "https://geocoding-api.open-meteo.com/*",
-    "https://aihot.virxact.com/*",
     "https://aihot.news/*",
     "https://monster-siren.hypergryph.com/*",
     "https://*.hycdn.cn/*",

@@ -9,6 +9,7 @@ import { getLocalDeviceInfo, type DeviceInfo } from "./device-identity";
 import { computeConfigDiff, type ChangeSummary } from "./sync-diff";
 import { mergeSyncSettings } from "./sync-merger";
 import { ARTICLE_REVISION_KEY, PROMPT_REVISION_KEY, parseBackpackRevision } from '../backpack/revision-guard';
+import { employeeBackup, employeesForRestore } from './employee-sync';
 
 export { MAX_SAFE_SYNC_PAYLOAD_BYTES } from "./sync-payload";
 export type { SyncPayloadResult } from "./sync-payload";
@@ -19,7 +20,9 @@ export const BASE_KEYS = [
   "displaySize", "city", "showWeather", "showSites", "showHomeNews", "showHomePlayer", "showQuickSearchWallpaper", "showBili",
   "showTodo", "showLeftNavigation", "showNavBall", "showBookmarkPanel",
   "showBookmarkFoldersTop", "showStartupAnimation", "startupAnimationStyle",
-  "singleNewTab", "enableQuickSearch", "showHomeMusicVisualizer"
+  "singleNewTab", "enableQuickSearch", "showHomeMusicVisualizer",
+  "defaultSitesView", "sitesTransparency", "weatherTransparency", "newsTransparency", "playerTransparency",
+  "searchEngine", "dockPosition", "theme"
 ];
 export const SHORTCUT_KEY = "customShortcuts";
 export const SEARCH_IGNORED_BOOKMARK_FOLDERS_KEY = "searchIgnoredBookmarkFolders";
@@ -35,7 +38,7 @@ export const SYNC_WHITELIST_KEYS: readonly string[] = [
   "ghUser", "ghToken", "todoistToken", "todoistActiveProjectIdV1", "lw_private_chat_v1", "googleCalendarSessionTokenV1", "lw_webdav_config",
   "launcherGroups", "launcherFolders", "quickLinks", "quickLinkGroupSizes",
   "launcherPages", "launcherPageLabels", "launcherActivePage", "launcherFolderPositionV1",
-  "heroBackground", "heroBackgroundHistory",
+  "heroBackground", "heroBackgroundHistory", "lw-rss-channels-v1", "lw-rss-selected-v1", "msFavoriteSongs", "digitalEmployeesV1",
   "logicweaver_prompt_backpack_v1", "logicweaver_prompt_backpack_categories_v1",
   "logicweaver_saved_articles_v1", "logicweaver_saved_article_categories_v1",
   CUSTOM_AVATAR_KEY, LEGACY_AVATAR_KEY
@@ -91,6 +94,7 @@ export async function readSyncSettings(): Promise<Record<string, unknown>> {
         resolve(filtered);
       });
     });
+    if (data.digitalEmployeesV1 !== undefined) data.digitalEmployeesV1 = employeeBackup(data.digitalEmployeesV1);
     // Include localStorage items (e.g. private chat config) if not present in chrome.storage.local
     if (typeof localStorage !== "undefined") {
       const extraKeys = ["lw_private_chat_v1", "ghUser", "ghToken", "todoistToken", "googleCalendarSessionTokenV1", "lw_webdav_config", "biliRadioSeriesV1", "gh_my_repo_groups_v2", "gh_my_repo_groups_map_v2", ...BACKPACK_SYNC_KEYS];
@@ -115,6 +119,13 @@ export async function readSyncSettings(): Promise<Record<string, unknown>> {
         if (Object.keys(groupsMap).length) {
           data["ghLocalStarGroupsV1"] = groupsMap;
         }
+      }
+      // RSS is currently owned by localStorage; it must override a stale chrome-storage restore.
+      for (const key of ['lw-rss-channels-v1', 'lw-rss-selected-v1']) {
+        const raw = localStorage.getItem(key);
+        if (raw === null) { delete data[key]; continue; }
+        if (key === 'lw-rss-selected-v1') data[key] = raw;
+        else { try { data[key] = JSON.parse(raw); } catch { throw new SyncBackupError('RSS 订阅数据格式无效，未生成备份'); } }
       }
       for (const key of launcherMirrorKeys) {
         if (!SYNC_WHITELIST_KEYS.includes(key)) continue;
@@ -144,6 +155,7 @@ export async function readSyncSettings(): Promise<Record<string, unknown>> {
     if (raw === null) continue;
     try { result[key] = JSON.parse(raw); } catch { result[key] = raw; }
   }
+  if (result.digitalEmployeesV1 !== undefined) result.digitalEmployeesV1 = employeeBackup(result.digitalEmployeesV1);
   return result;
 }
 
@@ -160,6 +172,11 @@ export async function restoreSyncBackup(data: unknown, options: { allowCredentia
     const commit = async () => {
       if (options.beforeCommit) await options.beforeCommit();
       const values: Record<string, unknown> = { ...settings };
+      if (Object.hasOwn(settings, 'digitalEmployeesV1')) {
+        const current = await chrome.storage.local.get('digitalEmployeesV1');
+        values.digitalEmployeesV1 = employeesForRestore(settings.digitalEmployeesV1, current.digitalEmployeesV1);
+        values.digitalEmployeeOrganizerSeededV1 = true;
+      }
       if (revisionKeys.length) {
         const current = await chrome.storage.local.get(revisionKeys);
         for (const key of revisionKeys) {
@@ -217,7 +234,7 @@ export async function restoreSyncBackup(data: unknown, options: { allowCredentia
           if (launcherMirrorKeys.has(key)) {
             localStorage.setItem(`logicweaver:${key}`, json);
           }
-          localStorage.setItem(key, json);
+          localStorage.setItem(key, (key === 'theme' || key === 'lw-rss-selected-v1') && typeof value === 'string' ? value : json);
         } catch {}
       }
     }
@@ -226,7 +243,7 @@ export async function restoreSyncBackup(data: unknown, options: { allowCredentia
     if (options.beforeCommit) await options.beforeCommit();
     if (typeof localStorage === "undefined") throw new Error("本地存储不可用");
     const writes = Object.entries(settings).flatMap(([key, value]) => {
-      const json = JSON.stringify(value);
+      const json = (key === 'theme' || key === 'lw-rss-selected-v1') && typeof value === 'string' ? value : JSON.stringify(value);
       return launcherMirrorKeys.has(key)
         ? [[key, json], [`logicweaver:${key}`, json]] : [[key, json]];
     });

@@ -177,6 +177,7 @@ export async function executeEmployeeTool(
           author: data.author,
           cover: String(view.pic || '').replace(/^http:/, 'https:'),
           desc: data.desc.slice(0, 600),
+          descStatus: 'loaded',
           tname: data.tname,
           pages: pages.slice(0, 8),
           stat: {

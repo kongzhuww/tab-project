@@ -106,6 +106,26 @@ test('live peek modal exposes simulated targets for source, info, comments, subt
   }
 });
 
+test('preloaded Bilibili details are projected into live peek before the AI calls tools', async () => {
+  const { peekVideoFromView } = await loadTsModule('src/agents/employee-peek-video.ts');
+  const current = { bvid: 'BV1GJ411x7h7', title: '原始标题', author: 'UP', cover: '' };
+  const result = peekVideoFromView(current, {
+    desc: '真实简介', title: '视频标题', owner: { name: '作者' }, pic: 'http://example.com/a.jpg',
+    pages: [{ page: 1, part: '正片', duration: 42 }], stat: { view: 10, like: 3 }
+  });
+  assert.equal(result.desc, '真实简介');
+  assert.equal(result.descStatus, 'loaded');
+  assert.equal(result.pages[0].durationSec, 42);
+  assert.equal(result.cover, 'https://example.com/a.jpg');
+  assert.equal(peekVideoFromView(current, { desc: '' }).descStatus, 'loaded');
+  const worker = await readFile(new URL('../src/background/employee-worker.ts', import.meta.url), 'utf8');
+  assert.match(worker, /await emitPeek\(\{ activeVideo: peekVideoFromView\(peekState\.activeVideo!, view\) \}\)/);
+  assert.match(worker, /descStatus: 'unavailable'/);
+  const modal = await readFile(new URL('../src/agents/LivePeekModal.vue', import.meta.url), 'utf8');
+  assert.match(modal, /该视频暂无简介/);
+  assert.match(modal, /暂时无法获取视频简介/);
+});
+
 test('decision gate retryOnSkip defaults to true and respects explicit opt-out', () => {
   const def = contract.createDefaultBiliEmployee(1000);
   assert.equal(def.decisionGate.retryOnSkip, true);

@@ -151,20 +151,20 @@ export function bindChannelFavoritesActions(target: ChannelActionsTarget): void 
           void target.loadSubVideo(true);
           break;
         case "subscription-script-mode": {
-          const nextMode = (localStorage.getItem("biliSubScriptMode") || "newspaper") === "newspaper" ? "lyrics" : "newspaper";
-          localStorage.setItem("biliSubScriptMode", nextMode);
+          localStorage.setItem("biliSubScriptMode", "lyrics");
           target.publishSubscriptionSnapshot();
           break;
         }
         case "subscription-seek": {
           const from = Number(payload?.from);
           const doc = target.getActiveSubscriptionDocument();
-          if (doc && Number.isFinite(from)) {
+          const currentSub = biliFavoritesController.state.organizer.subscriptionCurrent;
+          if (Number.isFinite(from) && (doc || currentSub)) {
             const embeddedVideo = document.querySelector<HTMLMediaElement>(".bili-sub-native-video");
             if (embeddedVideo) {
               embeddedVideo.currentTime = Math.max(0, from - 0.1);
               embeddedVideo.play().catch(() => {});
-            } else {
+            } else if (doc) {
               biliTheaterController.openVideo({
                 bvid: doc.bvid,
                 aid: String(doc.aid || ""),
@@ -184,8 +184,10 @@ export function bindChannelFavoritesActions(target: ChannelActionsTarget): void 
         }
         case "subscription-copy-description": {
           const doc = target.getActiveSubscriptionDocument();
-          if (doc?.desc || doc?.text) {
-            navigator.clipboard.writeText(doc.desc || doc.text || "").then(() => {
+          const org = biliFavoritesController.state.organizer;
+          const descText = doc?.desc || doc?.text || org.subscriptionCurrent?.description || org.subscriptionDescription.join("\n");
+          if (descText) {
+            navigator.clipboard.writeText(descText).then(() => {
               notifyToast("视频简介已复制");
             }).catch(() => {
               notifyToast("复制简介失败");

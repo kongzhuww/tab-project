@@ -64,11 +64,33 @@ export async function openOrFocusNewTab(): Promise<void> {
   await chrome.tabs.create({ url: chrome.runtime.getURL("newtab.html"), active: true });
 }
 
-export function routeNewTab(sendResponse: (res: any) => void): void {
-  void chrome.storage.local.get(['singleNewTab', 'enableQuickSearch']).then((stored: any) => {
-    const quick = stored.enableQuickSearch ?? stored.singleNewTab;
-    sendResponse({ action: quick === true ? 'open-search' : 'open-home' });
-  }, () => sendResponse({ action: 'open-home' }));
+// Serialize simultaneous bootstrap requests so exactly one can reserve the first home page.
+let routingQueue: Promise<void> = Promise.resolve();
+let pendingHomeTabId: number | null = null;
+
+export function routeNewTab(sendResponse: (res: any) => void, senderTabId?: number): void {
+  const run = async () => {
+    try {
+      const stored = await chrome.storage.local.get(['enableQuickSearch', 'singleNewTab']);
+      if ((stored.enableQuickSearch ?? stored.singleNewTab) !== true || senderTabId == null) {
+        sendResponse({ action: 'open-home' });
+        return;
+      }
+      const tabs = await chrome.tabs.query({});
+      const hasHome = tabs.some((tab: any) => tab.id !== senderTabId && tabHasPage(tab, 'newtab.html'));
+      const reserved = tabs.some((tab: any) => tab.id === pendingHomeTabId && tab.id !== senderTabId &&
+        (tabHasPage(tab, 'newtab-bootstrap.html') || tabHasPage(tab, 'newtab.html')));
+      if (hasHome || reserved) {
+        sendResponse({ action: 'open-search' });
+      } else {
+        pendingHomeTabId = senderTabId;
+        sendResponse({ action: 'open-home' });
+      }
+    } catch {
+      sendResponse({ action: 'open-home' });
+    }
+  };
+  routingQueue = routingQueue.then(run, run);
 }
 
 function normalizeUrl(value: string): string {
@@ -203,9 +225,8 @@ export async function cleanupOrReplaceBrowserDefaultNewTabs(): Promise<void> {
     });
     if (!strayTabs.length) return;
 
-    const stored = await chrome.storage.local.get(['singleNewTab', 'enableQuickSearch']);
-    const quick = stored.enableQuickSearch ?? stored.singleNewTab;
-    const targetUrl = chrome.runtime.getURL(quick === true ? 'newtab-search.html' : 'newtab.html');
+    // Route these through the same bootstrap as ordinary new tabs, including first-home selection.
+    const targetUrl = chrome.runtime.getURL('newtab-bootstrap.html');
     for (const tab of strayTabs) if (tab.id != null) await chrome.tabs.update(tab.id, { url: targetUrl });
   } catch {}
 }

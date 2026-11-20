@@ -1,14 +1,14 @@
 # AGENTS.md — tab-project 协作准则与系统架构规范
 
-> **现行产品与发布入口**：产品名为 **tab-project 新标签页**，正式仓库为 `kongzhuww/tab-project`；`tab-project-next` 和 `LogicWeaver` 是历史名称，现存内部标识不据此批量重命名。仓库现行版本为 **v1.0.21**（以 `manifest.json` 与 `package.json` 为准）。产品已上架 Microsoft Edge 加载项商店，正式安装入口：https://microsoftedge.microsoft.com/addons/detail/tabproject-%E6%96%B0%E6%A0%87%E7%AD%BE%E9%A1%B5/dbkaiojfbolnkpaegflocfbdgpmhjcco 。自动提交规则见第 6.1 节及 `docs/EDGE_STORE_PUBLISH.md`。
+> **现行产品与发布入口**：产品名为 **tab-project 新标签页**，正式仓库为 `kongzhuww/tab-project`；`tab-project-next` 和 `LogicWeaver` 是历史名称，现存内部标识不据此批量重命名。仓库版本以 `manifest.json` 与 `package.json` 为准；商店上线状态与本地源码分开核对。产品已上架 Microsoft Edge 加载项商店，正式安装入口：https://microsoftedge.microsoft.com/addons/detail/tabproject-%E6%96%B0%E6%A0%87%E7%AD%BE%E9%A1%B5/dbkaiojfbolnkpaegflocfbdgpmhjcco 。自动提交规则见第 6.1 节及 `docs/EDGE_STORE_PUBLISH.md`。
 
 > **当前范围优先**：本仓库源自旧 2.3.0 代码的全新历史迁移副本，旧版本号仅说明来源，不是当前产品版本。按用户要求已彻底移除 ArkPets、Neuro / Evil、Web Mascot、Spine、角色素材、桌宠快捷栏、独立设置页和控制命令。下文历史台账中的桌宠描述不代表当前能力，禁止据此恢复代码、素材或依赖。旧仓库与本地个人预览图不迁移；公开前检查参见 `docs/PUBLICATION_REVIEW.md`。
 
-> **网易云登录链路（用户已确认账户连接成功）**：网易云模块提供“官网登录”和“连接官网账户”，使用固定 music.163.com 的浏览器会话只读请求；不提取 Cookie、不连接旧 localhost 节点、不生成第三方二维码。未接入的写入/历史/榜单操作不假称支持，详情见 docs/NETEASE_WEBSITE_SESSION.md。用户授权纳入1.0.0同版本重发，其他接口未全面验收。
+> **网易云登录链路**：网易云模块提供“官网登录”和“连接官网账户”，使用固定 music.163.com 的浏览器会话只读请求；不提取 Cookie、不连接旧 localhost 节点、不生成第三方二维码。未接入的写入/历史/榜单操作不假称支持，详情见 docs/NETEASE_WEBSITE_SESSION.md。
 
 > **移动端已移除**：用户当前只维护桌面 Chromium 扩展；独立 Android / Capacitor 应用、mobile 运行时、移动端构建命令和依赖已删除，不根据历史台账恢复。桌面窗口的窄屏响应式布局保留；手机实机、旧仓库与旧发布目录未操作。
 
-> **最新默认行为**：聊天室为实验性组件，默认关闭，只能在商店逐项启用；关闭时不自动同步、读取服务房间或补发，保留配置/历史/凭据，不把已经提交的请求假称撤回。Alt+E / Alt+Q 仅列出已注册且已启用的组件，不恢复退役工具。工作台不预置演示视频或恢复自动播放，必须可见且用户本页主动点击后才创建iframe，切走销毁播放器。
+> **最新默认行为**：聊天室为实验性组件，默认关闭，只能在商店逐项启用；关闭时保留配置、历史和凭据。工作台不预置演示视频或自动播放。主页已移除旧顶栏及其标签管理入口；天气、常用网站、书签、资讯和音乐可分别隐藏，隐藏时保留原位置。B站订阅不预置 UP 主；网易云与塞壬播放队列分开，无上下文的主页播放按钮不默认播放。AI 工作区、数字员工及可选本机 Native Host 当前存在；不能根据下方旧台账重新删除或复原功能。
 
 > **面向 AI 助手与开发者的核心准则**：在当前仓库执行任何开发、重构或调试时，必须严格遵守本规范。
 > 先用 [docs/CURRENT_STATE.md](docs/CURRENT_STATE.md) 定位现行入口；现行模块架构见 [docs/MODULE_INDEX.md](docs/MODULE_INDEX.md)，历史演进与迁移台账已归档至 [docs/history/](docs/history/README.md)。
@@ -24,16 +24,14 @@
    - manifest 当前加载 `generated/background.js`，源文件为 `src/background/index.ts`；根 `background.js` 也是构建输出，但不是 manifest 当前入口。MV3 Service Worker 会被浏览器回收，不依赖永久驻留或仅内存状态；
    - 当前仅维护桌面 Chromium 扩展；独立移动端应用已按用户要求删除，不提供 Android / iOS 构建或 APK 更新入口。
 2. **验证与安全铁律**：
-   - **测试现行授权（用户已更新要求）**：允许编写与运行断言、单元测试、集成测试、静态契约检查和隔离的无头 E2E；旧文档中“禁止断言/无头 E2E”的表述已被本条替代。允许测试不代表仓库已经拥有测试套件或相应覆盖率。
-   - **分层与隔离**：优先覆盖纯逻辑、模块注册、Manifest 入口、权限清单、构建产物与发布保护；浏览器测试仅使用独立临时配置和虚构数据，不复用日常浏览器资料、真实 Token、Cookie、任务或聊天历史。不得为了测试恢复已退役的 CLI/Broker、Native Host 或任意脚本执行通道。
+   - **测试现行授权**：允许编写与运行断言、单元测试、集成测试、静态契约检查和隔离的无头 E2E；`tests/` 是现有自动化测试套件。覆盖范围以实际测试为准。
+   - **分层与隔离**：优先覆盖纯逻辑、模块注册、Manifest 入口、权限清单、构建产物与发布保护；浏览器测试仅使用独立临时配置和虚构数据，不复用日常浏览器资料、真实 Token、Cookie、任务或聊天历史。不得为了测试恢复已退役的调试 CLI/Broker 或任意脚本执行通道；现行可选 Native Host 不代表获准操作用户本机。
    - **外部副作用仍须授权**：测试不得擅自操作用户现有标签页、读取真实个人目录、使用真实账号、发起付费请求、写入云端、部署、发布或提交商店审核。需要此类验证时，先说明目标与影响并取得明确授权；默认使用受控 mock/fixture，不把模拟通过当作真实接口验收。
-   - **质量门禁**：运行 `npm test`（当前为发行策略离线回归，详见 `docs/TESTING.md`）；保留 `npm run check`（`vue-tsc` + Vite 多入口构建）与 `git diff --check`，生成单文件按需执行 `node --check`；新增测试后按项目实际配置执行对应命令。报告分别列出静态检查、类型检查、构建、自动化测试和人工/真实环境验收结果，不虚报未运行项；
+   - **质量门禁**：运行 `npm test`（`node --test tests/*.test.mjs`）；发布工作流使用 Node 22，涉及发布时也要在 Node 22 验证。保留 `npm run check`（类型检查 + 构建）与 `git diff --check`，按需执行针对性测试及语法检查。不把构建或模拟通过当作真实环境验收；
    - **严禁黑色起手**：所有窗口、卡片、菜单与浮层必须继承主题系统 CSS 变量（`var(--panel)`、`var(--surface)`、`var(--text)`、`var(--heading)`、`var(--border)` 等），在明亮（Light）、米纸（Lonetrail）及暗色模式下均自适应且对比度舒适，严禁硬编码 `#0f172a`、`#121212` 等纯黑背景；
    - **默认无模态铁律（Modeless by Default）**：
      - **禁止自造遮罩**：项目中所有弹窗、对话框、确认框、输入框及设置小面板**默认一律为无模态（Modeless）**！除非用户在需求中有明确特别指明要求“有模态”，否则严禁添加全屏暗化/模糊模态遮罩（Overlay / Backdrop Mask），严禁使整屏变暗、变灰、发乌或阻断页面视线；
-     - **100% 实体纸面底色与防透光穿透铁律**：
-       - 无模态浮层与卡片必须采用 **100% 实心不透光实体背景色**（明亮模式下强制实心纯白 `#ffffff`，暗黑模式下为实心深色 `#1e293b`），坚决杜绝半透明变量导致弹窗本身发暗发灰、字迹混叠；
-       - **严禁浮层/下拉菜单（Dropdown/Popover/Flyout）使用 `--surface` 等半透明变量**！在侧边栏、卡片和工作区中，所有绝对定位浮动气泡（如分区切换下拉菜单 `sp-page-picker-dropdown`、Todoist 挂载板块下拉菜单 `todoist-section-dropdown`、右键级联菜单等）其背景必须使用实心的面板底色 `var(--panel)`（配合清晰阴影与边框），**绝对禁止使用半透明的 `var(--surface)`**，否则浮层会与下层的任务列表、输入框文字产生严重的透明重叠与字迹混杂！
+     - 主界面天气、常用网站、资讯和音乐支持用户分别调节背景透明度与毛玻璃效果，不能一律强制不透明。菜单和小型浮层仍应保持文字清晰、避免与底层内容重叠，优先使用主题面板变量。
      - **轻巧交互收口**：无模态弹窗统一采用**点击外部空白就地收起（Click-Outside）**与 **`Esc` 键快捷收起**，配合拖拽手柄自由移动，保持页面轻盈、通透与极速响应；
    - **绝对凭据保护**：禁止在日志、输出、提交或代码中明文写入 Token、Cookie、私有 IP、密钥或本地绝对路径。
    - **浏览器操作须另行授权**：用户不希望助手擅自启动浏览器调试；修 UI 不等于授权操作现有标签页、刷新扩展、启动 Broker 或调用页面桥接。优先读截图和源码，完成后让用户刷新验收；不得拿编译通过代替视觉或真实数据验收。
@@ -60,17 +58,19 @@
 
 在与用户沟通或编写代码时，**必须严格采用以下标准口令与源码映射**，严禁使用自造修饰词：
 
-### 3.1 顶栏区域（TopBar）
+### 3.1 旧顶栏区域（已移除）
+
+以下组件名可能仍有其他用途或遗留源码，不代表主页顶栏入口仍存在；不要据此恢复头像、通知中心、书签、播放条、标签管理或设置顶栏。
 | 用户口令 | 对应源码文件 | 作用位置与说明 |
 | :--- | :--- | :--- |
-| **头像 / 通知中心** | `src/notifications/NotificationCenter.vue` / `src/profile/ProfileMenu.vue` / `src/profile/TabManagerPanel.vue` | 顶栏最左侧头像点击直开**持久通知中心**（聚合30天重要Toast与任务闹钟）；右键菜单提供独立无模态**标签页管理**。旧 ProfilePanel 与微架构硬件探针已彻底移除 |
-| **书签** | `src/bookmarks/BookmarkFolderStrip.vue` / `BookmarkBoard.vue` | 顶栏书签条及弹出的常用网站式平铺看板展开 |
+| **头像 / 通知中心 / 标签管理** | `src/profile/` 等保留源码按实际用途核对 | 旧主页顶栏入口已移除，不恢复持久通知中心入口；标签管理仅指移除该入口 |
+| **书签** | `src/bookmarks/` 和首页相关组件 | 旧顶栏书签条已移除；首页书签模块及其独立显隐设置保留 |
 | **工作区（已移除）** | 原 `src/layout/AppTopBar.vue` 的 `#workspace-bar` | 用户已要求整条及课表/热点/VPS/Phone Link专属链路删除，不恢复；与常用网站工作区、工作区导航不是同一功能 |
-| **滚动立方体** | `src/layout/TopInfoCube.vue` / `CubeConfigDialog.vue` | 仅主界面顶栏的 3D 旋转信息块（音乐默认面、自定义倒计时/便签/链接面配置），不进入各大屏 |
+| **滚动立方体** | 旧顶栏入口 | 旧主页顶栏已移除；不要因为历史描述重建入口 |
 | **桌宠快捷栏（已移除）** | 无入口 | 新仓库按用户要求整套删除，严禁恢复 |
 | **监控快捷栏（已移除）** | 无入口 | 原 `AgentLaunchers.vue` 与专属服务探针已彻底移除，严禁恢复 |
-| **设置** | `src/settings/SettingsDialog.vue` / `SettingsView.vue` | 顶栏右上角设置齿轮按钮及非模态设置面板 |
-| **主题** | `src/settings/SettingsView.vue` (主题与外观) | 顶栏独立轮转按钮已移除（保持顶栏整洁），系统主题已统一移入设置面板「04 主题与外观」，集中管理系统风格切换（白天 light / 夜晚 dark / 终末地 endfield / 孤星 lonetrail）与桌面壁纸定制 |
+| **设置** | `src/settings/SettingsDialog.vue` / `SettingsView.vue` | 设置功能保留；不恢复旧顶栏入口 |
+| **主题** | `src/settings/SettingsView.vue` | 主题和壁纸在设置中管理；`endfield` 是启动动画而非页面主题 |
 
 ### 3.2 首屏展台区（Hero Launcher）
 | 用户口令 | 对应源码文件 | 作用位置与说明 |
@@ -93,11 +93,11 @@
 | 用户口令 | 对应源码文件 | 核心功能与当前状态 |
 | :--- | :--- | :--- |
 | **todoist** | `src/todoist/TodoistWorkspace.vue` | `todoist` | 独立可拖动待办看板：支持本地 0ms 离线缓存直出；支持 GitHub 任务区按关联仓库自动分层排版；未配置 Token 时显示引导卡片 |
-| **b站插件** | `src/bilibili/BilibiliWorkspace.vue` | B站双栏收藏夹整理、AI 字幕提取、刹那观察室订阅视频与小窗播放 |
+| **b站插件** | `src/bilibili/BilibiliWorkspace.vue` | 收藏夹整理、AI 字幕、用户自行添加的订阅视频与小窗播放；不硬编码默认 UP 主 |
 | **github插件** | `src/github/GitHubWorkspaceCard.vue` | GitHub Star 仓库深度检索、资源专区（原Awesome专区）、开阔式标准 Markdown README 阅读与一键创建关联任务 |
-| **ai hot插件** | `src/aihot/AihotFeed.vue` | 每日精选 AI 科技资讯热榜与沉浸阅读器 |
+| **ai hot插件** | `src/aihot/AihotFeed.vue` / `RssChannels.vue` | AIHOT 精选、模型榜、日报及用户自选 RSS / Atom 频道；AIHOT 为默认来源 |
 | **模型插件** | *已彻底移除* | 退役 | ❌ 彻底移除模型评测与价格看板，保持专注 |
-| **youtube插件** | `src/youtube/YouTubeCard.vue` | ⚠️ **【状态：封藏】** 用户指示暂未达到发布标准，暂不对外暴露，禁止主动扩展 |
+| **youtube插件** | 已移除 | 不依据旧台账恢复 |
 
 ### 3.5 独立模块与商店（Dock 栏右侧 · 独立非模态弹窗）
 
@@ -116,7 +116,7 @@
 | **N8N模块** | *历史模块，当前无注册入口* | `workflow` | 旧 `src/workflow/` 已不存在，不根据历史快照重建或自动连接 n8n |
 | **壁纸模块** | `src/wallpaper/WallpaperWorkspace.vue` | `wallpaper` | 动态/静态壁纸库与沙箱源码仍在；当前未在 builtins 注册，不等于壁纸渲染已移除 |
 | **表情包模块** | `src/stickers/StickersDialog.vue` / `StickerBoard.vue` / `StickerFolderCards.vue` | `stickers` | 已从 Dock 和商店独立模块列表隐藏，不删除源码或图库；保留聊天室“我的表情包”面板及其“表情库”管理入口。具体交互与存储边界见第 9 节 |
-| **Multica** | *已彻底移除* | `multica` | ❌ 旧 Multica 协同中心已彻底移除；后续按需由专属于本机的轻量海狸 Agent 控制台接替 |
+| **AI 工作区 / Multica** | `src/multica/MulticaDialog.vue` | `multica` | 当前已注册的 AI 工作区，包含数字员工和本机 AI 接入；功能以源码为准 |
 | **同步模块** | `src/sync/SyncWorkspaceDialog.vue` | `sync` | WebDAV 配置/同步源码仍在；当前未在 builtins 注册，`sync-bridge.html` 等独立入口另行核对 |
 | **日历模块** | `src/calendar/CalendarWorkspace.vue` | `calendar` | 日历源码及共享消费者仍在；当前未在 builtins 注册，不能据此重加旧 Dock 图标 |
 | ~~**频道模块**~~ | *已删除* | *channels* | ❌ 独立频道模块已移除，不得恢复 `src/channels/` 或注册独立模块；聊天室内部的房间频道及协议 `channel` 参数不属于此禁令。 |
@@ -158,10 +158,10 @@
    - 已移除 `scripts/lw-cli.mjs`、`npm run lw` 和相应执行器。历史文档中的 CLI 命令仅是旧记录，禁止照抄运行或恢复。
    - 保留正常业务通信、快捷键、页面内控制器、聊天与同步功能；调试工具退役不等于允许清除用户存储、停止外部进程、刷新浏览器或扩大删除范围。
    - 构建后检查源码、新生成入口与隔离发布包不含退役通道。历史发布目录不覆写，已打开的旧页面不会自动更新；仍由用户另行刷新验收。
-2. **纯浏览器扩展架构（无 Native Messaging）**：
-   - 项目已彻底移除 `native-host/` 辅助程序及 `manifest.json` 中的 `nativeMessaging` 权限；
-   - 表情包/视频缓存（File System Access API）、海狸聊天室等由浏览器标准 API 驱动，不依赖外部 EXE、PowerShell 脚本或注册表；网页桌宠及 Spine 已移除，不根据这段历史描述恢复；
-   - 严禁引入任何未授权的系统级提权机制或本地常驻进程依赖。
+2. **可选本机 AI 与浏览器能力**：
+   - 现行 `manifest.json` 包含 `nativeMessaging`，`src/services/native-bridge.service.ts`、`src/native-bridge/` 与 `native-host/` 支持可选本机 AI；`src/core/native-messaging.ts` 是旧同步通道存根，不代表全部 Native Messaging 已删除。
+   - 表情包和视频缓存使用浏览器文件系统 API；旧手机短信、电话与设备探针链路不因本机 AI 功能恢复。
+   - 安装宿主、启动本机进程、执行命令或操作用户文件须遵守现有授权边界；不擅自新增提权或后台常驻依赖。
 
 ---
 
@@ -180,7 +180,7 @@
 ### 6.1 Edge 商店、GitHub 发行与描述维护
 
 - **三个描述位置分开维护**：GitHub About 是仓库简介，README 是使用说明，`manifest.json.description` 是安装包内描述；工具栏悬停提示由 `action.default_title` 决定。Partner Center 的商店详情、截图等元数据另在后台维护；修改 README 或 manifest 不等于已修改在线商店详情。
-- **正式发布链路**：`.github/workflows/release.yml` 在正式版本 Tag 推送后完成检查、隔离构建和 GitHub Release，再调用 `.github/workflows/edge-store.yml` 上传同一发行 ZIP 并提交审核；普通 main 提交和 PR 不自动送审。不要仅依赖由内置 GITHUB_TOKEN 创建的 Release 再触发 `release.published` 工作流。
+- **正式发布链路**：`.github/workflows/release.yml` 在正式版本 Tag 推送后完成检查、隔离构建和 GitHub Release，再调用 `.github/workflows/edge-store.yml` 与 `.github/workflows/chrome-store.yml` 分别上传同一发行 ZIP 并尝试提交审核；普通 main 提交和 PR 不自动送审。两家商店结果须分别确认。
 - **补交已有正式版本**：可手动触发 `Submit to Edge Add-ons` 并提供 Release Tag；先检查 Partner Center，不重复提交正在审核或已上线的相同版本。上传/提交结果不明时不自动重试写请求、不假称撤回。
 - **凭据边界**：发布凭据仅放 GitHub Actions Secrets 的 `EDGE_CLIENT_ID`、`EDGE_API_KEY`；后台产品 ID 放 Actions Variable `EDGE_PRODUCT_ID`，不得与公开扩展 ID 混用。不将真实凭据、个人后台信息或聊天中提供的密钥复制进文档、源码、日志与构建包；轮换只更新 Secret，不改代码。
 - **发行包不可偷换**：现行 Release 工作流仅创建新发行，拒绝覆盖/编辑/补写已有版本（含草稿和预发布版），不使用 `--clobber`；校验集合/哈希/manifest/构建来源和远端 Tag，查询失败应停止。相关测试直接执行工作流内联校验逻辑，不维护另一份影子策略。该保护不等于已开启服务端不可变发行或 Tag 保护。Tag、package 与 manifest 版本必须一致。发布过的版本或审核中的 ZIP 不因本地改动而自动变新；描述修订默认纳入后续版本，未经明确授权不覆盖已发行附件、不移动旧 Tag、不取消当前审核。提交、发布 Tag 和商店送审须符合用户当次授权范围。
@@ -282,7 +282,7 @@
 
 ### 8.1 默认白色主题，不混淆启动动画
 
-- 用户偏好白色的**明亮（`light`）主题**。`src/theme/theme-init.ts` 与 `src/layout/AppTopBar.vue` 在没有已保存偏好时均默认 `light`；不要将默认改成米纸色或暗色，也不要为此覆盖所有用户已保存的主题。
+- 用户偏好白色的**明亮（`light`）主题**。默认行为以 `src/theme/theme-init.ts` 和 `src/theme/system-theme.ts` 为准；不要覆盖用户已保存的主题。
 - 系统主题统一由全局设置面板「04 主题与外观」进行切换与壁纸定制，支持白天模式 (`light`)、夜晚模式 (`dark`) 和暖纸色 (`lonetrail`，兼容旧配置)；旧版终末地界面主题回退到夜晚模式。
 - 独立开机启动动画由 `startupAnimationStyle` 控制：莱茵生命 (`rhinelab`) 与终末地 (`endfield`)，**启动动效与页面主题不是同一设置**。
 - 用户看到不同颜色时先区分已保存主题、首帧初始化和启动动画，不要用硬编码白色绕过主题 CSS 变量。
@@ -306,7 +306,7 @@
 - GitHubStatus仅保留AI任务/结果未确认的核对和停止入口；不能为了紧凑删掉付费任务风险提醒。此布局已通过构建，实际效果仍待用户刷新验收。
 - 仓库详情右侧“任务”栏在创建表单上方展示未完成的关联Todoist任务，多个卡片单列限高滚动；左圆圈是独立完成按钮，正文才走既有插件内任务详情。完成调用既有Todoist完成接口、确认后隐藏并更新相关显示；未确认提示核对，不自动重试。不复制/移动云端任务、不新增删除操作。统一识别API v1 checked与旧is_completed，已完成项刷新后不继续展示，保留原关联记录。反向查本机repository-links记录，按已关联ID只读取任务，不依赖当前Todoist看板或任务区名称；未配置/失效关联/读取失败应明确提示，不静默移除关联。
 
-### 通知中心B站目标
+### 通知中心B站目标（历史记录，主页通知中心入口已移除）
 
 - 视频通知保存受限的bili-video目标（BV或AV编号），通知中心与即时通知均打开对应插件视频小窗；私信/回复/提及汇总显式保存bili-messages，仍打开消息面板。普通B站操作不再仅凭appType一律跳消息中心。
 - showBiliToast兼容(text, options)和(text, duration, options)，透传target/url/视频编号，不能把即时onClick回调误当成可持久化目标。
@@ -335,8 +335,8 @@
 - 用户确认完整移除整条工作区及专属链路：课表导入/本地回退/向Google批量同步、热点流量、VPS探针、手机状态/短信与系统通知。已删除schedule/traffic/system/phone视图与store/runtime/service，App启动、Overlay、island注册、全局桥接、命令及专属CSS不再引用。
 - AppTopBar不留工作区占位，顶栏高度变量从92px收紧为64px并去掉42px底部预留。保留头像/书签/滚动立方体/设置/主题、Dock、大屏/工作台、通用天气及Google/Todoist日历；桌宠快捷栏与监控快捷栏已按后续要求移除，不恢复；WeatherWidget独立初始化天气，不依赖旧工作区runtime。
 - 通用日历只投影原有Google事件与Todoist任务，不再读取ClassIsland私有JSON或课程配置，不导入/批量创建课程事件，已存在云端事件原样保留。个人classisland-schedule.local.json未读/未删，Git忽略且干净发布输入排除；公开示例已删除。旧浏览器存储不读取、不迁移、不自动清空，不为“清理”触碰真实凭据。
-- 手机文件通知/复制及原生 Native 宿主链路已按用户指示全量彻底删除：移除 `native-host/` 整个目录及所有相关 C# 源码、PowerShell 脚本与二进制，`manifest.json` 中删除 `nativeMessaging` 高危权限。手机端文件接收、短信与电话监听、纯净 Edge 启动、任务栏歌词、旧版 Codex/AI 桥接均已清理，不留任何原生常驻进程或提权代码。
-- manifest 移除热点专用 LAN 条目与 nativeMessaging 权限；既有 `<all_urls>` 等其它广泛权限仍需按需收窄。干净发布排除 .local/.env 与旧 generated 块；不要清空整个 generated、Git 历史、本机配置或已有发布目录。构建/编译和静态核对不代替真实浏览器/硬件/云端验收。
+- 手机文件通知、短信、电话和旧设备探针属于已移除的历史链路；现行本机 AI 使用的 `native-host/` 和 `nativeMessaging` 是后续接入，不应混淆或误删。
+- 干净发布排除 .local/.env 与旧 generated 块；不要清空整个 generated、Git 历史、本机配置或已有发布目录。构建/编译和静态核对不代替真实浏览器/硬件/云端验收。
 
 - 本轮最终npm run check、git diff --check、背景脚本语法与原生C#编译通过；干净release:build也已通过。发现并修复隔离构建漏拷贝公开server/private-chat/protocol.json，仅纳入构建输入，不复制整个server或其私有配置。128个当前输出均未引用的96个旧工作区构建块已定向删除；源码/当前运行产物/新干净扩展包的退役链路标记零匹配，宿主二进制的短信读取标记零匹配，新扩展包私有配置/密钥容器文件名检查为0。Git发布候选文件名核对仅命中公开.env.example；.gitignore补充全局.env/.env.*排除并保留.env.example。文件名/标记检查不等于秘密内容与Git历史的完整审计。新干净目录为dist-extension/v2.2.2-xmhelK/extension，未上传、未覆盖旧发布目录；失败的首次隔离构建副本保留供排查，不误当可发布包。
 
@@ -366,7 +366,7 @@
 
 ---
 
-## 滚动立方体：仅主界面，不跨大屏
+## 滚动立方体（历史记录，旧顶栏入口现已移除）
 
 - 用户已明确授权移除跨大屏互通。TopInfoCube不再选择大屏Teleport目标；fullscreen-cards.store不再持有HTMLElement宿主表或注册函数；todoist、B站、GitHub、ai hot、youtube、模型插件不再创建宿主、登记/注销或保留占位样式。不要按历史生命周期文档恢复。
 - AppTopBar只传入主界面可见性active。大屏打开时隐藏但不销毁立方体实例，保留当前面/旋转；关闭菜单和管理面板，暂停倒计时刷新及滚轮锁，回到主界面再恢复。音乐播放、共享数据源与自定义面配置不删除。
@@ -430,7 +430,7 @@
 
 ### 9.4 当前统一图库与数据边界
 
-- **目录模式（`directory`，旧内部名 native 不代表 Native Host）**：Edge/Chrome 的 File System Access API 直接读取用户授权文件夹。原图保留在磁盘；浏览器只存句柄、虚拟分类/图片 UUID 索引和可重建的预览。全扩展已彻底移除 Native Host 与 nativeMessaging，所有模块均为纯前端标准 Web API。
+- **目录模式（`directory`，旧内部名 native 不代表 Native Host）**：Edge/Chrome 的 File System Access API 直接读取用户授权文件夹。原图保留在磁盘；浏览器只存句柄、虚拟分类/图片 UUID 索引和可重建的预览。此图库能力不依赖本机 AI 的 Native Host。
 - 表情包目录设置入口已按最新要求移除，现有目录关联保留；不得据历史说明恢复全局表单。现存导入/删除仍按原授权与确认规则，不自动迁移、删除原图或改写目录。
 - 分类的新建、重命名、同级排序、删除与图片归类均只改 IndexedDB 索引。删分类及子分类时图片改归可见上一级。**按用户最新要求，“删除图片”在逐张确认后真实删除磁盘原图**：提示相对文件名及通常不进回收站/索引备份无法恢复，按需申请写权限；使用真实根句柄 resolve 确认归属、核对实际文件句柄与大小/修改时间后，仅对其父目录 removeEntry 一个文件名，不递归删目录、不用虚拟分类拼磁盘路径。deleteStickerFile 与界面共用此确认链路。取消、拒绝授权或目标变化停止；结果未确认不自动重试。文件系统检查与删除不是原子操作，不能承诺对外部同时替换文件零竞态。磁盘删除后才清理该图片索引；清理失败明确说明原图已删除、要求刷新，不伪装回滚。设置“显示旧版隐藏图片”仅兼容历史隐藏标记，不能恢复被删除的原图。
 - `library-index.ts` 按真实根句柄 `isSameEntry` 区分图库，旧根索引保留。首次建立索引将旧扫描目录及展示别名/移除/顺序映射为虚拟分类，不平铺、搬移或重命名文件。后续磁盘新增子目录不自动变成分类；图片 UUID 不随分类名/路径变化。外部改名仅在句柄身份还能匹配时保留 UUID，不保证跨盘移动/换机自动识别；失联关系保留，不猜同名就是同图。

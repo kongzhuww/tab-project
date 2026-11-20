@@ -1,11 +1,13 @@
 import {
   DIGITAL_EMPLOYEES_KEY,
   DIGITAL_EMPLOYEE_ORGANIZER_SEEDED_KEY,
+  DIGITAL_EMPLOYEE_SITE_FINDER_SEEDED_KEY,
   EMPLOYEE_LIVE_PEEK_KEY,
   EMPLOYEE_RUN_LOG_KEY,
   EMPLOYEE_WORKER_STAMP,
   createDefaultBiliEmployee,
   createDefaultOrganizerEmployee,
+  createDefaultSiteFinderEmployee,
   localDayKey,
   normalizeEmployee,
   safeEmployeesList,
@@ -18,6 +20,7 @@ import {
 } from '../agents/employee-contract';
 import { evaluateWithDecisionGate, passesDecisionGate } from '../agents/decision-engine';
 import { runAutonomousEmployeeAnalysis } from '../agents/employee-tools';
+import { peekVideoFromView } from '../agents/employee-peek-video';
 import {
   applyOrganizerPlanStep,
   buildHeuristicOrganizerFallback,
@@ -27,10 +30,16 @@ import {
   bindOrganizerPlan,
   undoOrganizerPlanStep,
 } from '../agents/workspace-organizer';
+import {
+  buildHeuristicSiteFinderFallback,
+  buildSiteFinderPrompt,
+  parseSiteFinderResponse,
+  rankSiteCandidates,
+} from '../agents/site-finder';
 import { saveArticleFromBackground } from '../backpack/article.service';
 import { publishAiNotification } from '../multica/ai-notifications';
 import { bilibiliService } from '../services/bilibili.service';
-import { loadConfig, streamOpenAiCompatible } from '../services/byok.service';
+import { loadConfig, loadJevConfig, streamOpenAiCompatible } from '../services/byok.service';
 import { pingNativeHost, runLocalAgent } from '../services/native-bridge.service';
 
 declare const chrome: any;
@@ -46,12 +55,17 @@ function serial<T>(fn: () => Promise<T>): Promise<T> {
 }
 
 async function readEmployees(): Promise<DigitalEmployee[]> {
-  const stored = await chrome.storage.local.get([DIGITAL_EMPLOYEES_KEY, DIGITAL_EMPLOYEE_ORGANIZER_SEEDED_KEY]);
+  const stored = await chrome.storage.local.get([
+    DIGITAL_EMPLOYEES_KEY,
+    DIGITAL_EMPLOYEE_ORGANIZER_SEEDED_KEY,
+    DIGITAL_EMPLOYEE_SITE_FINDER_SEEDED_KEY,
+  ]);
   if (stored[DIGITAL_EMPLOYEES_KEY] === undefined) {
-    const initial = [createDefaultBiliEmployee(), createDefaultOrganizerEmployee()];
+    const initial = [createDefaultBiliEmployee(), createDefaultOrganizerEmployee(), createDefaultSiteFinderEmployee()];
     await chrome.storage.local.set({
       [DIGITAL_EMPLOYEES_KEY]: initial,
       [DIGITAL_EMPLOYEE_ORGANIZER_SEEDED_KEY]: true,
+      [DIGITAL_EMPLOYEE_SITE_FINDER_SEEDED_KEY]: true,
     });
     return initial;
   }
@@ -62,6 +76,13 @@ async function readEmployees(): Promise<DigitalEmployee[]> {
       await writeEmployees(list);
     }
     await chrome.storage.local.set({ [DIGITAL_EMPLOYEE_ORGANIZER_SEEDED_KEY]: true });
+  }
+  if (!stored[DIGITAL_EMPLOYEE_SITE_FINDER_SEEDED_KEY]) {
+    if (list.length < 40 && !list.some(e => e.source.kind === 'site-finder')) {
+      list.push(createDefaultSiteFinderEmployee());
+      await writeEmployees(list);
+    }
+    await chrome.storage.local.set({ [DIGITAL_EMPLOYEE_SITE_FINDER_SEEDED_KEY]: true });
   }
   return list;
 }
@@ -313,6 +334,7 @@ async function executeOneForEmployee(
     return { status: 'limit', message: `今日已达处理上限（${emp.schedulePolicy.dailyLimit} 条）。` };
   }
   if (emp.source.kind === 'workspace-organizer') return executeOrganizerForEmployee(emp);
+  if (emp.source.kind === 'site-finder') return { status: 'idle', message: '请在「找站面板」输入你的记忆描述后再开始找站。' };
   if (!emp.skills.includes('bili.source')) {
     throw new Error('该员工未启用「B站数据源读取」Skill。');
   }
@@ -413,7 +435,7 @@ async function executeOneForEmployee(
     cursorTarget: 'video-card',
     cursorLabel: `选中视频：${title.slice(0, 20)}`,
     sourceVideos,
-    activeVideo: { bvid, title, author, cover },
+    activeVideo: { bvid, title, author, cover, descStatus: 'loading' },
   }, true);
   await new Promise(resolve => setTimeout(resolve, 420));
 
@@ -422,12 +444,16 @@ async function executeOneForEmployee(
   let descSnippet = '';
   try {
     const view = await bilibiliService.getVideoView(bvid);
-    if (view?.cid) {
-      viewCache.set(bvid, view);
+    if (view) {
+      if (view.cid) viewCache.set(bvid, view);
       descSnippet = String(view.desc || '').slice(0, 800);
+      await emitPeek({ activeVideo: peekVideoFromView(peekState.activeVideo!, view) });
+    } else {
+      await emitPeek({ activeVideo: { ...peekState.activeVideo!, descStatus: 'unavailable' } });
     }
   } catch {
     // Non-fatal: the agent tools can still fetch on demand or report unavailable.
+    await emitPeek({ activeVideo: { ...peekState.activeVideo!, descStatus: 'unavailable' } });
   }
 
   if (emp.decisionGate.skipWithoutSubtitle) {
@@ -463,7 +489,10 @@ async function executeOneForEmployee(
   }
 
   let preTriageNote = '';
-  if (emp.skills.includes('jev.triage') && emp.runtime.decisionMode === 'jev-http' && emp.runtime.jevEndpoint) {
+  const globalJevEndpoint = emp.skills.includes('jev.triage') && emp.runtime.decisionMode === 'jev-http' && !emp.runtime.jevEndpoint
+    ? (await loadJevConfig().catch(() => ({ endpoint: '' }))).endpoint
+    : '';
+  if (emp.skills.includes('jev.triage') && emp.runtime.decisionMode === 'jev-http' && (emp.runtime.jevEndpoint || globalJevEndpoint)) {
     const verdict = await evaluateWithDecisionGate(emp, {
       bvid,
       title,
@@ -641,7 +670,12 @@ export async function runPatrolCycle(targetEmployeeId?: string, _organizerConsen
 
     const targets = targetEmployeeId
       ? employees.filter(e => e.id === targetEmployeeId)
-      : employees.filter(e => e.enabled && (!e.nextEligibleAt || e.nextEligibleAt <= now));
+      : employees.filter(
+          e =>
+            e.enabled
+            && e.source.kind !== 'site-finder'
+            && (!e.nextEligibleAt || e.nextEligibleAt <= now)
+        );
 
     if (!targets.length) {
       await armPatrolAlarm(employees);
@@ -974,6 +1008,92 @@ async function handleAction(action: string, message: any): Promise<unknown> {
       return { run, step, note: feedbackSaved ? '步骤状态和本条偏好已保存。' : '步骤状态已保存，但偏好保存失败。' };
     });
   }
+  if (action === 'run-site-finder') {
+    const query = String(message?.query || '').trim().slice(0, 500);
+    if (!query) throw new Error('请输入记忆描述或关键词。');
+    return serial(async () => {
+      const startedAt = Date.now();
+      const employees = await readEmployees();
+      const runs = await readRuns();
+      const emp = employees.find(e => e.id === String(message?.employeeId || ''))
+        || employees.find(e => e.source.kind === 'site-finder');
+      if (!emp) throw new Error('未找到记忆找站专员。');
+
+      const snapshot = await readOrganizerWorkspaceSnapshot();
+      const candidates = rankSiteCandidates(query, snapshot, emp.schedulePolicy.maxFetchItems || 45);
+
+      let result = buildHeuristicSiteFinderFallback(query, snapshot, candidates);
+      let engine: EmployeeRunRecord['engine'] = 'heuristic';
+
+      const cfg = await loadConfig().catch(() => ({ configured: false, model: '' } as any));
+      const prompt = buildSiteFinderPrompt(emp, query, candidates);
+
+      if (emp.runtime.analyzer === 'native-pi') {
+        try {
+          const res = await runLocalAgent({
+            agentId: 'pi',
+            model: emp.runtime.piModel || undefined,
+            thinking: emp.runtime.piThinking || 'medium',
+            toolsEnabled: false,
+            timeoutMs: 120_000,
+            prompt,
+          });
+          if (res.text) {
+            result = parseSiteFinderResponse(res.text, snapshot, query, candidates.length);
+            engine = 'pi';
+          }
+        } catch (err) {
+          console.warn('[SiteFinder] Pi 推理失败，尝试云端模型或回退本地召回', err);
+        }
+      }
+
+      if (engine === 'heuristic' && cfg.configured && cfg.model) {
+        try {
+          let out = '';
+          await streamOpenAiCompatible(
+            cfg,
+            cfg.model,
+            [{ role: 'user', content: prompt }],
+            AbortSignal.timeout(90_000),
+            chunk => { out += chunk; }
+          );
+          if (out) {
+            result = parseSiteFinderResponse(out, snapshot, query, candidates.length);
+            engine = 'deepseek';
+          }
+        } catch (err) {
+          console.warn('[SiteFinder] LLM 推理失败，回退本地召回', err);
+        }
+      }
+
+      const record: EmployeeRunRecord = {
+        id: `run-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        employeeId: emp.id,
+        kind: 'site-finder',
+        bvid: `sf-${Date.now()}`,
+        title: `找站：${query.slice(0, 36)}`,
+        author: emp.name,
+        url: result.matches[0]?.url || result.recommendations[0]?.url || '',
+        status: 'analyzed',
+        engine,
+        worth: true,
+        score: result.foundInLibrary ? 0.92 : 0.65,
+        category: result.foundInLibrary ? '站内找回' : '外部推荐',
+        reason: result.summary,
+        siteFinderQuery: query,
+        siteFinderResult: result,
+        durationMs: Date.now() - startedAt,
+        createdAt: Date.now(),
+      };
+      emp.lastRunAt = Date.now();
+      emp.lastError = undefined;
+      runs.unshift(record);
+      await writeEmployees(employees);
+      await writeRuns(runs);
+      return { message: result.summary, record };
+    });
+  }
+
   throw new Error('未知数字员工操作');
 }
 

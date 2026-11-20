@@ -3,7 +3,7 @@
 export const reviewedApiPermissions = Object.freeze([
   'storage', 'unlimitedStorage', 'bookmarks', 'favicon', 'alarms',
   'activeTab', 'tabs', 'cookies', 'declarativeNetRequest', 'identity', 'scripting',
-  'notifications', 'downloads', 'contextMenus', 'clipboardWrite', 'nativeMessaging',
+  'notifications', 'downloads', 'contextMenus', 'clipboardWrite', 'nativeMessaging', 'offscreen',
 ]);
 
 export const reviewedOptionalApiPermissions = Object.freeze([]);

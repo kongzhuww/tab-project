@@ -36,8 +36,20 @@ const MessageMarkdown = defineAsyncComponent({
 });
 
 const service = ref<'deepseek' | 'native'>('native');
-const workspaceSection = ref<'chat' | 'library' | 'schedule' | 'agents'>('chat');
-const libraryOpened = ref(false), scheduleOpened = ref(false), agentsOpened = ref(false);
+type WorkspaceSection = 'chat' | 'library' | 'schedule' | 'agents';
+const MULTICA_SECTION_SESSION_KEY = 'lw-multica-section';
+function readSavedWorkspaceSection(): WorkspaceSection {
+  try {
+    const saved = sessionStorage.getItem(MULTICA_SECTION_SESSION_KEY);
+    if (saved === 'chat' || saved === 'library' || saved === 'schedule' || saved === 'agents') return saved;
+  } catch {}
+  return 'chat';
+}
+const workspaceSection = ref<WorkspaceSection>(readSavedWorkspaceSection());
+const libraryOpened = ref(workspaceSection.value === 'library'), scheduleOpened = ref(workspaceSection.value === 'schedule'), agentsOpened = ref(workspaceSection.value === 'agents');
+watch(workspaceSection, section => {
+  try { sessionStorage.setItem(MULTICA_SECTION_SESSION_KEY, section); } catch {}
+});
 const workspaceVisible = computed(() => fullscreenCardState.activeId === 'multica');
 const byok = useByokChat();
 const { conversations: localConversations, current: byokCurrent, currentId: byokCurrentId, error: byokError, configured: byokConfigured, model: byokModel, providerLabel: byokLabel, effort: byokEffort, sending: byokSending } = byok;
@@ -140,7 +152,16 @@ watch(() => [workspaceVisible.value, aiWorkspaceBridge.pending?.id, anySending.v
     if (!localConversations.value.some(item => item.id === request.conversationId)) { byokError.value = '该本地会话已不存在。'; aiWorkspaceBridge.pending = null; return; }
     openLocalConversation(request.conversationId);
   } else {
-    newConversation();
+    if (request.target?.service === 'deepseek') {
+      workspaceSection.value = 'chat';
+      service.value = 'deepseek';
+      byok.newChat();
+      if (request.target.model) void byok.chooseModel(request.target.model);
+    } else if (request.target?.service === 'native') {
+      chooseNative(request.target.nativeAgentId || 'pi', request.target.model || '');
+    } else {
+      newConversation();
+    }
     const existing = draft.value.text;
     draft.value.text = existing.trim() ? `${existing}\n\n${request.text}` : request.text;
     if (request.resource && !draft.value.resources.some(item => item.kind === request.resource!.kind && item.id.toLowerCase() === request.resource!.id.toLowerCase())) {

@@ -7,6 +7,7 @@ import {
   EMPLOYEE_WORKER_STAMP,
   createDefaultBiliEmployee,
   createDefaultOrganizerEmployee,
+  createDefaultSiteFinderEmployee,
   exportEmployeeBlueprint,
   localDayKey,
   normalizeEmployee,
@@ -20,6 +21,7 @@ import { callEmployeeBackend, type EmployeeSnapshotResult } from './employee-cli
 import { bilibiliService } from '../services/bilibili.service';
 import LivePeekModal from './LivePeekModal.vue';
 import OrganizerPeekModal from './OrganizerPeekModal.vue';
+import SiteFinderModal from './SiteFinderModal.vue';
 
 declare const chrome: any;
 
@@ -67,6 +69,16 @@ const organizerModal = ref<{
   employeeName: string;
   runId?: string;
 }>({ open: false, employeeId: '', employeeName: '' });
+
+const siteFinderModal = ref<{
+  open: boolean;
+  employeeId: string;
+  employeeName: string;
+}>({ open: false, employeeId: '', employeeName: '' });
+
+function openSiteFinder(emp: DigitalEmployee) {
+  siteFinderModal.value = { open: true, employeeId: emp.id, employeeName: emp.name };
+}
 
 const activeOrganizerRun = computed<EmployeeRunRecord | null>(() => {
   if (!organizerModal.value.open || !organizerModal.value.employeeId) return null;
@@ -193,6 +205,13 @@ function createNewOrganizerEmployee() {
   openEmployeeDrawer(fresh, 'runtime');
 }
 
+function createNewSiteFinderEmployee() {
+  const fresh = createDefaultSiteFinderEmployee();
+  fresh.id = `emp-sf-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+  fresh.name = `记忆找站专员 #${employees.value.filter(e => e.source.kind === 'site-finder').length + 1}`;
+  openEmployeeDrawer(fresh, 'runtime');
+}
+
 function createNewEmployee() {
   const fresh = createDefaultBiliEmployee();
   fresh.id = `emp-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
@@ -274,6 +293,10 @@ async function togglePatrol(emp: DigitalEmployee) {
 }
 
 async function runOneNow(emp: DigitalEmployee) {
+  if (emp.source.kind === 'site-finder') {
+    openSiteFinder(emp);
+    return;
+  }
   if (busyId.value) return;
   const isOrg = emp.source.kind === 'workspace-organizer';
   busyId.value = emp.id;
@@ -404,6 +427,7 @@ async function clearRunLogs(employeeId: string) {
 
 function sourceLabel(emp: DigitalEmployee): string {
   if (emp.source.kind === 'workspace-organizer') return '桌面网站 + 书签';
+  if (emp.source.kind === 'site-finder') return '记忆找站 · 书签+桌面';
   if (emp.source.kind === 'bili-history') return '播放历史';
   if (emp.source.kind === 'bili-fav') return emp.source.folderTitle || '指定收藏夹';
   return '稍后再看';
@@ -474,6 +498,9 @@ onBeforeUnmount(() => {
         <button type="button" class="emp-pill-btn subtle" @click="createNewOrganizerEmployee">
           <span>+ 桌面书签专员</span>
         </button>
+        <button type="button" class="emp-pill-btn subtle" @click="createNewSiteFinderEmployee">
+          <span>+ 记忆找站专员</span>
+        </button>
         <button type="button" class="emp-pill-btn primary" @click="createNewEmployee">
           <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M8 3v10M3 8h10"/></svg>
           <span>新建员工</span>
@@ -543,26 +570,39 @@ onBeforeUnmount(() => {
                 <span v-if="emp.source.kind === 'workspace-organizer'">
                   提案 {{ organizerRunStats(emp.id).pending }} 待批 / {{ organizerRunStats(emp.id).applied }} 已生效
                 </span>
+                <span v-else-if="emp.source.kind === 'site-finder'">
+                  累计找站 {{ runs.filter(r => r.employeeId === emp.id && r.kind === 'site-finder').length }} 次
+                </span>
                 <span v-else>今日 {{ employeeTodayStats(emp.id).analyzed }} 精读 / {{ employeeTodayStats(emp.id).skipped }} 跳过</span>
               </div>
               <div class="emp-card-btns">
                 <button
+                  v-if="emp.source.kind === 'site-finder'"
                   type="button"
                   class="emp-mini-btn"
-                  :disabled="Boolean(busyId)"
-                  :title="emp.source.kind === 'workspace-organizer' ? '只读盘点桌面网站与书签并生成提案' : '立即抓取 1 条未处理视频试跑'"
-                  @click="runOneNow(emp)"
+                  @click="openSiteFinder(emp)"
                 >
-                  {{ busyId === emp.id ? '运行中…' : (emp.source.kind === 'workspace-organizer' ? '生成提案' : '试跑 1 条') }}
+                  🔍 输入描述找站
                 </button>
-                <button
-                  type="button"
-                  class="emp-mini-btn ghost"
-                  :title="emp.source.kind === 'workspace-organizer' ? '打开整理预览与逐条审批清单' : '打开仿真实况窥屏窗口'"
-                  @click="openLivePeek(emp)"
-                >
-                  {{ emp.source.kind === 'workspace-organizer' ? '预览审批' : '窥屏' }}
-                </button>
+                <template v-else>
+                  <button
+                    type="button"
+                    class="emp-mini-btn"
+                    :disabled="Boolean(busyId)"
+                    :title="emp.source.kind === 'workspace-organizer' ? '只读盘点桌面网站与书签并生成提案' : '立即抓取 1 条未处理视频试跑'"
+                    @click="runOneNow(emp)"
+                  >
+                    {{ busyId === emp.id ? '运行中…' : (emp.source.kind === 'workspace-organizer' ? '生成提案' : '试跑 1 条') }}
+                  </button>
+                  <button
+                    type="button"
+                    class="emp-mini-btn ghost"
+                    :title="emp.source.kind === 'workspace-organizer' ? '打开整理预览与逐条审批清单' : '打开仿真实况窥屏窗口'"
+                    @click="openLivePeek(emp)"
+                  >
+                    {{ emp.source.kind === 'workspace-organizer' ? '预览审批' : '窥屏' }}
+                  </button>
+                </template>
                 <button type="button" class="emp-mini-btn ghost" title="导出脱敏员工包分享给别人" @click="exportEmployee(emp)">导出</button>
                 <button type="button" class="emp-mini-btn ghost" title="编辑配置与查看运行记录" @click="openEmployeeDrawer(emp, 'runtime')">配置</button>
               </div>
@@ -609,6 +649,7 @@ onBeforeUnmount(() => {
                 <label>工作数据源</label>
                 <select v-model="draft.source.kind">
                   <option value="workspace-organizer">桌面网站 + 浏览器书签（整理审批）</option>
+                  <option value="site-finder">记忆找站（模糊检索书签/桌面 + 推荐入口）</option>
                   <option value="bili-toview">稍后再看</option>
                   <option value="bili-fav">指定 B 站收藏夹</option>
                   <option value="bili-history">播放历史</option>
@@ -866,6 +907,14 @@ onBeforeUnmount(() => {
       @run-now="id => { const target = employees.find(e => e.id === id); if (target) void runOneNow(target); }"
       @updated="void refresh()"
       @reload-extension="reloadExtensionWorker"
+    />
+    <SiteFinderModal
+      v-if="siteFinderModal.open"
+      :employee-id="siteFinderModal.employeeId"
+      :employee-name="siteFinderModal.employeeName"
+      :recent-runs="runs"
+      @close="siteFinderModal.open = false"
+      @updated="void refresh()"
     />
   </section>
 </template>

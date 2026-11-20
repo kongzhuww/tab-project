@@ -2,12 +2,13 @@ import type { PiThinkingLevel } from '../services/native-bridge.service';
 
 export const DIGITAL_EMPLOYEES_KEY = 'digitalEmployeesV1';
 export const DIGITAL_EMPLOYEE_ORGANIZER_SEEDED_KEY = 'digitalEmployeeOrganizerSeededV1';
+export const DIGITAL_EMPLOYEE_SITE_FINDER_SEEDED_KEY = 'digitalEmployeeSiteFinderSeededV1';
 export const EMPLOYEE_RUN_LOG_KEY = 'digitalEmployeeRunsV1';
 export const EMPLOYEE_LIVE_PEEK_KEY = 'digitalEmployeeLivePeekV1';
 export const EMPLOYEE_SHARE_FORMAT = 'tab-project-employee-v1';
 export const EMPLOYEE_WORKER_STAMP = 'organizer-approval-safe-v6';
 
-export type EmployeeSourceKind = 'bili-toview' | 'bili-fav' | 'bili-history' | 'workspace-organizer';
+export type EmployeeSourceKind = 'bili-toview' | 'bili-fav' | 'bili-history' | 'workspace-organizer' | 'site-finder';
 export type EmployeeAnalyzer = 'native-pi' | 'deepseek';
 export type EmployeeDecisionMode = 'llm-fast' | 'jev-http';
 export type EmployeeSkillId =
@@ -20,7 +21,8 @@ export type EmployeeSkillId =
   | 'notify.high_value'
   | 'bookmarks.read'
   | 'launcher.read'
-  | 'organizer.plan';
+  | 'organizer.plan'
+  | 'site.recall';
 
 export interface EmployeeSkillDescriptor {
   id: EmployeeSkillId;
@@ -39,6 +41,7 @@ export const AVAILABLE_EMPLOYEE_SKILLS: readonly EmployeeSkillDescriptor[] = [
   { id: 'bookmarks.read', name: '浏览器书签树读取', description: '只读读取 Chrome 书签栏与其他书签目录树用于分类盘点' },
   { id: 'launcher.read', name: '桌面分区与网站读取', description: '只读读取新标签页分区、大/小文件夹、嵌套层级与网站卡片' },
   { id: 'organizer.plan', name: '整理提案（审批后生效）', description: '输出分步桌面/书签整理提案，每一步需用户点击审核后才写入' },
+  { id: 'site.recall', name: '记忆找站与推荐', description: '根据模糊记忆描述在书签与桌面网站中召回匹配项，未找到时推荐外部入口' },
 ];
 
 export interface EmployeeFeedbackExample {
@@ -228,6 +231,7 @@ export interface EmployeePeekSnapshot {
     author: string;
     cover: string;
     desc?: string;
+    descStatus?: 'loading' | 'loaded' | 'unavailable';
     tname?: string;
     pages?: Array<{ page: number; part: string; durationSec: number }>;
     stat?: { view: number; like: number; coin: number; favorite: number };
@@ -242,10 +246,37 @@ export interface EmployeePeekSnapshot {
   updatedAt: number;
 }
 
+export interface SiteFinderMatch {
+  id: string;
+  source: 'launcher' | 'bookmark';
+  title: string;
+  url: string;
+  location: string;
+  confidence: 'high' | 'medium';
+  reason: string;
+}
+
+export interface SiteFinderRecommendation {
+  title: string;
+  url: string;
+  description: string;
+  reason: string;
+}
+
+export interface SiteFinderResult {
+  query: string;
+  summary: string;
+  foundInLibrary: boolean;
+  searchedCount: number;
+  shortlistCount: number;
+  matches: SiteFinderMatch[];
+  recommendations: SiteFinderRecommendation[];
+}
+
 export interface EmployeeRunRecord {
   id: string;
   employeeId: string;
-  kind?: 'bili' | 'organizer';
+  kind?: 'bili' | 'organizer' | 'site-finder';
   organizerRevision?: number;
   bvid: string;
   title: string;
@@ -260,6 +291,8 @@ export interface EmployeeRunRecord {
   planSummary?: string;
   planSteps?: OrganizerPlanStep[];
   organizerSnapshot?: OrganizerWorkspaceSnapshot;
+  siteFinderQuery?: string;
+  siteFinderResult?: SiteFinderResult;
   toolTrace?: EmployeeToolTraceStep[];
   peekFrames?: EmployeePeekSnapshot[];
   articleId?: string;
@@ -374,6 +407,56 @@ export function createDefaultOrganizerEmployee(now = Date.now()): DigitalEmploye
   };
 }
 
+export function createDefaultSiteFinderEmployee(now = Date.now()): DigitalEmployee {
+  return {
+    id: 'emp-site-finder-default',
+    name: '记忆找站专员',
+    role: '模糊描述找站 · 未果智能推荐',
+    description: '根据你的零碎记忆描述，先用 Jev/本地召回漏斗从常用网站与书签中快速筛出候选，再由大模型精准推理匹配；若未找到，主动推荐可靠的外部网站入口。',
+    accentColor: '#8b5cf6',
+    enabled: false,
+    source: {
+      kind: 'site-finder',
+      folderId: '',
+      folderTitle: '本地桌面网站 + 浏览器书签',
+    },
+    runtime: {
+      analyzer: 'deepseek',
+      piThinking: 'medium',
+      decisionMode: 'llm-fast',
+      jevEndpoint: '',
+    },
+    prompt: {
+      systemPrompt: [
+        '你是主人的「记忆找站专员」。主人经常只记得一个网站的大致用途、外观特征、领域或零碎英文关键词，需要你帮他从已收藏的常用网站和浏览器书签里找回来。',
+        '工作方式：',
+        '1. 系统会先通过 Jev / 关键词多路召回漏斗初筛出最相关的候选清单；请你结合语义、域名联想和所在文件夹分类，找出 1~5 个最可能的站内命中（matches），说明匹配依据。',
+        '2. 绝对不要编造站内原本不存在的 id 或链接。',
+        '3. 如果站内候选都不太符合（foundInLibrary = false），或需要补充更顺手的替代工具，请在 recommendations 中推荐 2~4 个真实可靠的知名官方网站/工具入口（必须是明确可访问的 https 网址）。',
+      ].join('\n'),
+      reportTemplate: '输出严格 JSON，包含 summary、foundInLibrary、matches 与 recommendations。',
+    },
+    skills: ['bookmarks.read', 'launcher.read', 'jev.triage', 'site.recall'],
+    customSkillInstructions: '',
+    decisionGate: {
+      worthQuestion: '哪些本地网站或书签最符合主人的模糊记忆描述？若没有，推荐哪些外部入口？',
+      minScore: 0.45,
+      categories: ['站内精准找回', '站内近似候选', '外部推荐入口'],
+      skipCategories: [],
+      skipWithoutSubtitle: false,
+      retryOnSkip: false,
+    },
+    schedulePolicy: {
+      intervalMinutes: 1440,
+      dailyLimit: 50,
+      maxFetchItems: 45,
+    },
+    ownerFeedback: [],
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
 const VALID_SKILL_IDS = new Set<EmployeeSkillId>([
   'bili.source',
   'bili.info',
@@ -385,6 +468,7 @@ const VALID_SKILL_IDS = new Set<EmployeeSkillId>([
   'bookmarks.read',
   'launcher.read',
   'organizer.plan',
+  'site.recall',
 ]);
 
 function clampNumber(value: unknown, min: number, max: number, fallback: number): number {
@@ -415,13 +499,20 @@ export function normalizeEmployee(input: unknown, now = Date.now()): DigitalEmpl
     throw new Error('员工配置格式无效。');
   }
   const raw = input as Record<string, any>;
-  const defaults = raw.source?.kind === 'workspace-organizer' ? createDefaultOrganizerEmployee(now) : createDefaultBiliEmployee(now);
+  const defaults = raw.source?.kind === 'workspace-organizer'
+    ? createDefaultOrganizerEmployee(now)
+    : raw.source?.kind === 'site-finder'
+      ? createDefaultSiteFinderEmployee(now)
+      : createDefaultBiliEmployee(now);
   const name = cleanString(raw.name, 48);
   if (!name) throw new Error('请输入员工名称。');
 
   const sourceRaw = (raw.source && typeof raw.source === 'object' ? raw.source : {}) as Record<string, any>;
   const sourceKind: EmployeeSourceKind =
-    sourceRaw.kind === 'bili-fav' || sourceRaw.kind === 'bili-history' || sourceRaw.kind === 'workspace-organizer'
+    sourceRaw.kind === 'bili-fav'
+    || sourceRaw.kind === 'bili-history'
+    || sourceRaw.kind === 'workspace-organizer'
+    || sourceRaw.kind === 'site-finder'
       ? sourceRaw.kind
       : 'bili-toview';
 
@@ -437,7 +528,7 @@ export function normalizeEmployee(input: unknown, now = Date.now()): DigitalEmpl
   const rawSkills = Array.isArray(raw.skills) ? raw.skills : defaults.skills;
   const skills = Array.from(new Set(rawSkills.filter((s: unknown): s is EmployeeSkillId => VALID_SKILL_IDS.has(s as EmployeeSkillId))));
   if (!skills.length) {
-    if (sourceKind === 'workspace-organizer') skills.push(...defaults.skills);
+    if (sourceKind === 'workspace-organizer' || sourceKind === 'site-finder') skills.push(...defaults.skills);
     else skills.push('bili.source', 'bili.subtitle');
   }
 

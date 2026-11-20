@@ -100,8 +100,8 @@ const FALLBACK_AIHOT_NEWS: AiHotNewsItem[] = [
     category: "ai-models",
     sourceName: "AI Research",
     publishedAt: new Date(Date.now() - 3600000).toISOString(),
-    links: { original: "https://aihot.virxact.com" },
-    url: "https://aihot.virxact.com"
+    links: { original: "https://aihot.news" },
+    url: "https://aihot.news"
   },
   {
     id: "fb-2",
@@ -111,8 +111,8 @@ const FALLBACK_AIHOT_NEWS: AiHotNewsItem[] = [
     category: "ai-models",
     sourceName: "Anthropic Blog",
     publishedAt: new Date(Date.now() - 7200000).toISOString(),
-    links: { original: "https://aihot.virxact.com" },
-    url: "https://aihot.virxact.com"
+    links: { original: "https://aihot.news" },
+    url: "https://aihot.news"
   },
   {
     id: "fb-3",
@@ -122,8 +122,8 @@ const FALLBACK_AIHOT_NEWS: AiHotNewsItem[] = [
     category: "industry",
     sourceName: "OpenAI Research",
     publishedAt: new Date(Date.now() - 10800000).toISOString(),
-    links: { original: "https://aihot.virxact.com" },
-    url: "https://aihot.virxact.com"
+    links: { original: "https://aihot.news" },
+    url: "https://aihot.news"
   },
   {
     id: "fb-4",
@@ -133,8 +133,8 @@ const FALLBACK_AIHOT_NEWS: AiHotNewsItem[] = [
     category: "robot",
     sourceName: "Robotics Weekly",
     publishedAt: new Date(Date.now() - 14400000).toISOString(),
-    links: { original: "https://aihot.virxact.com" },
-    url: "https://aihot.virxact.com"
+    links: { original: "https://aihot.news" },
+    url: "https://aihot.news"
   },
   {
     id: "fb-5",
@@ -144,8 +144,8 @@ const FALLBACK_AIHOT_NEWS: AiHotNewsItem[] = [
     category: "code",
     sourceName: "Hacker News",
     publishedAt: new Date(Date.now() - 18000000).toISOString(),
-    links: { original: "https://aihot.virxact.com" },
-    url: "https://aihot.virxact.com"
+    links: { original: "https://aihot.news" },
+    url: "https://aihot.news"
   },
   {
     id: "fb-6",
@@ -155,8 +155,8 @@ const FALLBACK_AIHOT_NEWS: AiHotNewsItem[] = [
     category: "hardware",
     sourceName: "Semiconductor Insights",
     publishedAt: new Date(Date.now() - 21600000).toISOString(),
-    links: { original: "https://aihot.virxact.com" },
-    url: "https://aihot.virxact.com"
+    links: { original: "https://aihot.news" },
+    url: "https://aihot.news"
   }
 ];
 
@@ -203,7 +203,7 @@ async function fetchNews(force = false) {
 
   // 2. 异步网络拉取最新当天精选
   try {
-    const r = await fetch("https://aihot.virxact.com/api/v1/items?mode=selected&window=24h&limit=24", {
+    const r = await fetch("https://aihot.news/api/v1/items?mode=selected&window=24h&limit=24", {
       headers: { Accept: "application/json" },
       signal: AbortSignal.timeout(5000)
     });

@@ -2740,3 +2740,11 @@ html[data-theme="lonetrail"] .task-shelf header { color: var(--muted); }
 html[data-theme="lonetrail"] .side-shelf.drop-hint { background: rgba(255,255,255,0.99); }
 html[data-theme="lonetrail"] .site-tag { background: rgba(15,23,42,0.035); }
 html[data-theme="lonetrail"] .site-shelf-folder-panel { background:rgba(255,255,255,.97); }
+
+/* Independent wallpaper layers stay behind each workspace's interactive content. */
+.fo-bili-layout.has-workspace-wallpaper,
+.gh-bili-layout.has-workspace-wallpaper,
+.todoist-workspace-body.has-workspace-wallpaper { position:relative; isolation:isolate; }
+.fo-bili-layout.has-workspace-wallpaper > :not(.workspace-wallpaper-layer),
+.gh-bili-layout.has-workspace-wallpaper > :not(.workspace-wallpaper-layer),
+.todoist-workspace-body.has-workspace-wallpaper > :not(.workspace-wallpaper-layer) { position:relative; z-index:1; }

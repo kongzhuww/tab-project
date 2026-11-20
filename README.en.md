@@ -27,7 +27,7 @@
 
 > **Now available on Microsoft Edge Add-ons**: [Install tab-project](https://microsoftedge.microsoft.com/addons/detail/tabproject-%E6%96%B0%E6%A0%87%E7%AD%BE%E9%A1%B5/dbkaiojfbolnkpaegflocfbdgpmhjcco) without Developer mode. Edge manages automatic updates for store installations. Each new version still requires a separate store submission and review; GitHub commits and releases do not immediately update the store version.
 
-> **Repository Version**: **1.0.26**, improving the home page and quick search, website and bookmark organization, Bilibili radio, music playback, and Todoist tasks. Store versions may lag behind GitHub Releases. See the [Changelog](CHANGELOG.md).
+> **Repository Version**: **1.0.27**, refining the Bilibili radio cards, favorites search and player experience, alongside per-workspace wallpapers, the Site Finder employee, caching, and view restoration. Store versions may lag behind GitHub Releases. See the [Changelog](CHANGELOG.md).
 
 ---
 

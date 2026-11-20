@@ -1,6 +1,13 @@
 import { bilibiliService } from "../services/bilibili.service";
 import { radioTapeState, radioTapeController } from "./radio-tape-store";
 import { homeMusicController } from "../music/store";
+import {
+  canUseOffscreenAudio,
+  fetchOffscreenAudioState,
+  sendAudioCommand,
+  subscribeOffscreenAudioState,
+} from "../offscreen/audio-client";
+import type { OffscreenBiliState } from "../offscreen/audio-protocol";
 
 type Track = {
   bvid: string;
@@ -177,11 +184,42 @@ function onAudioEnded(): void {
   }
 }
 
+let offscreenCurrentTime = 0;
+let offscreenDuration = 0;
+let offscreenPlaying = false;
+
+function applyOffscreenBiliState(remote: OffscreenBiliState): void {
+  active = Boolean(remote.active);
+  loading = Boolean(remote.loading);
+  name = remote.name || "B站电台";
+  items = Array.isArray(remote.items) ? remote.items : [];
+  index = typeof remote.index === "number" ? remote.index : -1;
+  track = remote.track || null;
+  offscreenCurrentTime = Number(remote.currentTime) || 0;
+  offscreenDuration = Number(remote.duration) || 0;
+  offscreenPlaying = Boolean(remote.playing);
+  playbackError = remote.error || "";
+  syncTape();
+}
+
+if (canUseOffscreenAudio()) {
+  subscribeOffscreenAudioState((source, remote) => {
+    if (source === "bili") applyOffscreenBiliState(remote as OffscreenBiliState);
+  });
+  void fetchOffscreenAudioState().then((snapshot) => {
+    if (snapshot?.bili) applyOffscreenBiliState(snapshot.bili);
+  });
+}
+
 function syncTape(): void {
-  const media = audio;
-  const playing = Boolean(media && !media.paused && !media.ended && active);
-  const duration = media?.duration && Number.isFinite(media.duration) ? media.duration : track?.duration || 0;
-  const cue = track?.cues?.find((item) => (media?.currentTime || 0) >= item.from && (media?.currentTime || 0) < item.to);
+  const useOffscreen = canUseOffscreenAudio();
+  const media = useOffscreen ? null : audio;
+  const playing = useOffscreen ? offscreenPlaying : Boolean(media && !media.paused && !media.ended && active);
+  const currentTime = useOffscreen ? offscreenCurrentTime : (media?.currentTime || 0);
+  const duration = useOffscreen
+    ? (offscreenDuration || track?.duration || 0)
+    : (media?.duration && Number.isFinite(media.duration) ? media.duration : track?.duration || 0);
+  const cue = track?.cues?.find((item) => currentTime >= item.from && currentTime < item.to);
   const currentLyricText = playbackError || cue?.content || (playing ? "♪ 伴奏播放中…" : track ? `已暂停 · 《${track.title}》` : "点击磁带继续播放");
   radioTapeController.update({
     active, loading, playing,
@@ -190,7 +228,7 @@ function syncTape(): void {
     seriesName: name,
     trackIndex: index >= 0 ? index + 1 : 1,
     totalTracks: items.length || 1,
-    currentTime: media?.currentTime || 0,
+    currentTime,
     duration,
     lyric: currentLyricText
   });
@@ -200,7 +238,7 @@ function syncTape(): void {
       title: track.title || "B站电台",
       artist: track.upper || track.author || name || "哔哩哔哩电台",
       coverUrl: track.cover || "",
-      currentTime: media?.currentTime || 0,
+      currentTime,
       duration,
       lyric: currentLyricText,
       seriesName: name
@@ -276,13 +314,31 @@ export const biliRadioPlayer = {
     items = Array.isArray(options.items) ? options.items.map((item) => ({ ...item })) : [];
     resolver = options.resolveTrack;
     queuePlayback = { isCurrent: options.isCurrent, autoplay: options.autoplay, onReady: options.onReady };
+    if (canUseOffscreenAudio() && !options.resolveTrack && !options.onReady) {
+      void sendAudioCommand("bili", "play-queue", {
+        name,
+        items,
+        startIndex: options.startIndex || 0,
+        autoplay: options.autoplay !== false,
+        mode: radioTapeState.mode || "order",
+      });
+      return;
+    }
     void playIndex(options.startIndex || 0);
   },
   playAt(targetIndex: number): void {
     if (!items.length) return;
+    if (canUseOffscreenAudio() && !resolver) {
+      void sendAudioCommand("bili", "play-at", { index: targetIndex });
+      return;
+    }
     void playIndex(targetIndex);
   },
   next(): void {
+    if (canUseOffscreenAudio() && !resolver) {
+      void sendAudioCommand("bili", "next");
+      return;
+    }
     const mode = radioTapeState.mode || "order";
     if (mode === "shuffle" && items.length > 1) {
       let nextIdx = Math.floor(Math.random() * items.length);
@@ -295,6 +351,10 @@ export const biliRadioPlayer = {
     }
   },
   prev(): void {
+    if (canUseOffscreenAudio() && !resolver) {
+      void sendAudioCommand("bili", "prev");
+      return;
+    }
     const mode = radioTapeState.mode || "order";
     if (mode === "shuffle" && items.length > 1) {
       let nextIdx = Math.floor(Math.random() * items.length);
@@ -307,6 +367,10 @@ export const biliRadioPlayer = {
     }
   },
   toggle(): void {
+    if (canUseOffscreenAudio() && !resolver) {
+      void sendAudioCommand("bili", "toggle");
+      return;
+    }
     const media = getAudio();
     if (!active && !media.src) {
       if (items.length > 0) {
@@ -319,6 +383,10 @@ export const biliRadioPlayer = {
     syncTape();
   },
   seek(percent: number): void {
+    if (canUseOffscreenAudio() && !resolver) {
+      void sendAudioCommand("bili", "seek", { percent });
+      return;
+    }
     const media = getAudio();
     if (Number.isFinite(media.duration) && media.duration > 0) {
       media.currentTime = Math.min(100, Math.max(0, percent)) / 100 * media.duration;
@@ -327,6 +395,14 @@ export const biliRadioPlayer = {
   },
   getAudioElement(): HTMLAudioElement | null { return audio; },
   getState() {
+    if (canUseOffscreenAudio() && !resolver) {
+      return {
+        active, loading, name, items, index, track,
+        currentTime: offscreenCurrentTime,
+        duration: offscreenDuration || track?.duration || 0,
+        playing: offscreenPlaying,
+      };
+    }
     return { active, loading, name, items, index, track,
       currentTime: audio?.currentTime || 0, duration: audio?.duration || 0,
       playing: Boolean(audio && !audio.paused && !audio.ended && active) };

@@ -457,6 +457,60 @@ export async function clearConfig(): Promise<void> {
   await area().set({ [CONFIG]: next });
 }
 
+const JEV_CONFIG_KEY = 'jevApiConfigV1';
+
+export interface JevConfig {
+  endpoint: string;
+  key: string;
+  configured: boolean;
+}
+
+export async function loadJevConfig(): Promise<JevConfig> {
+  const root = (await area().get(JEV_CONFIG_KEY))[JEV_CONFIG_KEY];
+  const rawEndpoint = typeof root?.endpoint === 'string' ? root.endpoint.trim() : '';
+  let endpoint = '';
+  if (rawEndpoint) {
+    try {
+      const parsed = new URL(rawEndpoint);
+      if (parsed.protocol === 'https:' || parsed.protocol === 'http:') {
+        endpoint = parsed.href;
+      }
+    } catch {}
+  }
+  const key = typeof root?.key === 'string' ? root.key : '';
+  return {
+    endpoint,
+    key,
+    configured: Boolean(endpoint),
+  };
+}
+
+export async function saveJevConfig(next: { endpoint: string; key?: string }): Promise<JevConfig> {
+  const raw = String(next.endpoint || '').trim();
+  let parsed: URL;
+  try {
+    parsed = new URL(raw);
+  } catch {
+    throw new Error('请输入有效的 Jev 接口地址（http:// 或 https://）。');
+  }
+  if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+    throw new Error('Jev 接口仅支持 http:// 或 https:// 协议。');
+  }
+  const old = await loadJevConfig();
+  const key = typeof next.key === 'string' ? next.key.trim() : old.key;
+  await area().set({
+    [JEV_CONFIG_KEY]: {
+      endpoint: parsed.href,
+      key,
+    },
+  });
+  return loadJevConfig();
+}
+
+export async function clearJevConfig(): Promise<void> {
+  await area().remove(JEV_CONFIG_KEY);
+}
+
 export async function loadConversations(): Promise<LocalConversation[]> {
   const value = (await area().get(HISTORY))[HISTORY];
   return Array.isArray(value) ? value.filter(v => v && v.provider === 'deepseek' && typeof v.id === 'string' && Array.isArray(v.messages)) : [];

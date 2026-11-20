@@ -518,6 +518,8 @@
               </div>
             </div>
 
+            <div class="field full-width"><WorkspaceWallpaperSettings /></div>
+
             <!-- 快捷导入与工具栏 -->
             <div class="field full-width">
               <label>{{ t('settings.wallpaper.actions') }} <em>IMPORT & ACTIONS</em></label>
@@ -992,6 +994,18 @@
             </div>
           </div>
         </section>
+
+        <section v-show="currentTab === 'about'" class="settings-panel">
+          <header class="panel-head">
+            <span class="panel-index">06</span>
+            <div><h2>{{ t('settings.about.title') }}</h2><p>{{ t('settings.about.desc') }}</p></div>
+          </header>
+          <div class="setting-group">
+            <p><a href="legal.html?doc=licenses" target="_blank" rel="noopener">{{ t('settings.about.licenses') }} ↗</a></p>
+            <p><a href="legal.html?doc=services" target="_blank" rel="noopener">{{ t('settings.about.services') }} ↗</a></p>
+            <p><a href="legal.html?doc=privacy" target="_blank" rel="noopener">{{ t('settings.about.privacy') }} ↗</a></p>
+          </div>
+        </section>
         </fieldset>
       </main>
     </div>
@@ -1054,6 +1068,7 @@ import {
 import { t, currentLanguage, setLanguage, SUPPORTED_LANGUAGES } from "../i18n";
 import { normalizeSystemTheme } from "../theme/system-theme";
 import CustomSelect, { type CustomSelectOption } from "../core/CustomSelect.vue";
+import WorkspaceWallpaperSettings from "./WorkspaceWallpaperSettings.vue";
 
 declare const chrome: any;
 const props = withDefaults(defineProps<{ active?: boolean }>(), { active: true });
@@ -1085,7 +1100,8 @@ const tabs = computed(() => [
   { id: "shortcuts", index: "02", name: t("settings.tab.shortcuts") },
   { id: "privacy", index: "03", name: t("settings.tab.privacy") },
   { id: "wallpaper", index: "04", name: t("settings.tab.appearance") },
-  { id: "sync", index: "05", name: t("settings.tab.sync") }
+  { id: "sync", index: "05", name: t("settings.tab.sync") },
+  { id: "about", index: "06", name: t("settings.about.title") }
 ]);
 
 const currentTab = ref("modules");

@@ -134,30 +134,6 @@ const BUILTIN_ITEMS: any[] = [
     value: DEFAULT_MOUNTAIN_VALUE,
     thumb: "assets/newtab-mountains.png",
     isBuiltin: true
-  },
-  {
-    id: "builtin-pure-dark",
-    title: "极简深黑 (Pure Dark)",
-    kind: "纯色",
-    value: null,
-    style: "background: #090d16;",
-    isPure: true
-  },
-  {
-    id: "builtin-cyber-gradient",
-    title: "赛博霓虹 (Cyber Neon)",
-    kind: "渐变",
-    value: { type: "style", style: "background: radial-gradient(circle at 80% 20%, rgba(56, 189, 248, 0.25), transparent 45%), radial-gradient(circle at 20% 80%, rgba(168, 85, 247, 0.2), transparent 45%), #090d16;" },
-    style: "background: radial-gradient(circle at 80% 20%, rgba(56, 189, 248, 0.25), transparent 45%), radial-gradient(circle at 20% 80%, rgba(168, 85, 247, 0.2), transparent 45%), #090d16;",
-    isGradient: true
-  },
-  {
-    id: "builtin-aurora",
-    title: "极光翡翠 (Aurora Green)",
-    kind: "渐变",
-    value: { type: "style", style: "background: radial-gradient(circle at 50% 0%, rgba(16, 185, 129, 0.28), transparent 60%), #0c141f;" },
-    style: "background: radial-gradient(circle at 50% 0%, rgba(16, 185, 129, 0.28), transparent 60%), #0c141f;",
-    isGradient: true
   }
 ];
 

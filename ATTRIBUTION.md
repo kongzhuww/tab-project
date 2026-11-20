@@ -8,9 +8,11 @@
 
 ## 软件依赖与设计借鉴
 
+完整开源组件清单与许可文本见 [THIRD-PARTY-LICENSES.md](THIRD-PARTY-LICENSES.md)；第三方服务和资讯来源见 [THIRD-PARTY-SERVICES.md](THIRD-PARTY-SERVICES.md)，数据处理见 [PRIVACY.md](PRIVACY.md)。
+
 - **Vue 3 / @vue**：MIT。来源：<https://github.com/vuejs/core>。运行时版权和完整许可保留于 `third_party/vue/LICENSE`。
 - **AGY Claude Style（`0DNANCY/agy-claude-style`）**：MIT（`Copyright (c) 2026 0DNANCY`）。来源：<https://github.com/0DNANCY/agy-claude-style>。本仓库 AI 工作区中的「上下文窗口与 Token 监控」浮窗结构、剩余容量圆环、遥测拆分卡片设计、首页编码矩阵波纹背景与用量热力图面板（`src/multica/ripple-core.ts`、`src/multica/CipherRippleCanvas.vue`、`src/multica/usage-analytics.ts`、`src/multica/HomeUsageCard.vue`），以及衍生自 MIT 许可 `dsh-claude-style` 的像素蟹宠状态机与精灵图（`src/multica/mascot-core.ts`、`src/multica/crab-assets.ts`、`src/multica/ClawdMascot.vue`）均致谢并遵循该 MIT 许可，未引入其 CDP 注入脚本。
-- 其余 npm 依赖与开发工具版本见 `package-lock.json`。本仓库不分发 `node_modules`；其许可证不能被本项目的 MIT 替代。
+- Rust / WASM 依赖和其上游许可证见 [THIRD-PARTY-LICENSES.md](THIRD-PARTY-LICENSES.md)。其余 npm 依赖与开发工具版本见 `package-lock.json`。本仓库不分发 `node_modules`；其许可证不能被本项目的 MIT 替代。
 
 ## 维护者原创素材声明
 

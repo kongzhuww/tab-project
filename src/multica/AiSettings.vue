@@ -3,22 +3,25 @@ import { computed, onMounted, ref } from 'vue';
 import {
   baseUrlRequiresKey,
   clearConfig,
+  clearJevConfig,
   fetchOpenAiCompatibleModels,
   findOpenAiCompatPreset,
   isLocalBaseUrl,
   isValidModelId,
   loadConfig,
+  loadJevConfig,
   normalizeBaseUrl,
   OPENAI_COMPAT_PRESETS,
   saveConfig,
+  saveJevConfig,
   type OpenAiCompatPresetId,
 } from '../services/byok.service';
 import NativeSettings from './NativeSettings.vue';
 
-const props = defineProps<{ initialTab: 'deepseek' | 'native' }>();
+const props = defineProps<{ initialTab: 'deepseek' | 'native' | 'jev' }>();
 const emit = defineEmits<{ close: []; connectionChanged: []; configChanged: []; busyChanged: [busy: boolean] }>();
 
-const tab = ref<'deepseek' | 'native'>(props.initialTab);
+const tab = ref<'deepseek' | 'native' | 'jev'>(props.initialTab);
 const presetId = ref<OpenAiCompatPresetId>('deepseek');
 const baseUrl = ref('https://api.deepseek.com');
 const key = ref('');
@@ -31,6 +34,13 @@ const savedBaseUrl = ref('');
 const savedHasKey = ref(false);
 const busy = ref(false);
 const note = ref('');
+
+const jevEndpoint = ref('');
+const jevKey = ref('');
+const jevConfigured = ref(false);
+const jevSavedEndpoint = ref('');
+const jevSavedHasKey = ref(false);
+const jevNote = ref('');
 
 const currentPreset = computed(() => findOpenAiCompatPreset(presetId.value));
 const isLocalEndpoint = computed(() => isLocalBaseUrl(baseUrl.value));
@@ -68,7 +78,7 @@ const presetGroups = computed(() => [
 
 onMounted(async () => {
   try {
-    const c = await loadConfig();
+    const [c, jev] = await Promise.all([loadConfig(), loadJevConfig()]);
     presetId.value = c.presetId;
     baseUrl.value = c.baseUrl;
     model.value = c.model;
@@ -78,6 +88,10 @@ onMounted(async () => {
     savedModel.value = c.model;
     savedBaseUrl.value = c.baseUrl;
     savedHasKey.value = Boolean(c.key);
+    jevEndpoint.value = jev.endpoint;
+    jevConfigured.value = jev.configured;
+    jevSavedEndpoint.value = jev.endpoint;
+    jevSavedHasKey.value = Boolean(jev.key);
     if (c.configured && (!requiresKey.value || c.key)) {
       void discover(true);
     }
@@ -216,6 +230,50 @@ async function remove() {
     busy.value = false;
   }
 }
+
+async function saveJev() {
+  if (busy.value) return;
+  busy.value = true;
+  jevNote.value = '';
+  try {
+    const sameEndpoint = jevConfigured.value && jevEndpoint.value.trim() === jevSavedEndpoint.value;
+    const keyToSave = jevKey.value.trim()
+      ? jevKey.value.trim()
+      : (sameEndpoint && jevSavedHasKey.value ? undefined : '');
+    const saved = await saveJevConfig({
+      endpoint: jevEndpoint.value,
+      ...(keyToSave !== undefined ? { key: keyToSave } : {}),
+    });
+    jevKey.value = '';
+    jevEndpoint.value = saved.endpoint;
+    jevConfigured.value = saved.configured;
+    jevSavedEndpoint.value = saved.endpoint;
+    jevSavedHasKey.value = Boolean(saved.key);
+    jevNote.value = `已保存 Jev API：${saved.endpoint}`;
+  } catch (e) {
+    jevNote.value = e instanceof Error ? e.message : '保存 Jev 设置失败';
+  } finally {
+    busy.value = false;
+  }
+}
+
+async function removeJev() {
+  if (busy.value) return;
+  busy.value = true;
+  try {
+    await clearJevConfig();
+    jevEndpoint.value = '';
+    jevKey.value = '';
+    jevConfigured.value = false;
+    jevSavedEndpoint.value = '';
+    jevSavedHasKey.value = false;
+    jevNote.value = '已清除本机保存的 Jev API 配置。';
+  } catch {
+    jevNote.value = '清除失败，请重试。';
+  } finally {
+    busy.value = false;
+  }
+}
 </script>
 
 <template>
@@ -233,17 +291,20 @@ async function remove() {
         <button type="button" :disabled="busy" :class="{ selected: tab === 'deepseek' }" @click="tab = 'deepseek'">
           <span class="provider-icon">☁</span> 模型服务 <i>兼容</i>
         </button>
+        <button type="button" :disabled="busy" :class="{ selected: tab === 'jev' }" @click="tab = 'jev'">
+          <span class="provider-icon">⚡</span> Jev 快筛 <i>API</i>
+        </button>
         <button type="button" :disabled="busy" :class="{ selected: tab === 'native' }" @click="tab = 'native'">
           <span class="provider-icon native">&gt;_</span> 本机终端 <i>Native</i>
         </button>
-        <small class="nav-foot">支持国内外大模型、OpenRouter 及本机 Ollama（免 Key）</small>
+        <small class="nav-foot">支持国内外大模型、OpenRouter、Jev 快筛与本机 Ollama（免 Key）</small>
       </aside>
 
       <main>
         <header>
           <div>
-            <small>服务设置 / {{ tab === 'deepseek' ? '通用 OpenAI 兼容 & 本机模型' : '本机终端' }}</small>
-            <h2 id="ai-settings-title">{{ tab === 'deepseek' ? '模型服务接入' : '本机终端桥接' }}</h2>
+            <small>服务设置 / {{ tab === 'deepseek' ? '通用 OpenAI 兼容 & 本机模型' : tab === 'jev' ? 'Jev 快筛接口' : '本机终端' }}</small>
+            <h2 id="ai-settings-title">{{ tab === 'deepseek' ? '模型服务接入' : tab === 'jev' ? 'Jev API 配置' : '本机终端桥接' }}</h2>
           </div>
           <button class="close" type="button" :disabled="busy" aria-label="关闭设置" @click="emit('close')">✕</button>
         </header>
@@ -344,6 +405,51 @@ async function remove() {
             <a v-if="currentPreset.docsUrl" :href="currentPreset.docsUrl" target="_blank" rel="noreferrer">{{ currentPreset.docsLabel }}</a>
           </div>
           <p v-if="note" class="note" role="status">{{ note }}</p>
+        </template>
+
+        <template v-else-if="tab === 'jev'">
+          <p class="intro">
+            配置你自己的 <strong>Jev 快筛 API</strong>：数字员工启用「外部 Jev 决策端点」且未单独指定接口时，将自动调用这里的 Jev 接口与 Key 进行快速分拣。
+          </p>
+
+          <div class="status" :class="{ ready: jevConfigured }">
+            <span></span>
+            {{ jevConfigured ? `已在本机就绪：${jevSavedEndpoint}` : '尚未配置全局 Jev API（未配置时默认使用上方的轻模型做快筛）' }}
+          </div>
+
+          <section class="form-card">
+            <label for="jev-endpoint">Jev 接口地址（Endpoint URL）</label>
+            <input
+              id="jev-endpoint"
+              v-model.trim="jevEndpoint"
+              type="url"
+              autocomplete="off"
+              :disabled="busy"
+              placeholder="例如 http://127.0.0.1:8787/decide 或 https://your-jev-api.example/decide"
+            />
+            <p>支持本地部署服务（http://127.0.0.1:...）或自定义 HTTPS 端点，接收 `tab-project-jev-v1` JSON 请求。</p>
+
+            <label for="jev-key">
+              Jev API Key
+              <span class="field-tag">可选 · Bearer Token</span>
+            </label>
+            <input
+              id="jev-key"
+              v-model="jevKey"
+              type="password"
+              autocomplete="off"
+              :disabled="busy"
+              :placeholder="jevConfigured && jevSavedHasKey ? '已保存 Jev Key；留空继续使用现有 Key' : '本地端口可留空；远程服务填写 API Key'"
+            />
+            <p>Key 仅保存在浏览器扩展本地存储，不进入普通同步备份；填写后会附带在 `Authorization: Bearer ...` 请求头中。</p>
+
+            <div class="actions">
+              <button class="primary" type="button" :disabled="busy || !jevEndpoint.trim()" @click="saveJev">保存 Jev 设置</button>
+              <button v-if="jevConfigured" type="button" :disabled="busy" @click="removeJev">清除配置</button>
+            </div>
+          </section>
+
+          <p v-if="jevNote" class="note" role="status">{{ jevNote }}</p>
         </template>
 
         <NativeSettings v-else @connection-changed="emit('connectionChanged')" @busy-changed="busy = $event; emit('busyChanged', $event)" />

@@ -602,9 +602,7 @@
   contain: layout paint;
 }
 
-.bili-sub-transcript-body,
-.bili-sub-newspaper-list,
-.bili-sub-srt-list {
+.bili-sub-transcript-body {
   scrollbar-gutter: stable;
   overflow-y: auto !important;
   overscroll-behavior: contain;
@@ -1536,7 +1534,7 @@
 .bili-sub-doc-meta { display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:11px;color:var(--dim); }
 .bili-sub-badge { padding:2px 7px;border-radius:4px;background:rgba(16,185,129,.15);color:#10b981;font-size:10px;font-weight:600; }
 .bili-sub-cues-count { padding:2px 7px;border-radius:4px;background:rgba(0,174,236,.12);color:#00aeec;font-size:10px;font-weight:600; }
-.bili-sub-transcript-body { flex:1 1 0;min-height:0;height:100%;max-height:100%;overflow-y:scroll !important;overflow-x:hidden;position:relative;padding:0 10px 0 4px;user-select:text;-webkit-user-select:text;scrollbar-width:thin;scrollbar-color:rgba(0,174,236,.5) transparent; }
+.bili-sub-transcript-body { flex:1 1 0;min-height:0;overflow-y:scroll !important;overflow-x:hidden;position:relative;padding:0 10px 0 4px;user-select:text;-webkit-user-select:text;scrollbar-width:thin;scrollbar-color:rgba(0,174,236,.5) transparent; }
 .bili-sub-transcript-body::-webkit-scrollbar { width:6px; }
 .bili-sub-transcript-body::-webkit-scrollbar-track { background:transparent; }
 .bili-sub-transcript-body::-webkit-scrollbar-thumb { background:rgba(0,174,236,.4);border-radius:999px;transition:background .15s; }
@@ -1722,6 +1720,62 @@
   right: 24px;
 }
 
+.bili-sub-comments-column {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  max-height: 100%;
+  overflow: hidden !important;
+}
+.bili-sub-comments-panel {
+  margin-top: 0 !important;
+  flex: 1 1 0 !important;
+  min-height: 0 !important;
+  height: 100%;
+  overflow: hidden !important;
+}
+.bili-sub-comments-head-right {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.bili-sub-close-btn {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease, background-color 0.15s ease;
+}
+.bili-sub-close-btn:hover {
+  border-color: rgba(244, 63, 94, 0.5);
+  color: #f43f5e;
+  background: rgba(244, 63, 94, 0.1);
+}
+.bili-sub-comments-scroll {
+  margin-top: 0 !important;
+}
+.bili-sub-inline-transcript {
+  flex: 1 1 0 !important;
+  min-height: 0 !important;
+  height: auto !important;
+  max-height: 100% !important;
+  margin-top: 8px;
+}
+.bili-sub-inline-transcript .bili-sub-article-wrap {
+  padding: 10px 12px;
+  background: var(--panel);
+}
+.bili-sub-video-meta > h4 { padding-right: 138px; }
+.bili-sub-video-box { max-height: min(46vh, 430px); }
 .bili-sub-scroll-stage {
   flex: 1 1 0;
   min-height: 0;
@@ -1760,12 +1814,25 @@
 .bili-sub-emote-item { display:grid;min-width:0;height:36px;place-items:center;padding:3px;border:1px solid transparent;border-radius:7px;background:var(--surface);cursor:pointer; }
 .bili-sub-emote-item:hover { border-color:#00aeec;background:rgba(0,174,236,.1); }
 .bili-sub-emote-item img { max-width:29px;max-height:29px;object-fit:contain; }
+.bili-sub-emote-group > .bili-sub-text-emotes { display:flex;flex-wrap:wrap;gap:5px; }
+.bili-sub-text-emotes .bili-sub-emote-item { display:inline-flex;width:auto;min-width:46px;max-width:100%;padding:4px 8px;color:var(--text);font:inherit;font-size:12px;white-space:nowrap; }
 .bili-comment-emote { display:inline-block;width:auto;height:28px;max-width:72px;margin:0 2px;vertical-align:middle;object-fit:contain; }
 .bili-sub-comment-send-btn { padding:7px 16px;border-radius:8px;border:none;background:#00aeec;color:#fff;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;flex-shrink:0; }
 .bili-sub-comment-send-btn:hover { background:#009ad4;box-shadow:0 2px 8px rgba(0,174,236,.32); }
 .bili-sub-comment-send-btn:disabled { opacity:.5;cursor:not-allowed; }
 .bili-sub-comment-tip { padding:6px 14px;font-size:11px;text-align:center;background:rgba(16,185,129,.12);color:#10b981; }
 .bili-sub-comment-tip.error { background:rgba(239,68,68,.12);color:#ef4444; }
+.bili-sub-comments-section.bili-sub-comments-panel {
+  margin-top: 0;
+  flex: 1 1 0;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden !important;
+}
+.bili-sub-comments-section.bili-sub-comments-panel .bili-mini-comments-head,
+.bili-sub-comments-section.bili-sub-comments-panel .bili-sub-comment-composer {
+  position: static;
+}
 
 .bili-sub-player-column { display:flex;flex-direction:column;min-width:0;min-height:0;height:100%;max-height:100%;overflow:hidden !important;padding-right:0; }
 .bili-sub-sticky-player { display:flex;flex-direction:column;height:100%;max-height:100%;min-height:0;gap:0; }
@@ -1773,6 +1840,7 @@
 .bili-sub-player-top { flex-shrink:0;display:flex;flex-direction:column; }
 .bili-sub-video-box { position:relative;width:100%;aspect-ratio:16/9;border-radius:8px;overflow:hidden;background:#000;box-shadow:0 4px 14px rgba(0,0,0,.4);flex-shrink:0; }
 .bili-sub-native-video { width:100%;height:100%;object-fit:contain;display:block;outline:0; }
+.bili-sub-danmaku-toggle { position:absolute;right:8px;top:8px;z-index:11;border:1px solid #ffffff66;border-radius:6px;padding:4px 8px;background:#000a;color:#fff;font-size:11px;cursor:pointer; }
 .bili-sub-native-iframe { width:100%;height:100%;border:0;display:block; }
 .bili-sub-video-loading { position:absolute;inset:0;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;gap:8px;color:#fff;font-size:11px;z-index:5; }
 .bili-sub-video-loading i { width:16px;height:16px;border:2px solid rgba(255,255,255,.3);border-top-color:#00aeec;border-radius:50%;animation:fo-bili-spin .8s linear infinite; }
@@ -1975,30 +2043,467 @@ html[data-theme="light"] .bili-ai-pre { background:#f8fafc; }
 .bili-subtitle-workspace footer button:hover { border-color:#8b5cf6; }
 @media(max-width:560px){.bili-subtitle-workspace{left:8px!important;top:62px!important;width:calc(100vw - 16px)!important;height:calc(100vh - 70px)!important;min-width:0;min-height:0;resize:none;transform:none!important}.bili-subtitle-head small{max-width:230px}}
 @media(prefers-reduced-motion:reduce){.fo-bili-loading i{animation:none}.fo-bili-thumb img{transition:none}.bili-subtitle-drop{transition:none}}
-.bili-radio-layout { display: grid; grid-template-columns: 190px minmax(260px,.9fr) minmax(340px,1.25fr); gap: 14px; flex: 1; min-height: 0; }
-.bili-radio-folders, .bili-radio-library, .bili-radio-editor { min-width: 0; height: calc(100vh - 235px); min-height: 500px; display: flex; flex-direction: column; overflow: hidden; border: 1px solid var(--border); border-radius: 12px; padding: 12px; background: var(--surface); box-sizing: border-box; }
-#bili-radio-folders, .bili-radio-videos, .bili-radio-queue { flex: 1; min-height: 0; overflow-y: auto; }
-.bili-radio-folder-group { margin-bottom:6px;border:1px solid var(--border);border-radius:9px;overflow:hidden;background:rgba(255,255,255,.018); }
-.bili-radio-group-head { display:grid;width:100%;grid-template-columns:12px minmax(0,1fr) auto;align-items:center;gap:6px;padding:8px;border:0;background:var(--surface);color:var(--heading);cursor:pointer;text-align:left; }
-.bili-radio-group-head:hover { background:var(--surface-hover); }
-.bili-radio-group-head .caret { color:var(--dim);font-size:10px; }
-.bili-radio-group-head strong { overflow:hidden;font-size:11px;text-overflow:ellipsis;white-space:nowrap; }
-.bili-radio-group-head small { color:var(--dim);font-size:9px; }
-.bili-radio-group-body { padding:4px; }
-.bili-radio-folder { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; margin-bottom: 4px; padding: 8px 9px; border: 0; border-radius: 8px; background: transparent; color: var(--text); text-align: left; cursor: pointer; font-size: 12px; }
-.bili-radio-folder:hover, .bili-radio-folder.on { background: rgba(129,140,248,.16); color: #c4b5fd; }
-.bili-radio-folder span:last-child { color: var(--dim); font-size: 10px; }
-.bili-radio-videos { display: grid; align-content: start; gap: 7px; max-height: 505px; }
-.bili-radio-video, .bili-radio-queue-item { display: grid; grid-template-columns: 72px minmax(0,1fr) auto; align-items: center; gap: 9px; padding: 7px; border: 1px solid var(--border); border-radius: 9px; background: var(--panel); cursor: default; }
-.bili-radio-video:hover { border-color: rgba(129,140,248,.55); }
-.bili-radio-video img, .bili-radio-queue-item img { width: 72px; aspect-ratio: 16/9; object-fit: cover; border-radius: 6px; }
-.bili-radio-video p, .bili-radio-queue-item p { display: -webkit-box; margin: 0; overflow: hidden; color: var(--text); font-size: 11px; line-height: 1.4; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
-.bili-radio-video span { color: var(--dim); font-size: 9px; }
-.bili-radio-video.dragging, .bili-radio-queue-item.dragging { opacity: .42; }
-.bili-radio-editor { display: flex; flex-direction: column; }
-.bili-radio-name-row { display: flex; align-items: center; gap: 8px; flex-wrap: nowrap; }
-.bili-radio-name-row input { flex: 1 1 180px; min-width: 140px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; outline: 0; background: var(--panel); color: var(--text); font-size: 11.5px; transition: border-color 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease; }
-.bili-radio-name-row input:focus { border-color: #818cf8; }
+.fo-radio-hero {
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.14), rgba(168, 85, 247, 0.10) 52%, rgba(236, 72, 153, 0.08)) !important;
+  border: 1px solid rgba(129, 140, 248, 0.28) !important;
+  border-radius: 18px !important;
+  padding: 16px 20px !important;
+}
+.fo-vue-radio-cover {
+  background: linear-gradient(135deg, #6366f1, #ec4899) !important;
+  box-shadow: 0 8px 22px rgba(99, 102, 241, 0.32);
+  border-radius: 16px !important;
+}
+.fo-vue-radio-cover.spinning span {
+  display: inline-block;
+  animation: radioFloat 2.4s ease-in-out infinite;
+}
+@keyframes radioFloat {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-2px) scale(1.06); }
+}
+.fo-radio-title-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.fo-radio-live-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 320px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: rgba(99, 102, 241, 0.14);
+  border: 1px solid rgba(129, 140, 248, 0.3);
+  color: #6366f1;
+  font-size: 11px;
+  font-weight: 600;
+}
+.fo-radio-live-pill span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.fo-radio-live-pill .eq-bars {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 10px;
+}
+.fo-radio-live-pill .eq-bars b {
+  width: 2.5px;
+  height: 4px;
+  border-radius: 2px;
+  background: currentColor;
+}
+.fo-radio-live-pill.playing .eq-bars b:nth-child(1) { animation: eqBounce 0.7s ease-in-out infinite; }
+.fo-radio-live-pill.playing .eq-bars b:nth-child(2) { animation: eqBounce 0.7s ease-in-out 0.2s infinite; }
+.fo-radio-live-pill.playing .eq-bars b:nth-child(3) { animation: eqBounce 0.7s ease-in-out 0.4s infinite; }
+@keyframes eqBounce {
+  0%, 100% { height: 3px; }
+  50% { height: 10px; }
+}
+.bili-radio-layout {
+  display: grid;
+  grid-template-columns: 205px minmax(270px, 0.95fr) minmax(350px, 1.25fr);
+  gap: 16px;
+  flex: 1;
+  min-height: 0;
+}
+.bili-radio-folders,
+.bili-radio-library,
+.bili-radio-editor {
+  min-width: 0;
+  height: calc(100vh - 235px);
+  min-height: 500px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 14px;
+  background: var(--panel, var(--surface));
+  box-shadow: 0 4px 18px rgba(15, 23, 42, 0.04);
+  box-sizing: border-box;
+}
+#bili-radio-folders,
+.bili-radio-videos,
+.bili-radio-queue {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+.bili-radio-folders .sw-title,
+.bili-radio-library .sw-title {
+  margin: 0 0 10px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--heading);
+}
+.bili-radio-folder {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  margin-bottom: 5px;
+  padding: 9px 11px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  transition: background-color 0.16s ease, border-color 0.16s ease, color 0.16s ease;
+}
+.bili-radio-folder:hover {
+  background: var(--surface-hover, rgba(129, 140, 248, 0.08));
+}
+.bili-radio-folder.on {
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.14), rgba(168, 85, 247, 0.12));
+  border-color: rgba(129, 140, 248, 0.35);
+  color: #6366f1;
+  font-weight: 650;
+}
+.bili-radio-folder span:last-child {
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--surface, rgba(148, 163, 184, 0.14));
+  color: var(--muted, var(--dim));
+  font-size: 10.5px;
+}
+.bili-radio-folder.on span:last-child {
+  background: rgba(99, 102, 241, 0.18);
+  color: #6366f1;
+}
+.bili-radio-library-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.bili-radio-library-head .sw-title {
+  margin: 0 !important;
+}
+.bili-radio-lib-pager {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--muted, #64748b);
+}
+.bili-radio-lib-pager button {
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--surface, var(--panel));
+  color: var(--text);
+  cursor: pointer;
+}
+.bili-radio-lib-pager button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.bili-radio-videos {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  max-height: none;
+  padding-right: 2px;
+}
+.bili-radio-videos.two-col,
+.bili-radio-queue.two-col {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  grid-auto-rows: max-content;
+  align-content: start;
+  gap: 8px;
+  overflow: hidden !important;
+}
+.bili-radio-card {
+  display: grid;
+  grid-template-columns: 84px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface, var(--panel));
+  contain-intrinsic-size: 0 64px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+}
+.bili-radio-card:hover {
+  border-color: rgba(99, 102, 241, 0.35);
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
+}
+.bili-radio-videos .bili-radio-card {
+  cursor: grab;
+}
+.bili-radio-videos .bili-radio-card:active {
+  cursor: grabbing;
+}
+.bili-radio-card .fo-bili-thumb {
+  position: relative;
+  width: 84px;
+  height: 48px;
+  aspect-ratio: 16 / 9;
+  border-radius: 6px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.bili-radio-card .fo-bili-duration {
+  right: 3px;
+  bottom: 3px;
+  padding: 1px 4px;
+  font-size: 9px;
+  border-radius: 4px;
+}
+.bili-radio-card-body {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.bili-radio-card .fo-bili-title-row {
+  margin-top: 0;
+  grid-template-columns: minmax(0, 1fr) 20px;
+  gap: 2px;
+}
+.bili-radio-card .fo-bili-title {
+  font-size: 11px;
+  line-height: 1.35;
+}
+.bili-radio-card .fo-bili-meta {
+  margin-top: 0;
+  font-size: 9.5px;
+}
+.bili-radio-queue-badge {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  padding: 1px 5px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.72);
+  color: #ffffff;
+  font-size: 9px;
+  font-weight: 700;
+}
+.bili-radio-queue-card.is-playing {
+  box-shadow: 0 0 0 2px #6366f1, 0 6px 18px rgba(99, 102, 241, 0.22);
+}
+.bili-radio-queue-card.is-playing .bili-radio-queue-badge {
+  background: #6366f1;
+}
+.bili-radio-card-remove {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 18px;
+  height: 18px;
+  border: 0;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: rgba(15, 23, 42, 0.68);
+  color: #ffffff;
+  font-size: 11px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s ease, background-color 0.15s ease;
+}
+.bili-radio-queue-card:hover .bili-radio-card-remove {
+  opacity: 1;
+}
+.bili-radio-card-remove:hover {
+  background: #f43f5e;
+}
+.bili-radio-hint-add {
+  color: #6366f1;
+  font-weight: 600;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.bili-radio-card:hover .bili-radio-hint-add {
+  opacity: 1;
+}
+.bili-radio-queue-empty {
+  grid-column: 1 / -1;
+}
+.bili-radio-video,
+.bili-radio-queue-item {
+  display: grid;
+  grid-template-columns: 78px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 8px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface, var(--panel));
+  text-align: left;
+  transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+}
+.bili-radio-videos.two-col .bili-radio-video {
+  grid-template-columns: 74px minmax(0, 1fr) auto;
+  height: 64px;
+  box-sizing: border-box;
+  gap: 8px;
+  padding: 6px 8px;
+}
+.bili-radio-video {
+  cursor: grab;
+}
+.bili-radio-video:active {
+  cursor: grabbing;
+}
+.bili-radio-card-ops,
+.bili-radio-queue-ops {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+}
+.bili-radio-like-btn {
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted, #94a3b8);
+  font-size: 13px;
+  cursor: pointer;
+  transition: transform 0.15s ease, color 0.15s ease, background-color 0.15s ease;
+}
+.bili-radio-like-btn:hover {
+  background: rgba(244, 63, 94, 0.12);
+  color: #f43f5e;
+  transform: scale(1.1);
+}
+.bili-radio-like-btn.liked {
+  color: #f43f5e;
+}
+.bili-radio-add-btn {
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(99, 102, 241, 0.1);
+  color: #6366f1;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+.bili-radio-video:hover .bili-radio-add-btn,
+.bili-radio-add-btn:hover {
+  background: #6366f1;
+  color: #ffffff;
+}
+.bili-radio-liked-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid rgba(244, 63, 94, 0.35) !important;
+  background: rgba(244, 63, 94, 0.08) !important;
+  color: #e11d48 !important;
+  font-weight: 600 !important;
+}
+.bili-radio-liked-pill:hover {
+  background: rgba(244, 63, 94, 0.16) !important;
+}
+.bili-radio-liked-pill .heart {
+  color: #f43f5e;
+}
+.bili-radio-liked-pill small {
+  font-size: 10px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: rgba(244, 63, 94, 0.14);
+}
+.bili-radio-video:hover {
+  border-color: rgba(129, 140, 248, 0.6);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.1);
+}
+.bili-radio-video img,
+.bili-radio-queue-item img {
+  width: 78px;
+  aspect-ratio: 16/9;
+  object-fit: cover;
+  border-radius: 8px;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.12);
+}
+.bili-radio-video p,
+.bili-radio-queue-item p {
+  display: -webkit-box;
+  margin: 0;
+  overflow: hidden;
+  color: var(--text);
+  font-size: 11.5px;
+  font-weight: 500;
+  line-height: 1.45;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+.bili-radio-video span:last-child {
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: rgba(99, 102, 241, 0.1);
+  color: #6366f1;
+  font-size: 12px;
+  font-weight: 700;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+.bili-radio-video:hover span:last-child {
+  background: #6366f1;
+  color: #ffffff;
+}
+.bili-radio-video.dragging,
+.bili-radio-queue-item.dragging {
+  opacity: 0.42;
+}
+.bili-radio-editor {
+  display: flex;
+  flex-direction: column;
+}
+.bili-radio-name-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+.bili-radio-name-row input {
+  flex: 1 1 160px;
+  min-width: 130px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  outline: 0;
+  background: var(--surface, var(--panel));
+  color: var(--text);
+  font-size: 12px;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease;
+}
+.bili-radio-name-row input:focus {
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.14);
+}
 .bili-radio-name-row input.has-error {
   border-color: #ef4444 !important;
   box-shadow: 0 0 0 2.5px rgba(239, 68, 68, 0.22) !important;
@@ -2015,39 +2520,271 @@ html[data-theme="light"] .bili-ai-pre { background:#f8fafc; }
   20%, 60% { transform: translateX(-4px); }
   40%, 80% { transform: translateX(4px); }
 }
-.bili-radio-btn-group { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
-.bili-radio-series-dropdown-wrap { flex-shrink: 0; }
-.bili-radio-series-select { padding: 7px 10px; border: 1px solid var(--border); border-radius: 8px; outline: none; background: var(--surface); color: var(--heading); font-size: 11px; font-weight: 600; cursor: pointer; transition: all 0.15s ease; max-width: 180px; }
-.bili-radio-series-select:hover { border-color: #818cf8; }
-.bili-radio-create-opt { font-weight: 700; color: #818cf8; background: var(--surface-hover); }
-.bili-radio-name-row button, .bili-radio-actions button { border: 1px solid var(--border); border-radius: 8px; padding: 7px 10px; background: var(--panel); color: var(--text); cursor: pointer; font-size: 11px; white-space: nowrap; flex-shrink: 0; transition: all 0.15s ease; }
-.bili-radio-name-row button:hover, .bili-radio-actions button:hover { border-color: #818cf8; color: #818cf8; background: var(--surface-hover); }
-.bili-radio-queue { flex: 1; min-height: 180px; margin-top: 10px; padding: 7px; border: 1px dashed var(--border-strong); border-radius: 10px; }
-.bili-radio-queue.over { border-color: #818cf8; background: rgba(129,140,248,.1); }
-.bili-radio-queue-item { grid-template-columns: 22px 64px minmax(0,1fr) auto; margin-bottom: 6px; cursor:pointer;transition:border-color .15s,background .15s; }
-.bili-radio-queue-item:hover { border-color:rgba(129,140,248,.62);background:rgba(129,140,248,.09); }
-.bili-radio-queue-item.is-playing { border-color:#818cf8;background:rgba(129,140,248,.16);box-shadow:0 0 0 1px rgba(129,140,248,.35); }
-.bili-radio-queue-item.is-playing .bili-radio-queue-no { color:#6366f1;font-weight:800; }
-.bili-radio-series.active { border-color:#818cf8;background:rgba(129,140,248,.14);color:#818cf8;font-weight:600; }
-.bili-radio-queue-item:hover .bili-radio-queue-no::before { content:"▶";font-size:9px; }
-.bili-radio-queue-item:hover .bili-radio-queue-no { font-size:0; }
-.bili-radio-queue-item img { width: 64px; }
-.bili-radio-queue-no { color: #a5b4fc; text-align: center; font-size: 11px; font-weight: 700; }
-.bili-radio-remove { border: 0; background: transparent; color: #fb7185; cursor: pointer; }
-.bili-radio-queue-item.over { border-color: #818cf8; box-shadow: 0 -2px 0 #818cf8; }
-.bili-radio-actions { display: flex; flex-wrap:wrap;gap: 8px; margin-top: 9px; }
-#bili-radio-play { background: #818cf8; border-color: #818cf8; color: #080b16; font-weight: 700; }
-#bili-radio-shuffle { border-color:rgba(244,114,182,.55);background:rgba(244,114,182,.13);color:#f9a8d4;font-weight:700; }
-.bili-radio-saved-title { margin-top: 12px; }
-.bili-radio-saved { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; }
-.bili-radio-series { display: inline-flex; align-items: center; gap: 6px; flex: none; padding: 5px 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--panel); color: var(--text); cursor: pointer; font-size: 11px; transition: all 0.15s ease; }
-.bili-radio-series:hover { border-color: rgba(129, 140, 248, 0.5); }
-.bili-radio-play-btn-chip { display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 4px; background: rgba(129, 140, 248, 0.2); color: #818cf8; font-size: 9px; border: 0; cursor: pointer; transition: all 0.15s ease; }
-.bili-radio-play-btn-chip:hover { background: #818cf8; color: #080b16; }
-.bili-radio-series-label { max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.bili-radio-del-btn { border: 0; background: transparent; color: #fb7185; cursor: pointer; padding: 0 2px; }
-.bili-radio-del-btn:hover { color: #f43f5e; }
-@media (max-width: 1050px) { .bili-radio-layout { grid-template-columns: 160px minmax(230px,1fr); } .bili-radio-editor { grid-column: 1 / -1; } }
+.bili-radio-btn-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.bili-radio-series-dropdown-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+.bili-radio-series-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 11px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface, var(--panel));
+  color: var(--heading);
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+.bili-radio-series-trigger:hover {
+  border-color: #6366f1;
+}
+.bili-radio-series-trigger .caret {
+  font-size: 10px;
+  color: var(--dim);
+}
+.bili-radio-series-popover {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 40;
+  width: 248px;
+  max-height: 290px;
+  overflow-y: auto;
+  padding: 6px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--panel, #ffffff);
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.16);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.bili-radio-series-new {
+  width: 100%;
+  text-align: left;
+  padding: 7px 9px;
+  border: 1px dashed rgba(99, 102, 241, 0.45);
+  border-radius: 8px;
+  background: rgba(99, 102, 241, 0.06);
+  color: #6366f1;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.bili-radio-series-new:hover {
+  background: rgba(99, 102, 241, 0.12);
+}
+.bili-radio-series-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.bili-radio-series-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: 8px;
+  padding: 2px;
+}
+.bili-radio-series-item.active {
+  background: rgba(99, 102, 241, 0.1);
+}
+.bili-radio-series-pick {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 5px 7px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--heading);
+  font-size: 11.5px;
+  text-align: left;
+  cursor: pointer;
+}
+.bili-radio-series-pick:hover {
+  background: var(--surface-hover, rgba(15, 23, 42, 0.05));
+}
+.bili-radio-series-pick .name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+.bili-radio-series-pick small {
+  color: var(--dim);
+  flex-shrink: 0;
+}
+.bili-radio-series-del,
+.bili-radio-del-btn {
+  flex-shrink: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 5px 8px;
+  background: var(--surface, var(--panel));
+  color: var(--dim);
+  font-size: 11px;
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
+}
+.bili-radio-series-del:hover,
+.bili-radio-del-btn:hover {
+  color: #e11d48;
+  border-color: rgba(225, 29, 72, 0.4);
+  background: rgba(225, 29, 72, 0.07);
+}
+.bili-radio-series-del.confirming,
+.bili-radio-del-btn.confirming {
+  color: #ffffff;
+  background: #e11d48;
+  border-color: #e11d48;
+  font-weight: 600;
+}
+.bili-radio-series-empty {
+  margin: 6px 4px;
+  text-align: center;
+}
+.bili-radio-in-queue-tag {
+  color: #10b981;
+  font-weight: 600;
+}
+.bili-radio-card.in-queue {
+  border-color: rgba(16, 185, 129, 0.35);
+}
+.bili-radio-name-row button,
+.bili-radio-actions button {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 7px 12px;
+  background: var(--surface, var(--panel));
+  color: var(--text);
+  cursor: pointer;
+  font-size: 11.5px;
+  font-weight: 500;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: transform 0.15s ease, border-color 0.15s ease, color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
+}
+.bili-radio-name-row button:hover,
+.bili-radio-actions button:hover:not(:disabled) {
+  border-color: #6366f1;
+  color: #6366f1;
+  background: rgba(99, 102, 241, 0.08);
+}
+.bili-radio-queue {
+  flex: 1;
+  min-height: 180px;
+  margin-top: 12px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--surface) 72%, transparent);
+}
+.bili-radio-queue.over {
+  border: 1.5px dashed #00aeec;
+  background: rgba(0, 174, 236, 0.06);
+}
+.bili-radio-queue-item {
+  grid-template-columns: 26px 68px minmax(0, 1fr) auto;
+  margin-bottom: 7px;
+  cursor: pointer;
+}
+.bili-radio-queue-item:hover {
+  border-color: rgba(129, 140, 248, 0.62);
+  background: rgba(129, 140, 248, 0.09);
+}
+.bili-radio-queue-item.is-playing {
+  border-color: #6366f1;
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.16), rgba(168, 85, 247, 0.1));
+  box-shadow: 0 4px 14px rgba(99, 102, 241, 0.18);
+}
+.bili-radio-queue-item.is-playing .bili-radio-queue-no {
+  color: #6366f1;
+  font-weight: 800;
+}
+.bili-radio-queue-item:hover .bili-radio-queue-no::before {
+  content: "▶";
+  font-size: 9px;
+}
+.bili-radio-queue-item:hover .bili-radio-queue-no {
+  font-size: 0;
+}
+.bili-radio-queue-item img {
+  width: 68px;
+}
+.bili-radio-queue-no {
+  color: #818cf8;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 700;
+}
+.bili-radio-remove {
+  border: 0;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: transparent;
+  color: var(--muted, #94a3b8);
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+.bili-radio-remove:hover {
+  background: rgba(244, 63, 94, 0.14);
+  color: #f43f5e;
+}
+.bili-radio-queue-item.over {
+  border-color: #6366f1;
+  box-shadow: 0 -2px 0 #6366f1;
+}
+.bili-radio-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+#bili-radio-play {
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  border-color: transparent;
+  color: #ffffff;
+  font-weight: 700;
+  box-shadow: 0 4px 14px rgba(99, 102, 241, 0.28);
+}
+#bili-radio-play:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(99, 102, 241, 0.36);
+}
+#bili-radio-shuffle {
+  border-color: rgba(236, 72, 153, 0.42);
+  background: rgba(236, 72, 153, 0.12);
+  color: #db2777;
+  font-weight: 650;
+}
+#bili-radio-shuffle:hover:not(:disabled) {
+  border-color: #ec4899;
+  background: rgba(236, 72, 153, 0.2);
+}
+.bili-radio-actions button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+@media (max-width: 1050px) {
+  .bili-radio-layout { grid-template-columns: 165px minmax(230px, 1fr); }
+  .bili-radio-editor { grid-column: 1 / -1; }
+}
 .fo-pager { display: flex; align-items: center; gap: 10px; margin-top: 14px; justify-content: center; }
 .fo-page-num { font-size: 12px; color: var(--muted); }
 .fo-btn:disabled { opacity: 0.4; cursor: default; }.ms-tv { position: fixed; right: 20px; bottom: 80px; z-index: 56; background: #171310; border: 1px solid rgba(0,0,0,0.5); border-radius: 16px; padding: 10px; box-shadow: 0 20px 50px -16px rgba(0,0,0,0.8); }
@@ -2061,7 +2798,10 @@ html[data-theme="light"] .bili-ai-pre { background:#f8fafc; }
 .bili-mini-player.is-dragging video,
 .bili-mini-player.is-dragging .bili-danmaku-stage { pointer-events: none !important; }
 .bili-mini-resize-handle { position: absolute; right: 0; bottom: 0; z-index: 8; width: 22px; height: 22px; cursor: nwse-resize; touch-action: none; background: linear-gradient(135deg, transparent 65%, rgba(255,255,255,.55) 65%, rgba(255,255,255,.55) 71%, transparent 71%); }
-.bili-mini-head { display: flex; align-items: center; gap: 6px; min-height: 32px; padding: 5px 7px 5px 10px; background: var(--panel); border-bottom: 1px solid var(--border); color: var(--heading); cursor: default; user-select: none; touch-action: none; }
+.bili-mini-head { position:relative; display:flex; flex-wrap:wrap; align-items:center; gap:6px; min-height:32px; padding:5px 60px 5px 10px; background:var(--panel); border-bottom:1px solid var(--border); color:var(--heading); cursor:default; user-select:none; touch-action:none; }
+.bili-mini-head .bili-mini-collapse, .bili-mini-head .bili-mini-close { position:absolute; top:5px; z-index:2; background:var(--panel); }
+.bili-mini-head .bili-mini-collapse { right:32px; }
+.bili-mini-head .bili-mini-close { right:5px; }
 .bili-mini-head:active { cursor: default; }
 .bili-mini-title { flex: 1; min-width: 0; overflow: hidden; font-size: 11px; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
 .bili-mini-head button, .bili-mini-head a { display: grid; place-items: center; width: 23px; height: 23px; flex: none; border: 0; border-radius: 6px; background: transparent; color: var(--muted); text-decoration: none; cursor: pointer; font-size: 11px; }
@@ -3734,8 +4474,8 @@ body.has-card-fullscreen .card.card-fullscreen:hover {
 
 .card.card-fullscreen .bili-sub-layout {
   display: grid !important;
-  grid-template-columns: minmax(380px, 1.05fr) minmax(0, 1.35fr) !important;
-  gap: 20px !important;
+  grid-template-columns: minmax(0, 1.3fr) minmax(360px, 1fr) !important;
+  gap: 18px !important;
   height: 100% !important;
   flex: 1 1 0 !important;
   min-height: 0 !important;

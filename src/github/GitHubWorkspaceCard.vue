@@ -28,6 +28,9 @@ const GitHubBookGuide = defineAsyncComponent(() => import("../launchers/Launcher
 import { githubGuideSpreads } from "./guide-content";
 import { gitHubService, type GitHubSearchRule } from "../services/github.service";
 import { fullscreenCardState } from "../core/fullscreen-card-state";
+import { useWorkspaceWallpaper } from "../wallpaper/workspace-wallpaper";
+import WorkspaceWallpaperLayer from "../wallpaper/WorkspaceWallpaperLayer.vue";
+const { style: githubWallpaperStyle, media: githubWallpaperMedia } = useWorkspaceWallpaper('github');
 import { gitHubTrendingController } from "./trending-store";
 import { t } from "../i18n";
 
@@ -38,7 +41,20 @@ let repositoryReadScope: AbortController | undefined;
 const initialError = ref("");
 
 type GitHubChannel = "dashboard" | "stars" | "trending" | "awesome" | "repos" | "search";
-const activeChannel = ref<GitHubChannel>("dashboard");
+const GITHUB_CHANNEL_SESSION_KEY = "lw-github-active-channel";
+function readSavedGitHubChannel(): GitHubChannel {
+  try {
+    const saved = sessionStorage.getItem(GITHUB_CHANNEL_SESSION_KEY);
+    if (saved === "dashboard" || saved === "stars" || saved === "trending" || saved === "awesome" || saved === "repos") {
+      return saved;
+    }
+  } catch {}
+  return "dashboard";
+}
+const activeChannel = ref<GitHubChannel>(readSavedGitHubChannel());
+if (activeChannel.value === "trending") {
+  gitHubTrendingController.switchTab("trending");
+}
 watch(() => active.value && activeChannel.value === "stars", visible => gitHubService.setAiViewActive(visible), { immediate: true, flush: "sync" });
 const isChannelsCollapsed = ref(false);
 const searchScope = ref<"local" | "global">("local");
@@ -69,6 +85,9 @@ let searchTimer = 0;
 function switchChannel(channel: GitHubChannel) {
   if (channel === "dashboard") dashboardSearchMode.value = null;
   activeChannel.value = channel;
+  if (channel !== "search") {
+    try { sessionStorage.setItem(GITHUB_CHANNEL_SESSION_KEY, channel); } catch {}
+  }
   if (channel === "trending") {
     gitHubTrendingController.switchTab("trending");
   } else {
@@ -78,6 +97,7 @@ function switchChannel(channel: GitHubChannel) {
 
 function handleSelectFolder() {
   activeChannel.value = "stars";
+  try { sessionStorage.setItem(GITHUB_CHANNEL_SESSION_KEY, "stars"); } catch {}
 }
 
 const SEARCH_RULES = computed(() => [
@@ -208,7 +228,8 @@ onBeforeUnmount(() => { gitHubService.setAiViewActive(false); ++initialVersion; 
     <p v-if="initialError" class="muted small" role="status">{{ initialError }}</p>
     <!-- 纯血 B站同款全景侧边栏与主工作台 -->
     <div class="gh-main-pane" id="gh-pane-main">
-      <div class="gh-bili-layout">
+      <div class="gh-bili-layout" :style="githubWallpaperStyle" :class="{ 'has-workspace-wallpaper': !!githubWallpaperStyle }">
+        <WorkspaceWallpaperLayer :media="githubWallpaperMedia" />
         <aside class="gh-bili-sidebar fo-bili-sidebar" id="gh-bili-sidebar">
           <!-- 1. B站同款快捷频道区域 -->
           <div

@@ -5,15 +5,12 @@ import { biliMiniPlayerController, biliMiniPlayerState } from "./mini-player-sto
 import { subtitleModalController } from "./subtitle-modal-store";
 import { fullscreenCardState } from "../core/fullscreen-cards.store";
 import { useCardActivity } from "../core/useCardActivity";
-import BiliSubscriptionHeader from "./BiliSubscriptionHeader.vue";
-import BiliSubscriptionTranscript from "./BiliSubscriptionTranscript.vue";
 import BiliSubscriptionPlayer from "./BiliSubscriptionPlayer.vue";
 import BiliOrganizerDialogs from "./BiliOrganizerDialogs.vue";
 import BiliCacheSettingsView from "./BiliCacheSettingsView.vue";
 import BiliUpGroupManager from "./BiliUpGroupManager.vue";
-import BiliRadioTapePlayer from "./BiliRadioTapePlayer.vue";
 import { radioTapeState } from "./radio-tape-store";
-import { biliRadioController } from "./radio-store";
+import { biliRadioController, LIKED_SERIES_ID, LIKED_SERIES_NAME } from "./radio-store";
 import { parseDurationToSeconds } from "./channel-format";
 import { onFollowingGroupsWheel } from "./horizontal-wheel";
 import { biliMessagePanelController, biliMessagePanelState } from "./message-panel-store";
@@ -27,7 +24,10 @@ import type { ChatShareTarget } from "../chat/private-chat-client";
 import { chatModuleState } from "../chat/chat-state";
 import { t } from "../i18n";
 import { workspaceSearchRequests, consumeWorkspaceSearch } from "../search/workspace-search";
+import { useWorkspaceWallpaper } from "../wallpaper/workspace-wallpaper";
+import WorkspaceWallpaperLayer from "../wallpaper/WorkspaceWallpaperLayer.vue";
 
+const { style: biliWallpaperStyle, media: biliWallpaperMedia } = useWorkspaceWallpaper('bilibili');
 const isSeriesNameError = ref(false);
 
 function handleSaveSeries() {
@@ -74,19 +74,73 @@ function handleShareCurrentSeries() {
   notifications.fetch(t("bili.radioAppName"), t("bili.radioSharedNotice", { name: series.name }));
 }
 
-function handleSeriesDropdownChange(e: Event) {
-  const target = e.target as HTMLSelectElement;
-  const val = target.value;
-  if (!val) return;
-  if (val === "__create_new__") {
-    dispatch("radio-clear");
-    biliFavoritesState.radioSeriesName = "";
-    notifications.fetch("哔哩哔哩电台", "已开启新系列创作，请从左侧添加视频");
-    target.value = "";
+const seriesMenuOpen = ref(false);
+const seriesMenuWrapEl = ref<HTMLElement | null>(null);
+const pendingDeleteSeriesId = ref<string | null>(null);
+let pendingDeleteTimer: ReturnType<typeof setTimeout> | null = null;
+
+function clearPendingSeriesDelete(): void {
+  pendingDeleteSeriesId.value = null;
+  if (pendingDeleteTimer) {
+    clearTimeout(pendingDeleteTimer);
+    pendingDeleteTimer = null;
+  }
+}
+
+function handleStartNewSeries(): void {
+  dispatch("radio-clear");
+  biliFavoritesState.radioSeriesName = "";
+  radioQueuePage.value = 1;
+  seriesMenuOpen.value = false;
+  clearPendingSeriesDelete();
+  notifications.fetch("哔哩哔哩电台", "已开启新歌单创作，请从左侧添加视频");
+  const seriesInput = document.getElementById("bili-radio-name") as HTMLInputElement | null;
+  seriesInput?.focus();
+}
+
+function handleSelectSeries(seriesId: string): void {
+  dispatch("radio-load-series", seriesId);
+  radioQueuePage.value = 1;
+  seriesMenuOpen.value = false;
+  clearPendingSeriesDelete();
+}
+
+function handleDeleteSeriesClick(seriesId: string): void {
+  if (pendingDeleteSeriesId.value !== seriesId) {
+    clearPendingSeriesDelete();
+    pendingDeleteSeriesId.value = seriesId;
+    pendingDeleteTimer = setTimeout(() => {
+      pendingDeleteSeriesId.value = null;
+      pendingDeleteTimer = null;
+    }, 3500);
     return;
   }
-  dispatch("radio-load-series", val);
+  clearPendingSeriesDelete();
+  dispatch("radio-delete-series", seriesId);
 }
+
+watch(seriesMenuOpen, (open, _prev, cleanup) => {
+  if (!open || typeof document === "undefined") return;
+  const onDocPointerDown = (e: PointerEvent) => {
+    const target = e.target as Node | null;
+    if (seriesMenuWrapEl.value && target && !seriesMenuWrapEl.value.contains(target)) {
+      seriesMenuOpen.value = false;
+      clearPendingSeriesDelete();
+    }
+  };
+  const onDocKeyDown = (e: KeyboardEvent) => {
+    if (e.key === "Escape") {
+      seriesMenuOpen.value = false;
+      clearPendingSeriesDelete();
+    }
+  };
+  document.addEventListener("pointerdown", onDocPointerDown);
+  document.addEventListener("keydown", onDocKeyDown);
+  cleanup(() => {
+    document.removeEventListener("pointerdown", onDocPointerDown);
+    document.removeEventListener("keydown", onDocKeyDown);
+  });
+});
 
 function openUpPreview(
   event: MouseEvent,
@@ -622,11 +676,46 @@ watch(organizerMain, (main, _old, cleanup) => {
 }, { flush: 'post' });
 watch(() => organizer.value.loading, loading => { if (!loading) updateFavoriteColumns(); });
 
+const BILI_MODE_SESSION_KEY = "lw-bili-active-mode";
+type BiliMode = typeof organizer.value.mode;
+const RESTORABLE_BILI_MODES: ReadonlyArray<BiliMode> = ["organizer", "cache", "recommendations", "following", "radio"];
+let biliModeRestored = false;
+
+function readSavedBiliMode(): BiliMode {
+  try {
+    const saved = sessionStorage.getItem(BILI_MODE_SESSION_KEY) as BiliMode | null;
+    return saved && RESTORABLE_BILI_MODES.includes(saved) ? saved : "organizer";
+  } catch {
+    return "organizer";
+  }
+}
+
+function restoreSavedBiliModeIfActive(): void {
+  if (biliModeRestored || !recommendationHostActive.value) return;
+  biliModeRestored = true;
+  const saved = readSavedBiliMode();
+  if (saved === "recommendations") dispatch("open-recommendations");
+  else if (saved === "following") dispatch("open-following");
+  else if (saved === "subscription") dispatch("open-sub-video");
+  else if (saved === "cache") dispatch("open-cache");
+  else if (saved === "radio") dispatch("open-radio");
+}
+
+watch(() => organizer.value.mode, mode => {
+  if (!biliModeRestored && !recommendationHostActive.value) return;
+  try { sessionStorage.setItem(BILI_MODE_SESSION_KEY, mode); } catch {}
+});
+
+watch(recommendationHostActive, visible => {
+  if (visible) restoreSavedBiliModeIfActive();
+});
+
 onMounted(() => {
   void import("../services/bilibili-channel.service").catch((error) =>
     console.error("[Bilibili] 频道动作服务加载失败", error));
   updateFavoriteColumns();
   void biliFavoritesController.loadOrganizer();
+  restoreSavedBiliModeIfActive();
   document.addEventListener("pointerdown", closeVideoMenu, true);
   document.addEventListener("pointerdown", handleGlobalPointer);
   window.addEventListener("keydown", closeVideoMenu);
@@ -736,6 +825,7 @@ function handleShareVideoToRoom(target: ChatShareTarget) {
 function onLayoutWheel(event: WheelEvent): void {
   if (!organizer.value.isTargetPickMode) return;
   const target = event.target as HTMLElement | null;
+  if (target?.closest(".bili-sub-transcript-body, .bili-sub-scroll-stage")) return;
   if (!target?.closest(".fo-bili-folder-list")) {
     const folderList = document.querySelector(".fo-bili-folder-list");
     if (folderList) {
@@ -745,36 +835,24 @@ function onLayoutWheel(event: WheelEvent): void {
   }
 }
 
-function createCassetteDragGhost(title: string): HTMLElement {
+function createCassetteDragGhost(_title: string): HTMLElement {
   const ghost = document.createElement("div");
   ghost.style.position = "fixed";
   ghost.style.top = "-9999px";
   ghost.style.left = "-9999px";
-  ghost.style.width = "144px";
-  ghost.style.height = "50px";
-  ghost.style.borderRadius = "6px";
-  ghost.style.backgroundColor = "#1e1e24";
-  ghost.style.border = "2px solid #eab308";
-  ghost.style.boxShadow = "0 8px 24px rgba(0,0,0,0.6), inset 0 0 12px rgba(234,179,8,0.25)";
+  ghost.style.width = "76px";
+  ghost.style.height = "26px";
   ghost.style.display = "flex";
   ghost.style.alignItems = "center";
-  ghost.style.padding = "4px 8px";
-  ghost.style.gap = "8px";
-  ghost.style.color = "#fff";
-  ghost.style.fontFamily = "sans-serif";
+  ghost.style.justifyContent = "center";
+  ghost.style.background = "transparent";
   ghost.style.zIndex = "999999";
   ghost.style.pointerEvents = "none";
   ghost.innerHTML = `
-    <div style="width:26px;height:26px;border-radius:50%;border:1.5px solid #d4d4d8;display:flex;align-items:center;justify-content:center;background:#09090b;box-shadow:inset 0 1px 3px rgba(0,0,0,0.5);">
-      <span style="display:block;width:7px;height:7px;background:#eab308;border-radius:50%;"></span>
-    </div>
-    <div style="flex:1;min-width:0;overflow:hidden;line-height:1.2;">
-      <div style="font-size:7.5px;font-weight:900;color:#eab308;letter-spacing:1px;">CASSETTE TAPE</div>
-      <div style="font-size:10px;font-weight:700;color:#f4f4f5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${title || 'B站音乐卡带'}</div>
-    </div>
-    <div style="width:26px;height:26px;border-radius:50%;border:1.5px solid #d4d4d8;display:flex;align-items:center;justify-content:center;background:#09090b;box-shadow:inset 0 1px 3px rgba(0,0,0,0.5);">
-      <span style="display:block;width:7px;height:7px;background:#eab308;border-radius:50%;"></span>
-    </div>
+    <svg width="76" height="26" viewBox="0 0 76 26" fill="none" xmlns="http://www.w3.org/2000/svg" style="filter:drop-shadow(0 1px 2px rgba(0,0,0,0.45));">
+      <line x1="6" y1="13" x2="64" y2="13" stroke="#00aeec" stroke-width="2.5" stroke-dasharray="5 3" stroke-linecap="round" />
+      <polyline points="56,6 66,13 56,20" stroke="#00aeec" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+    </svg>
   `;
   document.body.appendChild(ghost);
   return ghost;
@@ -801,9 +879,8 @@ function beginVideoDrag(event: DragEvent, video: BiliOrganizerVideoView): void {
   event.dataTransfer.setData("application/x-bili-cassette", cassettePayload);
   event.dataTransfer.setData("application/json", cassettePayload);
 
-  // 实体卡带幽灵图
   const ghost = createCassetteDragGhost(video.title);
-  event.dataTransfer.setDragImage(ghost, 72, 25);
+  event.dataTransfer.setDragImage(ghost, 66, 13);
   setTimeout(() => {
     if (ghost.parentNode) ghost.parentNode.removeChild(ghost);
   }, 0);
@@ -824,12 +901,114 @@ function onRadioVideoDragStart(event: DragEvent, video: { bvid: string; title: s
   event.dataTransfer.setData("application/json", cassettePayload);
   event.dataTransfer.setData("text/plain", `https://www.bilibili.com/video/${video.bvid}`);
 
-  // 实体卡带幽灵图
   const ghost = createCassetteDragGhost(video.title);
-  event.dataTransfer.setDragImage(ghost, 72, 25);
+  event.dataTransfer.setDragImage(ghost, 66, 13);
   setTimeout(() => {
     if (ghost.parentNode) ghost.parentNode.removeChild(ghost);
   }, 0);
+}
+const RADIO_PAGE_SIZE = 14;
+const radioLibraryPage = ref(1);
+const radioQueuePage = ref(1);
+const isRadioQueueDragOver = ref(false);
+
+const radioTotalPages = computed(() =>
+  Math.max(1, Math.ceil(biliFavoritesState.radioVideos.length / RADIO_PAGE_SIZE))
+);
+const pagedRadioVideos = computed(() => {
+  const safePage = Math.min(radioLibraryPage.value, radioTotalPages.value);
+  const start = (safePage - 1) * RADIO_PAGE_SIZE;
+  return biliFavoritesState.radioVideos.slice(start, start + RADIO_PAGE_SIZE);
+});
+
+const radioQueueTotalPages = computed(() =>
+  Math.max(1, Math.ceil(biliFavoritesState.radioQueue.length / RADIO_PAGE_SIZE))
+);
+const pagedRadioQueue = computed(() => {
+  const safePage = Math.min(radioQueuePage.value, radioQueueTotalPages.value);
+  const start = (safePage - 1) * RADIO_PAGE_SIZE;
+  return biliFavoritesState.radioQueue.map((item, idx) => ({ item, index: idx })).slice(start, start + RADIO_PAGE_SIZE);
+});
+
+const likedRadioCount = computed(() => {
+  const liked = biliFavoritesState.radioSeries.find(
+    (s) => s.id === LIKED_SERIES_ID || s.name === LIKED_SERIES_NAME
+  );
+  return liked?.items?.length || 0;
+});
+
+const radioQueueBvidSet = computed(
+  () => new Set(biliFavoritesState.radioQueue.map((item) => item.bvid))
+);
+
+const activeRadioSeries = computed(() => {
+  const name = biliFavoritesState.radioSeriesName?.trim();
+  if (!name) return null;
+  return biliFavoritesState.radioSeries.find((s) => s.name === name) || null;
+});
+
+function formatRadioDuration(sec?: number): string {
+  const total = Math.max(0, Math.floor(Number(sec) || 0));
+  if (!total) return "";
+  const m = Math.floor(total / 60);
+  const s = total % 60;
+  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+}
+
+watch(
+  () => biliFavoritesState.radioActiveFolderId,
+  (folderId, prevFolderId) => {
+    if (folderId !== prevFolderId) radioLibraryPage.value = 1;
+    else if (radioLibraryPage.value > radioTotalPages.value) radioLibraryPage.value = radioTotalPages.value;
+  }
+);
+
+watch(
+  () => biliFavoritesState.radioQueue.length,
+  () => {
+    if (radioQueuePage.value > radioQueueTotalPages.value) radioQueuePage.value = radioQueueTotalPages.value;
+  }
+);
+
+function onRadioQueueDragOver(event: DragEvent): void {
+  isRadioQueueDragOver.value = true;
+  if (event.dataTransfer) event.dataTransfer.dropEffect = "copy";
+}
+
+function onRadioQueueDragLeave(event: DragEvent): void {
+  const current = event.currentTarget as HTMLElement | null;
+  const related = event.relatedTarget as Node | null;
+  if (!current || !related || !current.contains(related)) {
+    isRadioQueueDragOver.value = false;
+  }
+}
+
+function onRadioQueueDrop(event: DragEvent): void {
+  isRadioQueueDragOver.value = false;
+  const dt = event.dataTransfer;
+  if (!dt) return;
+  const raw = dt.getData("application/x-bili-cassette") || dt.getData("application/json");
+  let track: any = null;
+  if (raw) {
+    try { track = JSON.parse(raw); } catch {}
+  }
+  if (!track?.bvid) {
+    const text = dt.getData("text/plain") || dt.getData("text/uri-list") || "";
+    const match = text.match(/BV[0-9a-zA-Z]+/);
+    if (match) {
+      const fromLib = biliFavoritesState.radioVideos.find(v => v.bvid === match[0]);
+      track = fromLib ? { ...fromLib } : { bvid: match[0], title: match[0] };
+    }
+  }
+  if (track?.bvid) {
+    dispatch("radio-add", {
+      bvid: track.bvid,
+      title: track.title,
+      cover: track.cover,
+      author: track.author,
+      duration: track.duration,
+    });
+  }
 }
 </script>
 
@@ -837,7 +1016,8 @@ function onRadioVideoDragStart(event: DragEvent, video: { bvid: string; title: s
   <section id="daily-bilibili" class="card wide" :class="{ 'card-fullscreen': isStandalone || fullscreenCardState.activeId === 'daily-bilibili' }">
     <div class="fm-pane" id="pane-organizer">
       <div id="fo-body">
-        <div class="fo-bili-layout" :class="{ 'fo-picking-move-target': organizer.isTargetPickMode }" data-vue-organizer-shell="true" @wheel="onLayoutWheel">
+        <div class="fo-bili-layout" :style="biliWallpaperStyle" :class="{ 'fo-picking-move-target': organizer.isTargetPickMode, 'has-workspace-wallpaper': !!biliWallpaperStyle }" data-vue-organizer-shell="true" @wheel="onLayoutWheel">
+          <WorkspaceWallpaperLayer :media="biliWallpaperMedia" />
           <aside class="fo-bili-sidebar">
             <div
               class="fo-sidebar-toggle-bar"
@@ -862,12 +1042,6 @@ function onRadioVideoDragStart(event: DragEvent, video: { bvid: string; title: s
             </div>
 
             <div v-show="!isFeaturesCollapsed" class="fo-sidebar-features-wrap">
-              <div class="fo-sidebar-sub-wrap">
-                <button id="fo-sidebar-sub-btn" type="button" class="fo-sidebar-sub-btn" :class="{ on: organizer.mode === 'subscription' }" :title="t('bili.channel.subVideoTip')" @click="dispatch('open-sub-video')">
-                  <div class="fo-sidebar-sub-main"><span class="fo-sidebar-sub-icon">🎬</span><div class="fo-sidebar-sub-text"><strong>{{ t('bili.channel.subVideo') }}</strong><small>{{ t('bili.channel.subVideoSub') }}</small></div></div>
-                  <span class="fo-sidebar-sub-badge">NEW</span>
-                </button>
-              </div>
               <div class="fo-sidebar-sub-wrap fo-sidebar-cache-wrap">
                 <button id="fo-sidebar-cache-btn" type="button" class="fo-sidebar-sub-btn" :class="{ on: organizer.mode === 'cache' }" :title="t('bili.channel.cacheVideoTip')" @click="dispatch('open-cache')">
                   <div class="fo-sidebar-sub-main"><span class="fo-sidebar-sub-icon">💾</span><div class="fo-sidebar-sub-text"><strong>{{ t('bili.channel.cacheVideo') }}</strong><small>{{ t('bili.channel.cacheVideoSub') }}</small></div></div>
@@ -1019,6 +1193,55 @@ function onRadioVideoDragStart(event: DragEvent, video: { bvid: string; title: s
                   <div class="fo-hero-folder-info"><h3>{{ organizer.folderTitle }}</h3><p>{{ organizer.folderSubtitle }}</p></div>
                 </div>
 
+                <!-- 收藏夹顶部同样提供 B站全站搜索框（与个性推荐一致） -->
+                <div class="card-fullscreen-bili-search fo-hero-bili-search" ref="searchHostRef">
+                  <form class="card-fullscreen-bili-searchbar" role="search" @submit.prevent="onSearchSubmit">
+                    <input
+                      v-model="biliSearchQuery"
+                      type="search"
+                      autocomplete="off"
+                      :placeholder="t('bili.workspace.searchPlaceholder')"
+                      :aria-label="t('bili.workspace.searchAria')"
+                      @focus="onSearchFocus"
+                      @input="onSearchInputChange"
+                    />
+                    <button type="submit" :title="t('bili.workspace.searchBtnTip')">⌕</button>
+                  </form>
+
+                  <div
+                    v-if="isSearchSuggestVisible"
+                    class="card-fullscreen-bili-suggestions"
+                    role="listbox"
+                  >
+                    <div class="card-fullscreen-bili-suggest-head">
+                      <span>{{ searchSuggestHeadTitle }}</span>
+                      <small>{{ searchSuggestHeadSubtitle }}</small>
+                    </div>
+                    <p v-if="isSearchLoading" class="card-fullscreen-bili-suggest-status">正在获取推荐 / 搜索中…</p>
+                    <p v-else-if="!searchSuggestResults.length && !isSearchLoading" class="card-fullscreen-bili-suggest-status">暂无联想结果，按回车在插件内搜索</p>
+                    <template v-else>
+                      <button
+                        v-for="item in searchSuggestResults"
+                        :key="item.bvid || item.aid"
+                        type="button"
+                        class="card-fullscreen-bili-video-row"
+                        role="option"
+                        @click="openVideoItem(item)"
+                        @contextmenu.prevent="openSuggestContextMenu($event, item)"
+                      >
+                        <span class="card-fullscreen-bili-thumb">
+                          <img :src="item.cover" alt="" referrerpolicy="no-referrer" loading="lazy" />
+                          <i v-if="item.durationText">{{ item.durationText }}</i>
+                        </span>
+                        <span class="card-fullscreen-bili-video-copy">
+                          <strong>{{ item.title }}</strong>
+                          <small>{{ item.upper }} · {{ item.playText }}播放</small>
+                        </span>
+                      </button>
+                    </template>
+                  </div>
+                </div>
+
                 <div class="fo-bili-actions">
                   <!-- B站互动消息按钮 -->
                   <button
@@ -1031,17 +1254,6 @@ function onRadioVideoDragStart(event: DragEvent, video: { bvid: string; title: s
                   >
                     <span class="bili-header-msg-icon">🔔</span>
                     <span class="bili-header-msg-label">{{ t('bili.workspace.msgBtn') }}</span>
-                  </button>
-
-                  <!-- ⚙ 关注分组管理按钮 -->
-                  <button
-                    id="bili-up-group-manager-top"
-                    class="fm-tab bili-header-up-group-btn hero-action-btn"
-                    type="button"
-                    :title="t('bili.workspace.upGroupManagerTip')"
-                    @click="dispatch('manage-up-groups')"
-                  >
-                    {{ t('bili.workspace.upGroupManager') }}
                   </button>
 
                   <button type="button" class="primary hero-action-btn" :disabled="!organizer.videos.length" @click="dispatch('organizer-batch-toggle')">{{ organizer.batchMode ? t('bili.workspace.batchBack') : t('bili.workspace.batch') }}</button>
@@ -1290,7 +1502,7 @@ function onRadioVideoDragStart(event: DragEvent, video: { bvid: string; title: s
               <div class="fo-bili-heading"><div class="fo-feed-hero-title"><h3>{{ organizer.specialTitle }}</h3><span v-if="organizer.specialBadge !== `第 ${organizer.specialPage} 页`" class="fo-feed-badge">{{ organizer.specialBadge }}</span></div><p>{{ organizer.specialSubtitle }}</p></div>
               <div class="fo-up-groups-bar">
                 <div class="fo-up-groups-list" @wheel="onFollowingGroupsWheel"><button v-for="group in organizer.followingGroups" :key="group.id" type="button" class="fo-up-group-chip" :class="{ active: group.active }" @click="dispatch('following-group', group.id)">{{ group.child ? '↳ ' : '' }}{{ group.name }} <small class="count">{{ group.count }}</small></button></div>
-                <div class="fo-up-groups-actions"><button type="button" @click="dispatch('following-manage-groups', 'create')">＋ 新建分组</button><button type="button" @click="dispatch('following-manage-groups', 'manage')">⚙️ 管理分组</button></div>
+                <div class="fo-up-groups-actions"><button id="bili-following-up-group-manager" type="button" :title="t('bili.workspace.upGroupManagerTip')" @click="dispatch('manage-up-groups')">{{ t('bili.workspace.upGroupManager') }}</button></div>
               </div>
               <div class="fo-bili-actions"><button type="button" @click="dispatch('organizer-open')">返回收藏夹</button></div>
             </header>
@@ -1321,27 +1533,29 @@ function onRadioVideoDragStart(event: DragEvent, video: { bvid: string; title: s
           </section>
           <section v-else-if="organizer.mode === 'subscription'" id="fo-vue-subscription-main" class="fo-bili-main fo-vue-subscription-main">
             <div class="bili-sub-vue-shell">
-              <BiliSubscriptionHeader show-back />
-              <div v-if="organizer.subscriptionLoading" class="fo-bili-loading"><i></i><span>正在读取订阅视频与 AI 字幕稿…</span></div>
+              <div v-if="organizer.subscriptionLoading" class="fo-bili-loading"><i></i><span>正在读取视频与 AI 字幕稿…</span></div>
               <p v-else-if="organizer.subscriptionError" class="fo-bili-empty">读取失败：{{ organizer.subscriptionError }}</p>
-              <div v-else-if="!organizer.subscriptionChannels.length" class="fo-bili-empty">还没有订阅的 UP 主。 <button type="button" class="fo-btn" @click="dispatch('subscription-add-channel')">添加 UP 主</button></div>
-              <div v-else class="bili-sub-layout bili-sub-vue-layout">
-                <BiliSubscriptionPlayer />
-                <BiliSubscriptionTranscript />
-              </div>
+              <div v-else-if="!organizer.subscriptionCurrent && !organizer.subscriptionChannels.length" class="fo-bili-empty">暂无正在播放的视频。</div>
+              <BiliSubscriptionPlayer v-else />
             </div>
           </section>
           <section v-else-if="organizer.mode === 'radio'" id="fo-vue-radio-main" class="fo-bili-main fo-vue-radio-main">
             <header class="fo-bili-hero fo-radio-hero">
               <div class="fo-hero-left">
-                <div class="fo-bili-cover fo-vue-radio-cover"><span>📻</span></div>
+                <div class="fo-bili-cover fo-vue-radio-cover" :class="{ spinning: radioTapeState.playing }"><span>📻</span></div>
                 <div class="fo-hero-folder-info">
-                  <h3>B站电台</h3>
-                  <p>从左侧选择收藏夹，将视频拖拽或添加到连播队列，自由编排系列随心听</p>
+                  <div class="fo-radio-title-line">
+                    <h3>B站电台</h3>
+                    <span v-if="radioTapeState.active" class="fo-radio-live-pill" :class="{ playing: radioTapeState.playing }">
+                      <i class="eq-bars" aria-hidden="true"><b /><b /><b /></i>
+                      <span>{{ radioTapeState.playing ? '正在播' : '已暂停' }} · {{ radioTapeState.title }}</span>
+                    </span>
+                  </div>
+                  <p>从左侧挑选收藏夹曲目，点击或拖拽装填进随身听连播队列，支持系列编排与跨刷新不断声</p>
                 </div>
               </div>
               <div class="fo-bili-actions">
-                <button type="button" @click="dispatch('organizer-open')">返回收藏夹</button>
+                <button type="button" @click="dispatch('organizer-open')">← 返回收藏夹</button>
               </div>
             </header>
             <div class="bili-radio-layout fo-vue-radio-layout">
@@ -1353,56 +1567,95 @@ function onRadioVideoDragStart(event: DragEvent, video: { bvid: string; title: s
                 </div>
               </aside>
               <section class="bili-radio-library">
-                <p id="bili-radio-library-title" class="sw-title">收藏夹视频</p>
+                <div class="bili-radio-library-head">
+                  <p id="bili-radio-library-title" class="sw-title">收藏夹视频</p>
+                  <div v-if="radioTotalPages > 1" class="bili-radio-lib-pager">
+                    <button type="button" :disabled="radioLibraryPage <= 1" aria-label="上一页" @click="radioLibraryPage--">‹</button>
+                    <span>{{ radioLibraryPage }} / {{ radioTotalPages }}</span>
+                    <button type="button" :disabled="radioLibraryPage >= radioTotalPages" aria-label="下一页" @click="radioLibraryPage++">›</button>
+                  </div>
+                </div>
                 <p v-if="biliFavoritesState.radioError" role="alert" class="muted small">{{ biliFavoritesState.radioError }}</p>
-                <div id="bili-radio-videos" class="bili-radio-videos">
-                  <button
-                    v-for="video in biliFavoritesState.radioVideos"
+                <div id="bili-radio-videos" class="bili-radio-videos two-col bili-radio-card-grid">
+                  <article
+                    v-for="video in pagedRadioVideos"
                     :key="video.bvid"
-                    type="button"
-                    class="bili-radio-video"
-                    :title="`${video.title} (点击加入连播队列，或按住拖拽封面到下方卡带机直接播放)`"
+                    class="fo-bili-card bili-radio-card"
+                    :class="{ 'in-queue': radioQueueBvidSet.has(video.bvid) }"
+                    :title="`${video.title} (点击或拖入右侧队列，点击 ♥ 喜欢)`"
                     draggable="true"
                     @dragstart="onRadioVideoDragStart($event, video)"
                     @click="dispatch('radio-add', { bvid: video.bvid, title: video.title, cover: video.cover, author: video.author, duration: video.duration })"
                   >
-                    <img v-if="video.cover" :src="video.cover" alt="" loading="lazy" referrerpolicy="no-referrer" />
-                    <span v-else></span>
-                    <p>{{ video.title }}</p>
-                    <span>＋</span>
-                  </button>
+                    <div class="fo-bili-thumb">
+                      <img v-if="video.cover" :src="video.cover" alt="" loading="lazy" referrerpolicy="no-referrer" />
+                      <span v-else class="bili-radio-cover-ph"></span>
+                      <span v-if="formatRadioDuration(video.duration)" class="fo-bili-duration">{{ formatRadioDuration(video.duration) }}</span>
+                    </div>
+                    <div class="bili-radio-card-body">
+                      <div class="fo-bili-title-row">
+                        <span class="fo-title-link fo-bili-title">{{ video.title }}</span>
+                        <button
+                          type="button"
+                          class="fo-card-more bili-radio-like-btn"
+                          :class="{ liked: biliRadioController.isLiked(video.bvid) }"
+                          :title="biliRadioController.isLiked(video.bvid) ? '取消喜欢' : '添加到我喜欢的电台'"
+                          :aria-label="biliRadioController.isLiked(video.bvid) ? '取消喜欢' : '喜欢'"
+                          @click.stop="void biliRadioController.toggleLike(video)"
+                        >
+                          {{ biliRadioController.isLiked(video.bvid) ? '♥' : '♡' }}
+                        </button>
+                      </div>
+                      <div class="fo-bili-meta">
+                        <span>{{ video.author || 'Bilibili' }}</span>
+                        <span v-if="radioQueueBvidSet.has(video.bvid)" class="bili-radio-in-queue-tag">✓ 已入队</span>
+                        <span v-else class="bili-radio-hint-add">+ 入队</span>
+                      </div>
+                    </div>
+                  </article>
                   <p v-if="!biliFavoritesState.radioVideos.length" class="muted small">{{ biliFavoritesState.radioLoading ? '读取视频中…' : '此收藏夹暂无可播放视频' }}</p>
                 </div>
               </section>
               <section class="bili-radio-editor">
                 <div class="bili-radio-name-row">
+                  <button
+                    type="button"
+                    class="bili-radio-liked-pill"
+                    title="一键载入「我喜欢的电台」到当前连播队列"
+                    @click="biliRadioController.openLikedSeries()"
+                  >
+                    <span class="heart">♥</span>
+                    <span>我喜欢的电台</span>
+                    <small>{{ likedRadioCount }}</small>
+                  </button>
                   <input
                     id="bili-radio-name"
                     v-model="biliFavoritesState.radioSeriesName"
                     maxlength="48"
                     :class="{ 'has-error': isSeriesNameError }"
-                    :placeholder="isSeriesNameError ? '⚠️ 请在此输入系列名称后再保存！' : '请输入系列名称（必填）'"
+                    :placeholder="isSeriesNameError ? '⚠️ 请输入歌单名称' : '歌单名称（可选）'"
                     autocomplete="off"
                     @input="isSeriesNameError = false"
                     @keydown.enter.prevent="handleSaveSeries"
                   />
-                  <!-- 操作按钮组：保存系列、重命名、分享到海狸聊天室 -->
                   <div class="bili-radio-btn-group">
                     <button
                       id="bili-radio-save"
                       type="button"
-                      title="保存当前队列为系列"
+                      title="保存当前队列"
                       @click="handleSaveSeries"
                     >
-                      💾 保存系列
+                      💾 保存
                     </button>
                     <button
-                      id="bili-radio-rename"
+                      v-if="activeRadioSeries"
                       type="button"
-                      title="重命名当前系列"
-                      @click="handleRenameCurrentSeries"
+                      class="bili-radio-del-btn"
+                      :class="{ confirming: pendingDeleteSeriesId === activeRadioSeries.id }"
+                      :title="pendingDeleteSeriesId === activeRadioSeries.id ? '再次点击确认删除当前歌单' : `删除歌单「${activeRadioSeries.name}」`"
+                      @click="handleDeleteSeriesClick(activeRadioSeries.id)"
                     >
-                      ✏️ 重命名
+                      {{ pendingDeleteSeriesId === activeRadioSeries.id ? '确认删除?' : '🗑️' }}
                     </button>
                     <ChatShareMenu
                       id="bili-radio-share"
@@ -1412,65 +1665,111 @@ function onRadioVideoDragStart(event: DragEvent, video: { bvid: string; title: s
                       @select="handleShareSeriesToRoom"
                     />
                   </div>
-                  <!-- 系列下拉快速切换选择框 (移动至最右侧，并在底部包含创建系列) -->
-                  <div class="bili-radio-series-dropdown-wrap">
-                    <select
-                      class="bili-radio-series-select"
-                      title="快速切换已保存的系列"
-                      @change="handleSeriesDropdownChange"
+                  <div ref="seriesMenuWrapEl" class="bili-radio-series-dropdown-wrap">
+                    <button
+                      type="button"
+                      class="bili-radio-series-trigger"
+                      :aria-expanded="seriesMenuOpen"
+                      title="切换或删除已保存的歌单"
+                      @click="seriesMenuOpen = !seriesMenuOpen"
                     >
-                      <option value="" disabled selected>
-                        {{ biliFavoritesState.radioSeries.length ? `📚 已保存系列 (${biliFavoritesState.radioSeries.length})` : '📚 暂无保存系列' }}
-                      </option>
-                      <option
-                        v-for="series in biliFavoritesState.radioSeries"
-                        :key="series.id"
-                        :value="series.id"
-                      >
-                        {{ series.name }} ({{ series.count }}首)
-                      </option>
-                      <option value="__create_new__" class="bili-radio-create-opt">
-                        ＋ 创建系列
-                      </option>
-                    </select>
+                      <span>{{ biliFavoritesState.radioSeries.length ? `📚 歌单 (${biliFavoritesState.radioSeries.length})` : '📚 暂无歌单' }}</span>
+                      <span class="caret">▾</span>
+                    </button>
+                    <div v-if="seriesMenuOpen" class="bili-radio-series-popover" role="menu">
+                      <button type="button" class="bili-radio-series-new" @click="handleStartNewSeries">
+                        ＋ 新建空白歌单
+                      </button>
+                      <div v-if="biliFavoritesState.radioSeries.length" class="bili-radio-series-list">
+                        <div
+                          v-for="series in biliFavoritesState.radioSeries"
+                          :key="series.id"
+                          class="bili-radio-series-item"
+                          :class="{ active: activeRadioSeries?.id === series.id }"
+                        >
+                          <button
+                            type="button"
+                            class="bili-radio-series-pick"
+                            @click="handleSelectSeries(series.id)"
+                          >
+                            <span class="name">{{ series.name }}</span>
+                            <small>{{ series.count }}首</small>
+                          </button>
+                          <button
+                            type="button"
+                            class="bili-radio-series-del"
+                            :class="{ confirming: pendingDeleteSeriesId === series.id }"
+                            :title="pendingDeleteSeriesId === series.id ? '再次点击确认删除' : `删除歌单「${series.name}」`"
+                            @click.stop="handleDeleteSeriesClick(series.id)"
+                          >
+                            {{ pendingDeleteSeriesId === series.id ? '确认?' : '🗑️' }}
+                          </button>
+                        </div>
+                      </div>
+                      <p v-else class="muted small bili-radio-series-empty">还没有保存过歌单</p>
+                    </div>
+                  </div>
+                  <div v-if="radioQueueTotalPages > 1" class="bili-radio-lib-pager">
+                    <button type="button" :disabled="radioQueuePage <= 1" aria-label="队列上一页" @click="radioQueuePage--">‹</button>
+                    <span>{{ radioQueuePage }} / {{ radioQueueTotalPages }}</span>
+                    <button type="button" :disabled="radioQueuePage >= radioQueueTotalPages" aria-label="队列下一页" @click="radioQueuePage++">›</button>
                   </div>
                 </div>
-                <div id="bili-radio-queue" class="bili-radio-queue" aria-label="电台播放队列">
-                  <div
-                    v-for="(item, index) in biliFavoritesState.radioQueue"
+                <div
+                  id="bili-radio-queue"
+                  class="bili-radio-queue two-col bili-radio-card-grid"
+                  :class="{ over: isRadioQueueDragOver }"
+                  aria-label="电台播放队列"
+                  @dragover.prevent="onRadioQueueDragOver"
+                  @dragleave="onRadioQueueDragLeave"
+                  @drop.prevent="onRadioQueueDrop"
+                >
+                  <article
+                    v-for="{ item, index } in pagedRadioQueue"
                     :key="`${item.bvid}-${index}`"
-                    class="bili-radio-queue-item"
+                    class="fo-bili-card bili-radio-card bili-radio-queue-card"
                     :class="{ 'is-playing': radioTapeState.active && radioTapeState.trackIndex === index + 1 }"
                     title="点击立即从该曲目开始播放"
                     @click="dispatch('radio-play-index', index)"
                   >
-                    <span class="bili-radio-queue-no">{{ radioTapeState.active && radioTapeState.trackIndex === index + 1 ? '♪' : index + 1 }}</span>
-                    <img v-if="item.cover" :src="item.cover" alt="" loading="lazy" referrerpolicy="no-referrer" />
-                    <span v-else></span>
-                    <p>{{ item.title }}</p>
-                    <button type="button" class="bili-radio-remove" :aria-label="`移除 ${item.title}`" @click.stop="dispatch('radio-remove', { index })">×</button>
-                  </div>
-                  <p v-if="!biliFavoritesState.radioQueue.length" class="muted small">点击左侧视频加入连播队列。</p>
+                    <div class="fo-bili-thumb">
+                      <img v-if="item.cover" :src="item.cover" alt="" loading="lazy" referrerpolicy="no-referrer" />
+                      <span v-else class="bili-radio-cover-ph"></span>
+                      <span class="bili-radio-queue-badge">{{ radioTapeState.active && radioTapeState.trackIndex === index + 1 ? '♪ 播放中' : `#${index + 1}` }}</span>
+                      <button type="button" class="bili-radio-card-remove" :aria-label="`移除 ${item.title}`" title="从队列移除" @click.stop="dispatch('radio-remove', { index })">×</button>
+                      <span v-if="formatRadioDuration(item.duration)" class="fo-bili-duration">{{ formatRadioDuration(item.duration) }}</span>
+                    </div>
+                    <div class="bili-radio-card-body">
+                      <div class="fo-bili-title-row">
+                        <span class="fo-title-link fo-bili-title">{{ item.title }}</span>
+                        <button
+                          type="button"
+                          class="fo-card-more bili-radio-like-btn"
+                          :class="{ liked: biliRadioController.isLiked(item.bvid) }"
+                          :title="biliRadioController.isLiked(item.bvid) ? '取消喜欢' : '添加到我喜欢的电台'"
+                          @click.stop="void biliRadioController.toggleLike(item)"
+                        >
+                          {{ biliRadioController.isLiked(item.bvid) ? '♥' : '♡' }}
+                        </button>
+                      </div>
+                      <div class="fo-bili-meta">
+                        <span>{{ item.author || 'Bilibili' }}</span>
+                      </div>
+                    </div>
+                  </article>
+                  <p v-if="!biliFavoritesState.radioQueue.length" class="muted small bili-radio-queue-empty">点击或直接从左侧拖入视频到此处，即可连播。</p>
                 </div>
                 <div class="bili-radio-actions">
                   <button id="bili-radio-play" type="button" :disabled="!biliFavoritesState.radioQueue.length" @click="dispatch('radio-play')">▶ 按顺序播放</button>
                   <button id="bili-radio-shuffle" type="button" :disabled="!biliFavoritesState.radioQueue.length" @click="dispatch('radio-shuffle')">🔀 随机播放</button>
-                  <button id="bili-radio-clear" type="button" @click="dispatch('radio-clear')">清空编辑区</button>
+                  <button id="bili-radio-clear" type="button" @click="radioQueuePage = 1; dispatch('radio-clear')">清空编辑区</button>
                 </div>
               </section>
             </div>
-            <!-- 非全屏卡片时保留在电台编辑区下方 -->
-            <BiliRadioTapePlayer v-if="!(isStandalone || fullscreenCardState.activeId === 'daily-bilibili')" />
           </section>
         </div>
       </div>
     </div>
-
-    <!-- 🌟 B站全屏插件左下角常驻磁带机（停靠在底部 Mac Dock 的左侧，图 2 样式保持稳定） -->
-    <BiliRadioTapePlayer
-      v-if="isStandalone || fullscreenCardState.activeId === 'daily-bilibili'"
-      dock-side
-    />
 
     <!-- 兼容性保留占位节点，避免第三方脚本找不到 ID，内部不再重复实例化 BiliSubscriptionPlayer -->
     <div class="fm-pane" id="pane-sub-video" hidden style="display:none !important;"></div>

@@ -2,6 +2,7 @@
 import { ref, computed, watch, nextTick, onMounted, onUnmounted } from "vue";
 import { subtitleModalState as state, subtitleModalController as controller } from "./subtitle-modal-store";
 import { biliMiniPlayerState } from "./mini-player-store";
+import { createSubtitleFollow } from "./subtitle-follow";
 
 const windowRef = ref<HTMLElement | null>(null);
 const pos = ref<{ x: number; y: number } | null>(null);
@@ -43,17 +44,16 @@ function formatTime(seconds: number): string {
 }
 
 const activeCueEl = ref<HTMLElement | null>(null);
+const cuesList = ref<HTMLElement | null>(null);
+const subtitleFollow = createSubtitleFollow(() => cuesList.value, () => activeCueEl.value);
 
 function scrollToActiveCue(smooth = true) {
-  nextTick(() => {
-    if (activeCueEl.value) {
-      activeCueEl.value.scrollIntoView({
-        behavior: smooth ? "smooth" : "auto",
-        block: "center"
-      });
-    }
-  });
+  void nextTick(() => subtitleFollow.follow(smooth));
 }
+
+watch(activeCueIndex, () => {
+  if (state.isOpen) scrollToActiveCue();
+});
 
 function seekVideo(seconds: number) {
   const video = document.querySelector(".bili-mini-screen video, .bili-sub-screen video") as HTMLVideoElement | null;
@@ -72,6 +72,7 @@ watch(() => state.isOpen, (open) => {
       scrollToActiveCue(false);
     }, 120);
   } else {
+    subtitleFollow.reset();
     if (timeTrackerTimer) {
       clearInterval(timeTrackerTimer);
       timeTrackerTimer = null;
@@ -140,6 +141,8 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
+  subtitleFollow.reset();
+  if (timeTrackerTimer) clearInterval(timeTrackerTimer);
   window.removeEventListener("keydown", handleKeydown);
   window.removeEventListener("pointerdown", handleGlobalPointerDown, true);
 });
@@ -201,7 +204,8 @@ onUnmounted(() => {
             <p>{{ state.error }}</p>
           </div>
           <!-- 🌟 结构化时间轴字幕列表：当前 0:20 等台词突出高亮（蓝色背景 + 黑色加粗） -->
-          <div v-else-if="state.cues.length" class="bili-sub-cues-list">
+          <div v-else-if="state.cues.length" ref="cuesList" class="bili-sub-cues-list" tabindex="0"
+            @wheel.passive="subtitleFollow.interact" @pointerdown="subtitleFollow.pointerDown" @keydown="subtitleFollow.keyDown">
             <div
               v-for="(cue, idx) in state.cues"
               :key="idx"

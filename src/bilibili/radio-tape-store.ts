@@ -1,4 +1,5 @@
 import { reactive, readonly, type DeepReadonly } from "vue";
+import { canUseOffscreenAudio, sendAudioCommand } from "../offscreen/audio-client";
 
 export interface BiliRadioTapeState {
   active: boolean;
@@ -131,6 +132,7 @@ export const radioTapeController: RadioTapeController = {
     try {
       localStorage.setItem("bili_radio_mode", next);
     } catch {}
+    if (canUseOffscreenAudio()) void sendAudioCommand("bili", "set-mode", { mode: next });
   },
   seek(percent) {
     const player = (window as any).LogicWeaverBiliRadioPlayer;

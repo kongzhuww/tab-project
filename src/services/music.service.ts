@@ -5,6 +5,13 @@
 
 import type { MusicSong, MusicAlbum, PlayMode } from "../music/store";
 import { neteaseService } from "./netease.service";
+import {
+  canUseOffscreenAudio,
+  fetchOffscreenAudioState,
+  sendAudioCommand,
+  subscribeOffscreenAudioState,
+} from "../offscreen/audio-client";
+import type { OffscreenMusicState } from "../offscreen/audio-protocol";
 
 declare const chrome: any;
 
@@ -77,13 +84,28 @@ export class MusicService {
   private albumCoverMap: Map<string, string> = new Map();
 
   private constructor() {
-    if (typeof window !== "undefined" && typeof Audio !== "undefined") {
+    if (canUseOffscreenAudio()) {
+      subscribeOffscreenAudioState((source, remote) => {
+        if (source === "music") this.applyOffscreenState(remote as OffscreenMusicState);
+      });
+      void fetchOffscreenAudioState().then((snapshot) => {
+        if (snapshot?.music) this.applyOffscreenState(snapshot.music);
+      });
+    } else if (typeof window !== "undefined" && typeof Audio !== "undefined") {
       this.audio = new Audio();
       this.audio.crossOrigin = "anonymous";
       this.audio.preload = "none";
       this.bindAudioEvents();
     }
     this.initStorage();
+    if (typeof chrome !== 'undefined' && chrome.storage?.onChanged) {
+      chrome.storage.onChanged.addListener((changes: Record<string, any>, area: string) => {
+        if (area !== 'local' || !changes[MUSIC_FAV_KEY]) return;
+        const next = changes[MUSIC_FAV_KEY].newValue;
+        this.favorites = next && typeof next === 'object' && !Array.isArray(next) ? next : {};
+        this.notify();
+      });
+    }
   }
 
   public static getInstance(): MusicService {
@@ -263,8 +285,21 @@ export class MusicService {
   // ==========================================================================
   // 回放控制
   // ==========================================================================
+  private applyOffscreenState(remote: OffscreenMusicState): void {
+    this.state.playing = Boolean(remote.playing);
+    this.state.currentSong = remote.currentSong;
+    this.state.currentTime = Number(remote.currentTime) || 0;
+    this.state.duration = Number(remote.duration) || 0;
+    this.state.mode = remote.mode || this.state.mode;
+    this.state.queue = Array.isArray(remote.queue) ? remote.queue : [];
+    this.state.queueIndex = typeof remote.queueIndex === "number" ? remote.queueIndex : -1;
+    this.state.currentLyric = remote.currentLyric || "";
+    this.notify();
+  }
+
   public async playSong(song: MusicSong, options: MusicPlayOptions = {}): Promise<boolean> {
-    if (!this.audio || options.isCurrent?.() === false) return false;
+    const useOffscreen = canUseOffscreenAudio();
+    if ((!useOffscreen && !this.audio) || options.isCurrent?.() === false) return false;
     const version = ++this.playVersion;
     const current = () => version === this.playVersion && options.isCurrent?.() !== false;
 
@@ -288,7 +323,11 @@ export class MusicService {
       if (song.isNetease && song.neteaseId) {
         // 网易云音乐 URL 获取：优先通过 NeteaseService 获取，带外链兜底
         void neteaseService.getSongLyric(song.neteaseId).then(raw => {
-          if (current()) { this.setLyrics(raw); this.notify(); }
+          if (current()) {
+            this.setLyrics(raw);
+            this.notify();
+            if (useOffscreen) void sendAudioCommand("music", "set-lyrics", { lyrics: this.lyrics });
+          }
         });
         playUrl = await neteaseService.getSongAudioUrl(song.neteaseId);
       } else {
@@ -296,7 +335,11 @@ export class MusicService {
         const detail = await this.getSirenSongUrl(song.cid);
         if (detail.lyricUrl) {
           void fetch(detail.lyricUrl).then(res => res.ok ? res.text() : '').then(raw => {
-            if (current()) { this.setLyrics(raw); this.notify(); }
+            if (current()) {
+              this.setLyrics(raw);
+              this.notify();
+              if (useOffscreen) void sendAudioCommand("music", "set-lyrics", { lyrics: this.lyrics });
+            }
           }).catch(() => {});
         }
         playUrl = detail.sourceUrl;
@@ -304,10 +347,25 @@ export class MusicService {
 
       if (!current()) return false;
       if (playUrl) {
-        this.audio.src = playUrl;
-        if (options.autoplay !== false) await this.audio.play();
+        if (useOffscreen) {
+          await sendAudioCommand("music", "play-url", {
+            song,
+            url: playUrl,
+            lyrics: this.lyrics,
+            queue: this.state.queue,
+            queueIndex: this.state.queueIndex,
+            mode: this.state.mode,
+            autoplay: options.autoplay !== false,
+          });
+          if (!current()) return false;
+          this.state.playing = options.autoplay !== false;
+          this.notify();
+          return true;
+        }
+        this.audio!.src = playUrl;
+        if (options.autoplay !== false) await this.audio!.play();
         if (!current()) return false;
-        this.state.playing = !this.audio.paused;
+        this.state.playing = !this.audio!.paused;
         this.notify();
         return true;
       }
@@ -327,6 +385,10 @@ export class MusicService {
   }
 
   public togglePlay(): void {
+    if (canUseOffscreenAudio()) {
+      void sendAudioCommand("music", "toggle");
+      return;
+    }
     if (!this.audio) return;
     if (this.state.playing) {
       this.audio.pause();
@@ -336,6 +398,10 @@ export class MusicService {
   }
 
   public seek(percent: number): void {
+    if (canUseOffscreenAudio()) {
+      void sendAudioCommand("music", "seek", { percent });
+      return;
+    }
     if (!this.audio || !this.audio.duration) return;
     const target = (Math.max(0, Math.min(100, percent)) / 100) * this.audio.duration;
     this.audio.currentTime = target;
@@ -343,6 +409,7 @@ export class MusicService {
 
   public setPlayMode(mode: PlayMode): void {
     this.state.mode = mode;
+    if (canUseOffscreenAudio()) void sendAudioCommand("music", "set-mode", { mode });
     this.notify();
   }
 
@@ -379,6 +446,9 @@ export class MusicService {
   public setQueue(songs: MusicSong[], startIndex = -1, autoPlay = false): void {
     this.state.queue = [...songs];
     this.state.queueIndex = startIndex;
+    if (canUseOffscreenAudio()) {
+      void sendAudioCommand("music", "set-queue", { queue: this.state.queue, queueIndex: startIndex });
+    }
     if (startIndex >= 0 && songs[startIndex]) {
       this.state.currentSong = songs[startIndex];
       this.notify();

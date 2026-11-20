@@ -28,7 +28,7 @@ test('every reviewed API permission still has a source usage', async () => {
     declarativeNetRequest: 'declarativeNetRequest', identity: 'chrome.identity',
     scripting: 'chrome.scripting', notifications: 'chrome.notifications',
     downloads: 'downloads.download', contextMenus: 'chrome.contextMenus', clipboardWrite: 'clipboard.write',
-    nativeMessaging: 'sendNativeMessage',
+    nativeMessaging: 'sendNativeMessage', offscreen: 'chrome.offscreen',
   };
   for (const permission of manifest.permissions) {
     assert.ok(evidence[permission], 'Missing evidence mapping for ' + permission);

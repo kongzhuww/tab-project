@@ -459,7 +459,7 @@ export class TodoistService {
   public async loadWorkspaceData(
     view: "inbox" | "today" | "projects" = "inbox",
     targetProjectId?: string,
-    _force = false,
+    force = false,
     signal?: AbortSignal
   ): Promise<TodoistWorkspaceData> {
     await this.initToken();
@@ -468,6 +468,14 @@ export class TodoistService {
       const cached = await this.getCachedWorkspaceData(view, targetProjectId);
       signal?.throwIfAborted();
       return cached || { columns: [], projects: [], activeProjectId: "", activeProjectName: "", availableLabels: [] };
+    }
+    if (!force && !this.workspaceCacheInvalidated) {
+      const key = this.getWorkspaceCacheKey(view, targetProjectId);
+      const cached = await this.getCachedWorkspaceData(view, targetProjectId);
+      const mem = this.workspaceMemoryCache.get(key);
+      if (cached && cached.columns?.length && mem && Date.now() - mem.timestamp < 3 * 60 * 1000) {
+        return cached;
+      }
     }
     // The window already paints its cloned cache. No detached SWR callback may write its store.
     return this.fetchWorkspaceDataOnline(view, targetProjectId, signal);

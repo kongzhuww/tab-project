@@ -24,6 +24,12 @@ export function mergeSyncSettings(
     }
   }
 
+  for (const key of ['lw-rss-channels-v1', 'msFavoriteSongs', 'digitalEmployeesV1']) {
+    if (loc[key] !== undefined && rem[key] !== undefined && JSON.stringify(loc[key]) !== JSON.stringify(rem[key])) {
+      throw new Error('本机和云端的 RSS 订阅、音乐收藏或数字员工不同，请先选择要保留的数据。');
+    }
+  }
+
   // Discard data from the removed module even when merging legacy backups.
   delete merged.youtubeFavoritesV1;
   delete merged.youtubeFavGroupsV1;

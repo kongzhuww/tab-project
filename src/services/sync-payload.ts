@@ -15,14 +15,15 @@ const arrayKeys = new Set([
   "foCollapsedGroupsV1", "biliFollowingGroupsV1", "biliSubCustomChannelsV1", "biliRadioSeriesV1",
   "gh_my_repo_groups_v2", "heroBackgroundHistory",
   "logicweaver_prompt_backpack_v1", "logicweaver_prompt_backpack_categories_v1",
-  "logicweaver_saved_articles_v1", "logicweaver_saved_article_categories_v1"
+  "logicweaver_saved_articles_v1", "logicweaver_saved_article_categories_v1",
+  "lw-rss-channels-v1", "digitalEmployeesV1"
 ]);
 const objectKeys = new Set([
   "customShortcuts", "launcherFolders", "quickLinkGroupSizes",
   "launcherPageLabels", "launcherFolderPositionV1",
   "foTree", "ghRepoRemarksV1", "ghLocalStarGroupsV1",
   "lw_private_chat_v1", "lw_webdav_config", "googleCalendarSessionTokenV1",
-  "gh_my_repo_groups_map_v2"
+  "gh_my_repo_groups_map_v2", "msFavoriteSongs"
 ]);
 
 export function isRecord(value: unknown): value is Record<string, unknown> {
@@ -116,7 +117,7 @@ export function selectSyncSettings(data: unknown, keys: readonly string[]): Sync
       selected[key] = value;
     } catch (err) {
       // 如果本地或远端某单个历史配置项格式不合规（如残留的旧版本缓存或空字符串），跳过该脏字段，绝不因单个脏字段导致整个备份崩溃！
-      if (["logicweaver_prompt_backpack_v1", "logicweaver_prompt_backpack_categories_v1", "logicweaver_saved_articles_v1", "logicweaver_saved_article_categories_v1"].includes(key)) {
+      if (["logicweaver_prompt_backpack_v1", "logicweaver_prompt_backpack_categories_v1", "logicweaver_saved_articles_v1", "logicweaver_saved_article_categories_v1", "lw-rss-channels-v1", "msFavoriteSongs", "digitalEmployeesV1"].includes(key)) {
         throw new SyncBackupError(`收藏或背包数据 ${key} 格式无效；未生成不完整的备份`);
       }
       console.warn(`[SyncPayload] 跳过格式不匹配的配置项 "${key}":`, err);

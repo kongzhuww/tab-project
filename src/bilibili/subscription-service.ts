@@ -199,7 +199,7 @@ export class BiliSubscriptionCoordinator {
     biliFavoritesController.updateOrganizer({
       subscriptionTitle: String(channel?.fallbackName || channel?.title || "订阅视频"),
       subscriptionSubtitle: "订阅视频 · AI 逐字字幕稿 · 点击台词即刻跳转播放",
-      subscriptionScriptMode: localStorage.getItem("biliSubScriptMode") === "lyrics" ? "lyrics" : "newspaper",
+      subscriptionScriptMode: "lyrics",
       subscriptionChannels: Object.entries(this.subChannels).map(([id, item]) => ({
         id,
         name: String(item.fallbackName || item.title || id),
@@ -265,28 +265,17 @@ export class BiliSubscriptionCoordinator {
 
   public async copyActiveSubscriptionScript(): Promise<void> {
     const doc = this.getActiveSubscriptionDocument();
-    if (!doc) {
-      notifyToast("当前没有可复制的字幕稿");
-      return;
-    }
-    const mode = localStorage.getItem("biliSubScriptMode") || "newspaper";
-    const chapters = this.extractChapters(doc);
-    const text =
-      mode === "newspaper" && chapters.length
-        ? chapters
-            .map(
-              (chapter, index) =>
-                `【第 ${String(index + 1).padStart(2, "0")} 节 · ${chapter.title}】(⏱ ${formatSrtTime(chapter.from)} - ${formatSrtTime(chapter.to)})\n${(chapter.paragraphs || []).join("\n\n")}`
-            )
-            .join("\n\n")
-        : String(doc.text || doc.cues?.map((cue) => cue.content).filter(Boolean).join("\n") || "").trim();
+    const orgCues = biliFavoritesController.state.organizer.subscriptionCues || [];
+    const text = doc
+      ? String(doc.text || doc.cues?.map((cue) => cue.content).filter(Boolean).join("\n") || "").trim()
+      : orgCues.map((cue) => cue.content).filter(Boolean).join("\n").trim();
     if (!text) {
       notifyToast("当前视频暂无可复制的字幕稿");
       return;
     }
     try {
       await navigator.clipboard.writeText(text);
-      notifyToast(mode === "newspaper" ? "报纸分段稿已复制" : "字幕稿已复制为纯文本");
+      notifyToast("字幕稿已复制为纯文本");
     } catch {
       notifyToast("复制失败，请检查剪贴板权限");
     }

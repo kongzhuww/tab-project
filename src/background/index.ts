@@ -268,11 +268,136 @@ chrome.contextMenus?.onClicked?.addListener?.(async (info: any) => {
   }
 });
 
+const OFFSCREEN_AUDIO_PATH = "offscreen-audio.html";
+const OFFSCREEN_CLOSE_GRACE_MS = 1800;
+let creatingOffscreenAudio: Promise<void> | null = null;
+const activeAudioClients = new Set<any>();
+let audioStopGraceTimer: ReturnType<typeof setTimeout> | null = null;
+
+function cancelAudioStopGraceTimer(): void {
+  if (audioStopGraceTimer !== null) {
+    clearTimeout(audioStopGraceTimer);
+    audioStopGraceTimer = null;
+  }
+}
+
+async function stopAndCloseOffscreenAudio(): Promise<void> {
+  if (!(await hasOffscreenAudioDocument())) return;
+  try {
+    await Promise.all([
+      new Promise<void>((resolve) => {
+        chrome.runtime.sendMessage({ type: "offscreen-audio:command", target: "music", action: "pause" }, () => resolve());
+      }),
+      new Promise<void>((resolve) => {
+        chrome.runtime.sendMessage({ type: "offscreen-audio:command", target: "bili", action: "pause" }, () => resolve());
+      }),
+    ]);
+  } catch {}
+  try {
+    if (typeof chrome.offscreen?.closeDocument === "function") {
+      await chrome.offscreen.closeDocument();
+    }
+  } catch {}
+}
+
+chrome.runtime.onConnect?.addListener?.((port: any) => {
+  if (port?.name !== "offscreen-audio-keepalive") return;
+  cancelAudioStopGraceTimer();
+  activeAudioClients.add(port);
+  port.onDisconnect?.addListener?.(() => {
+    activeAudioClients.delete(port);
+    if (activeAudioClients.size > 0) return;
+    cancelAudioStopGraceTimer();
+    audioStopGraceTimer = setTimeout(() => {
+      audioStopGraceTimer = null;
+      if (activeAudioClients.size === 0) {
+        void stopAndCloseOffscreenAudio();
+      }
+    }, OFFSCREEN_CLOSE_GRACE_MS);
+  });
+});
+
+async function hasOffscreenAudioDocument(): Promise<boolean> {
+  if (typeof chrome.runtime?.getContexts === "function") {
+    const offscreenUrl = chrome.runtime.getURL(OFFSCREEN_AUDIO_PATH);
+    const contexts = await chrome.runtime.getContexts({
+      contextTypes: ["OFFSCREEN_DOCUMENT"],
+      documentUrls: [offscreenUrl],
+    });
+    return contexts.length > 0;
+  }
+  return false;
+}
+
+async function ensureOffscreenAudioDocument(): Promise<void> {
+  if (await hasOffscreenAudioDocument()) return;
+  if (creatingOffscreenAudio) {
+    await creatingOffscreenAudio;
+    return;
+  }
+  creatingOffscreenAudio = chrome.offscreen
+    .createDocument({
+      url: OFFSCREEN_AUDIO_PATH,
+      reasons: ["AUDIO_PLAYBACK"],
+      justification: "Keep music and Bilibili radio playing seamlessly across page refreshes",
+    })
+    .finally(() => {
+      creatingOffscreenAudio = null;
+    });
+  await creatingOffscreenAudio;
+}
+
 // 2. 统一全局消息分发路由
 chrome.runtime.onMessage.addListener((message: any, sender: any, sendResponse: (res: any) => void) => {
+  // 0. Offscreen 后台音频桥接（跨刷新不断声）
+  if (message?.type === "audio-bg:get-state") {
+    (async () => {
+      if (!(await hasOffscreenAudioDocument())) {
+        return { ok: true, music: null, bili: null };
+      }
+      return new Promise((resolve) => {
+        chrome.runtime.sendMessage({ type: "offscreen-audio:get-state" }, (reply: any) => {
+          if (chrome.runtime?.lastError || !reply?.ok) {
+            resolve({ ok: true, music: null, bili: null });
+            return;
+          }
+          resolve(reply);
+        });
+      });
+    })()
+      .then(sendResponse)
+      .catch(() => sendResponse({ ok: true, music: null, bili: null }));
+    return true;
+  }
+
+  if (message?.type === "audio-bg:command") {
+    (async () => {
+      await ensureOffscreenAudioDocument();
+      return new Promise((resolve) => {
+        chrome.runtime.sendMessage(
+          {
+            type: "offscreen-audio:command",
+            target: message.target,
+            action: message.action,
+            payload: message.payload,
+          },
+          (reply: any) => {
+            if (chrome.runtime?.lastError) {
+              resolve({ ok: false });
+              return;
+            }
+            resolve(reply || { ok: true });
+          }
+        );
+      });
+    })()
+      .then(sendResponse)
+      .catch(() => sendResponse({ ok: false }));
+    return true;
+  }
   // A. 新标签页智能单例去重
   if (message?.type === "routeNewTab") {
-    routeNewTab(sendResponse);
+    routeNewTab(sendResponse, sender.tab?.id);
     return true;
   }
 
