@@ -20,117 +20,75 @@
   <a href="https://microsoftedge.microsoft.com/addons/detail/tabproject-%E6%96%B0%E6%A0%87%E7%AD%BE%E9%A1%B5/dbkaiojfbolnkpaegflocfbdgpmhjcco"><strong>Edge 商店安装</strong></a> ·
   <a href="https://github.com/kongzhuww/tab-project/releases/latest">Release 下载</a> ·
   <a href="CHANGELOG.md">更新日志</a> ·
-  <a href="#快速指引如何选择适合你的路径">快速起步</a> ·
   <a href="#安装">安装指南</a> ·
   <a href="#开发">开发说明</a>
 </p>
 
-> **核心定位**：tab-project 是一个基于 **Vue 3、TypeScript 和 Chromium Manifest V3** 的浏览器新标签页工作台（面向 Chrome / Edge）。它优先解决**常用网站、书签看板、日常任务和多媒体工具分散在多个页面**的割裂痛点，在一个清爽、自适应主题的统一界面中聚合高频工作流。
+> **核心定位**：`tab-project` 是一个基于 **Vue 3、TypeScript、Rust WebAssembly 与 Chromium Manifest V3** 的桌面浏览器新标签页工作台（面向 Chrome / Edge）。它把常用网站、书签看板、极速搜索、Todoist、GitHub、B 站电台与小窗、音乐播放以及 AI 工作区聚合在同一个自适应主题界面中。
 
-> **已双端上架官方应用商店**：
-> - **Chrome 网上应用店**：[安装 tab-project 新标签页](https://chromewebstore.google.com/detail/tab-project-%E6%96%B0%E6%A0%87%E7%AD%BE%E9%A1%B5/hogpkihhicjhiakkgjkbchpdoicmbolj)（ID: `hogpkihhicjhiakkgjkbchpdoicmbolj`）
-> - **Microsoft Edge 加载项商店**：[安装 tab-project 新标签页](https://microsoftedge.microsoft.com/addons/detail/tabproject-%E6%96%B0%E6%A0%87%E7%AD%BE%E9%A1%B5/dbkaiojfbolnkpaegflocfbdgpmhjcco)
->
-> 商店安装由浏览器官方托管安全检查与自动更新，无需开启开发者模式。每次新版本仍需单独提交各商店审核，GitHub 提交或 Release 与商店版可能存在发布时间差。
-
-> **仓库版本**：**1.0.27**。本版优化 B 站电台卡片、收藏与播放器体验，新增工作区独立壁纸、找网站数字员工与多项缓存及状态恢复能力。商店版本以商店页面及实际安装版本为准，可能与 GitHub Release 存在时间差。详见 [更新日志](CHANGELOG.md)。
+> **仓库版本**：**1.0.27**。本版带来全新两列 7 行紧凑 B 站电台卡片与歌单管理、工作区独立壁纸、找网站数字员工、RSS 订阅与二级视图刷新保留等能力。商店版本由平台审核自动更新，可能与 GitHub 主分支源码存在发布时间差。详见 [更新日志](CHANGELOG.md)。
 
 ## 反馈与更新
 
 [报告问题](https://github.com/kongzhuww/tab-project/issues/new?template=bug_report.yml) · [功能建议](https://github.com/kongzhuww/tab-project/issues/new?template=feature_request.yml) · [使用交流](https://github.com/kongzhuww/tab-project/discussions) · [版本更新](https://github.com/kongzhuww/tab-project/releases)
 
-反馈时请填写实际安装版本、浏览器版本与复现步骤；截图请先遮挡私人信息，勿提交 Token、Cookie 或密钥。商店安装会由 Edge 检查并获取已审核上线的更新；想收到 GitHub 发行通知，可在仓库 **Watch → Custom → Releases** 中订阅。
+反馈问题时请附上实际版本、浏览器版本与复现步骤；截图前请先遮挡个人隐私，切勿公开 Token、Cookie 或密钥。
 
-## 核心功能概览与状态分级
+---
 
-| 能力 / 模块 | 核心功能 | 状态分级 | 使用条件与说明 |
-| :--- | :--- | :--- | :--- |
-| **动态壁纸与Steam工坊** | 纯浏览器 Wallpaper Engine 运行时、OPFS 私有缓存 0 弹窗秒开、本地 Steam 创意工坊 (431960) 智能扫描、4K 视频/Web 交互/Scene 一键应用、128 位对数音频频谱律动、5 项 Mac 视网膜与 120Hz 高刷降温守护 | **默认可用** | 浏览器本地 OPFS 存储，支持直接关联 Steam 工坊或自定义本地壁纸目录 |
-| **常用网站与大文件夹** | 多分组工作区、大文件夹（2x2）、拖拽重排、内联快速编辑标题与网址 | **默认可用** | 浏览器本地存储，基础功能完全离线可用 |
-| **书签看板与检索** | 平铺展示浏览器书签、文件夹层级穿梭、拖拽管理、Worker 离线拼音/模糊检索 | **默认可用** | 需要浏览器书签读取权限，不修改未操作数据 |
-| **多引擎聚合搜索** | 普通关键词合并匹配历史、书签与常用网站；支持 `/bm` 与 `/sites` 过滤；集成 GitHub、B站、网易云、企查查 | **默认可用** | 离线优先联想，提交时直达对应官网搜索引擎 |
-| **首屏时钟、标语与天气** | 3D 大时钟与时区切换、6 款精选个性配色即选即显、柔和立体投影、个性标语滚轮切换、Open-Meteo 实时气温与天气 | **默认可用** | 天气通过浏览器直接向 Open-Meteo 发送只读请求，时钟支持右键菜单个性化配置 |
-| **B站插件、电台与字幕流** | 双栏收藏夹整理、时间轴高亮字幕提取与点击跳转播放、悬浮台词胶囊栏拖拽、DASH 纯音频电台（~3MB）与卡顿自动切源 | **可选模块** | 基础浏览无需登录；读取个人收藏与关注需在同一浏览器登录 B站 |
-| **GitHub 工作区** | Star 仓库分类与多规则检索、开阔式 Markdown README 阅读、一键关联待办 | **可选模块** | 基础查看无需鉴权；深度查询与关联任务需配置个人 GitHub Token |
-| **Todoist 任务看板** | 0ms 离线直出、GitHub 关联仓库自动分层排版、任务日历与跨页面缓存实时失效 | **可选模块** | 需在设置中填写 Todoist API Token |
-| **音乐工作区** | 网易云官网会话直连登录、塞壬唱片专辑库、首屏 3D 旋转唱片机与实时台词同步 | **可选模块** | 塞壬唱片默认可用；网易云需先在同一浏览器官网登录再点击连接 |
-| **资讯与 RSS** | 默认接入 AIHOT 精选资讯、榜单和日报；可添加 RSS / Atom 频道并打开原文 | **可选模块** | 在精选资讯中选择或添加频道 |
-| **AI 工作区 · 库** | 保存和分类提示词、管理变量、文章与表情包，支持复制和备份 | **可选模块** | 沿用背包的本机数据；未启用 AI 工作区时仍保留旧背包入口 |
-| **AI 工作区 · 已安排** | Multica／DeepSeek 对话、定时任务和完成提醒 | **可选模块** | 需自行配置服务；定时行为和限制见 [使用说明](docs/AI_WORKSPACE_SCHEDULING.md) |
+## 核心功能概览
 
-### 可选组件与扩展服务
+| 模块 | 核心能力 | 使用条件与说明 |
+| :--- | :--- | :--- |
+| **动态壁纸与工坊** | 纯浏览器 Wallpaper Engine 运行时（OPFS 私有缓存秒开、Steam 创意工坊 `431960` 扫描、4K 视频 / Web / Scene 一键应用、128 位对数音频频谱）、5 项高刷/视网膜屏降温守护、**支持各工作区独立设置壁纸** | 默认可用；支持关联本地 Steam 工坊目录或自定义目录 |
+| **常用网站与书签看板** | 多分组常用网站、`2×2` 大文件夹、拖拽排序与整理专员建议；浏览器书签平铺展示、层级穿梭与 WebAssembly / Worker 离线拼音模糊搜索 | 默认可用；书签功能需授予 `bookmarks` 权限，仅响应主动整理操作 |
+| **极速搜索与首屏** | 合并检索历史、书签与常用网站，支持 `/bm`、`/sites` 过滤与 GitHub / B站 / 网易云 / 企查查直达；3D 时钟、精选配色、标语滚轮切换与 Open-Meteo 天气 | 默认可用；极速搜索可跟随壁纸并打开侧栏，天气发送只读坐标/气象请求 |
+| **B 站工作台与电台** | 收藏夹整理与顶部全局搜索、个性推荐、关注 UP 主与分组管理；**紧凑两列 7 行电台卡片**（`♥` 喜欢、歌单新建/保存/删除、虚线箭头拖拽队列、Offscreen 后台续播与刷新恢复条）；悬浮视频小窗（弹幕、倍速、评论与楼中楼看图、字幕提取）及本地缓存 | 公开浏览免登录；个人收藏、关注与评论操作需在同一浏览器登录 B 站；支持刷新保留二级界面 |
+| **GitHub 工作区** | Star 仓库 Lists 分组、Topic 看板拖拽与远端同步、PR / 最近更新缓存、Markdown README 阅读、关联仓库 Todoist 待办 | 公开仓库免鉴权；个人仓库管理与高频访问需配置 GitHub Token |
+| **Todoist 任务看板** | 本地优先缓存、今日任务有序排布、日历侧栏、附件看图与 GitHub 仓库关联任务 | 需在设置中填写 Todoist API Token |
+| **音乐工作区** | 网易云音乐（官网会话连接）与塞壬唱片（默认可用）双队列分离、首屏 3D 唱片机、歌词与标签页关闭联动 | 塞壬唱片开箱即用；网易云需在同一浏览器登录官网后连接 |
+| **AIHOT 资讯与 RSS** | AIHOT 热点资讯、模型榜、日报，以及自选 RSS / Atom 订阅频道与原文阅读 | 默认可用；支持二级界面刷新保留 |
+| **AI 工作区与数字员工** | OpenAI 兼容多模型接入（DeepSeek / Kimi / 硅基流动 / 智谱 / 百炼 / OpenAI / OpenRouter / 本机 Ollama / LM Studio）与模型切换；Native Messaging 本机 CLI 引擎桥接（Pi / Claude Code / Codex / OpenCode / ACP）；数字员工（含 GitHub 榜单精选、找网站员工等）与定时任务；支持实时「窥屏」与「回放窥屏」 | 按需配置对应 API Key 或本机终端宿主；定时与依赖说明见 [调度说明](docs/AI_WORKSPACE_SCHEDULING.md) |
+| **AI 资料库** | 本地管理提示词、变量模板、沉淀文章与表情包；文章正文图片支持点击打开悬浮看图器并滚轮缩放 | 默认可用；沿用本机存储并支持备份导出 |
 
-| 扩展能力 | 核心功能 | 状态分级 | 使用条件与说明 |
-| :--- | :--- | :--- | :--- |
-| **海狸聊天室** | 私有安全聊天室、共享房间、活动感知、卡片分享与受限图片消息 | **可选服务 (实验性)** | 默认关闭，需在商店手动启用；需要自备自托管 HTTPS 服务与专属邀请 |
-| **我的表情包 / 表情库** | 聊天室面板选图、本地磁盘目录挂载（File System Access API）与表情库分类管理 | **辅助模块** | 默认在聊天室内部唤醒，不展示独立 Dock 图标；访问本地目录需浏览器授权 |
-| **WebDAV 云漫游** | 加密备份常用网站、配置、背包与电台系列；可选启动时同步，冲突时暂停并提示 | **可选服务** | 需自备 WebDAV 服务器、账号、应用专用密码和独立备份加密口令 |
+### 可选扩展服务
 
-- **全站主题系统**：统一由「04 主题与外观」管理，支持白天模式（`light`）、夜晚模式（`dark`）和暖纸色（兼容旧主题键 `lonetrail`）；旧版终末地界面主题回退为夜晚模式。独立开机动画与界面主题相互独立。
-- **模块自治**：工作区与独立模块分工明确，统一接入 `src/sdk/` 窗口、菜单、通知与图片查看器。
-- **纯浏览器扩展**：Native Host、Native Messaging、专属设备探针与整套桌宠已彻底移除；音视频缓存与表情库通过浏览器标准 API 授权读写。
+| 服务 | 说明 | 使用条件 |
+| :--- | :--- | :--- |
+| **WebDAV 云漫游** | 本机加密备份常用网站、配置、资料库与电台歌单，支持差异对比与智能合并，冲突时暂停提示 | 需自备支持 HTTPS 的 WebDAV 服务（如坚果云）、账号密码及独立加密口令 |
+| **海狸聊天室** | 私有房间、消息分享与协同听歌等扩展能力 | 默认关闭，需在设置/插件启用并连接自托管服务端；详见 [部署说明](server/private-chat/README.md) |
+| **我的表情包 / 表情库** | 聊天面板选图与本地目录挂载（File System Access API）管理 | 作为聊天与资料库辅助能力按需授权本地目录 |
 
-部分模块仍在迭代。历史文档、截图或源码中存在某个入口，不代表它已经稳定发布或默认启用。YouTube 工作台已移除；升级后会清理插件内的本地收藏和设置，旧备份中的这部分数据不再恢复，不影响浏览器的 YouTube 登录或账号收藏。
+> **主题与系统架构**：全站由设置统一管理 **白天 (`light`) / 夜晚 (`dark`) / 暖纸色 (`lonetrail`)** 三种主题与独立启动动效（`endfield` / `rhinelab`）；覆盖式侧栏支持 `Alt+W` 随时在网页上方唤起。
 
-## 界面预览
+---
 
-以下为使用虚构数据的演示界面，不含真实个人待办或收藏。首屏 AI 资讯标题也属于演示内容，并非新闻事实或模型发布声明；具体功能以实际安装版本为准。
+## 最近更新亮点
 
-### 首屏
+- **v1.0.27**：
+  - **B 站电台重塑**：视频卡片与播放队列统一为 2 列 7 行小卡，支持 `♥` 喜欢、自定义歌单下拉管理与二次确认删除、虚线箭头拖拽队列；移除电台磁带机横条、侧边栏订阅频道入口与报纸模式，收藏夹顶部补充全局搜索栏。
+  - **效率与缓存**：支持 B 站、GitHub、Agent、AIHOT 二级界面刷新保持；GitHub PR / 最近更新及 Todoist 数据缓存；Agent 资料库正文图片支持滚轮缩放；新增「找网站」数字员工与 AIHOT RSS 频道。
+  - **工作区壁纸与稳定性**：支持各工作区独立壁纸配置；修复跨标签切回偶发视频点不开、刷新音乐暂停提示恢复，并补齐合规隐私与许可证查看页。
+- **v1.0.24 ~ v1.0.26**：落地显式状态机与 Vue 3 网桥、多模型 OpenAI 兼容预设与本机 Native Messaging 多引擎桥接、数字员工与 GitHub 今日榜单定时任务「窥屏」监控、常用网站/书签整理专员及各模块测试加固。
 
-![明亮主题首屏：时钟、天气、搜索、常用网站与 AI HOT 演示内容](docs/images/demo-home.png)
+> 更早版本的完整变更记录请参阅 [CHANGELOG.md](CHANGELOG.md)。
 
-### B站插件
-
-![B站收藏夹：使用演示视频与虚构收藏展示布局](docs/images/demo-bilibili.png)
-
-### Todoist 任务看板
-
-![Todoist：使用虚构任务展示日历与多列看板](docs/images/demo-todoist.png)
-
-## 快速指引：如何选择适合你的路径？
-
-根据你的使用场景，选择最适合的指引快速起步：
-
-- **日常使用（推荐）**：直接从官方商店一键安装，无需解压或开启开发者模式，支持静默自动更新：
-  - **Chrome 用户**：推荐直接[从 Chrome 网上应用店安装](https://chromewebstore.google.com/detail/tab-project-%E6%96%B0%E6%A0%87%E7%AD%BE%E9%A1%B5/hogpkihhicjhiakkgjkbchpdoicmbolj)。
-  - **Edge 用户**：推荐直接[从 Edge 加载项商店安装](https://microsoftedge.microsoft.com/addons/detail/tabproject-%E6%96%B0%E6%A0%87%E7%AD%BE%E9%A1%B5/dbkaiojfbolnkpaegflocfbdgpmhjcco)。
-- **手动安装或尝鲜 Release**：阅读 [手动安装：使用 Release 下载包](#手动安装使用-release-下载包)。
-- **想参与功能开发或本地修改**：请阅读 [从源码构建](#从源码构建) 与 [本地开发指令](#开发)。
-- **想部署或接入海狸私有聊天室**：请阅读 [私有聊天室服务端部署指南](server/private-chat/README.md)。
-- **想了解移动端状况**：当前项目仅专注维护桌面 Chromium 扩展（Edge / Chrome），独立 Android / Capacitor 移动应用已退役归档，无需单独构建；桌面窗口已内置窄屏自适应布局。
-- **想深入研究系统架构与实现**：请先阅读 [系统架构设计](ARCHITECTURE.md) 与面向开发者的 [现行真实入口说明](docs/CURRENT_STATE.md)。
+---
 
 ## 安装
 
-### 推荐：从官方应用商店安装（一键安装 & 自动更新）
+### 推荐：通过官方应用商店安装（自动更新）
 
-#### 1. Google Chrome 商店
-1. 打开 [tab-project 新标签页 · Chrome 网上应用店](https://chromewebstore.google.com/detail/tab-project-%E6%96%B0%E6%A0%87%E7%AD%BE%E9%A1%B5/hogpkihhicjhiakkgjkbchpdoicmbolj)。
-2. 点击“添加至 Chrome”，按浏览器提示确认添加扩展。
-3. 打开新标签页；若 Chrome 弹出提示询问是否保留新标签页更改，点击“保留更改”。
+- **Google Chrome**：打开 [Chrome 网上应用店页面](https://chromewebstore.google.com/detail/tab-project-%E6%96%B0%E6%A0%87%E7%AD%BE%E9%A1%B5/hogpkihhicjhiakkgjkbchpdoicmbolj)，点击「添加至 Chrome」。
+- **Microsoft Edge**：打开 [Microsoft Edge 加载项商店页面](https://microsoftedge.microsoft.com/addons/detail/tabproject-%E6%96%B0%E6%A0%87%E7%AD%BE%E9%A1%B5/dbkaiojfbolnkpaegflocfbdgpmhjcco)，点击「获取」。
 
-#### 2. Microsoft Edge 商店
-1. 打开 [tab-project 新标签页 · Microsoft Edge 加载项商店](https://microsoftedge.microsoft.com/addons/detail/tabproject-%E6%96%B0%E6%A0%87%E7%AD%BE%E9%A1%B5/dbkaiojfbolnkpaegflocfbdgpmhjcco)。
-2. 点击“获取”，按浏览器提示确认添加扩展。
-3. 打开新标签页；若 Edge 提示确认新标签页更改，请确认保留本扩展。
+> **从手动解压版迁移提示**：商店版与手动开发者加载版的扩展 ID 不同，不会自动继承原存储。切换前请在设置中导出备份并保留旧版，确认数据恢复无误后再停用旧版本。
 
-> **提示**：商店安装无需开发者模式，后续由浏览器官方商店自动更新。GitHub 的源码提交、Release 发布与商店审核发布是独立流程，各平台审核周期不同，商店版更新上线可能略有差异。
+### 手动安装：使用 Release 打包产物
 
-**已有解压安装用户**：商店版可能使用不同的扩展 ID，不会自动继承开发版的本地数据。切换前请先导出重要配置，保留原安装，确认可恢复后再停用旧版；不要先卸载或清空原数据。
-
-### 手动安装：使用 Release 下载包
-
-适用于 Chrome、开发调试或需要手动管理版本的用户。下载最新 Release 附件；想参与开发或使用尚未发布的源码，再按下方步骤从源码构建。
-
-1. 打开 [最新发行版](https://github.com/kongzhuww/tab-project/releases/latest)。
-2. 下载 `tab-project-v版本号-extension.zip`，解压到一个固定文件夹。
-3. 打开 `edge://extensions` 或 `chrome://extensions`，开启“开发者模式”。
-4. 点击“加载解压缩的扩展”，选择解压后包含 `manifest.json` 的目录。
-
-**不要把 GitHub 自动生成的 Source code 压缩包当成已构建的扩展包。**
-
-升级前建议备份重要配置。沿用同一个扩展目录与浏览器资料；不要为了升级随意卸载扩展，浏览器数据清理或卸载可能丢失本地记录。
+1. 前往 [GitHub Releases](https://github.com/kongzhuww/tab-project/releases/latest) 下载 `tab-project-v版本号-extension.zip` 并解压至固定目录（请勿直接加载 GitHub 自动生成的 `Source code` 源码压缩包）。
+2. 打开 `chrome://extensions` 或 `edge://extensions`，开启「开发者模式」。
+3. 点击「加载解压缩的扩展」，选择包含 `manifest.json` 的目录即可；升级时直接覆盖解压该目录并刷新扩展。
 
 ### 从源码构建
 
@@ -141,171 +99,55 @@ npm ci
 npm run check
 ```
 
-构建完成后，按上方开发者模式加载仓库根目录（`/path/to/tab-project`，其中的 `manifest.json` 与 `generated/` 属于同一份扩展）。已有源码副本需要先保护自己的未提交改动，不要直接覆盖整个目录。
+构建完成后可直接在浏览器开发者模式加载仓库根目录，或运行 `npm run release:build` 生成隔离的发行包目录。更多构建与切片工具说明见 [开发构建文档](docs/DEVELOPMENT_BUILD.md)。
 
-设置的「数据备份、多端云同步与版本更新」中显示当前运行的构建标识和 UTC 构建时间；构建文件更新但扩展尚未重载时会提示重载。旧版本或无法读取元数据时会显示无法核对，不会据此断言版本一致。
+---
 
-`npm run release:build` 输出独立的发布目录，不会替换浏览器已加载的目录。`npm run audit:chunks` 只读盘点当前构建引用与可能过时的切片；候选文件仍可能被已打开的旧标签使用。**不要将它们视为可安全删除的证明**。`npm run clean:chunks` 会实际删除文件，清理前应备份并确认不再有旧页面使用。构建与可选浏览器测试步骤见 [开发构建与界面验证](docs/DEVELOPMENT_BUILD.md)。
+## 权限声明与数据隐私
 
-## 最近更新
+本扩展严格遵循 **Chromium Manifest V3** 规范：**无任何统计埋点或第三方遥测上报服务器**，个人数据默认保留在浏览器本地（`chrome.storage.local` / IndexedDB / OPFS）。
 
-### v1.0.24 · 通用模型接入、GitHub 榜单助手与自动化窥屏
-
-- **通用模型与本地 Ollama**：将原单一 DeepSeek 设置扩展为 OpenAI 兼容通用预设（DeepSeek / 硅基流动 / Kimi / 智谱 / 百炼 / OpenAI / OpenRouter / 本机免 Key Ollama / LM Studio）。
-- **GitHub 榜单自动化与模拟窥屏**：默认预置可自由编辑/删除的 GitHub 今日榜单精选助手，配备实时「窥屏」与「回放窥屏」以及 `auto` 智能引擎兜底（免配模型也能先生成结构化基础简报）。
-- **数字员工与本机多引擎桥接**：支持本机 Pi / Claude Code / Codex / OpenCode / ACP 与会话遥测监控。详见 [更新日志](CHANGELOG.md)。
-
-### v1.0.23 · AI 工作区与搜索改进
-
-- AI 工作区支持本机定时任务、完成通知和 Dock 未读角标，并接入资源浏览及 Todoist 任务。
-- 优化 GitHub 首页、Star 浏览与 AI Hot 日报；修复极速搜索交接、网易云搜索和 Todoist 输入体验。
-- 定时任务依赖浏览器、扩展和网络运行，限制与注意事项见 [使用说明](docs/AI_WORKSPACE_SCHEDULING.md)。
-
-### v1.0.22 · 背包、AI 工作台与安全备份
-
-- 新增提示词和文章背包，以及 Multica／DeepSeek 工作台。
-- WebDAV 支持加密备份和保守自动同步；冲突或可能丢失数据时暂停，逐条删除记录合并尚未接入。
-- 更新 AI Hot 模型榜和导航；调整界面主题并移除 YouTube 工作台。详见 [更新日志](CHANGELOG.md)。
-
-### v1.0.20 · 纯浏览器 Wallpaper Engine 运行时与工业级高刷降温守护
-
-- **纯浏览器 Wallpaper Engine 核心运行时与创意工坊集成**：OPFS 私有文件系统零弹窗冷启动秒开；本地 Steam 创意工坊 (431960) 智能关联与卡片瀑布流；突破外部脚本与样式沙盒 CSP 拦截，全面满血支持 HALOFLUX 等重度 Web 交互壁纸。
-- **5 项工业级高刷与视网膜屏降温防护**：沙盒锁定 DPR=1（像素负荷直降 75%）、锁定 40 FPS 消除 120Hz 高刷空转、`shadowBlur` 钳制 <= 12、音频分析器纯事件驱动与静默挂起 `suspend()`（无音乐 0% CPU）、彻底移除 `document.elementFromPoint` 消除强制同步回流、弹窗打开自动休眠底层壁纸渲染、视频卡片仅在 hover 悬停时播放。
-- **时钟颜色最高特异性修复**：彻底清理浅色模式下的全局 CSS `!important` 覆盖，恢复 6 款自选配色绝对优先权与暗色立体光影。
-
-### v1.0.19 · B站字幕时间轴精准高亮与沉浸工作区
-
-- **字幕流定位与跳转**：结构化时间轴字幕流实时跟随播放进度高亮（加粗深底），打开弹窗自动平滑居中滚动，支持点击台词一键 Seek 跳转进度。
-- **工作区布局与悬浮胶囊**：搜索栏移至收集箱 Header 居中，消息与关注分组同行并排；实时台词胶囊栏支持自由拖拽摆放与双击复位；彻底移除顶部冗余标题行。
-
-### v1.0.18 · WebDAV 跨设备智能合并漫游
-
-- **端到端差异对比与合并**：设置面板增加两端差异详情与可视化预览，提供合并上传、合并到本地与单向覆盖选项。
-- **快捷方式与分组健壮性提升**：合并常用网站时保留独立文件夹归属，自动消解链接 ID 冲突；健壮处理异常非数组历史数据；新用户 Dock 首位默认置为 B站。
-
-### v1.0.9 · 权限最小化、不可变发布防护与代码收口
-
-- **Manifest 权限最小化**：广域 `<all_urls>` 收敛为明确的 `https://*/*` 与 `http://*/*`，彻底清除已退役模块的 13 个遗留域名声明。
-- **不可变 Release 与自动化门禁**：移除发布工作流中的 `--clobber` 覆盖逻辑，新增 51 项离线回归断言测试并全面接入 CI。
-- **历史代码大清洗**：清理 `newtab-workspaces.css` 中近 3000 行废弃工作区与监控样式（体积缩减 66.4KB），将 Markdown 排版通用化，清除全部 QQ 残留配置与资产。详见 [v1.0.9 发行说明](docs/RELEASE_1.0.9.md)。
-
-### v1.0.8 · 覆盖式侧栏与 GitHub 原生 Lists
-
-- 新标签页和普通网页采用不挤压视口的覆盖式侧栏，支持扩展图标、Alt+W、× 与 Esc；受保护页面不支持注入。
-- GitHub 收藏分类采用官方 Lists，同一仓库可归属多个列表；移除“正在使用”特殊分类。
-- B站收藏搜索改为按回车或搜索按钮执行。详见 [v1.0.8 发行说明](docs/RELEASE_1.0.8.md)。
-
-### v1.0.5 · 我的仓库 Topic 看板、双向拖拽与远端标签同步
-
-- **GitHub 快捷频道全新「我的仓库 · Topic 看板」**：左侧新增快捷入口，多列横向看板展示个人仓库，左侧默认收拢未分类项目，右侧按 GitHub Topics 分列。
-- **双向拖拽与 GitHub 远端自动同步**：卡片在列间自由拖拽，拖入 Topic 自动打标签并调用 GitHub API 同步远端，拖回默认板块自动移出标签。
-- **全方位横向滚动体验**：支持拖拽中随时直接滚动滚轮左右滑动视口、Shift + 滚轮横向滑动、触碰看板左右边缘（100px）自动平滑滚动。
-- **原生右键级联菜单系统**：右键卡片弹出菜单，悬停/点击「移动到分组」弹出二级面板并支持边缘翻转；支持一键设为未分类/移入指定 Topic；提供链接复制、克隆命令复制与 GitHub 直达。
-- **界面优化与主题契合**：解决卡片高度被挤压细缝的 CSS 缺陷（`flex-shrink: 0`），全面遵从系统明亮与暗色主题变量。
-
-### v1.0.4 · 电台防覆盖、容灾切源与三层文档重构
-
-- **B站电台系列保存防覆盖**：彻底移除空名时自动取当前收藏夹名并静默覆盖同名系列的隐式逻辑；未填名字时保存按钮触发红色高亮抖动与焦点聚焦提示。
-- **智能切源与播放防卡死**：遇到超时、网络错误、鉴权/限流异常时立即终止无效重试，支持最多 3 次自动切换备用音视频源；小窗与剧场模式均接入多源故障转移，彻底清理后台幽灵音频。
-- **WebDAV 同步漫游**：同步载荷增加 `bili_radio_custom_series` 字段，自定义电台歌曲系列完整纳入坚果云/私有 WebDAV 云端备份与跨设备一键恢复。
-- **历史说明**：该版本曾调整视频推荐卡片样式；相关工作台已在后续开发中移除。
-- **全仓文档三层体系落地与正式主题统一定义**：确立 4 套正式界面主题（白天 `light`、夜晚 `dark`、终末地 `endfield`、孤星 `lonetrail`）与启动动效（`rhinelab` / `endfield`）；补充权限详细声明；彻底清理 Native 历史残留命名。
-- **构建优化**：清理 847 个历史废弃 chunk 产物。
-
-### v1.0.3 · 仓库任务、阅读与播放修复
-
-- GitHub 仓库任务栏展示关联的未完成 Todoist 任务，支持滚动、独立完成与插件内详情；兼容新版完成状态字段。
-- GitHub 读取进度和普通错误统一显示在顶部标题旁。
-- B站磁带不随播放自动展开，小窗评论与楼中楼支持图片预览；视频通知保存对应视频目标。
-- ai hot文章复制/原文按钮统一主题样式，正文提取排除源站重复控件并避开旧缓存。
-- 真实账号、浏览器交互及商店审核仍需分别验收；无法恢复未保存视频标识的旧通知。
-
-### v1.0.2 · 移除开发调试桥接
-
-- 删除页面与后台的本机调试轮询、任意 JS 调试入口、专用 CLI 脚本和 Jev 页面协作桥接。
-- 开发版与发行版一致，不保留开发开关，不自动操作或刷新用户浏览器。
-- 原有业务通信与个人数据不清理；升级后由用户自行刷新扩展和页面。
-
-### v1.0.0 · 开源首发版本
-
-- 新仓库使用全新历史，旧仓库与本地数据不迁移、不覆盖。
-- 删除 ArkPets、Neuro / Evil、Spine、角色素材、独立设置页和相关控制命令。
-- 新目录加载可能获得不同扩展 ID；不会自动继承旧扩展的浏览器存储，请先备份并保留旧安装。
-- 移除笔记本、Multica 及旧原生宿主相关入口与代码。
-- 保留聊天室“我的表情包”和“表情库”，隐藏表情包独立入口。
-- 整理 B站电台、常用网站文件夹、todoist 与窗口交互。
-- 补充虚拟列表和按帧处理等性能优化；不把构建通过等同于实测流畅。
-
-> 更多历史演进详情（含旧仓库 v2.2.x 阶段记录）请参阅完整 [更新日志 (CHANGELOG.md)](CHANGELOG.md)。
-
-## 配置与数据边界
-
-- GitHub、Todoist、音乐、自托管聊天室等功能分别需要对应的账号、API 或服务，不是全部开箱即用。
-- 聊天室沿用自托管服务和独立邀请；请按 [服务端说明](server/private-chat/README.md) 核对部署及版本。不能据此假设旧下载包已有当前源码中的修复；服务端升级与浏览器扩展发布需要分别进行。
-- `chrome.storage.local` 和 IndexedDB 是浏览器存储，**不等于应用级加密**；不要把“保存在本机”理解成“秘密不会离开本机”。
-- 调用 API 时，请求会发送到对应服务；聊天室内容由服主服务器保存，不提供端到端加密。
-- 原图、聊天历史、目录授权和分类索引不是同一种数据。备份配置或分类记录，不代表已经备份图片原件。
-- 不要把 Token、Cookie、邀请凭证、个人服务地址或本地私密配置提交到仓库。
-
-## 权限声明与数据隐私说明
-
-本扩展遵循 **Chromium Manifest V3** 安全规范，所有个人配置、书签缓存与使用数据均**默认保存在用户本地浏览器内**。扩展没有任何统计分析、商业埋点或第三方隐私上报服务器。
-
-### 1. 为什么需要这些扩展权限？
-
-| 声明权限 | 用途与必要性说明 |
+| Manifest 权限 | 用途与必要性说明 |
 | :--- | :--- |
-| `storage` / `unlimitedStorage` | 在本地（`chrome.storage.local` / IndexedDB）存储常用网站、自定义分组、主题偏好、电台队列与离线缓存。 |
-| `bookmarks` | 读取浏览器书签并在新标签页看板平铺展示，支持在页面内整理、新建与拖拽排序（通过 Web Worker 进行离线本地检索）。 |
-| `tabs` / `activeTab` | 顶栏标签页管理器（树状显示打开的标签、一键聚焦切换）；避免重复打开已有工作区标签页。 |
-| `cookies` | B站操作读取 `bili_jct` CSRF Cookie。网易云使用官网会话请求；YouTube 工作台及其后台鉴权和 Cookie 诊断路径已移除。详见[权限审计](docs/MANIFEST_PERMISSION_AUDIT.md)。 |
-| `downloads` | 用于用户主动触发的操作：备份文件导出、视频/音频本地缓存下载以及壁纸保存。 |
-| `scripting` | 在用户主动触发时，向普通网页注入隔离的覆盖式侧栏（建议快捷键 `Alt+W`），或网页汉化浮层；不缩窄网页，不常驻注入所有网站。浏览器内置页、扩展商店等受保护页面不支持。 |
-| `identity` | 用于可选的 Google Calendar 日历授权登录（通过官方 OAuth2 流程连接）。 |
-| `declarativeNetRequest` | 为扩展发起的 B站媒体及图片请求设置必要的请求头，并清理旧版网络规则。 |
-| `contextMenus` / `clipboardWrite` | 提供常用网站右键菜单，以及一键复制链接、AI 资讯正文到剪贴板。 |
+| `storage` / `unlimitedStorage` | 在本地保存设置偏好、常用网站、资料库、电台歌单与缓存数据。 |
+| `bookmarks` / `favicon` | 展示与整理浏览器书签及站点图标，并在 Web Worker 中执行本地检索。 |
+| `tabs` / `activeTab` | 顶栏标签页管理器切换与定位已有工作区标签页。 |
+| `cookies` | 在用户使用 B 站工作台交互时读取 `bili_jct` CSRF 校验字段；不使用隐藏账号凭证。 |
+| `declarativeNetRequest` | 为扩展内部发起的 B 站音视频与图片请求补充合规的来源/Referer 头。 |
+| `scripting` | 仅在用户主动触发（如 `Alt+W` 或右键菜单）时向普通网页注入覆盖式侧栏或网页汉化浮层。 |
+| `alarms` / `notifications` | 支持用户主动创建的 AI 定时任务调度与任务完成本地桌面提醒。 |
+| `downloads` | 用于导出配置文件备份、本地保存壁纸与用户主动触发的离线媒体下载。 |
+| `identity` | 用于可选的 Google Calendar OAuth2 授权登录。 |
+| `nativeMessaging` | 仅当用户在 AI 工作区主动启用本机终端代理桥接（Pi / Claude Code / Codex / OpenCode / ACP）时，与本机已授权宿主通信。 |
+| `offscreen` | 通过 MV3 Offscreen Document 在后台稳定宿主电台等连续音频播放。 |
+| `contextMenus` / `clipboardWrite` | 提供快捷右键操作与一键复制链接/文章/字幕内容到剪贴板。 |
 
-### 2. 数据会发送到哪里？
+> 详情请参阅 [隐私说明 (PRIVACY.md)](PRIVACY.md)、[第三方服务与内容来源](THIRD-PARTY-SERVICES.md) 与 [权限审计文档](docs/MANIFEST_PERMISSION_AUDIT.md)。
 
-* **零第三方遥测**：tab-project-next 没有自建的统计收集服务器，不追踪任何用户行为、统计数据或浏览历史。
-* **第三方服务通信**：B站、GitHub、Todoist、网易云音乐、AIHOT 和天气等功能会连接各自服务；部分网站功能使用网站接口。图片、媒体或原文可能由其他来源提供。具体见 [第三方服务说明](THIRD-PARTY-SERVICES.md)。
-* **账号凭据**：Token 等凭据保存在扩展本地配置中，用于对应服务授权；用户启用的加密 WebDAV 备份也可能包含这些凭据。详见 [隐私说明](PRIVACY.md)。
-* **海狸聊天室（自托管）**：聊天室属于完全自托管服务，仅当你明确在商店开启并填入服主服务器地址与邀请码时，聊天消息才会与指定的自建服务器同步，扩展本身不设公共中继。
-* **WebDAV 云漫游**：需主动配置服务器和独立备份口令；支持手动上传、恢复，以及可选的浏览器启动时自动同步。上传前在本机加密，遇到冲突会暂停提示。请使用 HTTPS；服务端历史版本及旧导出文件不会因重新上传而自动删除。
+---
 
 ## 开发
 
 ```bash
-# 监听前端源码并重建；页面由使用者自行刷新
-npm run ui:watch
-
-# 类型检查与多入口构建
-npm run check
-
-# 隔离构建扩展发布目录
-npm run release:build
+npm test              # 运行离线回归与策略测试
+npm run ui:watch      # 监听前端源码增量重编
+npm run check         # 校验多语言、vue-tsc 类型检查并构建前端与后台脚本
+npm run release:build # 生成纯净的隔离发布产物目录与压缩包
 ```
 
-当前仅维护桌面 Chromium 浏览器扩展。独立 Android / Capacitor 应用及移动端工具链已移除；桌面窗口的响应式布局保留。
-
-主要目录：
+主要目录结构：
 
 ```text
-src/                 前端模块、SDK 与后台源码
-server/private-chat/ 私有聊天室服务
-docs/                现行架构、模块索引与部署文档
-docs/history/        历史迁移台账与审查档案
-generated/           构建产物
-manifest.json        扩展清单
+src/                 前端组件、SDK、工作区与后台服务源码
+crates/fast-search/  Rust / WebAssembly 本地快速检索模块
+server/private-chat/ 私有聊天室可选服务端
+tests/               自动化单元测试与策略回归集
+docs/                架构设计、模块索引与历史归档
+generated/           构建输出的静态产物
+manifest.json        Chromium MV3 扩展清单
 ```
 
-### 文档导航（三层结构）
+### 延伸阅读
 
-- **第一层 · 首次访问与使用者**：阅读本文 [README.md](README.md) 与 [更新日志](CHANGELOG.md)。
-- **第二层 · 开发者与现行入口**：阅读 [系统架构设计](ARCHITECTURE.md) 与 [开发者实时状态与真实入口](docs/CURRENT_STATE.md)。
-- **第三层 · 现行模块与组件索引**：阅读 [现行模块与组件索引](docs/MODULE_INDEX.md) 与 [SDK 说明](src/sdk/README.md)。
-- **历史归档**：历史演进台账、各轮增量审查与已退役方案请参阅 [docs/history/ 历史档案](docs/history/README.md)。
-
-## 许可证
-
-原创代码许可见 [LICENSE](LICENSE)。第三方组件、运行时和素材分别遵循各自许可证；原创代码的 MIT 许可不代表所有素材都可商用。详见 [第三方开源许可](THIRD-PARTY-LICENSES.md)、[第三方服务与内容来源](THIRD-PARTY-SERVICES.md)、[隐私说明](PRIVACY.md) 和 [素材及致谢](ATTRIBUTION.md)。
+- **架构与现行入口**：[系统架构设计](ARCHITECTURE.md) · [现行真实入口说明](docs/CURRENT_STATE.md) · [模块索引](docs/MODULE_INDEX.md)
+- **许可与合规**：[LICENSE](LICENSE) · [第三方开源许可](THIRD-PARTY-LICENSES.md) · [素材与致谢](ATTRIBUTION.md) · [隐私说明](PRIVACY.md)

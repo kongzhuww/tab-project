@@ -4,10 +4,11 @@
   <img src="assets/icon-128.png" alt="tab-project" width="80" height="80" />
 </p>
 
-<p align="center"><strong>A Browser New-Tab Personal Productivity Workspace</strong></p>
+<p align="center"><strong>A personal productivity command center built around your browser New Tab</strong></p>
 
 <p align="center">
-  <a href="https://microsoftedge.microsoft.com/addons/detail/tabproject-%E6%96%B0%E6%A0%87%E7%AD%BE%E9%A1%B5/dbkaiojfbolnkpaegflocfbdgpmhjcco"><img src="https://img.shields.io/badge/Microsoft_Edge-Install-0078D4?style=for-the-badge" alt="Install from Microsoft Edge Add-ons" /></a>
+  <a href="https://chromewebstore.google.com/detail/tab-project-%E6%96%B0%E6%A0%87%E7%AD%BE%E9%A1%B5/hogpkihhicjhiakkgjkbchpdoicmbolj"><img src="https://img.shields.io/badge/Chrome_Web_Store-Install-4285F4?style=for-the-badge&logo=googlechrome&logoColor=white" alt="Install from Chrome Web Store" /></a>
+  <a href="https://microsoftedge.microsoft.com/addons/detail/tabproject-%E6%96%B0%E6%A0%87%E7%AD%BE%E9%A1%B5/dbkaiojfbolnkpaegflocfbdgpmhjcco"><img src="https://img.shields.io/badge/Microsoft_Edge-Install-0078D4?style=for-the-badge&logo=microsoftedge&logoColor=white" alt="Install from Microsoft Edge Add-ons" /></a>
 </p>
 
 <p align="center">
@@ -15,123 +16,81 @@
 </p>
 
 <p align="center">
-  <a href="https://microsoftedge.microsoft.com/addons/detail/tabproject-%E6%96%B0%E6%A0%87%E7%AD%BE%E9%A1%B5/dbkaiojfbolnkpaegflocfbdgpmhjcco"><strong>Install from Edge Add-ons</strong></a> ·
-  <a href="https://github.com/kongzhuww/tab-project/releases/latest">Release Downloads</a> ·
+  <a href="https://chromewebstore.google.com/detail/tab-project-%E6%96%B0%E6%A0%87%E7%AD%BE%E9%A1%B5/hogpkihhicjhiakkgjkbchpdoicmbolj"><strong>Chrome Web Store</strong></a> ·
+  <a href="https://microsoftedge.microsoft.com/addons/detail/tabproject-%E6%96%B0%E6%A0%87%E7%AD%BE%E9%A1%B5/dbkaiojfbolnkpaegflocfbdgpmhjcco"><strong>Edge Add-ons</strong></a> ·
+  <a href="https://github.com/kongzhuww/tab-project/releases/latest">Releases</a> ·
   <a href="CHANGELOG.md">Changelog</a> ·
-  <a href="#quick-guide-which-path-fits-you">Quick Start</a> ·
-  <a href="#installation">Installation Guide</a> ·
+  <a href="#installation">Install</a> ·
   <a href="#development">Development</a>
 </p>
 
-> **Core Concept**: `tab-project` is a browser new-tab workspace extension built with **Vue 3, TypeScript, and Chromium Manifest V3** (for Microsoft Edge and Google Chrome). It unifies frequently visited websites, bookmark kanban boards, daily tasks, and multimedia widgets—which are typically scattered across different tabs and apps—into a clean, responsive, theme-adaptive command center for your daily workflows.
+> **Core Concept**: `tab-project` is a desktop Chromium New Tab workspace extension built with **Vue 3, TypeScript, Rust WebAssembly, and Manifest V3** (for Chrome & Edge). It unifies quick-access sites, bookmark kanban boards, aggregated search, Todoist, GitHub, Bilibili tools & audio radio, music playback, and local-first AI workflows into one adaptive interface.
 
-> **Now available on Microsoft Edge Add-ons**: [Install tab-project](https://microsoftedge.microsoft.com/addons/detail/tabproject-%E6%96%B0%E6%A0%87%E7%AD%BE%E9%A1%B5/dbkaiojfbolnkpaegflocfbdgpmhjcco) without Developer mode. Edge manages automatic updates for store installations. Each new version still requires a separate store submission and review; GitHub commits and releases do not immediately update the store version.
-
-> **Repository Version**: **1.0.27**, refining the Bilibili radio cards, favorites search and player experience, alongside per-workspace wallpapers, the Site Finder employee, caching, and view restoration. Store versions may lag behind GitHub Releases. See the [Changelog](CHANGELOG.md).
-
----
+> **Repository Version**: **1.0.27**, featuring the redesigned 2×7 Bilibili radio cards and playlist manager, per-workspace wallpapers, the Site Finder digital employee, RSS channels, and sub-view refresh persistence. Store editions are updated after platform review and may lag behind `main`. See [CHANGELOG.md](CHANGELOG.md).
 
 ## Feedback & Updates
 
-[Report a bug](https://github.com/kongzhuww/tab-project/issues/new?template=bug_report.yml) · [Request a feature](https://github.com/kongzhuww/tab-project/issues/new?template=feature_request.yml) · [Discussions](https://github.com/kongzhuww/tab-project/discussions) · [Releases](https://github.com/kongzhuww/tab-project/releases)
+[Report a Bug](https://github.com/kongzhuww/tab-project/issues/new?template=bug_report.yml) · [Request a Feature](https://github.com/kongzhuww/tab-project/issues/new?template=feature_request.yml) · [Discussions](https://github.com/kongzhuww/tab-project/discussions) · [Releases](https://github.com/kongzhuww/tab-project/releases)
 
-Include your installed extension version, browser version, and reproduction steps. Redact private data before sharing screenshots; never post tokens, cookies, or API keys. Edge checks for approved store updates automatically. To follow GitHub releases, select **Watch → Custom → Releases** on this repository.
-
-## Core Features & Module Status
-
-| Capability / Module | Core Functionality | Status Level | Conditions & Requirements |
-| :--- | :--- | :--- | :--- |
-| **Live Wallpapers & Steam Workshop** | Pure browser Wallpaper Engine runtime, OPFS private caching for zero-dialog cold boot, Steam Workshop (431960) scanning, 4K video / Web interactive / Scene wallpapers, 128-band logarithmic audio visualizer, 5 hardware cooling safeguards for Mac Retina & 120Hz displays | **Available by default** | Browser local OPFS storage; supports direct link to Steam Workshop or custom directories |
-| **Favorite Sites & Large Folders** | Multi-group workspaces, 2x2 large folders, drag-and-drop reordering, inline quick title & URL editing | **Available by default** | Stored in local browser storage; basic features are completely offline |
-| **Bookmark Kanban & Search** | Grid/tile layout for browser bookmarks, folder tree navigation, drag-and-drop organization, offline Pinyin/fuzzy search via Web Worker | **Available by default** | Requires browser bookmark read permission; never mutates untouched items |
-| **Multi-Engine Unified Search** | Blended keyword matching across history, bookmarks, and shortcuts; `/bm` and `/sites` filters; instant redirect to GitHub, Bilibili, NetEase Music, and Qichacha | **Available by default** | Offline-first suggestions; Enter submits query directly to the selected search engine |
-| **Clock, Mottos & Weather** | 3D clock with Solar & Lunar calendar, scroll-to-switch mottos, real-time Open-Meteo temperature & urban weather conditions | **Available by default** | Weather fetched via direct, read-only browser requests to Open-Meteo API |
-| **Bilibili Plugin & Radio** | Dual-column favorite organization, AI subtitle extraction, picture-in-picture mini-player; Radio uses DASH pure audio streams (~3MB) with auto-failover | **Optional Module** | Public browsing requires no login; accessing personal collections/following requires existing login session in the same browser |
-| **GitHub Workspace** | Starred repository classification, multi-rule search, distraction-free Markdown README viewer, one-click issue-to-todo linking | **Optional Module** | Public viewing needs no token; deep queries and task integration require a personal GitHub Token |
-| **Todoist Task Kanban** | 0ms offline instant rendering, auto-hierarchical layout mapped from linked GitHub repos, task calendar, and real-time cross-tab cache invalidation | **Optional Module** | Requires a Todoist API Token entered in settings |
-| **Music Workspace** | NetEase Cloud Music direct web session login, Monster Siren Records album library, 3D rotating vinyl turntable with synced lyrics display | **Optional Module** | Monster Siren is available out-of-the-box; NetEase requires logging in on the official site in the same browser |
-| **AI HOT Intelligence** | Curated daily AI news headlines with an immersive reader; technical trends and papers | **Optional Module** | Ships with curated news feeds and article view |
-| **Prompt Backpack** | Organize prompts and saved articles, fill variables and copy prompts | **Optional Module** | Stored locally; encrypted WebDAV backup is available |
-| **Multica Agent Workspace** | View tasks, projects and agents; dispatch tasks after confirmation | **Optional Module** | Requires a configured Multica connection |
-
-### Optional Components & Extended Services
-
-| Extended Capability | Core Functionality | Status Level | Conditions & Requirements |
-| :--- | :--- | :--- | :--- |
-| **Beaver Chatroom** | Private secure chatroom, shared rooms, activity sensing, interactive card sharing, and restricted image messages | **Optional Service (Experimental)** | Disabled by default; toggle in Store; requires self-hosted HTTPS server and dedicated invite |
-| **My Memes & Sticker Library** | Sticker picker inside chatroom, local directory mounting via File System Access API, and categorized sticker management | **Auxiliary Module** | Invoked inside the chatroom without a standalone dock icon; mounting local disk requires explicit browser grant |
-| **WebDAV Cloud Roaming** | Encrypted backup for shortcuts, settings, backpack and radio; optional startup sync with conflict prompts | **Optional Service** | Requires a WebDAV server, account, app password and separate backup passphrase |
+When filing an issue, include your extension version, browser version, and reproduction steps. Redact private information from screenshots and never share tokens, cookies, or credentials.
 
 ---
 
-## 🎨 Theme & Design Philosophy
+## Feature Overview
 
-- **Unified CSS Variable Theming**: Settings offers Light (`light`), Dark (`dark`) and Warm Paper (compatible with the `lonetrail` key). The retired Endfield UI theme falls back to Dark. Startup animations remain separate from UI themes.
-- **Autonomous Modular Design**: Clear boundaries between workspaces and auxiliary plugins, with standardized integration into `src/sdk/` for windows, context menus, notifications, and image viewports.
-- **Pure Browser Extension**: Native Host, Native Messaging, hardware device probes, and desktop pets have been completely removed. Media caching and sticker storage use standard browser permissions and APIs.
+| Module | Highlights | Requirements & Notes |
+| :--- | :--- | :--- |
+| **Live Wallpapers & Workshop** | Pure-browser Wallpaper Engine runtime (OPFS instant boot, Steam Workshop `431960` scanning, 4K Video / Web / Scene playback, 128-band logarithmic audio visualizer), 5 high-refresh/Retina cooling safeguards, and **per-workspace custom wallpapers** | Available by default; links directly to local Steam Workshop or custom folders |
+| **Quick Sites & Bookmark Board** | Multi-group site shelves, `2×2` large folders, drag-and-drop reordering, organizer assistant, flat/nested bookmark view, and Rust/Worker fuzzy pinyin search | Available by default; requires `bookmarks` permission and only edits items upon user action |
+| **Quick Search & Home** | Unified search across history, bookmarks, and saved sites (`/bm`, `/sites` filters + GitHub, Bilibili, NetEase, Qichacha); 3D clock, color presets, motto wheel switcher, and Open-Meteo weather | Available by default; weather uses read-only requests to Open-Meteo |
+| **Bilibili Workspace & Radio** | Favorites organizer with top global search bar, personalized feed, following groups; **compact 2×7 radio grid** (`♥` likes, custom playlist management & delete, dashed-arrow queue drag-and-drop, Offscreen playback & refresh restore prompt); floating player (danmaku, playback speed, comments/sub-replies viewer, subtitle modal) and local video cache | Public browsing needs no login; personal favorites/following require signing into Bilibili in the same browser; preserves active sub-view on refresh |
+| **GitHub Workspace** | Starred repository Lists, Topic kanban drag-and-drop sync, cached PRs & recent repos, Markdown README reader, and linked repository Todoist tasks | Public browsing works unauthenticated; private data & actions require a personal GitHub Token |
+| **Todoist Kanban** | Local-first caching, ordered Today queue, calendar sidebar, attachment image viewer, and GitHub-linked tasks | Requires a Todoist API Token in settings |
+| **Music Workspace** | Dual separated queues for NetEase Cloud (browser session login) and Monster Siren Records (built-in), 3D spinning player, lyrics, and tab-close audio controls | Monster Siren works immediately; NetEase requires browser login |
+| **AIHOT News & RSS** | AIHOT curated feed, model rankings, daily digests, and custom RSS / Atom channel subscriptions | Available by default; preserves active sub-view across page refreshes |
+| **AI Workspace & Digital Employees** | Multi-provider OpenAI-compatible support (DeepSeek, Kimi, SiliconFlow, GLM, Bailian, OpenAI, OpenRouter, local Ollama / LM Studio) with model picker; **Native Messaging** bridge for local CLI agents (Pi, Claude Code, Codex, OpenCode, ACP); digital employees (GitHub Trending assistant, Site Finder, etc.) and scheduled runs with live/replay peek inspection | Configure API keys or local host bridge as needed; see [AI Scheduling Docs](docs/AI_WORKSPACE_SCHEDULING.md) |
+| **AI Library** | Manage local prompts, variable templates, saved articles, and stickers; article images open in the wheel-zoomable floating image viewer | Available by default with local storage and backup export |
 
-*Some features remain in active iteration. The YouTube workspace has been removed: upgrading clears its extension-local favorites and settings, and old backups no longer restore them. Your browser login and account playlists are unaffected.*
+### Optional Self-Hosted / Cloud Services
 
----
+| Service | Summary | Requirements |
+| :--- | :--- | :--- |
+| **WebDAV Cloud Sync** | Client-side encrypted backup and smart diff/merge for quick sites, settings, library, and radio series | Bring your own HTTPS WebDAV endpoint, credentials, and backup passphrase |
+| **Beaver Chatroom** | Self-hosted private rooms, resource card sharing, and listen-together rooms | Disabled by default; requires a self-hosted server ([Server Guide](server/private-chat/README.md)) |
+| **Sticker Directory** | Chat picker & local folder mounting via File System Access API | Opt-in local directory access from chat/library |
 
-## Screenshots
-
-These screenshots use fictional demo data rather than personal tasks or collections. AI news headlines on the home screen are fictional examples, not factual news or model-release claims. Available features depend on the installed version.
-
-### Home
-
-![Light-theme home with clock, weather, search, favorite sites, and demo AI news](docs/images/demo-home.png)
-
-### Bilibili Plugin
-
-![Bilibili favorites with fictional demo videos and collections](docs/images/demo-bilibili.png)
-
-### Todoist Task Kanban
-
-![Todoist calendar and multi-column kanban with fictional tasks](docs/images/demo-todoist.png)
-
----
-
-## 🧭 Quick Guide: Which Path Fits You?
-
-Choose the best path for your needs:
-
-- **Everyday Edge User**: [Install from Edge Add-ons](https://microsoftedge.microsoft.com/addons/detail/tabproject-%E6%96%B0%E6%A0%87%E7%AD%BE%E9%A1%B5/dbkaiojfbolnkpaegflocfbdgpmhjcco); no extraction or Developer mode required.
-- **Chrome / Manual Installation**: Read [Manual Installation: Prebuilt Release Packages](#manual-installation-prebuilt-release-packages).
-- **Developer / Contributor**: Read [Building from Source](#building-from-source) and [Development Commands](#development).
-- **Self-Hosting Beaver Chatroom**: Read the [Private Chat Server Deployment Guide](server/private-chat/README.md).
-- **Mobile Support Inquiries**: The project focuses solely on desktop Chromium browsers (Edge / Chrome). Standalone Android / Capacitor builds are retired; the desktop layout features responsive mobile-width adaptation.
-- **System Architecture**: Read [System Architecture Design](ARCHITECTURE.md) and [Developer Current State & Actual Entry Points](docs/CURRENT_STATE.md).
+> **Themes & Layout**: Unified `light`, `dark`, and warm-paper (`lonetrail`) themes plus independent startup animations (`endfield` / `rhinelab`). Trigger the non-intrusive overlay sidebar anytime with `Alt+W`.
 
 ---
 
-## 📦 Installation
+## Recent Highlights
 
-### Recommended: Install from Edge Add-ons
+- **v1.0.27**:
+  - Revamped Bilibili radio into compact 2×7 cards with `♥` favorites, custom playlist popover & delete support, dashed-arrow drag cue, favorites hero search bar, and removed legacy tape bar, subscription sidebar entry, and newspaper mode.
+  - Added sub-view refresh persistence across Bilibili, GitHub, Agent, and AIHOT; cached GitHub PRs/recent repos and Todoist views; enabled mouse-wheel zoom on Agent library images via `FloatingImageViewer`; added the Site Finder employee and AIHOT RSS channels.
+  - Added independent per-workspace wallpapers, intermittent tab-return video click fix, music resume toast, and local legal/privacy documentation views.
+- **v1.0.24 – v1.0.26**: Unified state machines and Vue 3 bridge, universal OpenAI-compatible presets + local CLI Native Messaging bridge, GitHub Trending scheduled digest with peek monitoring, bookmark/site organizer assistant, and regression hardening.
 
-1. Open [tab-project on Microsoft Edge Add-ons](https://microsoftedge.microsoft.com/addons/detail/tabproject-%E6%96%B0%E6%A0%87%E7%AD%BE%E9%A1%B5/dbkaiojfbolnkpaegflocfbdgpmhjcco).
-2. Click **Get** and confirm adding the extension.
-3. Open a new tab. If Edge asks you to confirm the new-tab change, choose to keep this extension.
+> See [CHANGELOG.md](CHANGELOG.md) for the complete release history.
 
-No Developer mode is required. Edge manages future automatic updates. GitHub commits, GitHub Releases, and store review/publication are separate workflows, so store updates may arrive later.
+---
 
-**Switching from an unpacked installation?** The store version may use a different extension ID and will not automatically inherit local data from the development installation. Export important settings first, keep the original installation, and confirm recovery before disabling it. Do not uninstall or clear the original data first.
+## Installation
 
-### Manual Installation: Prebuilt Release Packages
+### Recommended: Official Browser Stores (Auto-Updates)
 
-For Chrome users, development, or manual version management, download the latest Release asset.
+- **Google Chrome**: Install from the [Chrome Web Store](https://chromewebstore.google.com/detail/tab-project-%E6%96%B0%E6%A0%87%E7%AD%BE%E9%A1%B5/hogpkihhicjhiakkgjkbchpdoicmbolj).
+- **Microsoft Edge**: Install from [Microsoft Edge Add-ons](https://microsoftedge.microsoft.com/addons/detail/tabproject-%E6%96%B0%E6%A0%87%E7%AD%BE%E9%A1%B5/dbkaiojfbolnkpaegflocfbdgpmhjcco).
 
-1. Open [Latest Releases](https://github.com/kongzhuww/tab-project/releases/latest).
-2. Download `tab-project-v<version>-extension.zip` and extract it to a persistent local folder.
-3. In Microsoft Edge navigate to `edge://extensions`, or in Google Chrome navigate to `chrome://extensions`.
-4. Turn on **Developer mode** (toggle in the top-right or sidebar).
-5. Click **Load unpacked**, and select the extracted directory containing `manifest.json`.
+> **Migrating from an unpacked build?** Store builds may use a different extension ID and do not inherit local data automatically. Export your settings first and keep your unpacked copy until migration is verified.
 
-> **Note**: Do not use GitHub's auto-generated "Source code (zip)" download—it contains uncompiled sources, not the ready-to-run extension build.
+### Manual Installation (Release Zip)
 
-*Before upgrading, consider exporting your settings. Keep your extension directory in place; do not uninstall the extension simply to upgrade, as clearing extension data will delete locally stored records.*
+1. Download `tab-project-v<version>-extension.zip` from [GitHub Releases](https://github.com/kongzhuww/tab-project/releases/latest) (do not use GitHub's `Source code` archives directly).
+2. Extract it to a permanent folder, open `chrome://extensions` or `edge://extensions`, and enable **Developer mode**.
+3. Click **Load unpacked** and select the folder containing `manifest.json`.
 
-### Building from Source
+### Build from Source
 
 ```bash
 git clone https://github.com/kongzhuww/tab-project.git
@@ -140,120 +99,55 @@ npm ci
 npm run check
 ```
 
-Once built, load the repository root directory as an unpacked extension following the steps above.
+Load the repository root in Developer mode, or run `npm run release:build` to output a clean isolated extension package. See [DEVELOPMENT_BUILD.md](docs/DEVELOPMENT_BUILD.md).
 
 ---
 
-## 🚀 Recent Updates
+## Permissions & Privacy
 
-### v1.0.9 · Permission Minimization, Immutable Release Safety & Code Cleanup
+`tab-project` follows **Chromium Manifest V3** guidelines with **zero analytics or telemetry servers**. User settings and caches stay locally in `chrome.storage.local`, IndexedDB, and OPFS unless you explicitly configure third-party APIs or self-hosted services.
 
-- **Manifest Permission Minimization**: Narrowed broad `<all_urls>` to explicit `https://*/*` and `http://*/*`; purged 13 retired domain declarations.
-- **Immutable Release & Automated Policy Gates**: Removed `--clobber` overwrite logic in the release workflow; added 51 offline regression tests integrated into CI.
-- **Legacy Code & Style Cleanup**: Purged nearly 3,000 lines of retired workspace styles from `newtab-workspaces.css` (reducing bundle size by 66.4KB); generalized Markdown classes; removed all QQ residues. See [v1.0.9 Release Notes](docs/RELEASE_1.0.9.md).
-
-### v1.0.8 · Overlay Sidebar & Native GitHub Lists
-
-- A non-resizing overlay sidebar on new tabs and ordinary webpages, with extension icon, Alt+W, close button, and Esc controls; protected pages do not support injection.
-- Star categories use official GitHub Lists with multi-list membership; the special “Currently Using” category has been removed.
-- Bilibili favorites search runs on Enter or the search button. See [v1.0.8 Release Notes](docs/RELEASE_1.0.8.md).
-
-### v1.0.5 · My Repositories Topic Kanban, Two-Way Drag & Drop, and Remote Topic Sync
-
-- **GitHub Workspace: "My Repositories · Topic Kanban"**: Left navigation adds an entry to view your repositories arranged in a multi-column horizontal kanban board, with unclassified repositories on the left and GitHub Topics categorized on the right.
-- **Bidirectional Drag-and-Drop with Automatic GitHub Sync**: Drag cards between columns; dragging into a Topic column attaches the topic tag and syncs remotely via GitHub API; dragging back removes the tag.
-- **Comprehensive Horizontal Navigation**: Supports dragging cards while scrolling the wheel horizontally, `Shift` + mouse wheel scrolling, and auto-scrolling when hovering near board edges (100px).
-- **Native Cascading Context Menus**: Right-click cards for options; hover/click "Move to Group" to open a secondary pane with boundary flipping; includes one-click link copying, clone command copying, and GitHub navigation.
-- **Layout & Visual Polishing**: Fixed a CSS bug where cards could collapse under vertical pressure (`flex-shrink: 0`), fully conforming to light and dark theme variables.
-
-### v1.0.4 · Radio Safeguards, Smart Failover, and 3-Tier Docs
-
-- **Radio Collection Overwrite Protection**: Eliminated implicit overwrites when saving empty playlist names; empty fields trigger a highlighted shake animation and focus prompt.
-- **Smart Failover & Anti-Stall**: Automatically aborts dead retries on timeouts, network errors, or auth limits, with up to 3 fallback source switches.
-- **WebDAV Cloud Roaming**: Custom radio station playlists are now backed up and restored via Nutstore / self-hosted WebDAV (`bili_radio_custom_series`).
-- **Historical note**: This version included a video recommendation card redesign; the associated workspace was removed in later development.
-- **Three-Tier Documentation & Official Theme System**: Established 4 official themes (`light`, `dark`, `endfield`, `lonetrail`) and startup animations (`rhinelab` / `endfield`).
-- **Build Optimization**: Cleaned up 847 unused legacy chunk artifacts.
-
-> For older release history and detailed migration logs, see the complete [Changelog (CHANGELOG.md)](CHANGELOG.md).
-
----
-
-## 🔒 Configuration & Data Boundaries
-
-- Features like GitHub, Todoist, music, and self-hosted chatrooms require their respective user accounts, tokens, or services.
-- Chatrooms run on self-hosted servers with personal invite codes; consult the [Server Guide](server/private-chat/README.md).
-- `chrome.storage.local` and IndexedDB reside inside the browser sandboxed profile. **This does not equal enterprise end-to-end encryption**; local storage simply means data does not leave your machine unless requested.
-- API calls communicate directly with target providers; chat messages are stored on your designated self-hosted server.
-- Backing up configurations does not duplicate original media files on disk.
-- Never commit private tokens, session cookies, invite credentials, or server keys into public repositories.
-
----
-
-## 🛡️ Permissions & Privacy Policy
-
-This extension strictly adheres to the **Chromium Manifest V3** security standard. All configurations, bookmark caches, and preferences are **stored locally within your browser by default**. There are zero analytics trackers, telemetry libraries, or commercial ad servers.
-
-### 1. Why Are These Permissions Declared?
-
-| Declared Permission | Purpose & Necessity |
+| Permission | Purpose |
 | :--- | :--- |
-| `storage` / `unlimitedStorage` | Store shortcuts, custom groups, theme settings, radio queues, and offline caches locally in `chrome.storage.local` and IndexedDB. |
-| `bookmarks` | Read browser bookmarks to display in the new-tab kanban grid; support organization, folder creation, and drag-and-drop sorting (indexed locally via Web Worker). |
-| `tabs` / `activeTab` | Power the top-bar tab manager (tree display of open tabs, one-click switching), avoiding duplicate opened tabs. |
-| `cookies` | Bilibili actions read the `bili_jct` CSRF cookie. NetEase uses website-session requests. The YouTube workspace and its background authentication and cookie diagnostics have been removed; see the [permission audit](docs/MANIFEST_PERMISSION_AUDIT.md). |
-| `downloads` | Triggered strictly by user action: exporting configuration backups, downloading cached audio/video, and saving wallpapers. |
-| `scripting` | Injects an isolated, non-modal overlay sidebar or web translation helper only on explicit user invocation. The sidebar (suggested shortcut: `Alt+W`) does not resize webpages. Browser internal pages, extension stores and other protected pages cannot be injected. |
-| `identity` | Optional Google Calendar OAuth2 authorization for agenda synchronization. |
-| `declarativeNetRequest` | Sets required headers for extension-originated Bilibili media and image requests and removes obsolete network rules. |
-| `contextMenus` / `clipboardWrite` | Context menus for shortcut cards, and one-click copying of URLs, clone commands, or AI news summaries to clipboard. |
+| `storage` / `unlimitedStorage` | Store local settings, sites, library items, radio series, and caches. |
+| `bookmarks` / `favicon` | Render and organize bookmarks with site icons in the local Worker search index. |
+| `tabs` / `activeTab` | Support the top tab manager tree and focus existing workspace tabs. |
+| `cookies` | Read Bilibili's `bili_jct` CSRF cookie when performing user-initiated Bilibili actions. |
+| `declarativeNetRequest` | Attach required media/image headers for extension-initiated Bilibili requests. |
+| `scripting` | Inject the overlay sidebar (`Alt+W`) or page translator only when explicitly triggered. |
+| `alarms` / `notifications` | Run user-scheduled AI tasks and deliver local completion notifications. |
+| `downloads` | Export backups, save wallpapers, and download user-requested cached media. |
+| `identity` | Optional Google Calendar OAuth2 sign-in. |
+| `nativeMessaging` | Communicate with user-configured local AI CLI agent hosts (e.g., Pi / Claude Code / Codex / OpenCode / ACP) when enabled. |
+| `offscreen` | Host continuous background audio playback via MV3 Offscreen Documents. |
+| `contextMenus` / `clipboardWrite` | Context actions and one-click copy of links, articles, and transcripts. |
 
-### 2. Where Does Data Go?
-
-- **Zero Third-Party Telemetry**: We do not operate telemetry servers. We do not track user habits, statistics, or navigation history.
-- **Direct Official API Communications**:
-  - When utilizing Bilibili favorites, GitHub Stars, Todoist tasks, NetEase Cloud Music, or Open-Meteo weather, requests **travel directly between your browser and the respective official service**.
-  - Your API tokens and keys remain strictly in local storage and are only sent in request headers to the corresponding official endpoint.
-- **Self-Hosted Beaver Chatroom**: Chatrooms are entirely self-hosted. Messages sync only with your specified server address after you manually provide an invite code; no public relay exists.
-- **WebDAV Cloud Sync**: Requires a configured server and separate backup passphrase. Backups are encrypted locally; manual operations and optional startup sync are supported, with conflict prompts. Use HTTPS; old server versions and exported files are not automatically deleted.
+See [PRIVACY.md](PRIVACY.md), [THIRD-PARTY-SERVICES.md](THIRD-PARTY-SERVICES.md), and [MANIFEST_PERMISSION_AUDIT.md](docs/MANIFEST_PERMISSION_AUDIT.md).
 
 ---
 
-## 💻 Development
+## Development
 
 ```bash
-# Watch UI sources and recompile; refresh your browser page to view changes
-npm run ui:watch
-
-# Run TypeScript checks and multi-entry builds
-npm run check
-
-# Create a clean release package
-npm run release:build
+npm test              # Run offline regression & policy suite
+npm run ui:watch      # Watch and rebuild frontend modules
+npm run check         # Validate locales, vue-tsc typecheck, and build bundles
+npm run release:build # Produce isolated extension release directory & zip
 ```
 
-The project is dedicated to desktop Chromium browsers. Legacy Android / Capacitor toolchains have been removed; responsive styling for narrower browser windows is preserved.
-
-### Directory Structure
+Key directories:
 
 ```text
-src/                 Frontend modules, SDK, and background service workers
-server/private-chat/ Self-hosted private chatroom backend
-docs/                Architecture, module index, and deployment guides
-docs/history/        Historical migration ledgers and audit records
-generated/           Compiled assets
-manifest.json        Chromium extension manifest (MV3)
+src/                 Frontend modules, SDK, workspaces, and background worker
+crates/fast-search/  Rust / WebAssembly local search engine
+server/private-chat/ Optional self-hosted private chatroom server
+tests/               Unit & policy regression tests
+docs/                Architecture docs, module index, and historical archives
+generated/           Built runtime artifacts
+manifest.json        Chromium MV3 extension manifest
 ```
 
-### Three-Tier Documentation Navigation
+### Further Reading
 
-- **Tier 1 · Visitors & Everyday Users**: Read this [README.md](README.md) and the [Changelog](CHANGELOG.md).
-- **Tier 2 · Developers & Current Entries**: Read [System Architecture](ARCHITECTURE.md) and [Current State & Actual Entry Points](docs/CURRENT_STATE.md).
-- **Tier 3 · Module Index & SDK**: Read [Module & Component Index](docs/MODULE_INDEX.md) and [SDK Documentation](src/sdk/README.md).
-- **Archives**: Historical migration records and retired proposals are preserved in the [docs/history/ Archive](docs/history/README.md).
-
----
-
-## 📄 License & Attribution
-
-Original code is licensed under the [MIT License](LICENSE). Third-party components, runtimes, and graphical assets follow their respective licenses. The MIT license of the original code does not imply commercial license for all bundled assets. See [ATTRIBUTION.md](ATTRIBUTION.md) for full details.
+- **Architecture & Modules**: [ARCHITECTURE.md](ARCHITECTURE.md) · [CURRENT_STATE.md](docs/CURRENT_STATE.md) · [MODULE_INDEX.md](docs/MODULE_INDEX.md)
+- **Licensing & Legal**: [LICENSE](LICENSE) · [THIRD-PARTY-LICENSES.md](THIRD-PARTY-LICENSES.md) · [ATTRIBUTION.md](ATTRIBUTION.md) · [PRIVACY.md](PRIVACY.md)
