@@ -1,50 +1,50 @@
-import { d as F, o as M, e as P, f as n, g as a, h as o, j as d, C as v, t as h, F as g, i as V, u as b, s as z, E as w, b as p, c as D } from "./chunks/vendor-vue-BbmU9NUg.js";
-import { S as L } from "./chunks/StickerBoard-DpiYWVME.js";
-import { a as f } from "./chunks/stickers.service-DwyFQlqA.js";
-import { w as $ } from "./chunks/InlineEditStatus.vue_vue_type_style_index_0_scoped_c63d0c6d_lang-DwclBqWw.js";
-import { g as y, i as S, s as j } from "./chunks/quick-links-export.service-bmE4-0fH.js";
-import { _ as H } from "./chunks/_plugin-vue_export-helper-Dzz2LC3-.js";
+import { d as N, o as F, e as M, f as n, g as r, h as o, j as d, B as v, t as h, F as g, i as P, u as b, q as V, D as w, b as p, c as z } from "./chunks/vendor-vue-C-_ocEUS.js";
+import { _ as L, e as $ } from "./chunks/_plugin-vue_export-helper-CUD1GoS1.js";
+import { S as j } from "./chunks/StickerBoard-D_YCLRFN.js";
+import { a as f } from "./chunks/stickers.service-BHqjZdvX.js";
+import { w as q } from "./chunks/InlineEditStatus.vue_vue_type_style_index_0_scoped_c63d0c6d_lang-Bk2ztKZ7.js";
+import { g as y, i as S, s as H } from "./chunks/quick-links-export.service-bmE4-0fH.js";
 const Q = { class: "sticker-app" }, U = {
   key: 0,
   class: "sticker-side-nav"
-}, q = {
+}, G = {
   key: 1,
   class: "sticker-side-tools"
-}, G = {
+}, J = {
   key: 2,
   class: "sticker-page-section"
-}, J = { class: "sticker-page-grid" }, K = {
+}, K = { class: "sticker-page-grid" }, O = {
   key: 0,
   class: "sticker-empty"
-}, O = ["title", "onClick"], R = ["src"], X = ["hidden"], Y = /* @__PURE__ */ F({
+}, R = ["title", "onClick"], X = ["src"], Y = ["hidden"], Z = /* @__PURE__ */ N({
   __name: "StickerStandalone",
-  setup(tt) {
-    const T = w(() => import("./chunks/SettingsDialog-BsT2mC7g.js")), B = w(() => import("./chunks/AppPromptModal-Tn-L0vs0.js")), m = document.body.dataset.mode === "sidepanel", l = p([]), i = p("等待扫描"), u = p(""), _ = p(!1);
+  setup(et) {
+    const C = w(() => import("./chunks/SettingsDialog-Bop3AG7S.js")), B = w(() => import("./chunks/AppPromptModal-K1q5dpLz.js")), m = document.body.dataset.mode === "sidepanel", l = p([]), i = p("等待扫描"), u = p(""), _ = p(!1);
     let k = 0;
-    function r(s, e = !1) {
+    function a(s, e = !1) {
       u.value = s, _.value = e, clearTimeout(k), k = window.setTimeout(() => {
         u.value = "";
       }, 2800);
     }
-    M(() => {
-      f.onToast = r;
-    }), P(() => {
+    F(() => {
+      f.onToast = a;
+    }), M(() => {
       f.onToast = void 0, clearTimeout(k);
     });
-    function E() {
+    function I() {
       location.href = "stickers.html";
     }
-    async function I() {
+    async function W() {
       try {
         const s = await y();
         if (!S(s)) throw new Error("当前标签页不是普通网页");
-        const e = await j(s);
-        r(e.ok ? "已保存到常用网站" : e.error || "保存失败", !e.ok);
+        const e = await H(s);
+        a(e.ok ? "已保存到常用网站" : e.error || "保存失败", !e.ok);
       } catch (s) {
-        r(s?.message || "保存失败", !0);
+        a(s?.message || "保存失败", !0);
       }
     }
-    async function W() {
+    async function A() {
       i.value = "正在扫描…", l.value = [];
       try {
         const s = await y();
@@ -56,40 +56,40 @@ const Q = { class: "sticker-app" }, U = {
             width: t.naturalWidth || t.width,
             height: t.naturalHeight || t.height,
             alt: t.alt || ""
-          })).filter((t) => t.url && !t.url.startsWith("blob:") && t.width >= 32 && t.height >= 32).filter((t, c, x) => x.findIndex((N) => N.url === t.url) === c).sort((t, c) => c.width * c.height - t.width * t.height).slice(0, 80)
+          })).filter((t) => t.url && !t.url.startsWith("blob:") && t.width >= 32 && t.height >= 32).filter((t, c, x) => x.findIndex((D) => D.url === t.url) === c).sort((t, c) => c.width * c.height - t.width * t.height).slice(0, 80)
         });
         l.value = e?.[0]?.result || [], i.value = `${l.value.length} 张 · 点击保存`;
       } catch (s) {
-        i.value = "扫描失败", r(s?.message || "无法扫描当前页", !0);
+        i.value = "扫描失败", a(s?.message || "无法扫描当前页", !0);
       }
     }
-    async function A(s) {
+    async function E(s) {
       try {
-        const e = await $(() => f.saveImageToFavoritesAny({ url: s.url }));
+        const e = await q(() => f.saveImageToFavoritesAny({ url: s.url }));
         if (!e.ok) throw new Error(e.error);
-        r("图片已保存到当前图库");
+        a("图片已保存到当前图库");
       } catch (e) {
-        r(e?.message || "保存图片失败", !0);
+        a(e?.message || "保存图片失败", !0);
       }
     }
-    return (s, e) => (n(), a(g, null, [
+    return (s, e) => (n(), r(g, null, [
       o("main", Q, [
-        m ? (n(), a("nav", U, [...e[0] || (e[0] = [
+        m ? (n(), r("nav", U, [...e[0] || (e[0] = [
           o("a", { href: "sidepanel.html" }, "← 工具首页", -1),
           o("span", null, "表情包", -1)
         ])])) : d("", !0),
-        v(L),
-        m ? (n(), a("div", q, [
-          o("button", {
-            type: "button",
-            onClick: E
-          }, "完整工具 ↗"),
+        v(j),
+        m ? (n(), r("div", G, [
           o("button", {
             type: "button",
             onClick: I
+          }, "完整工具 ↗"),
+          o("button", {
+            type: "button",
+            onClick: W
           }, "☆ 保存网页到常用网站")
         ])) : d("", !0),
-        m ? (n(), a("section", G, [
+        m ? (n(), r("section", J, [
           o("header", null, [
             o("div", null, [
               e[1] || (e[1] = o("strong", null, "当前网页图片", -1)),
@@ -97,36 +97,38 @@ const Q = { class: "sticker-app" }, U = {
             ]),
             o("button", {
               type: "button",
-              onClick: W
+              onClick: A
             }, "扫描当前页")
           ]),
-          o("div", J, [
-            i.value.endsWith("0 张 · 点击保存") ? (n(), a("div", K, "当前页面没有可收集的图片")) : d("", !0),
-            (n(!0), a(g, null, V(l.value, (t) => (n(), a("button", {
+          o("div", K, [
+            i.value.endsWith("0 张 · 点击保存") ? (n(), r("div", O, "当前页面没有可收集的图片")) : d("", !0),
+            (n(!0), r(g, null, P(l.value, (t) => (n(), r("button", {
               key: t.url,
               type: "button",
               class: "sticker-page-image",
               title: t.alt || t.url,
-              onClick: (c) => A(t)
+              onClick: (c) => E(t)
             }, [
               o("img", {
                 src: t.url,
                 loading: "lazy",
                 alt: ""
-              }, null, 8, R),
+              }, null, 8, X),
               o("i", null, h(t.width) + "×" + h(t.height), 1)
-            ], 8, O))), 128))
+            ], 8, R))), 128))
           ])
         ])) : d("", !0)
       ]),
-      v(b(T)),
+      v(b(C)),
       v(b(B)),
       o("div", {
         id: "sticker-toast",
-        class: z(["sticker-toast", { bad: _.value }]),
+        class: V(["sticker-toast", { bad: _.value }]),
         hidden: !u.value
-      }, h(u.value), 11, X)
+      }, h(u.value), 11, Y)
     ], 64));
   }
-}), Z = /* @__PURE__ */ H(Y, [["__scopeId", "data-v-7b038dbe"]]), C = document.getElementById("vue-sticker-standalone-root");
-C && D(Z).mount(C);
+}), tt = /* @__PURE__ */ L(Z, [["__scopeId", "data-v-7b038dbe"]]);
+$();
+const T = document.getElementById("vue-sticker-standalone-root");
+T && z(tt).mount(T);

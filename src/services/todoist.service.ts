@@ -168,7 +168,11 @@ export class TodoistService {
   private inboxProjectId: string = (typeof localStorage !== "undefined" && localStorage.getItem("todoist_inbox_project_id")) || "";
   private activeProjectName: string = "";
 
-  private readonly changeChannel = createTodoistChangeChannel(() => this.initToken(), () => {
+  private readonly changeChannel: {
+    publish(token: string): Promise<void>;
+    markSynced?(token: string): Promise<void>;
+    clear?(): void;
+  } = createTodoistChangeChannel(() => this.initToken(), () => {
     this.invalidateWorkspaceSnapshots();
     todoistModuleState.dataRevision++;
   });
@@ -244,6 +248,14 @@ export class TodoistService {
         const keys = Object.keys(await chrome.storage.local.get(null))
           .filter(key => key.startsWith("todoistSnapshot:"));
         await chrome.storage.local.remove([TODOIST_WORKSPACE_CACHE_KEY, ...keys]);
+        if (typeof localStorage !== "undefined") {
+          try {
+            Object.keys(localStorage)
+              .filter(k => k.startsWith("todoist_fast_snapshot:") || k === "todoist_calendar_cache_v1" || k === "todoist_labels_cache_v1")
+              .forEach(k => localStorage.removeItem(k));
+          } catch {}
+        }
+        this.changeChannel.clear?.();
         this.invalidateWorkspaceSnapshots();
       }
     } else {
@@ -335,6 +347,10 @@ export class TodoistService {
   private workspaceMemoryCache = new Map<string, { data: TodoistWorkspaceData; timestamp: number }>();
   private workspaceMutationVersion = 0;
   private workspaceCacheInvalidated = false;
+
+  public isWorkspaceCacheInvalidated(): boolean {
+    return this.workspaceCacheInvalidated;
+  }
 
   public invalidateWorkspaceSnapshots(): void {
     ++this.workspaceMutationVersion;
@@ -473,7 +489,11 @@ export class TodoistService {
       const key = this.getWorkspaceCacheKey(view, targetProjectId);
       const cached = await this.getCachedWorkspaceData(view, targetProjectId);
       const mem = this.workspaceMemoryCache.get(key);
-      if (cached && cached.columns?.length && mem && Date.now() - mem.timestamp < 3 * 60 * 1000) {
+      const todayStr = new Date().toLocaleDateString("en-CA");
+      const staleTodayRollover = view === "today" && mem?.timestamp
+        ? new Date(mem.timestamp).toLocaleDateString("en-CA") !== todayStr
+        : false;
+      if (cached && cached.columns?.length && !staleTodayRollover) {
         return cached;
       }
     }
@@ -688,6 +708,7 @@ export class TodoistService {
         } catch (error) { console.warn("[Todoist] Snapshot persistence failed", error); }
         ensureCurrent();
       }
+      void this.changeChannel.markSynced?.(this.token);
 
       return result;
     } catch (netErr: any) {

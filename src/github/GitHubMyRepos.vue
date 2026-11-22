@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted, onUnmounted, watch } from "vue";
+import { onImeEnter } from "../core/ime-keyboard";
 import { myReposState, myReposController, type MyRepoItem } from "./my-repos-store";
 import { notifications } from "../sdk/notifications";
 import { githubTaskModalController } from "./github-task-modal-store";
@@ -531,7 +532,7 @@ onUnmounted(() => {
                 v-model="renameGroupInput"
                 type="text"
                 class="rename-input"
-                @keydown.enter="handleConfirmRename(group)"
+                @keydown="onImeEnter($event, () => handleConfirmRename(group))"
                 @keydown.esc="renamingColumnGroup = null"
                 autofocus
               />
@@ -640,7 +641,7 @@ onUnmounted(() => {
               type="text"
               placeholder="输入分组名称（如：前端工具、深度学习）"
               class="composer-input"
-              @keydown.enter="handleCreateGroup"
+              @keydown="onImeEnter($event, handleCreateGroup)"
               @keydown.esc="isCreatingGroup = false"
               autofocus
             />

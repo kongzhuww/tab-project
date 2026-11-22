@@ -1,4 +1,6 @@
 import { createApp } from 'vue';
+import { ensureImeDocumentTracker } from '../core/ime-keyboard';
+ensureImeDocumentTracker();
 import TodoistWorkspace from './TodoistWorkspace.vue';
 import { todoistModuleState } from './module-state';
 import { todoistMainWorkspaceState } from './main-workspace-store';

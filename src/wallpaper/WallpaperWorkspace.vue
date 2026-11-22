@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount, reactive, watch } from "vue";
+import { onImeEnter } from "../core/ime-keyboard";
 import { WallpaperService, DEFAULT_MOUNTAIN_VALUE, type WallpaperHistoryItem } from "../services/wallpaper.service";
 import { windowManagerController } from "../core/window-manager.store";
 import { useWindowDraggable } from "../core/useWindowDraggable";
@@ -464,7 +465,7 @@ function handleDrop(event: DragEvent) {
                   maxlength="40"
                   autofocus
                   @click.stop
-                  @keydown.enter="saveRename(item, $event)"
+                  @keydown="onImeEnter($event, e => saveRename(item, e))"
                   @keydown.esc="cancelRename($event)"
                 />
                 <button class="wallpaper-rename-action save" type="button" @click.stop="saveRename(item, $event)">✓</button>

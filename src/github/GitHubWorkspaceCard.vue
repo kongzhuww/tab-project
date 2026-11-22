@@ -27,6 +27,7 @@ const GitHubSettingsModal = defineAsyncComponent(() => import("./GitHubSettingsM
 const GitHubBookGuide = defineAsyncComponent(() => import("../launchers/LauncherBookGuideDialog.vue"));
 import { githubGuideSpreads } from "./guide-content";
 import { gitHubService, type GitHubSearchRule } from "../services/github.service";
+import { starBoardData } from "./stars-board-data";
 import { fullscreenCardState } from "../core/fullscreen-card-state";
 import { useWorkspaceWallpaper } from "../wallpaper/workspace-wallpaper";
 import WorkspaceWallpaperLayer from "../wallpaper/WorkspaceWallpaperLayer.vue";
@@ -213,6 +214,19 @@ watch(active, async visible => {
     initialError.value = t("github.initError");
   }
 }, { immediate: true, flush: "sync" });
+let autoFullLoadKey = "";
+watch(
+  () => [active.value, activeChannel.value, starBoardData.loading, starBoardData.ownerKey, accountRevision.value] as const,
+  ([visible, channel, loading, ownerKey, rev]) => {
+    if (!visible || channel !== "stars" || loading || !ownerKey) return;
+    if (gitHubService.allStarsLoaded || gitHubService.loadingAllStars || !gitHubService.baseUrl || !gitHubService.total) return;
+    const key = `${ownerKey}:${rev}`;
+    if (autoFullLoadKey === key) return;
+    autoFullLoadKey = key;
+    void gitHubService.ensureAllStarsLoaded();
+  },
+  { immediate: true }
+);
 onBeforeUnmount(() => { gitHubService.setAiViewActive(false); ++initialVersion; repositoryReadScope?.abort(); clearTimeout(searchTimer); });
 </script>
 

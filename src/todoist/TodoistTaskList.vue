@@ -110,7 +110,7 @@
             <textarea
               v-model="composerContent"
               rows="2"
-              placeholder="任务名称（Enter 换行，⌘/Ctrl+Enter 创建，支持粘贴图片）"
+              placeholder="任务名称（Enter 创建，Shift+Enter 换行，支持粘贴图片）"
               @keydown="onComposerKeyDown($event, col)"
               @paste="onComposerPaste($event)"
             ></textarea>
@@ -370,7 +370,7 @@
               class="todoist-add-section-input"
               placeholder="板块名称…"
               autofocus
-              @keydown.enter.prevent="submitAddSection"
+              @keydown="onImeEnter($event, submitAddSection)"
               @keydown.esc="cancelAddSection"
             />
             <div class="todoist-add-section-actions">
@@ -472,7 +472,7 @@
             type="text"
             :placeholder="t('todoist.menu.newLabelPlaceholder')"
             class="todoist-label-input"
-            @keydown.enter.prevent="onMenuAddNewLabel"
+            @keydown="onImeEnter($event, onMenuAddNewLabel)"
           />
           <button type="button" class="todoist-label-add-btn" @click="onMenuAddNewLabel">＋</button>
         </div>
@@ -527,7 +527,7 @@
             type="text"
             class="todoist-recur-custom-input"
             placeholder="自定义循环 (如: every 2 weeks)…"
-            @keydown.enter.prevent="onMenuSubmitCustomRecur"
+            @keydown="onImeEnter($event, onMenuSubmitCustomRecur)"
           />
           <button type="button" class="todoist-recur-custom-submit" @click="onMenuSubmitCustomRecur">确定</button>
         </div>
@@ -664,7 +664,7 @@
           type="text"
           class="todoist-dialog-input"
           :placeholder="promptModal.placeholder"
-          @keydown.enter.prevent="submitPromptModal"
+          @keydown="onImeEnter($event, submitPromptModal)"
           @keydown.esc.stop.prevent="closePromptModal"
         />
       </div>
@@ -723,6 +723,7 @@
 import { ref, reactive, computed, nextTick, watch, onMounted, onUnmounted } from "vue";
 import { useTodoistBoardDrag } from "./useTodoistBoardDrag";
 import { isImeKey, shouldCreateTask } from "./task-keyboard";
+import { onImeEnter } from "../core/ime-keyboard";
 import TodoistVirtualList from "./TodoistVirtualList.vue";
 import { todoistModuleState, withTodoistWrite } from "./module-state";
 import { imageViewerController } from "../viewers/image-viewer-store";

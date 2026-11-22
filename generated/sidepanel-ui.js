@@ -1,7 +1,9 @@
-import { c as i } from "./chunks/vendor-vue-BbmU9NUg.js";
-import { S as a } from "./chunks/SidePanelApp-Bz6vZbuI.js";
+import { c as i } from "./chunks/vendor-vue-C-_ocEUS.js";
+import { e as s } from "./chunks/_plugin-vue_export-helper-CUD1GoS1.js";
+import { S as a } from "./chunks/SidePanelApp-CG6dp1i8.js";
 /* empty css                       */
-async function s() {
+s();
+async function c() {
   const e = document.getElementById("vue-sidepanel-root");
   if (!e) return;
   if (window.parent === window) {
@@ -14,12 +16,12 @@ async function s() {
     if (!t || !/^[a-f0-9-]{36}$/.test(t)) throw new Error("Missing grant");
     const n = await chrome.runtime.sendMessage({ type: "AUTHORIZE_SIDE_DRAWER_EMBED", token: t });
     if (!n?.ok || !/^https?:\/\//i.test(n.parentOrigin || "")) throw new Error("Invalid grant");
-    const o = () => window.parent.postMessage({ type: "TAB_PROJECT_CLOSE_DRAWER", token: t }, n.parentOrigin);
-    window.addEventListener("keydown", (r) => {
-      r.key === "Escape" && !r.defaultPrevented && o();
-    }), i(a, { inDrawer: !0, onClose: o }).mount(e);
+    const r = () => window.parent.postMessage({ type: "TAB_PROJECT_CLOSE_DRAWER", token: t }, n.parentOrigin);
+    window.addEventListener("keydown", (o) => {
+      o.key === "Escape" && !o.defaultPrevented && r();
+    }), i(a, { inDrawer: !0, onClose: r }).mount(e);
   } catch {
     e.textContent = "侧栏未获授权，请关闭后通过扩展图标或快捷键重新打开。";
   }
 }
-s();
+c();

@@ -1,6 +1,8 @@
 import "../assets/tokens.css";
 import { installPageCopyPolicy } from "../core/page-copy-policy";
 installPageCopyPolicy();
+import { ensureImeDocumentTracker } from "../core/ime-keyboard";
+ensureImeDocumentTracker();
 import "../assets/styles.css";
 import { commandRegistry } from "../core/commands";
 import { createFeatureRegistry } from "../core/features";

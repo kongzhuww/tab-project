@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { CACHED_FAVORITES_KEY, readPlaylistCache, writePlaylistCache } from "../music/playlist-cache";
 import { ref, computed, watch, onMounted, onUnmounted } from "vue";
+import { onImeEnter } from "../core/ime-keyboard";
 import {
   togetherPartyState as party,
   isPartyHost,
@@ -945,7 +946,7 @@ function onHeaderPointerDown(e: PointerEvent) {
                 v-model="customBvidInput"
                 placeholder="输入 BV号 点播音频"
                 class="custom-input"
-                @keydown.enter="handleAddCustomBvid"
+                @keydown="onImeEnter($event, handleAddCustomBvid)"
               />
               <button
                 type="button"

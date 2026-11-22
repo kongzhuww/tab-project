@@ -592,7 +592,7 @@ export default {
   "github.myRepos.openInGitHub": "↗ 在 GitHub 打开",
 
   "todoist.subtask.delete": "删除子任务",
-  "todoist.subtask.inputPlaceholder": "输入子任务，⌘/Ctrl+Enter 添加…",
+  "todoist.subtask.inputPlaceholder": "输入子任务，按 Enter 添加…",
   "todoist.subtask.add": "添加子任务",
   "todoist.comment.placeholder": "评论…",
   "todoist.comment.attachPhoto": "上传照片附件",

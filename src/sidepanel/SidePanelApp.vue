@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref } from "vue";
+import { onImeEnter } from "../core/ime-keyboard";
 import { todoistService } from "../services/todoist.service";
 import type { TodoistColumnItem, TodoistTaskItem } from "../todoist/task-list-store";
 import {
@@ -623,13 +624,13 @@ onUnmounted(() => {
           v-model="manualUrl"
           type="text"
           :placeholder="t('sidepanel.manualUrlPlaceholder')"
-          @keydown.enter.prevent="submitManualLink"
+          @keydown="onImeEnter($event, submitManualLink)"
         />
         <input
           v-model="manualTitle"
           type="text"
           :placeholder="t('sidepanel.manualTitlePlaceholder')"
-          @keydown.enter.prevent="submitManualLink"
+          @keydown="onImeEnter($event, submitManualLink)"
         />
         <button class="manual-submit-btn" type="button" :disabled="busy" @click="submitManualLink">
           {{ t('sidepanel.manualConfirmBtn') }}
@@ -774,7 +775,7 @@ onUnmounted(() => {
               type="text"
               :placeholder="t('sidepanel.todoistQuickInput')"
               class="todoist-quick-input"
-              @keydown.enter.prevent="submitQuickTodo"
+              @keydown="onImeEnter($event, submitQuickTodo)"
             />
             <button
               type="button"

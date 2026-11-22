@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { onImeEnter } from "../core/ime-keyboard";
 import { biliFavoritesController, biliFavoritesState, favoriteGridColumns, type BiliOrganizerFolderView, type BiliOrganizerVideoView } from "./bili-favorites-store";
 import { biliMiniPlayerController, biliMiniPlayerState } from "./mini-player-store";
 import { subtitleModalController } from "./subtitle-modal-store";
@@ -858,34 +859,6 @@ function createCassetteDragGhost(_title: string): HTMLElement {
   return ghost;
 }
 
-function beginVideoDrag(event: DragEvent, video: BiliOrganizerVideoView): void {
-  if (!event.dataTransfer) return;
-  event.dataTransfer.effectAllowed = "copyMove";
-  event.dataTransfer.setData("text/uri-list", video.url);
-  event.dataTransfer.setData("text/plain", video.url);
-  event.dataTransfer.setData("application/x-logicweaver-video-url", video.url);
-  event.dataTransfer.setData("application/x-logicweaver-task", JSON.stringify({ type: "material", title: video.title, url: video.url, source: "B站收藏" }));
-
-  // 🌟 卡带拖拽专属载荷 (Cassette Payload)
-  const bvid = video.bvid || (video.url?.match(/video\/(BV[0-9a-zA-Z]+)/)?.[1]) || video.id;
-  const cassettePayload = JSON.stringify({
-    type: "bili-cassette-tape",
-    bvid,
-    title: video.title,
-    cover: video.cover,
-    author: video.author,
-    duration: video.duration
-  });
-  event.dataTransfer.setData("application/x-bili-cassette", cassettePayload);
-  event.dataTransfer.setData("application/json", cassettePayload);
-
-  const ghost = createCassetteDragGhost(video.title);
-  event.dataTransfer.setDragImage(ghost, 66, 13);
-  setTimeout(() => {
-    if (ghost.parentNode) ghost.parentNode.removeChild(ghost);
-  }, 0);
-}
-
 function onRadioVideoDragStart(event: DragEvent, video: { bvid: string; title: string; cover?: string; author?: string; duration?: number }): void {
   if (!event.dataTransfer) return;
   event.dataTransfer.effectAllowed = "copyMove";
@@ -1331,10 +1304,10 @@ function onRadioQueueDrop(event: DragEvent): void {
               <p v-if="organizer.error" class="muted small" role="status">{{ organizer.error }}</p>
               <div class="fo-bili-grid fo-favorites-grid" :style="{ '--favorite-columns': organizer.pageSize / 3 }" :aria-busy="organizer.loading">
                 <p v-if="!organizer.videos.length" class="fo-bili-empty">{{ organizer.query ? '没有找到匹配的视频。' : '这个收藏夹是空的。' }}</p>
-                <article v-for="video in organizer.videos" :key="video.id" class="fo-bili-card" :class="{ 'batch-selected': video.selected, 'fo-single-moving': organizer.movingVideoId === video.id }" :data-batch-id="video.id" draggable="true" @dragstart="beginVideoDrag($event, video)" @contextmenu.prevent.stop="openVideoContextMenu($event, video)">
+                <article v-for="video in organizer.videos" :key="video.id" class="fo-bili-card" :class="{ 'batch-selected': video.selected, 'fo-single-moving': organizer.movingVideoId === video.id }" :data-batch-id="video.id" @contextmenu.prevent.stop="openVideoContextMenu($event, video)">
                   <div class="fo-bili-thumb">
                     <label v-if="organizer.batchMode" class="fo-batch-check" title="选择此视频"><input type="checkbox" :checked="video.selected" @change="dispatch('organizer-batch-select', video.id)" /><span>✓</span></label>
-                    <a class="fo-cover-link" :href="video.url" target="_blank" rel="noreferrer" @click.prevent="dispatch('organizer-play-video', video)"><img loading="lazy" decoding="async" referrerpolicy="no-referrer" :src="video.cover ? video.cover.replace(/^http:/, 'https:') : ''" alt="" /></a>
+                    <a class="fo-cover-link" draggable="false" :href="video.url" target="_blank" rel="noreferrer" @click.prevent="dispatch('organizer-play-video', video)"><img draggable="false" loading="lazy" decoding="async" referrerpolicy="no-referrer" :src="video.cover ? video.cover.replace(/^http:/, 'https:') : ''" alt="" /></a>
                     <span class="fo-bili-count">▣ {{ video.playCount }}</span><span class="fo-bili-duration">{{ video.duration }}</span>
                   </div>
                   <div class="fo-bili-title-row">
@@ -1474,8 +1447,8 @@ function onRadioQueueDrop(event: DragEvent): void {
             <p v-else-if="organizer.specialError" class="fo-bili-empty">{{ organizer.specialError }}</p>
             <div v-else class="fo-bili-grid fo-favorites-grid" :style="{ '--favorite-columns': gridColumns }">
               <p v-if="!organizer.specialVideos.length" class="fo-bili-empty">暂无推荐视频。</p>
-              <article v-for="video in organizer.specialVideos" :key="video.id" class="fo-bili-card" draggable="true" @dragstart="beginVideoDrag($event, video)">
-                <div class="fo-bili-thumb"><a class="fo-cover-link" :href="video.url" target="_blank" rel="noreferrer" @click.prevent="dispatch('special-play-video', video)"><img loading="lazy" decoding="async" referrerpolicy="no-referrer" :src="video.cover ? video.cover.replace(/^http:/, 'https:') : ''" alt="" /></a><span class="fo-bili-count">▣ {{ video.playCount }}</span><span class="fo-bili-duration">{{ video.duration }}</span></div>
+              <article v-for="video in organizer.specialVideos" :key="video.id" class="fo-bili-card">
+                <div class="fo-bili-thumb"><a class="fo-cover-link" draggable="false" :href="video.url" target="_blank" rel="noreferrer" @click.prevent="dispatch('special-play-video', video)"><img draggable="false" loading="lazy" decoding="async" referrerpolicy="no-referrer" :src="video.cover ? video.cover.replace(/^http:/, 'https:') : ''" alt="" /></a><span class="fo-bili-count">▣ {{ video.playCount }}</span><span class="fo-bili-duration">{{ video.duration }}</span></div>
                 <div class="fo-bili-title-row"><a class="fo-title-link fo-bili-title" :href="video.url" target="_blank" rel="noreferrer" @click.prevent="dispatch('special-play-video', video)">{{ video.title }}</a><button class="fo-card-more" type="button" aria-label="更多操作" :aria-expanded="openMenuId === video.id" @click.stop="toggleVideoMenu(video.id)">⋮</button><div v-if="openMenuId === video.id" class="fo-card-menu">
                       <button type="button" @click="dispatch('special-video-action', { video, id: video.id, action: 'collect-inbox' }); openMenuId = ''">📥 添加到收集箱</button>
                       <button type="button" @click="dispatch('special-video-action', { id: video.id, action: 'play' }); openMenuId = ''">本地播放与评论</button>
@@ -1516,8 +1489,8 @@ function onRadioQueueDrop(event: DragEvent): void {
             <p v-else-if="organizer.specialError" class="fo-bili-empty">{{ organizer.specialError }}</p>
             <div v-else class="fo-bili-grid fo-favorites-grid" :style="{ '--favorite-columns': gridColumns }">
               <p v-if="!organizer.specialVideos.length" class="fo-bili-empty">暂无最新关注视频动态。</p>
-              <article v-for="video in organizer.specialVideos" :key="video.id" class="fo-bili-card" draggable="true" @dragstart="beginVideoDrag($event, video)">
-                <div class="fo-bili-thumb"><a class="fo-cover-link" :href="video.url" target="_blank" rel="noreferrer" @click.prevent="dispatch('special-play-video', video)"><img loading="lazy" decoding="async" referrerpolicy="no-referrer" :src="video.cover" alt="" /></a><span class="fo-bili-count">▣ {{ video.playCount }}</span><span class="fo-bili-duration">{{ video.duration }}</span></div>
+              <article v-for="video in organizer.specialVideos" :key="video.id" class="fo-bili-card">
+                <div class="fo-bili-thumb"><a class="fo-cover-link" draggable="false" :href="video.url" target="_blank" rel="noreferrer" @click.prevent="dispatch('special-play-video', video)"><img draggable="false" loading="lazy" decoding="async" referrerpolicy="no-referrer" :src="video.cover" alt="" /></a><span class="fo-bili-count">▣ {{ video.playCount }}</span><span class="fo-bili-duration">{{ video.duration }}</span></div>
                 <div class="fo-bili-title-row"><a class="fo-title-link fo-bili-title" :href="video.url" target="_blank" rel="noreferrer" @click.prevent="dispatch('special-play-video', video)">{{ video.title }}</a><button class="fo-card-more" type="button" aria-label="更多操作" :aria-expanded="openMenuId === video.id" @click.stop="toggleVideoMenu(video.id)">⋮</button><div v-if="openMenuId === video.id" class="fo-card-menu"><button type="button" @click="dispatch('special-video-action', { video, id: video.id, action: 'play' }); openMenuId = ''">本地播放与评论</button><button type="button" @click="dispatch('special-video-action', { video, id: video.id, action: 'subtitle' }); openMenuId = ''">字幕提取</button><button type="button" @click="dispatch('special-video-action', { video, id: video.id, action: 'cache' }); openMenuId = ''">缓存视频</button><button type="button" @click="dispatch('special-video-action', { video, id: video.id, action: 'open' }); openMenuId = ''">打开网页</button></div></div>
                 <div class="fo-bili-meta">
                   <span
@@ -1636,7 +1609,7 @@ function onRadioQueueDrop(event: DragEvent): void {
                     :placeholder="isSeriesNameError ? '⚠️ 请输入歌单名称' : '歌单名称（可选）'"
                     autocomplete="off"
                     @input="isSeriesNameError = false"
-                    @keydown.enter.prevent="handleSaveSeries"
+                    @keydown="onImeEnter($event, handleSaveSeries)"
                   />
                   <div class="bili-radio-btn-group">
                     <button

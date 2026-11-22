@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from "vue";
+import { onImeEnter } from "../core/ime-keyboard";
 import { biliUpGroupManagerController as controller, biliUpGroupManagerState as state, type BiliUpGroupView } from "./up-group-manager-store";
 
 const createParentId = ref<string | null | undefined>(undefined);
@@ -248,7 +249,7 @@ function selectAllVisible(): void {
                 @drop.prevent="dropGroup($event, group.id)"
                 @click="state.activeGroupId = group.id"
               >
-                <template v-if="editingId === group.id"><input v-model="editingName" class="fo-upg-rename-input" maxlength="20" @click.stop @keydown.enter.prevent="submitRename" /><button type="button" @click.stop="submitRename">✓</button><button type="button" @click.stop="editingId = ''">✕</button></template>
+                <template v-if="editingId === group.id"><input v-model="editingName" class="fo-upg-rename-input" maxlength="20" @click.stop @keydown="onImeEnter($event, submitRename)" /><button type="button" @click.stop="submitRename">✓</button><button type="button" @click.stop="editingId = ''">✕</button></template>
                 <template v-else><span v-if="group.depth" class="fo-upg-tree-branch">↳</span><i v-else class="fo-folder-icon"></i><span class="fo-upg-group-name">{{ group.name }}</span><small>{{ group.upMids.length }}</small><span class="fo-upg-vue-group-actions"><button type="button" title="添加子分组" @click.stop="beginCreate(group.id)">＋</button><button type="button" title="重命名" @click.stop="beginRename(group)">✎</button><button type="button" class="danger" title="删除" @click.stop="controller.dispatch('delete-group', group.id)">×</button></span></template>
               </div>
               <form v-if="createParentId === group.id" class="fo-upg-create-box" :style="{ marginLeft: `${18 + group.depth * 18}px` }" @submit.prevent="submitCreate"><input v-model="createName" maxlength="20" :placeholder="`输入「${group.name}」的子分组名称…`" autofocus /><div class="fo-upg-create-btns"><button type="button" class="cancel" @click="cancelCreate">取消</button><button class="confirm" type="submit">确定</button></div></form>

@@ -46,7 +46,7 @@
             @input="resizeText($event.target as HTMLTextAreaElement); emit('update:editTitle', ($event.target as HTMLTextAreaElement).value); emit('scheduleDraftSave', $event)"
             @compositionend="emit('scheduleDraftSave', $event)"
             @blur="emit('saveTitleAndDesc', $event)"
-            @keydown.enter.prevent="emit('saveTitleAndDesc', $event)"
+            @keydown="onImeEnter($event, e => emit('saveTitleAndDesc', e))"
           />
         </div>
       </section>
@@ -142,7 +142,7 @@
               :placeholder="t('todoist.comment.placeholder')"
               :disabled="isSubmittingComment"
               @input="emit('update:newCommentText', ($event.target as HTMLInputElement).value)"
-              @keydown.enter.prevent="emit('submitComment')"
+              @keydown="onImeEnter($event, () => emit('submitComment'))"
             />
             <button
               type="button"
@@ -265,7 +265,7 @@
         <button ref="labelsBtnRef" type="button" class="side-item-row" @click="machine.send({ type: 'TOGGLE_POPOVER', popover: 'labels' })"><span class="row-text">{{ state.labels.join('、') || t('todoist.prop.addLabels') }}</span><span>＋</span></button>
         <InspectorPopover v-if="isLabelsMenuOpen" :anchor="labelsBtnRef" @close="machine.send({ type: 'CLOSE_POPOVER' })">
           <div class="inspector-menu">
-            <input v-model="labelSearchText" :placeholder="t('todoist.prop.searchOrCreateLabel')" :aria-label="t('todoist.prop.searchLabelAria')" @keydown.enter.prevent="createOrSelectLabel" />
+            <input v-model="labelSearchText" :placeholder="t('todoist.prop.searchOrCreateLabel')" :aria-label="t('todoist.prop.searchLabelAria')" @keydown="onImeEnter($event, createOrSelectLabel)" />
             <small v-if="labelsLoading">{{ t('todoist.prop.readingLabels') }}</small><p v-if="labelsError" role="alert">{{ labelsError }}</p>
             <div class="label-options-list"><label v-for="opt in filteredLabels" :key="opt" class="label-option-row"><span>◇ {{ opt }}</span><input type="checkbox" :checked="state.labels.includes(opt)" :disabled="!!todoistModuleState.pendingWrites" @change="emit('toggleLabelSelect', opt)" /></label></div>
             <button v-if="labelSearchText.trim() && !allKnownLabels.includes(labelSearchText.trim())" type="button" :disabled="!!todoistModuleState.pendingWrites" @click="createOrSelectLabel">{{ t('todoist.prop.createLabelBtn', { name: labelSearchText.trim() }) }}</button>
@@ -290,6 +290,7 @@ import { t } from "../i18n";
 import { useMachine } from "../core/useMachine";
 import { TodoistInspectorMachine } from "./inspector-machine";
 import { isImeKey, shouldCreateTask } from "./task-keyboard";
+import { onImeEnter } from "../core/ime-keyboard";
 import InspectorPopover from "./InspectorPopover.vue";
 import TaskRepositoryLinks from "./TaskRepositoryLinks.vue";
 import ReminderPicker from "./ReminderPicker.vue";

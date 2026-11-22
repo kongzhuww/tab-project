@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted } from "vue";
+import { isImeComposing } from "../core/ime-keyboard";
 import { searchState, searchController, type SearchSuggestionItem } from "./store";
 import { searchService } from "../services/search.service";
 import { gitHubService, type GitHubSearchRule } from "../services/github.service";
@@ -148,6 +149,7 @@ watch(() => searchState.isSuggestionsVisible, (visible) => {
 });
 
 function onKeydown(e: KeyboardEvent) {
+  if (isImeComposing(e)) return;
   if (!searchState.isSuggestionsVisible || !searchState.suggestions.length) {
     if (e.key === "Enter") onSubmit();
     return;

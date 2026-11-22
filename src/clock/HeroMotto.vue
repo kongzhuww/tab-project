@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, nextTick, onMounted, onUnmounted } from "vue";
+import { isImeComposing } from "../core/ime-keyboard";
 import { clockState } from "./store";
 import { mottoState, mottoController } from "./motto-store";
 import { notificationController } from "../notifications/store";
@@ -59,6 +60,7 @@ function cancelEditMotto() {
 }
 
 function onMottoKeydown(e: KeyboardEvent) {
+  if (isImeComposing(e)) return;
   if (e.key === "Enter") {
     e.preventDefault();
     saveMotto();

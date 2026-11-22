@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { nextTick, onMounted, onBeforeUnmount, ref, watch } from "vue";
+import { isImeComposing } from "../core/ime-keyboard";
 
 // Behaviour only: caller retains its existing class, dimensions and persistence logic.
 const props = defineProps<{ modelValue: string; busy?: boolean; revision?: number }>();
@@ -24,7 +25,7 @@ function commit() {
 }
 function onKey(event: KeyboardEvent) {
   // Enter/Escape belongs to the IME while its candidate list is open.
-  if (composing || event.isComposing || event.keyCode === 229) return;
+  if (composing || isImeComposing(event)) return;
   if (props.busy) {
     if (event.key === "Enter" || event.key === "Escape") { event.preventDefault(); event.stopPropagation(); }
     return;

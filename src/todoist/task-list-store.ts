@@ -221,19 +221,23 @@ export const todoistTaskListController = {
         return;
       }
 
+      let cachedFromStorage: any = null;
       if (!syncFast && !force) {
         // 优先读取本地持久化或内存缓存（0ms 极速直出）
         const cached = await todoistService.getCachedWorkspaceData(targetView, targetProjectId);
         if (!current()) return;
         if (cached && Array.isArray(cached.columns) && cached.columns.length > 0) {
+          cachedFromStorage = cached;
           apply(cached);
           this.setLoading(false);
         }
       }
 
-      // 静默向云端同步最新数据：即使云端较慢或网络异常，由于上方缓存已直出，用户不会感到任何卡顿或重新加载
+      // 若缓存有效且未失效，loadWorkspaceData 会直接返回同一份缓存对象，无需重复 apply 重绘看板
       const data = await todoistService.loadWorkspaceData(targetView, targetProjectId, force, request.signal);
-      apply(data);
+      if (data !== syncFast && data !== cachedFromStorage) {
+        apply(data);
+      }
     } catch (err: any) {
       if (current()) {
         this.setLoading(false);

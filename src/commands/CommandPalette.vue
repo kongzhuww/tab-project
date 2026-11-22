@@ -75,6 +75,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, nextTick } from "vue";
+import { isImeComposing } from "../core/ime-keyboard";
 import { commandRegistry, type CommandMetadata } from "../core/commands";
 import { commandPaletteState as state, commandPaletteController as controller } from "./command-palette-store";
 
@@ -107,6 +108,7 @@ function onInput() {
 }
 
 function onKeyDown(e: KeyboardEvent) {
+  if (isImeComposing(e)) return;
   const total = filteredCommands.value.length;
   if (e.key === "ArrowDown") {
     e.preventDefault();

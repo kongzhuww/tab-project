@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, reactive, computed, nextTick, onMounted, onUnmounted, TransitionGroup, defineAsyncComponent } from "vue";
+import { isImeComposing } from "../core/ime-keyboard";
 const BookmarkBoard = defineAsyncComponent(() => import("../bookmarks/BookmarkBoard.vue"));
 const LauncherBookGuideDialog = defineAsyncComponent(() => import("./LauncherBookGuideDialog.vue"));
 const sitesView = computed<"sites" | "bookmarks">({
@@ -639,6 +640,7 @@ function finishAddPage() {
 }
 
 function onPageInputKeydown(event: KeyboardEvent) {
+  if (isImeComposing(event)) return;
   if (event.key === "Enter") {
     event.preventDefault();
     finishAddPage();

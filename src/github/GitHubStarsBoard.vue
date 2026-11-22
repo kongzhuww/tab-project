@@ -41,10 +41,10 @@ const showShelfSkeleton = computed(() => isLoading.value && !starBoardData.repos
 // 当前处于下钻模式的父文件夹名称（null 为全部视图）
 const activeDrilldownParent = ref<string | null>(null);
 
-// 统一解析文件夹名称，支持半角 / 与中文全角 ／，以及斜杠两侧任意空格
+// 统一解析文件夹名称，支持半角 / 与中文全角 ／，以及斜杠两侧任意空格（按最后一级斜杠拆分以支持多级子分类）
 function parseFolderHierarchy(name: string): { parentPrefix: string; childName: string } | null {
   if (!name) return null;
-  const match = name.match(/^(.+?)[/／](.+)$/);
+  const match = name.match(/^(.+)[/／]([^/／]+)$/);
   if (!match) return null;
   const parentPrefix = match[1].trim();
   const childName = match[2].trim();
@@ -86,6 +86,11 @@ function handleDrilldown(parentName: string) {
   if (boardViewportRef.value) {
     boardViewportRef.value.scrollLeft = 0;
   }
+}
+
+function goBackDrilldown(): void {
+  if (!activeDrilldownParent.value) return;
+  activeDrilldownParent.value = getParentFolderName(activeDrilldownParent.value);
 }
 
 // 实际在看板中渲染展示的 Lists 列
@@ -206,11 +211,18 @@ function closeListMenu(): void {
 function handleOpenListMenu(e: MouseEvent, list: any) {
   e.preventDefault();
   e.stopPropagation();
-  const menuWidth = 150;
-  const menuHeight = 130;
+  const menuWidth = 160;
+  const menuHeight = 175;
   const x = Math.min(e.clientX, window.innerWidth - menuWidth - 10);
   const y = Math.min(e.clientY, window.innerHeight - menuHeight - 10);
   boardMachine.send({ type: "OPEN_COLUMN_MENU", payload: { x, y, list } });
+}
+
+async function handleCreateSubList() {
+  const l = listMenuState.list;
+  closeListMenu();
+  if (!l) return;
+  await gitHubService.promptCreateFolder(l.name);
 }
 
 async function handleRenameList() {
@@ -355,7 +367,7 @@ function onGlobalPointerDown(event: PointerEvent): void {
 function onGlobalKeyDown(event: KeyboardEvent): void {
   if (event.key === "Escape") {
     if (activeDrilldownParent.value) {
-      activeDrilldownParent.value = null;
+      goBackDrilldown();
       return;
     }
     boardMachine.send({ type: "RESET_IDLE" });
@@ -467,6 +479,26 @@ function openRepoDetail(repo: GitHubRawRepo) {
 
 function openRepoUrl(url: string) {
   window.open(url, "_blank", "noopener,noreferrer");
+}
+
+function getListBadgeText(list: any): string {
+  const visible = controller.getReposForList(list.name).length;
+  const saved = Number(list?.totalCount || 0);
+  if (!starBoardData.searchQuery.trim() && saved > visible) {
+    return `${visible}/${saved}`;
+  }
+  return String(visible);
+}
+
+function getListBadgeTitle(list: any): string {
+  const visible = controller.getReposForList(list.name).length;
+  const saved = Number(list?.totalCount || 0);
+  if (!starBoardData.searchQuery.trim() && saved > visible) {
+    return starBoardData.loading
+      ? `已加载 ${visible} 个，本地共记录 ${saved} 个（正在补全 Star 列表…）`
+      : `已显示 ${visible} 个，本地共记录 ${saved} 个（其余可能尚未拉取或已在 GitHub 取消 Star）`;
+  }
+  return `共 ${visible} 个仓库`;
 }
 
 function formatDate(iso: string): string {
@@ -664,10 +696,10 @@ onUnmounted(() => {
       <button
         type="button"
         class="gh-drilldown-back-btn"
-        title="返回查看全部一级分组 (Esc)"
-        @click="activeDrilldownParent = null"
+        title="返回上一级分组 (Esc)"
+        @click="goBackDrilldown"
       >
-        ‹ 返回全部
+        {{ getParentFolderName(activeDrilldownParent) ? '‹ 返回上一级' : '‹ 返回全部' }}
       </button>
       <span class="gh-drilldown-sep">/</span>
       <span class="gh-drilldown-current">📁 {{ activeDrilldownParent }}</span>
@@ -724,29 +756,29 @@ onUnmounted(() => {
         >
           <header
             class="column-header"
-            :title="isParentList(list.name)
+            :title="isParentList(list.name) && list.name !== activeDrilldownParent
               ? `📁 ${list.name}（包含 ${getChildLists(list.name).length} 个子分组，点击下钻进入）`
-              : '拖动此列可调换位置；右侧更多可重命名、置顶或删除'"
+              : '拖动此列可调换位置；右侧更多可创建子分类、重命名、置顶或删除'"
           >
             <div
               class="column-title-group"
-              :class="{ 'is-parent-folder': isParentList(list.name) && !activeDrilldownParent }"
-              @click="isParentList(list.name) && !activeDrilldownParent && handleDrilldown(list.name)"
+              :class="{ 'is-parent-folder': isParentList(list.name) && list.name !== activeDrilldownParent }"
+              @click="isParentList(list.name) && list.name !== activeDrilldownParent && handleDrilldown(list.name)"
             >
               <span class="col-dot list-dot"></span>
               <h3
                 class="column-title"
-                :class="{ 'title-clickable': isParentList(list.name) && !activeDrilldownParent }"
+                :class="{ 'title-clickable': isParentList(list.name) && list.name !== activeDrilldownParent }"
                 :title="list.description || ('本地分组: ' + list.name)"
               >
                 📁 {{ list.name }}
               </h3>
               <span v-if="list.pinned" class="col-pinned-icon" title="已置顶分组">📌</span>
-              <span class="badge-count">{{ controller.getReposForList(list.name).length }}</span>
+              <span class="badge-count" :title="getListBadgeTitle(list)">{{ getListBadgeText(list) }}</span>
               <span
-                v-if="isParentList(list.name) && !activeDrilldownParent"
+                v-if="isParentList(list.name) && list.name !== activeDrilldownParent"
                 class="col-sub-badge"
-                title="点击下钻查看所有子分组"
+                :title="`点击下钻查看 ${getChildLists(list.name).length} 个子分组（当前列仅显示直接归属「${list.name}」的仓库）`"
               >
                 {{ getChildLists(list.name).length }}个子分组 ›
               </span>
@@ -964,7 +996,7 @@ onUnmounted(() => {
         </button>
       </div>
 
-      <!-- 分组列更多操作菜单 (重命名、置顶、删除) -->
+      <!-- 分组列更多操作菜单 (创建子分类、重命名、置顶、删除) -->
       <div
         v-if="listMenuState.visible && listMenuState.list"
         class="fo-cover-context-menu gh-list-col-menu"
@@ -972,6 +1004,13 @@ onUnmounted(() => {
         @click.stop
         @contextmenu.prevent
       >
+        <button
+          class="fo-cover-menu-item"
+          type="button"
+          @click="handleCreateSubList"
+        >
+          ➕ 创建子分类
+        </button>
         <button
           class="fo-cover-menu-item"
           type="button"

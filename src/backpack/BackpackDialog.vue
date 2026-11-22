@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from "vue";
+import { onImeEnter } from "../core/ime-keyboard";
 import BackpackFrame from "./BackpackFrame.vue";
 defineProps<{ embedded?: boolean }>();
 import {
@@ -591,7 +592,7 @@ const displayedArticles = computed(() => {
                 placeholder="分组名称..."
                 maxlength="16"
                 autofocus
-                @keydown.enter="handleAddCategory"
+                @keydown="onImeEnter($event, handleAddCategory)"
                 @keydown.esc="showAddCategoryInput = false"
               />
               <button type="button" class="bp-btn-mini primary" @click="handleAddCategory">✔</button>
@@ -612,7 +613,7 @@ const displayedArticles = computed(() => {
                     class="bp-folder-rename-input"
                     maxlength="16"
                     autofocus
-                    @keydown.enter="submitRenameCategory(cat.id)"
+                    @keydown="onImeEnter($event, () => submitRenameCategory(cat.id))"
                     @keydown.esc="editingCategoryId = null"
                   />
                   <button type="button" class="bp-btn-mini primary" @click="submitRenameCategory(cat.id)">✔</button>
@@ -675,7 +676,7 @@ const displayedArticles = computed(() => {
                 placeholder="分组名称..."
                 maxlength="16"
                 autofocus
-                @keydown.enter="handleAddArticleCategory"
+                @keydown="onImeEnter($event, handleAddArticleCategory)"
                 @keydown.esc="showAddArticleCatInput = false"
               />
               <button type="button" class="bp-btn-mini primary bp-bg-indigo" @click="handleAddArticleCategory">✔</button>
@@ -696,7 +697,7 @@ const displayedArticles = computed(() => {
                     class="bp-folder-rename-input"
                     maxlength="16"
                     autofocus
-                    @keydown.enter="submitRenameArticleCategory(cat.id)"
+                    @keydown="onImeEnter($event, () => submitRenameArticleCategory(cat.id))"
                     @keydown.esc="editingArticleCatId = null"
                   />
                   <button type="button" class="bp-btn-mini primary bp-bg-indigo" @click="submitRenameArticleCategory(cat.id)">✔</button>

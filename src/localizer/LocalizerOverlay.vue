@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { nextTick, ref, watch } from "vue";
+import { isImeComposing, onImeEnter } from "../core/ime-keyboard";
 import { overlayState, saveTranslation, showLocalizerToast } from "./overlay-state";
 
 const input = ref<HTMLInputElement | null>(null);
@@ -27,7 +28,7 @@ async function save(): Promise<void> {
       <div class="editor-title">🌐 LogicWeaver 词条固化</div>
       <div class="editor-field"><label>原词（原文）：</label><div class="original">{{ overlayState.original }}</div></div>
       <div class="editor-field"><label for="lw-localizer-input">固化中文翻译：</label>
-        <input id="lw-localizer-input" ref="input" v-model="overlayState.translated" type="text" placeholder="输入修正后的中文" @keydown.enter.prevent="save" @keydown.esc.prevent="close" />
+        <input id="lw-localizer-input" ref="input" v-model="overlayState.translated" type="text" placeholder="输入修正后的中文" @keydown="onImeEnter($event, save)" @keydown.esc="if (!isImeComposing($event)) { $event.preventDefault(); close(); }" />
       </div>
       <div class="editor-actions"><button type="button" class="cancel" @click="close">取消</button><button type="button" class="save" :disabled="overlayState.saving" @click="save">保存并永久固化</button></div>
     </section>

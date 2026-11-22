@@ -106,6 +106,7 @@ import { todoistTaskListController, todoistTaskListState } from "./task-list-sto
 import { todoistService } from "../services/todoist.service";
 import { todoistTitleDrafts } from "./title-drafts";
 import { useWindowDraggable } from "../core/useWindowDraggable";
+import { isImeComposing } from "../core/ime-keyboard";
 import TodoistInspectorBody from "./TodoistInspectorBody.vue";
 
 const state = todoistInspectorState;
@@ -386,7 +387,7 @@ function flushDraft() {
 }
 
 function scheduleDraftSave(event?: Event) {
-  if (event && 'isComposing' in event && event.isComposing) return;
+  if (event && isImeComposing(event as any)) return;
   pendingDraft = captureDraft();
   todoistInspectorController.stageTitleDraft(pendingDraft.taskId, pendingDraft.title, pendingDraft.description);
   clearTimeout(titleDebounceTimer);
@@ -401,7 +402,7 @@ function onClose() {
 }
 
 function saveTitleAndDesc(event?: Event) {
-  if (event && 'isComposing' in event && event.isComposing) return;
+  if (event && isImeComposing(event as any)) return;
   flushDraft();
 }
 

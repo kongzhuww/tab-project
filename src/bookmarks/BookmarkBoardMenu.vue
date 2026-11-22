@@ -9,6 +9,7 @@ import { InlineTitleInput, InlineEditStatus, useInlineTitleEdit, useContextMenu 
 import { notifications } from '../sdk/notifications';
 import type { BookmarkBoardItem } from './board-data';
 import { webSiteTaskController } from '../launcher/web-task-store';
+import { webSitePreviewController } from '../launcher/web-preview-store';
 const props = defineProps<{
   target: { item?: BookmarkBoardItem; parentId: string; x: number; y: number; section?: boolean };
   busy: boolean; blocked: boolean; size: 'small' | 'large'; outerParentId?: string;
@@ -83,6 +84,23 @@ function handleCreateTask() {
     title: liveItem.value.title || liveItem.value.url,
     url: liveItem.value.url,
     icon,
+    source: 'bookmark'
+  });
+  emit('close');
+}
+
+function handlePreviewLink() {
+  if (!liveItem.value || liveItem.value.kind !== 'link' || actionsBlocked.value) return;
+  const chromeApi = (globalThis as any).chrome;
+  const icon = liveItem.value.url && chromeApi?.runtime?.id
+    ? `chrome-extension://${chromeApi.runtime.id}/_favicon/?pageUrl=${encodeURIComponent(liveItem.value.url)}&size=32`
+    : undefined;
+  webSitePreviewController.open({
+    id: liveItem.value.id,
+    title: displayTitle.value || liveItem.value.url,
+    url: displayUrl.value || liveItem.value.url,
+    icon,
+    category: '书签',
     source: 'bookmark'
   });
   emit('close');
@@ -193,6 +211,7 @@ async function runPluginAction(action: MenuSlotAction, target: { id: string; tit
         <LauncherMoveMenu v-model:open="flyout" :visible="true" :disabled="actionsBlocked || !moveItems.length" label="移动到分区"
           :items="moveItems" :x="Number.parseFloat(String(style.left || 0))" :y="Number.parseFloat(String(style.top || 0))"
           :vertical-budget="280" empty-text="暂无其他可移动分区" @select="moveTo" />
+        <button id="link-menu-preview" type="button" :disabled="actionsBlocked" @click="handlePreviewLink">预览</button>
         <button id="link-menu-rename" type="button" :disabled="actionsBlocked" @click="startTitle">重命名</button>
         <button id="link-menu-create-task" type="button" :disabled="actionsBlocked" @click="handleCreateTask">创建任务</button>
         <button id="link-menu-edit" type="button" :disabled="actionsBlocked" @click="startUrl">编辑</button>

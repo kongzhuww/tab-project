@@ -91,6 +91,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, nextTick, useId } from "vue";
+import { isImeComposing } from "../core/ime-keyboard";
 import InspectorPopover from "./InspectorPopover.vue";
 
 const props = defineProps<{
@@ -260,7 +261,7 @@ function commitTimeInput(): boolean {
 }
 function finishTimeInput() { showTimeOptions.value = false; commitTimeInput(); }
 function onTimeKeydown(event: KeyboardEvent) {
-  if (event.isComposing) return;
+  if (isImeComposing(event)) return;
   if (event.key === "ArrowDown" || event.key === "ArrowUp") {
     event.preventDefault(); event.stopPropagation();
     if (!showTimeOptions.value) openTimeOptions();

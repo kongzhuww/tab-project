@@ -29,3 +29,9 @@ test('mini-player keeps its close and collapse actions anchored at narrow widths
   assert.match(player, /class="bili-mini-collapse"/);
   assert.match(player, /class="bili-mini-close"/);
 });
+
+test('bilibili favorites and feed video covers do not enable drag ghost arrows', async () => {
+  const source = await readFile('src/bilibili/BilibiliWorkspace.vue', 'utf8');
+  assert.doesNotMatch(source, /beginVideoDrag/);
+  assert.match(source, /class="fo-cover-link" draggable="false"/);
+});

@@ -40,7 +40,79 @@
             </div>
           </template>
         </div>
-        <div style="display: flex; gap: 8px; align-items: center;">
+        <div class="ms-netease-search-wrap ms-netease-top-search" ref="searchWrapRef">
+          <div class="ms-netease-search-box">
+            <input
+              type="text"
+              class="ms-netease-search-input"
+              placeholder="搜索网易云歌曲或歌手…"
+              v-model="searchQuery"
+              @keydown="onImeEnter($event, onSearchEnter)"
+              @input="onSearchInput"
+              @focus="isSearchFocused = true"
+            />
+            <button
+              v-if="searchQuery"
+              type="button"
+              class="ms-netease-search-clear"
+              title="清除搜索"
+              aria-label="清除搜索"
+              @click="clearSearch"
+            >✕</button>
+          </div>
+          <!-- 聚焦时浮现的搜索历史与历史听歌面板 -->
+          <div
+            v-if="isSearchFocused && !searchQuery.trim()"
+            class="ms-netease-search-dropdown"
+            @mousedown.prevent
+          >
+            <!-- 搜索历史关键词 -->
+            <div v-if="searchHistory.length > 0" class="ms-dropdown-section">
+              <div class="ms-dropdown-head">
+                <span class="ms-dropdown-title">🔍 搜索历史</span>
+                <button type="button" class="ms-dropdown-clear" @click="clearSearchHistory">清空</button>
+              </div>
+              <div class="ms-search-history-tags">
+                <span
+                  v-for="kw in searchHistory"
+                  :key="'hist-' + kw"
+                  class="ms-search-tag"
+                  @click="applySearchHistory(kw)"
+                >
+                  {{ kw }}
+                  <b class="ms-tag-del" @click.stop="removeSearchHistory(kw)">×</b>
+                </span>
+              </div>
+            </div>
+
+            <!-- 历史听歌记录 -->
+            <div v-if="workspaceState.neteaseRecentSongs.length > 0" class="ms-dropdown-section">
+              <div class="ms-dropdown-head">
+                <span class="ms-dropdown-title">🕒 历史听歌记录</span>
+                <button type="button" class="ms-dropdown-clear" @click="workspace.clearRecent()">清空</button>
+              </div>
+              <div class="ms-recent-dropdown-list">
+                <div
+                  v-for="s in workspaceState.neteaseRecentSongs.slice(0, 8)"
+                  :key="'drop-rec-' + s.id"
+                  class="ms-recent-dropdown-item"
+                  :class="{ playing: isCurrentSong(s) }"
+                  @click="playNetease(s); isSearchFocused = false;"
+                >
+                  <span class="ms-drop-play">{{ isCurrentSong(s) ? '▶' : '♫' }}</span>
+                  <span class="ms-drop-title">{{ s.name }}</span>
+                  <span class="ms-drop-artist">{{ getSongArtists(s) }}</span>
+                  <span class="ms-drop-dur">{{ formatDuration(s) }}</span>
+                </div>
+              </div>
+            </div>
+
+            <div v-if="!searchHistory.length && !workspaceState.neteaseRecentSongs.length" class="ms-dropdown-empty">
+              暂无搜索与播放历史，输入歌名或歌手即可开始畅听
+            </div>
+          </div>
+        </div>
+        <div class="ms-netease-user-actions" style="display: flex; gap: 8px; align-items: center;">
           <button
             type="button"
             class="ms-netease-logout-btn"
@@ -295,71 +367,7 @@
 
           <!-- 网易云常规曲目专区 -->
           <template v-else>
-            <!-- 搜索条与最近听过快捷栏 -->
-            <div class="ms-netease-search-wrap" ref="searchWrapRef">
-            <input
-              type="text"
-              class="ms-netease-search-input"
-              placeholder="搜索网易云歌曲或歌手…"
-              v-model="searchQuery"
-              @keydown.enter="onSearchEnter"
-              @input="onSearchInput"
-              @focus="isSearchFocused = true"
-            />
-            <!-- 聚焦时浮现的搜索历史与历史听歌面板 -->
-            <div
-              v-if="isSearchFocused && !searchQuery.trim()"
-              class="ms-netease-search-dropdown"
-              @mousedown.prevent
-            >
-              <!-- 搜索历史关键词 -->
-              <div v-if="searchHistory.length > 0" class="ms-dropdown-section">
-                <div class="ms-dropdown-head">
-                  <span class="ms-dropdown-title">🔍 搜索历史</span>
-                  <button type="button" class="ms-dropdown-clear" @click="clearSearchHistory">清空</button>
-                </div>
-                <div class="ms-search-history-tags">
-                  <span
-                    v-for="kw in searchHistory"
-                    :key="'hist-' + kw"
-                    class="ms-search-tag"
-                    @click="applySearchHistory(kw)"
-                  >
-                    {{ kw }}
-                    <b class="ms-tag-del" @click.stop="removeSearchHistory(kw)">×</b>
-                  </span>
-                </div>
-              </div>
-
-              <!-- 历史听歌记录 -->
-              <div v-if="workspaceState.neteaseRecentSongs.length > 0" class="ms-dropdown-section">
-                <div class="ms-dropdown-head">
-                  <span class="ms-dropdown-title">🕒 历史听歌记录</span>
-                  <button type="button" class="ms-dropdown-clear" @click="workspace.clearRecent()">清空</button>
-                </div>
-                <div class="ms-recent-dropdown-list">
-                  <div
-                    v-for="s in workspaceState.neteaseRecentSongs.slice(0, 8)"
-                    :key="'drop-rec-' + s.id"
-                    class="ms-recent-dropdown-item"
-                    :class="{ playing: isCurrentSong(s) }"
-                    @click="playNetease(s); isSearchFocused = false;"
-                  >
-                    <span class="ms-drop-play">{{ isCurrentSong(s) ? '▶' : '♫' }}</span>
-                    <span class="ms-drop-title">{{ s.name }}</span>
-                    <span class="ms-drop-artist">{{ getSongArtists(s) }}</span>
-                    <span class="ms-drop-dur">{{ formatDuration(s) }}</span>
-                  </div>
-                </div>
-              </div>
-
-              <div v-if="!searchHistory.length && !workspaceState.neteaseRecentSongs.length" class="ms-dropdown-empty">
-                暂无搜索与播放历史，输入歌名或歌手即可开始畅听
-              </div>
-            </div>
-          </div>
-
-          <!-- 提示横幅 -->
+            <!-- 提示横幅 -->
           <div v-if="workspaceState.message" class="ms-netease-msg-banner">
             <span>{{ workspaceState.message }}</span>
           </div>
@@ -481,6 +489,7 @@
 <script setup lang="ts">
 import { CACHED_FAVORITES_KEY, CACHED_PLAYLISTS_KEY, removePlaylistCache } from "./playlist-cache";
 import { ref, computed, onMounted, onBeforeUnmount, watch } from "vue";
+import { onImeEnter } from "../core/ime-keyboard";
 import { useMachine } from "../core/useMachine";
 import { t } from "../i18n";
 import { createMusicWorkspaceData } from "./workspace-data";
@@ -584,6 +593,8 @@ function clearSearchHistory() {
 function applySearchHistory(kw: string) {
   searchQuery.value = kw;
   isSearchFocused.value = false;
+  isShowingRhine.value = false;
+  selectedRhineAlbum.value = null;
   void workspace.search(kw);
 }
 
@@ -805,7 +816,11 @@ function onSearchInput() {
   searchTimer = setTimeout(() => {
     if (!active.value) return;
     const q = searchQuery.value.trim();
-    if (q) addSearchHistory(q);
+    if (q) {
+      addSearchHistory(q);
+      isShowingRhine.value = false;
+      selectedRhineAlbum.value = null;
+    }
     void workspace.search(searchQuery.value);
   }, 400);
 }
@@ -813,7 +828,11 @@ function onSearchInput() {
 function onSearchEnter() {
   if (searchTimer) clearTimeout(searchTimer);
   const q = searchQuery.value.trim();
-  if (q) addSearchHistory(q);
+  if (q) {
+    addSearchHistory(q);
+    isShowingRhine.value = false;
+    selectedRhineAlbum.value = null;
+  }
   isSearchFocused.value = false;
   void workspace.search(searchQuery.value);
 }
@@ -920,18 +939,58 @@ onBeforeUnmount(() => {
   position: relative;
 }
 
+.ms-netease-top-search {
+  flex: 1;
+  min-width: 180px;
+  max-width: 420px;
+  padding: 0;
+  border-bottom: 0;
+  margin-bottom: 0;
+}
+
+.ms-netease-search-box {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.ms-netease-top-search .ms-netease-search-input {
+  padding-right: 28px;
+}
+
+.ms-netease-search-clear {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  border: 0;
+  background: transparent;
+  color: var(--muted, #94a3b8);
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 3px 5px;
+  border-radius: 4px;
+}
+
+.ms-netease-search-clear:hover {
+  color: #f43f5e;
+  background: rgba(244, 63, 94, 0.1);
+}
+
 .ms-netease-search-dropdown {
   position: absolute;
   top: 100%;
-  left: 4px;
-  right: 4px;
+  left: 0;
+  right: 0;
+  min-width: 280px;
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 10px;
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
   padding: 12px;
   margin-top: 6px;
-  z-index: 100;
+  z-index: 200;
   max-height: 380px;
   overflow-y: auto;
   display: flex;

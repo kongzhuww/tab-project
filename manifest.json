@@ -68,7 +68,7 @@
     "https://*.163.com/*"
   ],
   "content_security_policy": {
-    "extension_pages": "script-src 'self'; object-src 'self'; frame-src 'self' https://player.bilibili.com blob:; img-src 'self' https: http: data: blob:;",
+    "extension_pages": "script-src 'self'; object-src 'self'; frame-src 'self' https: http: blob:; img-src 'self' https: http: data: blob:;",
     "sandbox": "sandbox allow-scripts; script-src 'self' 'unsafe-inline' 'unsafe-eval' blob:; child-src blob:; frame-src blob:;"
   },
   "options_page": "options.html",

@@ -594,7 +594,7 @@ const en: Record<TranslationKey, string> = {
   "github.myRepos.openInGitHub": "↗ Open on GitHub",
 
   "todoist.subtask.delete": "Delete subtask",
-  "todoist.subtask.inputPlaceholder": "Enter a subtask; press ⌘/Ctrl+Enter to add…",
+  "todoist.subtask.inputPlaceholder": "Enter a subtask; press Enter to add…",
   "todoist.subtask.add": "Add subtask",
   "todoist.comment.placeholder": "Comment…",
   "todoist.comment.attachPhoto": "Attach photo",

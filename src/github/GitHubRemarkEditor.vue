@@ -1,8 +1,19 @@
 <script setup lang="ts">
 import { ref, onMounted, nextTick } from "vue";
+import { isImeComposing, onImeEnter } from "../core/ime-keyboard";
 import { remarkEditor as draft, saveRemark, cancelRemark, inspectSavedRemark } from "./remark-editor";
 const props = defineProps<{ active: boolean }>();
 const input = ref<HTMLInputElement | null>(null);
+function onRemarkKeydown(event: KeyboardEvent) {
+  if (isImeComposing(event) || !props.active) return;
+  if (event.key === "Escape") {
+    event.preventDefault();
+    event.stopPropagation();
+    cancelRemark();
+    return;
+  }
+  onImeEnter(event, saveRemark);
+}
 onMounted(() => { void nextTick(() => { if (props.active && !draft.busy) input.value?.focus(); }); });
 </script>
 
@@ -10,8 +21,7 @@ onMounted(() => { void nextTick(() => { if (props.active && !draft.busy) input.v
   <div class="gh-inline-remark-box" style="flex-wrap:wrap;max-width:100%" @click.stop>
     <input ref="input" v-model="draft.text" class="gh-inline-remark-input" type="text" maxlength="100"
       aria-label="手写仓库备注" placeholder="备注说明…" :disabled="draft.busy || !active"
-      @keydown.enter.prevent="!$event.isComposing && active && saveRemark()"
-      @keydown.esc.prevent.stop="!$event.isComposing && active && cancelRemark()">
+      @keydown="onRemarkKeydown">
     <button type="button" class="gh-inline-remark-btn save" title="保存备注" :disabled="draft.busy || !active" @click="saveRemark">✓</button>
     <button type="button" class="gh-inline-remark-btn cancel" title="取消草稿" :disabled="draft.busy || !active" @click="cancelRemark">✕</button>
     <button type="button" :disabled="draft.busy || !active" @click="inspectSavedRemark">读取已保存值</button>

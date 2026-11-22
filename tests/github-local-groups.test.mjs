@@ -151,6 +151,21 @@ test('cross-page transactions re-read current local data instead of losing anoth
   assert.equal(f.networkCalls(), 0);
 });
 
+test('rapid consecutive dropRepositoryIntoFolder calls serialize cleanly without dropping repos', async () => {
+  const f = await fixture();
+  f.records.set('ghListsCache_github-id:42', legacy);
+  await f.api.loadLists();
+  await Promise.all([
+    f.api.dropRepositoryIntoFolder('fixture/one', 'tools'),
+    f.api.dropRepositoryIntoFolder('fixture/two', 'tools'),
+    f.api.dropRepositoryIntoFolder('fixture/three', 'tools')
+  ]);
+  assert.deepEqual(Array.from(f.api.getRepoFolders('fixture/one')), ['tools']);
+  assert.deepEqual(Array.from(f.api.getRepoFolders('fixture/two')), ['tools']);
+  assert.deepEqual(Array.from(f.api.getRepoFolders('fixture/three')), ['tools']);
+  assert.equal(f.context.categoryFeedback.busy, false);
+});
+
 test('active classification paths contain no GitHub Lists mutation/query calls', async () => {
   const service = await read('src/services/github.service.ts');
   assert.doesNotMatch(service, /\b(?:fetchGitHubUserLists|createGitHubUserList|deleteGitHubUserList|updateGitHubItemLists|getOrFetchRepoNodeId)\s*\(/);
@@ -158,6 +173,8 @@ test('active classification paths contain no GitHub Lists mutation/query calls',
   assert.doesNotMatch(board, /class="shelf-search-wrap"|v-model="state.searchQuery"/);
   assert.match(board, /col-pinned-icon/);
   assert.match(board, /取消置顶/);
+  assert.match(board, /创建子分类/);
+  assert.match(board, /handleCreateSubList/);
   const hero = await read('src/github/GitHubHero.vue');
   assert.match(hero, /gh-github-help-btn/);
   const workspace = await read('src/github/GitHubWorkspaceCard.vue');

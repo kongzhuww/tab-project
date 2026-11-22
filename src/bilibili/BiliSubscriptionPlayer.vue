@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch, onMounted, onUnmounted, nextTick } from "vue";
+import { onImeEnter } from "../core/ime-keyboard";
 import { biliFavoritesController, biliFavoritesState } from "./bili-favorites-store";
 import { bilibiliService } from "../services/bilibili.service";
 import { attachBiliPlaybackSync, detachBiliPlaybackSync } from "./playback-sync";
@@ -639,7 +640,7 @@ onUnmounted(() => {
             class="bili-sub-comment-input"
             placeholder="发一条友善的评论吧…（Enter 发送）"
             maxlength="500"
-            @keydown.enter.prevent="handleSendComment"
+            @keydown="onImeEnter($event, handleSendComment)"
           />
           <button type="button" class="bili-sub-comment-send-btn" :disabled="sendingComment || !commentInput.trim()" @click="handleSendComment">
             {{ sendingComment ? '发送中…' : '发送' }}

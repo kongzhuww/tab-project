@@ -21,6 +21,7 @@ export async function initBilibiliNetRules(): Promise<void> {
   const RULE_ID_BILI_VIDEO_CN = 2003;
   const RULE_ID_BILI_HDSLB = 2004;
   const RULE_ID_AIHOT_IMG = 2005;
+  const RULE_ID_PREVIEW_FRAME = 2006;
 
   // 幂等防御：若规则已存在且有效，直接跳过写盘，避免 SW 每次冷启动重复写入
   try {
@@ -32,7 +33,8 @@ export async function initBilibiliNetRules(): Promise<void> {
         existingIds.has(RULE_ID_BILI_VIDEO) &&
         existingIds.has(RULE_ID_BILI_VIDEO_CN) &&
         existingIds.has(RULE_ID_BILI_HDSLB) &&
-        existingIds.has(RULE_ID_AIHOT_IMG)
+        existingIds.has(RULE_ID_AIHOT_IMG) &&
+        existingIds.has(RULE_ID_PREVIEW_FRAME)
       ) {
         return;
       }
@@ -122,12 +124,30 @@ export async function initBilibiliNetRules(): Promise<void> {
         initiatorDomains: [extId],
         resourceTypes: ["xmlhttprequest", "image", "other"]
       }
+    },
+    {
+      id: RULE_ID_PREVIEW_FRAME,
+      priority: 1,
+      action: {
+        type: "modifyHeaders",
+        responseHeaders: [
+          { header: "x-frame-options", operation: "remove" },
+          { header: "frame-options", operation: "remove" },
+          { header: "content-security-policy", operation: "remove" },
+          { header: "content-security-policy-report-only", operation: "remove" }
+        ]
+      },
+      condition: {
+        urlFilter: "://",
+        initiatorDomains: [extId],
+        resourceTypes: ["sub_frame"]
+      }
     }
   ];
 
   try {
     await chrome.declarativeNetRequest.updateDynamicRules({
-      removeRuleIds: [RULE_ID_BILI_API, RULE_ID_BILI_VIDEO, RULE_ID_BILI_VIDEO_CN, RULE_ID_BILI_HDSLB, RULE_ID_AIHOT_IMG],
+      removeRuleIds: [RULE_ID_BILI_API, RULE_ID_BILI_VIDEO, RULE_ID_BILI_VIDEO_CN, RULE_ID_BILI_HDSLB, RULE_ID_AIHOT_IMG, RULE_ID_PREVIEW_FRAME],
       addRules: rules
     });
   } catch (err) {

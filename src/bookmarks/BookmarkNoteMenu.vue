@@ -133,7 +133,7 @@
         maxlength="120"
         placeholder="输入新名称"
         autocomplete="off"
-        @keydown.enter="handleSaveRename"
+        @keydown="onImeEnter($event, handleSaveRename)"
       />
       <div>
         <button id="bookmark-rename-cancel" type="button" @click="handleSwitchMode('actions')">返回</button>
@@ -190,6 +190,7 @@
 
 <script setup lang="ts">
 import { onMounted, onUnmounted } from "vue";
+import { onImeEnter } from "../core/ime-keyboard";
 import { bookmarkMenuController, type BookmarkMenuMode } from "./menu-store";
 import CustomSelect from "../core/CustomSelect.vue";
 import { webSiteTaskController } from "../launcher/web-task-store";

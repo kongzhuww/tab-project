@@ -64,8 +64,49 @@ function mapTask(task: any, readStart = createTaskStartDateReader()): CalendarTo
 }
 let activeTasks: any[] = [];
 let savedAt = 0;
+let savedDay = "";
+let cacheHydrated = false;
+let calendarInvalidated = false;
 const history = new Map<string, { items: CalendarTodoItem[]; savedAt: number }>();
 const reopenedIds = new Set<string>();
+const CALENDAR_CACHE_KEY = "todoist_calendar_cache_v1";
+
+function hydrateCalendarCache() {
+  if (cacheHydrated) return;
+  cacheHydrated = true;
+  if (typeof localStorage === "undefined") return;
+  try {
+    const raw = localStorage.getItem(CALENDAR_CACHE_KEY);
+    if (!raw) return;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") return;
+    if (Array.isArray(parsed.activeTasks) && Number.isFinite(parsed.savedAt) && parsed.savedAt > 0) {
+      activeTasks = parsed.activeTasks;
+      savedAt = parsed.savedAt;
+      savedDay = typeof parsed.savedDay === "string" ? parsed.savedDay : "";
+    }
+    if (Array.isArray(parsed.history)) {
+      for (const entry of parsed.history) {
+        if (Array.isArray(entry) && typeof entry[0] === "string" && entry[1] && Array.isArray(entry[1].items)) {
+          history.set(entry[0], entry[1]);
+        }
+      }
+    }
+  } catch {}
+}
+
+function persistCalendarCache() {
+  if (typeof localStorage === "undefined") return;
+  try {
+    const entries = [...history.entries()].slice(-14);
+    localStorage.setItem(CALENDAR_CACHE_KEY, JSON.stringify({
+      savedAt,
+      savedDay,
+      activeTasks,
+      history: entries
+    }));
+  } catch {}
+}
 export const todoistCalendarSidebarState = reactive<TodoistCalendarSidebarState>({
   collapsed: false, selectedDate: getLocalTodayDateStr(), badgeText: "Todoist",
   monthLabel: "", yearLabel: "", cells: [], agendaTitle: "",
@@ -117,7 +158,17 @@ function projectTasks() {
 export const todoistCalendarSidebarController = {
   state: todoistCalendarSidebarState,
   cancelReads: cancelTodoistDateReads,
-  invalidateReads() { cancelTodoistDateReads(); savedAt = 0; history.clear(); reopenedIds.clear(); },
+  invalidateReads() {
+    cancelTodoistDateReads();
+    calendarInvalidated = true;
+    savedAt = 0;
+    savedDay = "";
+    history.clear();
+    reopenedIds.clear();
+    if (typeof localStorage !== "undefined") {
+      try { localStorage.removeItem(CALENDAR_CACHE_KEY); } catch {}
+    }
+  },
   setCollapsed(collapsed: boolean) { todoistCalendarSidebarState.collapsed = collapsed; },
   toggleCollapsed() {
     this.setCollapsed(!todoistCalendarSidebarState.collapsed);
@@ -141,24 +192,35 @@ export const todoistCalendarSidebarController = {
   },
   async loadTodosForDate(dateStr: string, force = false) {
     if (!todoistModuleState.active || todoistModuleState.pendingWrites) return;
+    hydrateCalendarCache();
     cancelTodoistDateReads();
     const request = new AbortController(); dateAbort = request;
     const version = dateVersion, session = todoistModuleState.session;
     dateStr ||= getLocalTodayDateStr();
+    const todayStr = getLocalTodayDateStr();
     const current = () => !request.signal.aborted && version === dateVersion && session === todoistModuleState.session &&
       todoistModuleState.active && todoistCalendarSidebarState.selectedDate === dateStr && !todoistModuleState.pendingWrites;
     todoistCalendarSidebarState.selectedDate = dateStr;
     todoistCalendarSidebarState.emptyText = "";
     projectTasks();
+    const needsActiveFetch = force || calendarInvalidated || !savedAt || savedDay !== todayStr;
+    const cachedHistory = history.get(dateStr);
+    const needsHistoryFetch = force || calendarInvalidated || !cachedHistory || savedDay !== todayStr;
+    if (!needsActiveFetch && !needsHistoryFetch) {
+      todoistCalendarSidebarState.todoLoading = false;
+      if (dateAbort === request) dateAbort = undefined;
+      return;
+    }
     todoistCalendarSidebarState.todoLoading = true;
     try {
-      if (force || !savedAt || Date.now() - savedAt > 30000) {
+      if (needsActiveFetch) {
         const tasks = await todoistService.listCalendarTasks(request.signal);
         if (!current()) return;
-        activeTasks = tasks; savedAt = Date.now(); projectTasks();
+        activeTasks = tasks; savedAt = Date.now(); savedDay = todayStr; calendarInvalidated = false;
+        persistCalendarCache();
+        projectTasks();
       }
-      const cached = history.get(dateStr);
-      if (force || !cached || Date.now() - cached.savedAt > 30000) {
+      if (needsHistoryFetch) {
         const nextDay = new Date(`${dateStr}T00:00:00`); nextDay.setDate(nextDay.getDate() + 1);
         try {
           const response = await todoistService.getCompletedTasks({ since: new Date(`${dateStr}T00:00:00`).toISOString(), until: nextDay.toISOString(), limit: 200 }, request.signal);
@@ -168,6 +230,8 @@ export const todoistCalendarSidebarController = {
           }));
           history.set(dateStr, { items, savedAt: Date.now() });
           if (history.size > 42) history.delete(history.keys().next().value!);
+          savedDay = todayStr; calendarInvalidated = false;
+          persistCalendarCache();
         } catch (error) {
           if (current()) {
             todoistCalendarSidebarState.emptyText = "完成历史：" + todoistErrorText(error) + " 现有任务保留。";

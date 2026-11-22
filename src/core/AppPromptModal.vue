@@ -36,7 +36,7 @@
                 :type="state.inputType"
                 class="app-dialog-input"
                 :placeholder="state.placeholder || '请输入…'"
-                @keydown.enter.prevent="appDialog.handleConfirm()"
+                @keydown="onImeEnter($event, () => appDialog.handleConfirm())"
               />
             </div>
           </div>
@@ -67,6 +67,7 @@
 
 <script setup lang="ts">
 import { nextTick, ref, watch } from "vue";
+import { onImeEnter } from "./ime-keyboard";
 import { appDialog, appDialogState } from "./app-dialog.store";
 
 const state = appDialogState;

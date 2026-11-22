@@ -737,7 +737,7 @@
                         v-model="editingWallpaperTitle"
                         type="text"
                         style="width: 100%; box-sizing: border-box; padding: 2px 6px; font-size: 11px; border: 1px solid #38bdf8; border-radius: 4px; background: var(--panel); color: var(--text);"
-                        @keydown.enter="saveRenameWallpaper(item)"
+                        @keydown="onImeEnter($event, () => saveRenameWallpaper(item))"
                         @keydown.esc="cancelRenameWallpaper"
                       />
                       <button type="button" class="wallpaper-card-edit-btn" title="保存" @click="saveRenameWallpaper(item)">✓</button>
@@ -1024,6 +1024,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, watch, onMounted, onUnmounted, defineAsyncComponent, nextTick } from "vue";
+import { onImeEnter } from "../core/ime-keyboard";
 import settingsCss from "./settings-view.css?inline";
 import { useExtensionUpdates } from "./useExtensionUpdates";
 import { ensureViewStyles } from "../core/view-styles";

@@ -13,7 +13,7 @@ export interface TodoistLabelActions {
 
 export interface TodoistLabelController {
   update(labels: readonly TodoistLabelView[]): void;
-  refresh(): Promise<void>;
+  refresh(force?: boolean): Promise<void>;
   setActions(actions: TodoistLabelActions): void;
   setMounted(mounted: boolean): void;
   startDrag(name: string, event: DragEvent): void;
@@ -28,12 +28,26 @@ export function cancelTodoistLabelReads() {
   labelVersion++; labelAbort?.abort(); labelAbort = undefined;
 }
 
+const LABELS_CACHE_KEY = "todoist_labels_cache_v1";
+
 function update(labels: readonly TodoistLabelView[]): void {
   state.labels = labels.map((label) => ({ ...label }));
 }
 
-async function refresh(): Promise<void> {
+async function refresh(force = false): Promise<void> {
   if (!todoistModuleState.active) return;
+  if (!force && typeof localStorage !== "undefined") {
+    try {
+      const raw = localStorage.getItem(LABELS_CACHE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          update(parsed);
+          return;
+        }
+      }
+    } catch {}
+  }
   cancelTodoistLabelReads();
   const request = new AbortController(); labelAbort = request;
   const version = labelVersion, session = todoistModuleState.session;
@@ -41,7 +55,11 @@ async function refresh(): Promise<void> {
     const list = await todoistService.getLabels(request.signal);
     if (!request.signal.aborted && version === labelVersion &&
         session === todoistModuleState.session && todoistModuleState.active && Array.isArray(list)) {
-      update(list.map((l) => ({ id: l.id, name: l.name })));
+      const mapped = list.map((l) => ({ id: l.id, name: l.name }));
+      update(mapped);
+      if (typeof localStorage !== "undefined") {
+        try { localStorage.setItem(LABELS_CACHE_KEY, JSON.stringify(mapped)); } catch {}
+      }
     }
   } catch (err) {
     if (!request.signal.aborted) console.warn("[Todoist Labels] Cloud refresh failed.");

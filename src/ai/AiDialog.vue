@@ -112,6 +112,7 @@
         placeholder="粘贴字幕或输入问题… Enter 发送，Shift+Enter 换行；内容仅在点击发送后上传给 OpenAI。"
         spellcheck="false"
         v-model="state.inputText"
+        @keydown="onInputKeydown"
       ></textarea>
       <footer>
         <span id="lw-ai-count">{{ state.charCountText }}</span>
@@ -135,6 +136,7 @@
 
 <script setup lang="ts">
 import { aiDialogController } from "./store";
+import { onImeEnter } from "../core/ime-keyboard";
 import CustomSelect, { type CustomSelectOption } from "../core/CustomSelect.vue";
 
 // AI 助手弹窗响应式状态
@@ -186,5 +188,9 @@ function handleStop() {
 
 function handleSend() {
   aiDialogController.send();
+}
+
+function onInputKeydown(event: KeyboardEvent) {
+  onImeEnter(event, handleSend);
 }
 </script>

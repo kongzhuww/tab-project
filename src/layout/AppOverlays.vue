@@ -17,6 +17,7 @@ import { commandPaletteState } from "../commands/command-palette-store";
 import { bookmarkMenuController } from "../bookmarks/menu-store";
 import { launcherDialogsState } from "../launcher/dialogs-store";
 import { githubRepoDetailState } from "../github/repo-detail-store";
+import { webSitePreviewState } from "../launcher/web-preview-store";
 import { sideDrawerState, bindSideDrawerMessages } from "../sidepanel/drawer-store";
 import BiliUpPreview from "../bilibili/BiliUpPreview.vue";
 
@@ -37,6 +38,7 @@ onMounted(() => { unbindSideDrawer = bindSideDrawerMessages(); });
 onUnmounted(() => { unbindSideDrawer?.(); });
 const mountBookmarkNoteMenu = useRetainedMount(() => bookmarkMenuController.state.isOpen);
 const mountLauncherFolder = useRetainedMount(() => folderState.isOpen);
+const mountWebSitePreview = useRetainedMount(() => webSitePreviewState.isOpen);
 const mountLauncherDialogs = useRetainedMount(() => (
   launcherDialogsState.editDialog.isOpen ||
   launcherDialogsState.linkMove.isOpen ||
@@ -67,6 +69,7 @@ const BiliSubtitleModal = defineAsyncComponent(() => import("../bilibili/BiliSub
 const BiliVideoTaskModal = defineAsyncComponent(() => import("../bilibili/BiliVideoTaskModal.vue"));
 const GitHubTaskModal = defineAsyncComponent(() => import("../github/GitHubTaskModal.vue"));
 const WebSiteTaskModal = defineAsyncComponent(() => import("../launcher/WebSiteTaskModal.vue"));
+const WebSitePreviewModal = defineAsyncComponent(() => import("../launcher/WebSitePreviewModal.vue"));
 const FirecrawlModal = defineAsyncComponent(() => import("../firecrawl/FirecrawlModal.vue"));
 const FloatingImageViewer = defineAsyncComponent(() => import("../viewers/FloatingImageViewer.vue"));
 const CommandPalette = defineAsyncComponent(() => import("../commands/CommandPalette.vue"));
@@ -193,6 +196,11 @@ const PluginMarketDialog = defineAsyncComponent(async () => {
     <!-- 🌐 网站与书签创建任务独立无模态浮动视窗 -->
     <div id="vue-web-task-modal-root">
       <WebSiteTaskModal />
+    </div>
+
+    <!-- 🌐 网站与书签内嵌预览独立无模态浮动视窗 -->
+    <div id="vue-web-preview-modal-root">
+      <WebSitePreviewModal v-if="mountWebSitePreview" />
     </div>
 
     <!-- ⚡ Firecrawl 网页纯净提炼便签视窗 -->

@@ -761,11 +761,12 @@ async function initBilibiliNetRules() {
   const RULE_ID_BILI_VIDEO_CN = 2003;
   const RULE_ID_BILI_HDSLB = 2004;
   const RULE_ID_AIHOT_IMG = 2005;
+  const RULE_ID_PREVIEW_FRAME = 2006;
   try {
     if (chrome.declarativeNetRequest.getDynamicRules) {
       const existing = await chrome.declarativeNetRequest.getDynamicRules();
       const existingIds = new Set((existing || []).map((r) => r.id));
-      if (existingIds.has(RULE_ID_BILI_API) && existingIds.has(RULE_ID_BILI_VIDEO) && existingIds.has(RULE_ID_BILI_VIDEO_CN) && existingIds.has(RULE_ID_BILI_HDSLB) && existingIds.has(RULE_ID_AIHOT_IMG)) {
+      if (existingIds.has(RULE_ID_BILI_API) && existingIds.has(RULE_ID_BILI_VIDEO) && existingIds.has(RULE_ID_BILI_VIDEO_CN) && existingIds.has(RULE_ID_BILI_HDSLB) && existingIds.has(RULE_ID_AIHOT_IMG) && existingIds.has(RULE_ID_PREVIEW_FRAME)) {
         return;
       }
     }
@@ -854,11 +855,29 @@ async function initBilibiliNetRules() {
         initiatorDomains: [extId],
         resourceTypes: ["xmlhttprequest", "image", "other"]
       }
+    },
+    {
+      id: RULE_ID_PREVIEW_FRAME,
+      priority: 1,
+      action: {
+        type: "modifyHeaders",
+        responseHeaders: [
+          { header: "x-frame-options", operation: "remove" },
+          { header: "frame-options", operation: "remove" },
+          { header: "content-security-policy", operation: "remove" },
+          { header: "content-security-policy-report-only", operation: "remove" }
+        ]
+      },
+      condition: {
+        urlFilter: "://",
+        initiatorDomains: [extId],
+        resourceTypes: ["sub_frame"]
+      }
     }
   ];
   try {
     await chrome.declarativeNetRequest.updateDynamicRules({
-      removeRuleIds: [RULE_ID_BILI_API, RULE_ID_BILI_VIDEO, RULE_ID_BILI_VIDEO_CN, RULE_ID_BILI_HDSLB, RULE_ID_AIHOT_IMG],
+      removeRuleIds: [RULE_ID_BILI_API, RULE_ID_BILI_VIDEO, RULE_ID_BILI_VIDEO_CN, RULE_ID_BILI_HDSLB, RULE_ID_AIHOT_IMG, RULE_ID_PREVIEW_FRAME],
       addRules: rules
     });
   } catch (err) {
@@ -4300,20 +4319,44 @@ function trackTodoistWrites(target, methods, apiMethod = false) {
 
 // src/todoist/change-channel.ts
 var KEY = "todoist_change_revision_v1";
+var SYNCED_KEY = "todoist_synced_revision_v1";
+function parseMarker(raw) {
+  if (!raw || raw.length > 512) return null;
+  try {
+    const marker = JSON.parse(raw);
+    if (marker.version !== 1 || !/^[a-f0-9]{64}$/.test(marker.scope) || typeof marker.revision !== "string" || !/^[a-f0-9-]{36}$/.test(marker.revision)) {
+      return null;
+    }
+    return marker;
+  } catch {
+    return null;
+  }
+}
 async function scopeFor(token) {
   const bytes = await crypto.subtle.digest("SHA-256", new TextEncoder().encode("todoist-invalidation-v1:" + token));
   return Array.from(new Uint8Array(bytes), (b) => b.toString(16).padStart(2, "0")).join("");
 }
 function createTodoistChangeChannel(getToken, invalidate) {
   let seen = "";
-  async function receive(raw) {
+  let startupChecked = false;
+  async function receive(raw, fromStartupReconcile = false) {
     try {
-      if (!raw || raw.length > 512) return;
-      const marker = JSON.parse(raw);
-      if (marker.version !== 1 || !/^[a-f0-9]{64}$/.test(marker.scope) || typeof marker.revision !== "string" || !/^[a-f0-9-]{36}$/.test(marker.revision)) return;
+      const marker = parseMarker(raw);
+      if (!marker) return;
       const token = await getToken();
-      if (!token || marker.scope !== await scopeFor(token) || token !== await getToken()) return;
+      if (!token) return;
+      const scope = await scopeFor(token);
+      if (marker.scope !== scope || token !== await getToken()) return;
       if (seen === marker.revision) return;
+      if (fromStartupReconcile && !startupChecked) {
+        startupChecked = true;
+        const synced = parseMarker(localStorage.getItem(SYNCED_KEY));
+        if (synced && synced.scope === scope && synced.revision === marker.revision) {
+          seen = marker.revision;
+          return;
+        }
+      }
+      startupChecked = true;
       seen = marker.revision;
       invalidate();
     } catch {
@@ -4322,14 +4365,14 @@ function createTodoistChangeChannel(getToken, invalidate) {
   function reconcile() {
     if (!document.hidden) {
       try {
-        void receive(localStorage.getItem(KEY));
+        void receive(localStorage.getItem(KEY), !startupChecked);
       } catch {
       }
     }
   }
   if (typeof window !== "undefined" && typeof document !== "undefined") {
     window.addEventListener("storage", (event) => {
-      if (event.key === KEY) void receive(event.newValue);
+      if (event.key === KEY) void receive(event.newValue, false);
     });
     document.addEventListener("visibilitychange", reconcile);
     window.addEventListener("pageshow", reconcile);
@@ -4340,9 +4383,34 @@ function createTodoistChangeChannel(getToken, invalidate) {
         if (!token) return;
         const marker = { version: 1, scope: await scopeFor(token), revision: crypto.randomUUID() };
         localStorage.setItem(KEY, JSON.stringify(marker));
+        startupChecked = true;
         if (token === await getToken()) seen = marker.revision;
       } catch {
         console.warn("[Todoist] Cross-page invalidation unavailable; refresh other pages manually.");
+      }
+    },
+    async markSynced(token) {
+      try {
+        if (!token || typeof localStorage === "undefined") return;
+        const scope = await scopeFor(token);
+        const current = parseMarker(localStorage.getItem(KEY));
+        if (current && current.scope === scope) {
+          localStorage.setItem(SYNCED_KEY, JSON.stringify(current));
+          seen = current.revision;
+        }
+        startupChecked = true;
+      } catch {
+      }
+    },
+    clear() {
+      seen = "";
+      startupChecked = false;
+      try {
+        if (typeof localStorage !== "undefined") {
+          localStorage.removeItem(KEY);
+          localStorage.removeItem(SYNCED_KEY);
+        }
+      } catch {
       }
     }
   };
@@ -4805,6 +4873,13 @@ var TodoistService = class _TodoistService {
       if (previous[TODOIST_TOKEN_KEY] !== value) {
         const keys2 = Object.keys(await chrome.storage.local.get(null)).filter((key2) => key2.startsWith("todoistSnapshot:"));
         await chrome.storage.local.remove([TODOIST_WORKSPACE_CACHE_KEY, ...keys2]);
+        if (typeof localStorage !== "undefined") {
+          try {
+            Object.keys(localStorage).filter((k) => k.startsWith("todoist_fast_snapshot:") || k === "todoist_calendar_cache_v1" || k === "todoist_labels_cache_v1").forEach((k) => localStorage.removeItem(k));
+          } catch {
+          }
+        }
+        this.changeChannel.clear?.();
         this.invalidateWorkspaceSnapshots();
       }
     } else {
@@ -4904,6 +4979,9 @@ var TodoistService = class _TodoistService {
   workspaceMemoryCache = /* @__PURE__ */ new Map();
   workspaceMutationVersion = 0;
   workspaceCacheInvalidated = false;
+  isWorkspaceCacheInvalidated() {
+    return this.workspaceCacheInvalidated;
+  }
   invalidateWorkspaceSnapshots() {
     ++this.workspaceMutationVersion;
     this.workspaceCacheInvalidated = true;
@@ -5025,7 +5103,9 @@ var TodoistService = class _TodoistService {
       const key2 = this.getWorkspaceCacheKey(view, targetProjectId);
       const cached = await this.getCachedWorkspaceData(view, targetProjectId);
       const mem = this.workspaceMemoryCache.get(key2);
-      if (cached && cached.columns?.length && mem && Date.now() - mem.timestamp < 3 * 60 * 1e3) {
+      const todayStr = (/* @__PURE__ */ new Date()).toLocaleDateString("en-CA");
+      const staleTodayRollover = view === "today" && mem?.timestamp ? new Date(mem.timestamp).toLocaleDateString("en-CA") !== todayStr : false;
+      if (cached && cached.columns?.length && !staleTodayRollover) {
         return cached;
       }
     }
@@ -5213,6 +5293,7 @@ var TodoistService = class _TodoistService {
         }
         ensureCurrent();
       }
+      void this.changeChannel.markSynced?.(this.token);
       return result;
     } catch (netErr) {
       ensureCurrent();

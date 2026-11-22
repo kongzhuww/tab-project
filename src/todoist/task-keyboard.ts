@@ -1,11 +1,12 @@
-type TaskKeyEvent = Pick<KeyboardEvent, 'key' | 'isComposing' | 'keyCode' | 'ctrlKey' | 'metaKey' | 'altKey' | 'shiftKey' | 'repeat'>;
+import { isImeComposing, shouldSubmitOnEnter, type ImeKeyEventLike } from '../core/ime-keyboard';
 
-/** Only an explicit shortcut may create a task; IME confirmation is never submission. */
+type TaskKeyEvent = ImeKeyEventLike;
+
+/** Enter (or Ctrl/Meta+Enter) creates a task; Shift+Enter inserts a newline and IME confirmation never submits. */
 export function shouldCreateTask(event: TaskKeyEvent): boolean {
-  return event.key === 'Enter' && !event.isComposing && event.keyCode !== 229 &&
-    (event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey && !event.repeat;
+  return shouldSubmitOnEnter(event, { allowCtrlOrMeta: true });
 }
 
-export function isImeKey(event: Pick<KeyboardEvent, 'isComposing' | 'keyCode'>): boolean {
-  return event.isComposing || event.keyCode === 229;
+export function isImeKey(event: Pick<ImeKeyEventLike, 'isComposing' | 'keyCode' | 'which' | 'target'>): boolean {
+  return isImeComposing(event);
 }

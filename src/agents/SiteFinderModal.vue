@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import type { EmployeeRunRecord, SiteFinderResult } from './employee-contract';
 import { callEmployeeBackend } from './employee-client';
+import { onImeEnter } from '../core/ime-keyboard';
 import { useWindowDraggable } from '../sdk/ui';
 
 declare const chrome: any;
@@ -163,8 +164,7 @@ onBeforeUnmount(() => {
             v-model="query"
             rows="2"
             placeholder="描述你隐约记得的网站特征，例如：用途、英文关键词、颜色风格、之前大概存放在哪个分区或书签里…"
-            @keydown.meta.enter.prevent="runSearch()"
-            @keydown.ctrl.enter.prevent="runSearch()"
+            @keydown="onImeEnter($event, () => runSearch(), { requireCtrlOrMeta: true })"
           />
           <div class="sf-search-foot">
             <div class="sf-examples">

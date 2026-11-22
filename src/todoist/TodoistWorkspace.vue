@@ -63,7 +63,10 @@ watch(() => todoistModuleState.visible, val => {
   if (val) {
     state.isOpen = true;
     todoistModuleState.active = pageVisible.value;
-    void todoistTaskListController.loadWorkspace();
+    if (pageVisible.value) {
+      firstRequested = true;
+      void todoistTaskListController.loadWorkspace();
+    }
   }
 }, { immediate: true });
 
@@ -156,7 +159,10 @@ function handleToggleCalendar() {
 
 function handleAccountSaved() {
   todoistTaskListController.updateState({ accountConfigured: true });
-  if (active.value) void todoistTaskListController.loadWorkspace(undefined, undefined, true);
+  if (active.value) {
+    void todoistTaskListController.loadWorkspace(undefined, undefined, true);
+    void todoistLabelController.refresh(true);
+  }
 }
 
 function handleMinimize() {

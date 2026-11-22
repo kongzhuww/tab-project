@@ -207,6 +207,8 @@ export class GitHubService {
   public repoNodeIds = new Map<string, string>();
   private listsRevision = 0;
   private listsLoading = false;
+  private localGroupMutationQueue?: Promise<unknown>;
+  private lastLocalGroupSnapshot = "";
   public remarks: Record<string, any> = {};
   private remarksRevision = 0;
   private categoryRevision = 0;
@@ -258,6 +260,9 @@ export class GitHubService {
         const key = `ghLocalStarGroupsV1:${owner}`;
         if (changes[key] && changes[key].newValue) {
           try {
+            if (this.lastLocalGroupSnapshot && JSON.stringify(changes[key].newValue) === this.lastLocalGroupSnapshot) {
+              return;
+            }
             void this.loadLists();
           } catch (_) {}
         }
@@ -646,12 +651,32 @@ export class GitHubService {
     return Number(firstPageCount || 0);
   }
 
+  private compactRepoForCache(repo: GitHubRawRepo) {
+    return {
+      id: repo.id,
+      node_id: repo.node_id,
+      name: repo.name,
+      full_name: repo.full_name,
+      html_url: repo.html_url,
+      description: repo.description,
+      language: repo.language,
+      stargazers_count: repo.stargazers_count,
+      forks_count: repo.forks_count,
+      updated_at: repo.updated_at,
+      topics: Array.isArray(repo.topics) ? repo.topics.slice(0, 10) : [],
+      owner: {
+        login: repo.owner?.login || "",
+        avatar_url: repo.owner?.avatar_url || ""
+      }
+    };
+  }
+
   private rebuildLoadedRepos(): void {
     const unique = new Map<string, GitHubRawRepo>();
+    this.categoryRepos.forEach((repo) => unique.set((repo.full_name || String(repo.id)).toLowerCase(), repo));
     [...this.pages.keys()].sort((a, b) => a - b).forEach((p) => {
-      (this.pages.get(p) || []).forEach((repo) => unique.set(repo.full_name || String(repo.id), repo));
+      (this.pages.get(p) || []).forEach((repo) => unique.set((repo.full_name || String(repo.id)).toLowerCase(), repo));
     });
-    this.categoryRepos.forEach((repo) => unique.set(repo.full_name || String(repo.id), repo));
     this.repos = [...unique.values()];
     this.repos.forEach(repo => {
       if (repo.node_id && repo.full_name) {
@@ -662,30 +687,12 @@ export class GitHubService {
 
   private async savePageCache(current: () => boolean = () => true, strict = false): Promise<void> {
     if (!current()) return;
-    const entries = [...this.pages];
-    const recent = entries.slice(-12);
-    if (this.pages.has(1) && !recent.some(([p]) => p === 1)) {
-      recent.unshift([1, this.pages.get(1)!]);
-    }
+    const entries = [...this.pages.entries()].sort(([a], [b]) => a - b);
+    // Keep up to 100 pages (2,000 repos) in order instead of slice(-12), which previously dropped page 2 once >240 stars existed.
+    const recent = entries.slice(0, 100);
     const pages = Object.fromEntries(recent.map(([p, items]) => [
       String(p),
-      (items || []).map((repo) => ({
-        id: repo.id,
-        node_id: repo.node_id,
-        name: repo.name,
-        full_name: repo.full_name,
-        html_url: repo.html_url,
-        description: repo.description,
-        language: repo.language,
-        stargazers_count: repo.stargazers_count,
-        forks_count: repo.forks_count,
-        updated_at: repo.updated_at,
-        topics: Array.isArray(repo.topics) ? repo.topics.slice(0, 10) : [],
-        owner: {
-          login: repo.owner?.login || "",
-          avatar_url: repo.owner?.avatar_url || ""
-        }
-      }))
+      (items || []).map((repo) => this.compactRepoForCache(repo))
     ]));
 
     if (typeof chrome !== "undefined" && chrome.storage?.local) {
@@ -769,27 +776,44 @@ export class GitHubService {
     if (this.active !== "全部" && this.active !== this.UNCAT && !this.cats.includes(this.active)) this.active = "全部";
   }
 
-  private async mutateLocalGroups(change: (data: LocalStarGroups) => void, message: string, owner = this.cacheKey): Promise<boolean> {
-    if (!owner || owner !== this.cacheKey || categoryFeedback.busy) return false;
-    categoryFeedback.busy = true;
-    try {
-      const data = await changeLocalStarGroups(owner, change, { lists: this.lists, names: this.repoListNames });
-      if (owner !== this.cacheKey) return false;
-      this.applyLocalGroups(data); this.actionMessage = message; this.actionError = false; categoryFeedback.message = "";
-      this.publishAll(); return true;
-    } catch (error) {
-      if (owner === this.cacheKey) {
-        this.actionMessage = error instanceof Error ? error.message : "本地分组保存失败，请刷新核对。";
-        this.actionError = true; this.publishStatus();
+  private mutateLocalGroups(change: (data: LocalStarGroups) => void, message: string, owner = this.cacheKey): Promise<boolean> {
+    if (!owner || owner !== this.cacheKey) return Promise.resolve(false);
+    const prev = this.localGroupMutationQueue ?? Promise.resolve();
+    const run = prev.catch(() => {}).then(async () => {
+      if (!owner || owner !== this.cacheKey) return false;
+      categoryFeedback.busy = true;
+      try {
+        const data = await changeLocalStarGroups(owner, change, { lists: this.lists, names: this.repoListNames });
+        if (owner !== this.cacheKey) return false;
+        try { this.lastLocalGroupSnapshot = JSON.stringify(data); } catch {}
+        this.applyLocalGroups(data); this.actionMessage = message; this.actionError = false; categoryFeedback.message = "";
+        this.publishAll(); return true;
+      } catch (error) {
+        if (owner === this.cacheKey) {
+          this.actionMessage = error instanceof Error ? error.message : "本地分组保存失败，请刷新核对。";
+          this.actionError = true; this.publishStatus();
+        }
+        return false;
+      } finally {
+        if (this.localGroupMutationQueue === run) {
+          categoryFeedback.busy = false;
+        }
       }
-      return false;
-    } finally { categoryFeedback.busy = false; }
+    });
+    this.localGroupMutationQueue = run;
+    return run;
   }
 
   // Keep the legacy Lists cache untouched as a one-time import/backup source.
   private async saveListsCache(): Promise<void> {
-    if (typeof chrome !== "undefined" && chrome.storage?.local && this.cacheKey)
-      await chrome.storage.local.set({ [`ghStarRepoPoolV1:${this.cacheKey}`]: { owner: this.cacheKey, repos: this.repos.slice(0, 500) } });
+    if (typeof chrome !== "undefined" && chrome.storage?.local && this.cacheKey) {
+      await chrome.storage.local.set({
+        [`ghStarRepoPoolV1:${this.cacheKey}`]: {
+          owner: this.cacheKey,
+          repos: this.repos.map((repo) => this.compactRepoForCache(repo))
+        }
+      });
+    }
   }
 
   private async restoreListsCache(key: string, current: () => boolean = () => true): Promise<void> {

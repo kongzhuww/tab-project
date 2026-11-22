@@ -1,4 +1,6 @@
 import { createApp } from "vue";
+import { ensureImeDocumentTracker } from "../core/ime-keyboard";
+ensureImeDocumentTracker();
 import SidePanelApp from "./SidePanelApp.vue";
 import "../assets/styles.css";
 

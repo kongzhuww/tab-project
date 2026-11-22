@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, defineAsyncComponent } from "vue";
+import { onImeEnter } from "../core/ime-keyboard";
 import { loadEndpoint, saveEndpoint } from "./settings";
 const EndpointSettingsPanel = defineAsyncComponent(() => import("../components/EndpointSettingsPanel.vue"));
 const settingsOpen = ref(false);
@@ -146,7 +147,7 @@ onUnmounted(() => {
               class="fc-url-input"
               type="url"
               placeholder="请粘贴文章或网页网址 (http/https)..."
-              @keydown.enter.prevent="handleStartScrape"
+              @keydown="onImeEnter($event, handleStartScrape)"
             />
             <button
               v-if="!inputUrl"

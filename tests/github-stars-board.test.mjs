@@ -257,6 +257,22 @@ test('late Lists cache hydration cannot overwrite a changed account', async () =
   assert.equal(api.lists.length, 0); assert.equal(api.repos.length, 0);
 });
 
+test('savePageCache retains intermediate pages beyond 12 pages without creating page-2 holes', async () => {
+  const { api, context } = await fixture();
+  const writes = {};
+  context.chrome = { storage: { local: { set: async (obj) => Object.assign(writes, obj) } } };
+  api.cacheKey = 'github-id:42';
+  const repos = Array.from({ length: 276 }, (_, i) => ({
+    id: i + 1, name: `r-${i}`, full_name: `fixture/r-${i}`, html_url: '', description: null,
+    language: null, stargazers_count: 1, forks_count: 0, updated_at: '', topics: [], owner: { login: 'fixture', avatar_url: '' }
+  }));
+  api.commitStarSnapshot(repos);
+  await api.savePageCache(() => true, true);
+  const cachedPages = writes.ghStarredCache?.pages || {};
+  assert.equal(Object.keys(cachedPages).length, 14);
+  assert.equal(cachedPages['2']?.length, 20, 'page 2 must not be dropped when total > 240');
+});
+
 test('shelf skeleton uses the same non-shrinking width class as real cards', async () => {
   const sfc = await read('src/github/GitHubStarsBoard.vue');
   assert.match(sfc, /class="repo gh-card shelf-card skel-card"/);

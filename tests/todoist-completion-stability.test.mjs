@@ -62,3 +62,86 @@ test('invalidated fast snapshots are not served', async t => {
   instance.invalidateWorkspaceSnapshots();
   assert.equal(instance.getFastSnapshot('today'), null);
 });
+
+test('fresh New Tab startup does not invalidate already-synced change-channel revision', async t => {
+  const storage = new Map();
+  const winListeners = new Map();
+  const docListeners = new Map();
+  const oldStorage = globalThis.localStorage;
+  const oldWindow = globalThis.window;
+  const oldDoc = globalThis.document;
+  globalThis.localStorage = {
+    getItem: k => storage.get(k) ?? null,
+    setItem: (k, v) => storage.set(k, v),
+    removeItem: k => storage.delete(k)
+  };
+  globalThis.window = {
+    addEventListener: (type, fn) => winListeners.set(type, fn)
+  };
+  globalThis.document = {
+    hidden: false,
+    addEventListener: (type, fn) => docListeners.set(type, fn)
+  };
+  t.after(() => {
+    globalThis.localStorage = oldStorage;
+    globalThis.window = oldWindow;
+    globalThis.document = oldDoc;
+  });
+
+  const { createTodoistChangeChannel } = await load('src/todoist/change-channel.ts', {});
+  let invalidations = 0;
+  const channel1 = createTodoistChangeChannel(async () => 'token-1', () => { invalidations++; });
+  await channel1.publish('token-1');
+  await channel1.markSynced('token-1');
+
+  // Simulate a New Tab refresh: new channel instance with empty in-memory `seen`.
+  createTodoistChangeChannel(async () => 'token-1', () => { invalidations++; });
+  winListeners.get('pageshow')?.();
+  await new Promise(r => setTimeout(r, 20));
+  assert.equal(invalidations, 0, 'synced revision must not invalidate on New Tab refresh');
+
+  // Simulate another tab publishing an un-synced write.
+  await channel1.publish('token-1');
+  winListeners.get('pageshow')?.();
+  await new Promise(r => setTimeout(r, 20));
+  assert.equal(invalidations, 1, 'unsynced write must invalidate');
+});
+
+test('loadWorkspaceData reuses valid cached snapshot across reloads without forcing network', async t => {
+  const oldStorage = globalThis.localStorage;
+  const oldTimestamp = Date.now() - 2 * 60 * 60 * 1000; // 2 hours ago
+  const snapshot = {
+    data: {
+      columns: [{ sectionId: '', title: 'Inbox', tasks: [{ id: 't1', content: 'cached', completed: false }] }],
+      projects: [],
+      activeProjectId: '',
+      activeProjectName: '',
+      availableLabels: []
+    },
+    timestamp: oldTimestamp
+  };
+  const store = new Map([['todoist_fast_snapshot:v3:inbox', JSON.stringify(snapshot)]]);
+  globalThis.localStorage = {
+    getItem: k => store.get(k) ?? null,
+    setItem: (k, v) => store.set(k, v),
+    removeItem: k => store.delete(k)
+  };
+  t.after(() => { globalThis.localStorage = oldStorage; });
+
+  const service = await load('src/services/todoist.service.ts', {
+    '../todoist/module-state': moduleMock + '; export const trackTodoistWrites=x=>x',
+    '../todoist/change-channel': `export const createTodoistChangeChannel=()=>({publish:async()=>{},markSynced:async()=>{},clear:()=>{}})`
+  });
+  const instance = service.TodoistService.getInstance();
+  instance.token = 'fixture-token';
+  let onlineCalls = 0;
+  instance.fetchWorkspaceDataOnline = async () => { onlineCalls++; return snapshot.data; };
+  // Populate memory cache from fast snapshot as task-list-store does
+  assert.ok(instance.getFastSnapshot('inbox'));
+  const loaded = await instance.loadWorkspaceData('inbox');
+  assert.equal(onlineCalls, 0, 'cached snapshot must be reused without network fetch');
+  assert.equal(loaded.columns[0].tasks[0].id, 't1');
+
+  await instance.loadWorkspaceData('inbox', undefined, true);
+  assert.equal(onlineCalls, 1, 'explicit force=true still fetches online');
+});

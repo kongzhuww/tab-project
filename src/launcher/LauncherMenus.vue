@@ -15,6 +15,7 @@ import { chatService } from "../chat/chat.service";
 import type { ChatShareTarget } from "../chat/private-chat-client";
 import { pluginSlots, type MenuSlotAction } from "../sdk/slots";
 import { webSiteTaskController } from "./web-task-store";
+import { webSitePreviewController } from "./web-preview-store";
 
 const state = menusState;
 
@@ -238,10 +239,28 @@ function handleCreateLargeFolder() {
   launcherMenusController.dispatch("link:create-large-folder", { link });
 }
 
-function handleMoveOut() {
+function handlePreviewLink() {
   const link = state.linkMenu.link;
+  if (!link) return;
+  const allLinks = launcherService.getState().links;
+  const full = allLinks.find(l => String(l.id) === String(link.id)) || link;
+  const chromeApi = (globalThis as any).chrome;
+  let icon = (full as any).customIcon || (full as any).icon || "";
+  if (!icon && link.url) {
+    icon = launcherService.getCachedIcon(link.url) || (chromeApi?.runtime?.id
+      ? `chrome-extension://${chromeApi.runtime.id}/_favicon/?pageUrl=${encodeURIComponent(link.url)}&size=32`
+      : "");
+  }
+  webSitePreviewController.open({
+    id: link.id,
+    title: link.title || link.url || "",
+    url: link.url || "",
+    icon: icon || undefined,
+    note: link.note || undefined,
+    category: link.group && link.group !== "常用网站" ? link.group : (link.page || "常用网站"),
+    source: "launcher"
+  });
   launcherMenusController.closeLinkMenu();
-  launcherMenusController.dispatch("link:move-out", { link });
 }
 
 function handleCreateTask() {
@@ -414,7 +433,9 @@ watch(() => [state.pageMenu, state.pageMenu.isOpen], () => {
         v-model:open="state.linkMenu.flyoutOpen" :visible="state.linkMenu.isOpen"
         :x="state.linkMenu.x" :y="state.linkMenu.y" :items="state.linkMenu.pages"
         :disabled="linkMenuBusy" :vertical-budget="280" @select="handleLinkMove" />
-      <button v-if="state.linkMenu.link?.group && state.linkMenu.link.group !== '常用网站'" type="button" @click="handleMoveOut">移出文件夹，放到外面</button>
+      <button id="link-menu-preview" type="button" @click="handlePreviewLink">
+        预览
+      </button>
       <button id="link-menu-rename" type="button" @click="handleLinkRename">
         重命名
       </button>

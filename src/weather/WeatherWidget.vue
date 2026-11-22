@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from "vue";
+import { onImeEnter } from "../core/ime-keyboard";
 import { weatherState, weatherController as controller } from "./store";
 import { weatherService, type WeatherCityItem } from "../services/weather.service";
 import { t, currentLanguage } from "../i18n";
@@ -278,7 +279,7 @@ function handleDialogClick(e: MouseEvent): void {
               class="weather-location-input"
               :placeholder="t('weather.menu.inputPlaceholder')"
               v-model="cityInput"
-              @keydown.enter.prevent="submitCity"
+              @keydown="onImeEnter($event, submitCity)"
               autocomplete="off"
             />
             <button

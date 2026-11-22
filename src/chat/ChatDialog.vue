@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, nextTick, watch, onMounted, onUnmounted } from "vue";
+import { shouldSubmitOnEnter } from "../core/ime-keyboard";
 import { AppWindowFrame } from "../sdk/ui";
 import { images } from "../sdk/images";
 import {
@@ -439,7 +440,7 @@ async function handleSend() {
 }
 
 function handleKeyDown(e: KeyboardEvent) {
-  if (e.key === "Enter" && !e.shiftKey) {
+  if (shouldSubmitOnEnter(e)) {
     e.preventDefault();
     handleSend();
   }
