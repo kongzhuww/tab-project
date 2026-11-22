@@ -134,7 +134,44 @@ export interface BiliCommentItem {
   isTop?: boolean;
   pictures?: string[];
   emotes?: Record<string, string>;
+  mentions?: Record<string, string>;
   replies?: BiliCommentItem[];
+}
+
+function extractReplyEmotes(content: any): Record<string, string> {
+  const emotes: Record<string, string> = {};
+  if (content?.emote && typeof content.emote === "object") {
+    for (const [key, val] of Object.entries(content.emote)) {
+      const u = (val as any)?.url || (val as any)?.gif_url;
+      if (typeof u === "string" && u) {
+        emotes[key] = u.replace(/^http:/i, "https:");
+      }
+    }
+  }
+  return emotes;
+}
+
+function extractReplyMentions(content: any): Record<string, string> {
+  const mentions: Record<string, string> = {};
+  if (content?.at_name_to_mid && typeof content.at_name_to_mid === "object") {
+    for (const [name, mid] of Object.entries(content.at_name_to_mid)) {
+      const cleanName = String(name || "").trim();
+      const cleanMid = mid !== undefined && mid !== null ? String(mid).trim() : "";
+      if (cleanName && /^\d+$/.test(cleanMid)) {
+        mentions[cleanName] = cleanMid;
+      }
+    }
+  }
+  if (Array.isArray(content?.members)) {
+    for (const m of content.members) {
+      const cleanName = String(m?.uname || "").trim();
+      const cleanMid = m?.mid !== undefined && m?.mid !== null ? String(m.mid).trim() : "";
+      if (cleanName && /^\d+$/.test(cleanMid) && !mentions[cleanName]) {
+        mentions[cleanName] = cleanMid;
+      }
+    }
+  }
+  return mentions;
 }
 
 function parseBiliCommentPictures(pictures: unknown): string[] {
@@ -1647,15 +1684,8 @@ export class BilibiliService {
     const total = Number(pageObj.count || 0);
 
     const parseComment = (r: any, isTop = false): BiliCommentItem => {
-      const emotes: Record<string, string> = {};
-      if (r.content?.emote && typeof r.content.emote === "object") {
-        for (const [key, val] of Object.entries(r.content.emote)) {
-          const u = (val as any)?.url;
-          if (typeof u === "string" && u) {
-            emotes[key] = u.replace(/^http:/, "https:");
-          }
-        }
-      }
+      const emotes = extractReplyEmotes(r.content);
+      const mentions = extractReplyMentions(r.content);
       const subReplies = Array.isArray(r.replies)
         ? r.replies.map((sub: any) => ({
             rpid: sub.rpid,
@@ -1665,7 +1695,9 @@ export class BilibiliService {
             message: String(sub.content?.message || ""),
             timeText: new Date(Number(sub.ctime || 0) * 1000).toLocaleString(),
             like: Number(sub.like || 0),
-            pictures: parseBiliCommentPictures(sub.content?.pictures)
+            pictures: parseBiliCommentPictures(sub.content?.pictures),
+            emotes: extractReplyEmotes(sub.content),
+            mentions: extractReplyMentions(sub.content)
           }))
         : [];
       return {
@@ -1680,6 +1712,7 @@ export class BilibiliService {
         isTop,
         pictures: parseBiliCommentPictures(r.content?.pictures),
         emotes,
+        mentions,
         replies: subReplies
       };
     };
@@ -1720,28 +1753,18 @@ export class BilibiliService {
     const pageObj = data?.page || {};
     const total = Number(pageObj.count || 0);
 
-    const replies: BiliCommentItem[] = repliesRaw.map((r: any) => {
-      const emotes: Record<string, string> = {};
-      if (r.content?.emote && typeof r.content.emote === "object") {
-        for (const [key, val] of Object.entries(r.content.emote)) {
-          const u = (val as any)?.url;
-          if (typeof u === "string" && u) {
-            emotes[key] = u.replace(/^http:/, "https:");
-          }
-        }
-      }
-      return {
-        rpid: r.rpid,
-        mid: Number(r.mid || 0),
-        uname: String(r.member?.uname || "B站用户"),
-        avatar: String(r.member?.avatar || "").replace(/^http:/, "https:"),
-        message: String(r.content?.message || ""),
-        timeText: new Date(Number(r.ctime || 0) * 1000).toLocaleString(),
-        like: Number(r.like || 0),
-        pictures: parseBiliCommentPictures(r.content?.pictures),
-        emotes
-      };
-    });
+    const replies: BiliCommentItem[] = repliesRaw.map((r: any) => ({
+      rpid: r.rpid,
+      mid: Number(r.mid || 0),
+      uname: String(r.member?.uname || "B站用户"),
+      avatar: String(r.member?.avatar || "").replace(/^http:/, "https:"),
+      message: String(r.content?.message || ""),
+      timeText: new Date(Number(r.ctime || 0) * 1000).toLocaleString(),
+      like: Number(r.like || 0),
+      pictures: parseBiliCommentPictures(r.content?.pictures),
+      emotes: extractReplyEmotes(r.content),
+      mentions: extractReplyMentions(r.content)
+    }));
 
     return {
       replies,

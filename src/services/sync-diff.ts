@@ -1,10 +1,12 @@
+import { SYNC_DIFF_SETTING_LABELS } from "./sync-schema";
+
 /**
  * 同步快照差异与两端比对分析器 (Sync Snapshot Diff & Comparison Analyzer)
  * 纯函数：比对两份配置字典，自动提取出人类易读的模块化改动日志或两端双向对比
  */
 
 export interface ChangeSummary {
-  category: "sites" | "star-groups" | "my-repos" | "settings" | "other";
+  category: "sites" | "star-groups" | "my-repos" | "backpack" | "settings" | "other";
   categoryLabel: string;
   action: "added" | "removed" | "modified";
   badge?: {
@@ -135,18 +137,7 @@ export function computeConfigDiff(
 
   // 4. 基础设置与模块开关变化
   const basicKeys: Record<string, string> = {
-    enableQuickSearch: "极速搜索",
-    theme: "界面主题",
-    showWeather: "天气挂件",
-    showSites: "常用网站和书签",
-    showHomeNews: "AI HOT 资讯",
-    showHomePlayer: "音乐播放器",
-    showBili: "B站卡片",
-    showYouTube: "YouTube卡片",
-    showTodo: "待办卡片",
-    showBookmarkPanel: "书签栏",
-    singleNewTab: "极速搜索（旧设置）",
-    city: "天气城市",
+    ...SYNC_DIFF_SETTING_LABELS,
     ghUser: "GitHub 账号",
     todoistToken: "Todoist 授权"
   };
@@ -304,23 +295,8 @@ export function compareLocalAndRemote(
   }
 
   // 4. 设置项差异
-  const basicKeys: Record<string, string> = {
-    enableQuickSearch: "极速搜索",
-    theme: "界面主题",
-    showWeather: "天气挂件",
-    showSites: "常用网站和书签",
-    showHomeNews: "AI HOT 资讯",
-    showHomePlayer: "音乐播放器",
-    showBili: "B站卡片",
-    showYouTube: "YouTube卡片",
-    showTodo: "待办卡片",
-    showBookmarkPanel: "书签栏",
-    singleNewTab: "极速搜索（旧设置）",
-    city: "天气城市"
-  };
-
   const diffSettings: string[] = [];
-  for (const [key, label] of Object.entries(basicKeys)) {
+  for (const [key, label] of Object.entries(SYNC_DIFF_SETTING_LABELS)) {
     if (loc[key] !== undefined && rem[key] !== undefined && JSON.stringify(loc[key]) !== JSON.stringify(rem[key])) {
       diffSettings.push(`${label} (本地: ${JSON.stringify(loc[key])} / 云端: ${JSON.stringify(rem[key])})`);
     }
@@ -335,6 +311,40 @@ export function compareLocalAndRemote(
       text: `存在差异的配置项: ${diffSettings.join("；")}`
     });
   }
+
+  // 4.5 背包内容（提示词 & 收藏文章）双向差异
+  const compareBackpackCollection = (key: string, label: string, unit: string) => {
+    const lArr = Array.isArray(loc[key]) ? loc[key] : [];
+    const rArr = Array.isArray(rem[key]) ? rem[key] : [];
+    if (JSON.stringify(lArr) === JSON.stringify(rArr)) return;
+    const itemKey = (item: any, idx: number) => (item && typeof item === "object" && item.id != null) ? String(item.id) : `#${idx}:${JSON.stringify(item)}`;
+    const lMap = new Map(lArr.map((it: any, idx: number) => [itemKey(it, idx), JSON.stringify(it)]));
+    const rMap = new Map(rArr.map((it: any, idx: number) => [itemKey(it, idx), JSON.stringify(it)]));
+    let onlyRemote = 0;
+    let onlyLocal = 0;
+    let edited = 0;
+    for (const [id, rJson] of rMap) {
+      if (!lMap.has(id)) onlyRemote++;
+      else if (lMap.get(id) !== rJson) edited++;
+    }
+    for (const id of lMap.keys()) {
+      if (!rMap.has(id)) onlyLocal++;
+    }
+    const parts: string[] = [];
+    if (onlyRemote) parts.push(`仅云端 ${onlyRemote} ${unit}`);
+    if (onlyLocal) parts.push(`仅本地 ${onlyLocal} ${unit}`);
+    if (edited) parts.push(`内容差异 ${edited} ${unit}`);
+    if (!parts.length) parts.push("排序或格式存在差异");
+    summaries.push({
+      category: "backpack",
+      categoryLabel: label,
+      action: "modified",
+      badge: { text: `本地 ${lArr.length} / 云端 ${rArr.length}`, type: "diff" },
+      text: `${label}不一致（${parts.join("，")}）`
+    });
+  };
+  compareBackpackCollection("logicweaver_prompt_backpack_v1", "提示词背包", "条");
+  compareBackpackCollection("logicweaver_saved_articles_v1", "收藏文章", "篇");
 
   // 5. 兜底概览
   if (summaries.length === 0) {

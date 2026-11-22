@@ -10,6 +10,8 @@ import { computeConfigDiff, type ChangeSummary } from "./sync-diff";
 import { mergeSyncSettings } from "./sync-merger";
 import { ARTICLE_REVISION_KEY, PROMPT_REVISION_KEY, parseBackpackRevision } from '../backpack/revision-guard';
 import { employeeBackup, employeesForRestore } from './employee-sync';
+import { SENSITIVE_SYNC_KEYS } from "./sync-schema";
+import { hasExtensionLocalStorage, readExtensionStorage, writeExtensionStorage } from "../core/storage-repo";
 
 export { MAX_SAFE_SYNC_PAYLOAD_BYTES } from "./sync-payload";
 export type { SyncPayloadResult } from "./sync-payload";
@@ -35,7 +37,7 @@ export const SYNC_WHITELIST_KEYS: readonly string[] = [
   "wereadSortIds", "foGroups",
   "foTree", "foCollapsedGroupsV1", "biliFollowingGroupsV1", "biliSubCustomChannelsV1", "biliRadioSeriesV1",
   "ghRepoRemarksV1", "ghLocalStarGroupsV1", "gh_my_repo_groups_v2", "gh_my_repo_groups_map_v2",
-  "ghUser", "ghToken", "todoistToken", "todoistActiveProjectIdV1", "lw_private_chat_v1", "googleCalendarSessionTokenV1", "lw_webdav_config",
+  "ghUser", "ghToken", "todoistToken", "todoistActiveProjectIdV1", "googleCalendarSessionTokenV1", "lw_webdav_config",
   "launcherGroups", "launcherFolders", "quickLinks", "quickLinkGroupSizes",
   "launcherPages", "launcherPageLabels", "launcherActivePage", "launcherFolderPositionV1",
   "heroBackground", "heroBackgroundHistory", "lw-rss-channels-v1", "lw-rss-selected-v1", "msFavoriteSongs", "digitalEmployeesV1",
@@ -71,33 +73,23 @@ const launcherMirrorKeys = new Set([
 
 /** Read only backup keys, not unrelated caches or other local credentials. */
 export async function readSyncSettings(): Promise<Record<string, unknown>> {
-  if (typeof chrome !== "undefined" && chrome.storage?.local) {
-    const data = await new Promise<Record<string, unknown>>((resolve, reject) => {
-      chrome.storage.local.get(null, (res: Record<string, unknown>) => {
-        const error = chrome.runtime.lastError;
-        if (error) {
-          reject(new Error(error.message || "读取本地配置失败"));
-          return;
-        }
-        const filtered: Record<string, unknown> = {};
-        const all = res || {};
-        for (const k of SYNC_WHITELIST_KEYS) {
-          if (all[k] !== undefined) filtered[k] = all[k];
-        }
-        // 自动汇聚所有按账号划分的 ghLocalStarGroupsV1: 前缀配置
-        const starGroupKeys = Object.keys(all).filter(k => k.startsWith("ghLocalStarGroupsV1:"));
-        if (starGroupKeys.length) {
-          const map: Record<string, unknown> = {};
-          for (const gk of starGroupKeys) map[gk] = all[gk];
-          filtered["ghLocalStarGroupsV1"] = map;
-        }
-        resolve(filtered);
-      });
-    });
+  if (hasExtensionLocalStorage()) {
+    const all = await readExtensionStorage(null);
+    const data: Record<string, unknown> = {};
+    for (const k of SYNC_WHITELIST_KEYS) {
+      if (all[k] !== undefined) data[k] = all[k];
+    }
+    // 自动汇聚所有按账号划分的 ghLocalStarGroupsV1: 前缀配置
+    const starGroupKeys = Object.keys(all).filter(k => k.startsWith("ghLocalStarGroupsV1:"));
+    if (starGroupKeys.length) {
+      const map: Record<string, unknown> = {};
+      for (const gk of starGroupKeys) map[gk] = all[gk];
+      data["ghLocalStarGroupsV1"] = map;
+    }
     if (data.digitalEmployeesV1 !== undefined) data.digitalEmployeesV1 = employeeBackup(data.digitalEmployeesV1);
-    // Include localStorage items (e.g. private chat config) if not present in chrome.storage.local
+    // Include localStorage items if not present in chrome.storage.local
     if (typeof localStorage !== "undefined") {
-      const extraKeys = ["lw_private_chat_v1", "ghUser", "ghToken", "todoistToken", "googleCalendarSessionTokenV1", "lw_webdav_config", "biliRadioSeriesV1", "gh_my_repo_groups_v2", "gh_my_repo_groups_map_v2", ...BACKPACK_SYNC_KEYS];
+      const extraKeys = ["ghUser", "ghToken", "todoistToken", "googleCalendarSessionTokenV1", "lw_webdav_config", "biliRadioSeriesV1", "gh_my_repo_groups_v2", "gh_my_repo_groups_map_v2", ...BACKPACK_SYNC_KEYS];
       for (const k of extraKeys) {
         if (data[k] === undefined) {
           const val = localStorage.getItem(k) ?? (k === "biliRadioSeriesV1" ? localStorage.getItem("lw_backup_bili_radio_series") : null);
@@ -168,30 +160,24 @@ export async function restoreSyncBackup(data: unknown, options: { allowCredentia
   const revisionKeys = [promptChanged && PROMPT_REVISION_KEY, articleChanged && ARTICLE_REVISION_KEY].filter((key): key is string => Boolean(key));
   const lockNames = revisionKeys.map(key => `tab-project:backpack:${key}`);
   if (Object.hasOwn(settings, "quickLinks")) settings.quickLinksReady = true;
-  if (typeof chrome !== "undefined" && chrome.storage?.local) {
+  if (hasExtensionLocalStorage()) {
     const commit = async () => {
       if (options.beforeCommit) await options.beforeCommit();
       const values: Record<string, unknown> = { ...settings };
       if (Object.hasOwn(settings, 'digitalEmployeesV1')) {
-        const current = await chrome.storage.local.get('digitalEmployeesV1');
+        const current = await readExtensionStorage('digitalEmployeesV1');
         values.digitalEmployeesV1 = employeesForRestore(settings.digitalEmployeesV1, current.digitalEmployeesV1);
         values.digitalEmployeeOrganizerSeededV1 = true;
       }
       if (revisionKeys.length) {
-        const current = await chrome.storage.local.get(revisionKeys);
+        const current = await readExtensionStorage(revisionKeys);
         for (const key of revisionKeys) {
           const value = parseBackpackRevision(current[key]);
           if (value >= Number.MAX_SAFE_INTEGER) throw new SyncBackupError('背包版本号已耗尽，未恢复数据');
           values[key] = value + 1;
         }
       }
-      await new Promise<void>((resolve, reject) => {
-        chrome.storage.local.set(values, () => {
-          const error = chrome.runtime.lastError;
-          if (error) reject(new Error(error.message || "写入本地配置失败"));
-          else resolve();
-        });
-      });
+      await writeExtensionStorage(values);
     };
     if (lockNames.length) {
       if (typeof navigator === 'undefined' || !navigator.locks) throw new SyncBackupError('浏览器缺少背包写入锁或收藏写入锁，未恢复任何数据');
@@ -222,9 +208,7 @@ export async function restoreSyncBackup(data: unknown, options: { allowCredentia
         }
       }
       if (Object.keys(toSet).length) {
-        await new Promise<void>((res) => {
-          chrome.storage.local.set(toSet, () => res());
-        });
+        await writeExtensionStorage(toSet).catch(() => {});
       }
     }
     if (typeof localStorage !== "undefined") {
@@ -304,9 +288,8 @@ export async function createSyncBackup(settings: Record<string, unknown>, device
 
   const sanitized = extractSyncPayload(settings).sanitized;
   // This comparison snapshot is not encrypted. Never duplicate credentials in it.
-  const sensitive = new Set(['ghToken', 'todoistToken', 'lw_private_chat_v1', 'googleCalendarSessionTokenV1', 'lw_webdav_config']);
-  const snapshot = Object.fromEntries(Object.entries(sanitized).filter(([key]) => !sensitive.has(key)));
-  const safePrevious = prevSnapshot && Object.fromEntries(Object.entries(prevSnapshot).filter(([key]) => !sensitive.has(key)));
+  const snapshot = Object.fromEntries(Object.entries(sanitized).filter(([key]) => !SENSITIVE_SYNC_KEYS.has(key)));
+  const safePrevious = prevSnapshot && Object.fromEntries(Object.entries(prevSnapshot).filter(([key]) => !SENSITIVE_SYNC_KEYS.has(key)));
   const changes = computeConfigDiff(safePrevious, snapshot);
 
   if (typeof localStorage !== "undefined") {

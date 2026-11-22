@@ -10,9 +10,6 @@ import LauncherMenuTitle from "./LauncherMenuTitle.vue";
 import LauncherMenuUrl from "./LauncherMenuUrl.vue";
 import LauncherMenuNote from "./LauncherMenuNote.vue";
 import LauncherMoveMenu from "./LauncherMoveMenu.vue";
-import ChatShareMenu from "../chat/ChatShareMenu.vue";
-import { chatService } from "../chat/chat.service";
-import type { ChatShareTarget } from "../chat/private-chat-client";
 import { pluginSlots, type MenuSlotAction } from "../sdk/slots";
 import { webSiteTaskController } from "./web-task-store";
 import { webSitePreviewController } from "./web-preview-store";
@@ -123,25 +120,6 @@ function startEditLinkUrl() {
 }
 const saveLinkUrl = urlEdit.commit;
 const cancelEditLinkUrl = urlEdit.cancel;
-function shareLink(target: ChatShareTarget) {
-  const link = state.linkMenu.link;
-  if (!link || linkMenuBusy.value) return;
-  const allLinks = launcherService.getState().links;
-  const full = allLinks.find(l => String(l.id) === String(link.id)) || link;
-  let safeIcon = (full as any).customIcon || (full as any).icon || "";
-  if (!safeIcon && link.url) {
-    const cached = launcherService.getCachedIcon(link.url);
-    if (cached && cached.length <= 64 * 1024) safeIcon = cached;
-  }
-  const payload = {
-    title: link.title || "网站",
-    url: link.url || "",
-    icon: safeIcon,
-    note: link.note || ""
-  };
-  handleCloseAll();
-  chatService.sendWebsiteShare(payload, target);
-}
 
 function startEditLinkNote() {
   const link = state.linkMenu.link;
@@ -442,7 +420,6 @@ watch(() => [state.pageMenu, state.pageMenu.isOpen], () => {
       <button id="link-menu-create-task" type="button" @click="handleCreateTask">
         创建任务
       </button>
-      <ChatShareMenu id="link-menu-send" :visible="state.linkMenu.isOpen" :disabled="linkMenuBusy" @open="state.linkMenu.flyoutOpen = false" @select="shareLink" />
       <button v-for="action in pluginLinkActions" :key="action.id" type="button"
         :disabled="action.disabled?.({ id: String(state.linkMenu.link?.id), title: state.linkMenu.link?.title || '', url: state.linkMenu.link?.url, kind: 'link' })"
         @click="state.linkMenu.link && runPluginAction(action, { id: String(state.linkMenu.link.id), title: state.linkMenu.link.title || '', url: state.linkMenu.link.url, kind: 'link' })">

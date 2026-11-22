@@ -903,6 +903,28 @@ async function removeRetiredYouTubeStorage() {
   await chrome.storage.local.remove([...REMOVED_YOUTUBE_KEYS]);
 }
 
+// src/core/removed-chat.ts
+var REMOVED_CHAT_KEYS = [
+  "lw_private_chat_v1",
+  "lw_chat_session_v1",
+  "lw_chat_server_url",
+  "lw_chat_server_explicit",
+  "lw_chat_user_id",
+  "lw_chat_user_name",
+  "lw_chat_user_avatar",
+  "lw_chat_groups",
+  "lw_chat_current_group",
+  "lw_chat_rooms",
+  "lw_chat_friends",
+  "lw_chat_friend_requests_v1",
+  "lw_chat_transport_mode",
+  "lw_chat_current_room"
+];
+async function removeRetiredChatStorage() {
+  if (typeof chrome === "undefined" || !chrome.storage?.local) return;
+  await chrome.storage.local.remove([...REMOVED_CHAT_KEYS]);
+}
+
 // src/todoist/local-reminders.ts
 var PREFIX = "todoist_reminder_v2:";
 var REMINDER_ALARM = "todoist_remind_";
@@ -6591,6 +6613,72 @@ function sessionTitle(message) {
 // src/native-bridge/installer.ts
 var NATIVE_HOST_NAME = "com.tab_project.agent_bridge";
 
+// src/core/runtime-protocol.ts
+function resolveRuntime(customRuntime) {
+  if (customRuntime?.sendMessage) return customRuntime;
+  if (typeof chrome !== "undefined" && chrome?.runtime?.sendMessage) {
+    return chrome.runtime;
+  }
+  return null;
+}
+function sendRuntimeMessage(request2, options) {
+  const runtime = resolveRuntime(options?.runtime);
+  const throwOnError = Boolean(options?.throwOnError);
+  if (!runtime?.sendMessage) {
+    if (throwOnError) return Promise.reject(new Error("RUNTIME_UNAVAILABLE"));
+    return Promise.resolve(void 0);
+  }
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const finish = (response, err) => {
+      if (settled) return;
+      settled = true;
+      const lastErr = runtime.lastError;
+      if (lastErr || err) {
+        if (throwOnError) {
+          reject(err instanceof Error ? err : new Error(lastErr?.message || String(err || "RUNTIME_ERROR")));
+        } else {
+          resolve(void 0);
+        }
+        return;
+      }
+      resolve(response);
+    };
+    try {
+      const maybePromise = runtime.sendMessage(request2, (response) => finish(response));
+      if (maybePromise && typeof maybePromise.then === "function") {
+        maybePromise.then(
+          (res) => finish(res),
+          (err) => finish(void 0, err)
+        );
+      }
+    } catch (err) {
+      finish(void 0, err);
+    }
+  });
+}
+function createRuntimeMessageRouter(handlers) {
+  return (message, sender, sendResponse) => {
+    const type = typeof message?.type === "string" ? message.type : "";
+    const handler = type ? handlers[type] : void 0;
+    if (!handler) return false;
+    try {
+      const outcome = handler(message, sender, sendResponse);
+      if (outcome && typeof outcome.then === "function") {
+        outcome.then(
+          (value) => sendResponse(value),
+          (error) => sendResponse({ ok: false, error: error instanceof Error ? error.message : String(error) })
+        );
+        return true;
+      }
+      return outcome === true;
+    } catch (error) {
+      sendResponse({ ok: false, error: error instanceof Error ? error.message : String(error) });
+      return false;
+    }
+  };
+}
+
 // src/services/native-bridge.service.ts
 async function hasNativeMessagingPermission() {
   if (typeof chrome === "undefined") return false;
@@ -6638,11 +6726,14 @@ async function sendNative(payload) {
     if (typeof chrome.runtime?.sendNativeMessage === "function") {
       response = await chrome.runtime.sendNativeMessage(NATIVE_HOST_NAME, envelope);
     } else if (typeof chrome.runtime?.sendMessage === "function") {
-      const proxy = await chrome.runtime.sendMessage({
-        type: "native-bridge:send",
-        hostName: NATIVE_HOST_NAME,
-        payload: envelope
-      });
+      const proxy = await sendRuntimeMessage(
+        {
+          type: "native-bridge:send",
+          hostName: NATIVE_HOST_NAME,
+          payload: envelope
+        },
+        { throwOnError: true }
+      );
       if (!proxy?.ok) {
         throw new Error(proxy?.error || "UNSUPPORTED_CONTEXT");
       }
@@ -8431,6 +8522,40 @@ function playbackDeadline(parent, ms) {
 }
 
 // src/services/bilibili.service.ts
+function extractReplyEmotes(content) {
+  const emotes = {};
+  if (content?.emote && typeof content.emote === "object") {
+    for (const [key2, val] of Object.entries(content.emote)) {
+      const u = val?.url || val?.gif_url;
+      if (typeof u === "string" && u) {
+        emotes[key2] = u.replace(/^http:/i, "https:");
+      }
+    }
+  }
+  return emotes;
+}
+function extractReplyMentions(content) {
+  const mentions = {};
+  if (content?.at_name_to_mid && typeof content.at_name_to_mid === "object") {
+    for (const [name, mid] of Object.entries(content.at_name_to_mid)) {
+      const cleanName = String(name || "").trim();
+      const cleanMid = mid !== void 0 && mid !== null ? String(mid).trim() : "";
+      if (cleanName && /^\d+$/.test(cleanMid)) {
+        mentions[cleanName] = cleanMid;
+      }
+    }
+  }
+  if (Array.isArray(content?.members)) {
+    for (const m of content.members) {
+      const cleanName = String(m?.uname || "").trim();
+      const cleanMid = m?.mid !== void 0 && m?.mid !== null ? String(m.mid).trim() : "";
+      if (cleanName && /^\d+$/.test(cleanMid) && !mentions[cleanName]) {
+        mentions[cleanName] = cleanMid;
+      }
+    }
+  }
+  return mentions;
+}
 function parseBiliCommentPictures(pictures) {
   if (!Array.isArray(pictures)) return [];
   return pictures.flatMap((picture) => {
@@ -9763,15 +9888,8 @@ var BilibiliService = class _BilibiliService {
     const pageObj = data?.page || {};
     const total = Number(pageObj.count || 0);
     const parseComment = (r, isTop = false) => {
-      const emotes = {};
-      if (r.content?.emote && typeof r.content.emote === "object") {
-        for (const [key2, val] of Object.entries(r.content.emote)) {
-          const u = val?.url;
-          if (typeof u === "string" && u) {
-            emotes[key2] = u.replace(/^http:/, "https:");
-          }
-        }
-      }
+      const emotes = extractReplyEmotes(r.content);
+      const mentions = extractReplyMentions(r.content);
       const subReplies = Array.isArray(r.replies) ? r.replies.map((sub) => ({
         rpid: sub.rpid,
         mid: Number(sub.mid || 0),
@@ -9780,7 +9898,9 @@ var BilibiliService = class _BilibiliService {
         message: String(sub.content?.message || ""),
         timeText: new Date(Number(sub.ctime || 0) * 1e3).toLocaleString(),
         like: Number(sub.like || 0),
-        pictures: parseBiliCommentPictures(sub.content?.pictures)
+        pictures: parseBiliCommentPictures(sub.content?.pictures),
+        emotes: extractReplyEmotes(sub.content),
+        mentions: extractReplyMentions(sub.content)
       })) : [];
       return {
         rpid: r.rpid,
@@ -9794,6 +9914,7 @@ var BilibiliService = class _BilibiliService {
         isTop,
         pictures: parseBiliCommentPictures(r.content?.pictures),
         emotes,
+        mentions,
         replies: subReplies
       };
     };
@@ -9822,28 +9943,18 @@ var BilibiliService = class _BilibiliService {
     const repliesRaw = data?.replies || [];
     const pageObj = data?.page || {};
     const total = Number(pageObj.count || 0);
-    const replies = repliesRaw.map((r) => {
-      const emotes = {};
-      if (r.content?.emote && typeof r.content.emote === "object") {
-        for (const [key2, val] of Object.entries(r.content.emote)) {
-          const u = val?.url;
-          if (typeof u === "string" && u) {
-            emotes[key2] = u.replace(/^http:/, "https:");
-          }
-        }
-      }
-      return {
-        rpid: r.rpid,
-        mid: Number(r.mid || 0),
-        uname: String(r.member?.uname || "B\u7AD9\u7528\u6237"),
-        avatar: String(r.member?.avatar || "").replace(/^http:/, "https:"),
-        message: String(r.content?.message || ""),
-        timeText: new Date(Number(r.ctime || 0) * 1e3).toLocaleString(),
-        like: Number(r.like || 0),
-        pictures: parseBiliCommentPictures(r.content?.pictures),
-        emotes
-      };
-    });
+    const replies = repliesRaw.map((r) => ({
+      rpid: r.rpid,
+      mid: Number(r.mid || 0),
+      uname: String(r.member?.uname || "B\u7AD9\u7528\u6237"),
+      avatar: String(r.member?.avatar || "").replace(/^http:/, "https:"),
+      message: String(r.content?.message || ""),
+      timeText: new Date(Number(r.ctime || 0) * 1e3).toLocaleString(),
+      like: Number(r.like || 0),
+      pictures: parseBiliCommentPictures(r.content?.pictures),
+      emotes: extractReplyEmotes(r.content),
+      mentions: extractReplyMentions(r.content)
+    }));
     return {
       replies,
       total,
@@ -12195,6 +12306,7 @@ async function saveContextSticker(blob, extension) {
 
 // src/background/index.ts
 void removeRetiredYouTubeStorage().catch((error) => console.warn("\u65E7 YouTube \u6570\u636E\u6E05\u7406\u5931\u8D25", error));
+void removeRetiredChatStorage().catch((error) => console.warn("\u65E7\u804A\u5929\u5BA4\u6570\u636E\u6E05\u7406\u5931\u8D25", error));
 initBilibiliNetRules();
 initNotificationListeners();
 initTodoistBackgroundSync();
@@ -12480,57 +12592,64 @@ async function ensureOffscreenAudioDocument() {
   });
   await creatingOffscreenAudio;
 }
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message?.type === "audio-bg:get-state") {
-    (async () => {
-      if (!await hasOffscreenAudioDocument()) {
-        return { ok: true, music: null, bili: null };
-      }
-      return new Promise((resolve) => {
-        chrome.runtime.sendMessage({ type: "offscreen-audio:get-state" }, (reply) => {
-          if (chrome.runtime?.lastError || !reply?.ok) {
-            resolve({ ok: true, music: null, bili: null });
-            return;
-          }
-          resolve(reply);
-        });
-      });
-    })().then(sendResponse).catch(() => sendResponse({ ok: true, music: null, bili: null }));
-    return true;
-  }
-  if (message?.type === "audio-bg:command") {
-    (async () => {
-      await ensureOffscreenAudioDocument();
-      return new Promise((resolve) => {
-        chrome.runtime.sendMessage(
-          {
-            type: "offscreen-audio:command",
-            target: message.target,
-            action: message.action,
-            payload: message.payload
-          },
-          (reply) => {
-            if (chrome.runtime?.lastError) {
-              resolve({ ok: false });
+var handleCleanupDefaultTabs = async () => {
+  await cleanupOrReplaceBrowserDefaultNewTabs();
+  return { ok: true };
+};
+chrome.runtime.onMessage.addListener(
+  createRuntimeMessageRouter({
+    // 0. Offscreen 后台音频桥接（跨刷新不断声）
+    "audio-bg:get-state": async () => {
+      try {
+        if (!await hasOffscreenAudioDocument()) {
+          return { ok: true, music: null, bili: null };
+        }
+        return await new Promise((resolve) => {
+          chrome.runtime.sendMessage({ type: "offscreen-audio:get-state" }, (reply) => {
+            if (chrome.runtime?.lastError || !reply?.ok) {
+              resolve({ ok: true, music: null, bili: null });
               return;
             }
-            resolve(reply || { ok: true });
-          }
-        );
-      });
-    })().then(sendResponse).catch(() => sendResponse({ ok: false }));
-    return true;
-  }
-  if (message?.type === "routeNewTab") {
-    routeNewTab(sendResponse, sender.tab?.id);
-    return true;
-  }
-  if (message?.type === "saveToFavorites") {
-    saveImageToFavoritesFolder(message).then(sendResponse);
-    return true;
-  }
-  if (message?.type === "downloadBiliVideo") {
-    (async () => {
+            resolve(reply);
+          });
+        });
+      } catch {
+        return { ok: true, music: null, bili: null };
+      }
+    },
+    "audio-bg:command": async (message) => {
+      try {
+        await ensureOffscreenAudioDocument();
+        return await new Promise((resolve) => {
+          chrome.runtime.sendMessage(
+            {
+              type: "offscreen-audio:command",
+              target: message.target,
+              action: message.action,
+              payload: message.payload
+            },
+            (reply) => {
+              if (chrome.runtime?.lastError) {
+                resolve({ ok: false });
+                return;
+              }
+              resolve(reply || { ok: true });
+            }
+          );
+        });
+      } catch {
+        return { ok: false };
+      }
+    },
+    // A. 新标签页智能单例去重
+    routeNewTab: (_message, sender, sendResponse) => {
+      routeNewTab(sendResponse, sender.tab?.id);
+      return true;
+    },
+    // C. 保存图片直入「新标签页/收藏夹」
+    saveToFavorites: (message) => saveImageToFavoritesFolder(message),
+    // D. 下载 B 站视频直落「新标签页/缓存视频」
+    downloadBiliVideo: async (message) => {
       try {
         const { url, fileName } = message;
         if (!url || !fileName) throw new Error("\u7F3A\u5C11\u4E0B\u8F7D\u53C2\u6570");
@@ -12548,82 +12667,80 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         flashBadge("ERR", "#ef4444");
         return { ok: false, error: err?.message || "\u89C6\u9891\u4E0B\u8F7D\u5931\u8D25" };
       }
-    })().then(sendResponse);
-    return true;
-  }
-  if (message?.type === "bookmarkCurrentPage") {
-    (async () => {
-      let targetTab = message?.tab;
-      const targetPage = message?.targetPage || "\u5E38\u7528\u7F51\u7AD9";
-      if (!targetTab || !targetTab.url) {
-        try {
-          const tabs = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
-          if (tabs && tabs.length && tabs[0]?.url) targetTab = tabs[0];
-        } catch {
-        }
-      }
-      if (!targetTab || !targetTab.url) {
-        try {
-          const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
-          if (tabs && tabs.length && tabs[0]?.url) targetTab = tabs[0];
-        } catch {
-        }
-      }
-      return bookmarkCurrentTab(targetTab, targetPage);
-    })().then(sendResponse).catch((err) => {
-      sendResponse({ ok: false, error: err?.message || "\u4FDD\u5B58\u5931\u8D25" });
-    });
-    return true;
-  }
-  if (message?.type === "searchWebImages") {
-    return handleSearchWebImages(message, sendResponse);
-  }
-  if (message?.type === "fetchSiteImages") {
-    return handleFetchSiteImages(message, sendResponse);
-  }
-  if (message?.type === "cleanupNativeTabs" || message?.type === "cleanupBrowserDefaultTabs") {
-    cleanupOrReplaceBrowserDefaultNewTabs().then(() => sendResponse({ ok: true }));
-    return true;
-  }
-  if (message?.type === "fetchImageForClipboard") {
-    const rawUrl = String(message?.url || "").trim();
-    if (!rawUrl) {
-      sendResponse({ ok: false, error: "\u56FE\u7247\u94FE\u63A5\u4E3A\u7A7A" });
-      return false;
-    }
-    (async () => {
-      let release;
+    },
+    // E. 快捷将当前页面收藏为书签
+    bookmarkCurrentPage: async (message) => {
       try {
-        release = acquireImageSlot();
-        const buffer = await fetchImageBytes(cleanBiliImageUrl(rawUrl));
-        const magic = detectImageFormatByMagic(new Uint8Array(buffer));
-        const mime = magic.ext === "jpg" ? "image/jpeg" : "image/" + magic.ext;
-        await validateImagePixels(buffer, mime);
-        const dataUrl = magic.isAvif ? await convertAvifToPngDataUrl(buffer) : `data:${mime};base64,${bufferToBase64(buffer)}`;
-        sendResponse({ ok: true, dataUrl, isPng: magic.isAvif || magic.ext === "png" });
-      } catch (error) {
-        sendResponse({ ok: false, error: error instanceof Error ? error.message : "\u56FE\u7247\u8BFB\u53D6\u5931\u8D25" });
-      } finally {
-        release?.();
+        let targetTab = message?.tab;
+        const targetPage = message?.targetPage || "\u5E38\u7528\u7F51\u7AD9";
+        if (!targetTab || !targetTab.url) {
+          try {
+            const tabs = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+            if (tabs && tabs.length && tabs[0]?.url) targetTab = tabs[0];
+          } catch {
+          }
+        }
+        if (!targetTab || !targetTab.url) {
+          try {
+            const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+            if (tabs && tabs.length && tabs[0]?.url) targetTab = tabs[0];
+          } catch {
+          }
+        }
+        return await bookmarkCurrentTab(targetTab, targetPage);
+      } catch (err) {
+        return { ok: false, error: err?.message || "\u4FDD\u5B58\u5931\u8D25" };
       }
-    })();
-    return true;
-  }
-  if (message?.type === "native-bridge:send") {
-    const hostName = typeof message?.hostName === "string" ? message.hostName : "";
-    const payload = message?.payload;
-    if (!hostName || !payload || typeof payload !== "object") {
-      sendResponse({ ok: false, error: "\u65E0\u6548\u7684 Native Messaging \u8BF7\u6C42" });
-      return false;
+    },
+    // I. 网络图片跨域搜索代理与图标提取
+    searchWebImages: (message, _sender, sendResponse) => handleSearchWebImages(message, sendResponse),
+    fetchSiteImages: (message, _sender, sendResponse) => handleFetchSiteImages(message, sendResponse),
+    // J. 清理重启扩展时残留的浏览器默认空白标签页（历史兼容命名 cleanupNativeTabs）
+    cleanupNativeTabs: handleCleanupDefaultTabs,
+    cleanupBrowserDefaultTabs: handleCleanupDefaultTabs,
+    // K. 图片复制跨域代理
+    fetchImageForClipboard: (message, _sender, sendResponse) => {
+      const rawUrl = String(message?.url || "").trim();
+      if (!rawUrl) {
+        sendResponse({ ok: false, error: "\u56FE\u7247\u94FE\u63A5\u4E3A\u7A7A" });
+        return false;
+      }
+      return (async () => {
+        let release;
+        try {
+          release = acquireImageSlot();
+          const buffer = await fetchImageBytes(cleanBiliImageUrl(rawUrl));
+          const magic = detectImageFormatByMagic(new Uint8Array(buffer));
+          const mime = magic.ext === "jpg" ? "image/jpeg" : "image/" + magic.ext;
+          await validateImagePixels(buffer, mime);
+          const dataUrl = magic.isAvif ? await convertAvifToPngDataUrl(buffer) : `data:${mime};base64,${bufferToBase64(buffer)}`;
+          return { ok: true, dataUrl, isPng: magic.isAvif || magic.ext === "png" };
+        } catch (error) {
+          return { ok: false, error: error instanceof Error ? error.message : "\u56FE\u7247\u8BFB\u53D6\u5931\u8D25" };
+        } finally {
+          release?.();
+        }
+      })();
+    },
+    // L. 本机 Native Messaging 代理
+    "native-bridge:send": (message, _sender, sendResponse) => {
+      const hostName = typeof message?.hostName === "string" ? message.hostName : "";
+      const payload = message?.payload;
+      if (!hostName || !payload || typeof payload !== "object") {
+        sendResponse({ ok: false, error: "\u65E0\u6548\u7684 Native Messaging \u8BF7\u6C42" });
+        return false;
+      }
+      if (typeof chrome.runtime?.sendNativeMessage !== "function") {
+        sendResponse({ ok: false, error: "UNSUPPORTED_CONTEXT" });
+        return false;
+      }
+      return chrome.runtime.sendNativeMessage(hostName, payload).then((response) => ({ ok: true, response })).catch((error) => ({
+        ok: false,
+        error: error instanceof Error ? error.message : String(error || "Native Messaging \u8C03\u7528\u5931\u8D25")
+      }));
     }
-    if (typeof chrome.runtime?.sendNativeMessage !== "function") {
-      sendResponse({ ok: false, error: "UNSUPPORTED_CONTEXT" });
-      return false;
-    }
-    chrome.runtime.sendNativeMessage(hostName, payload).then((response) => sendResponse({ ok: true, response })).catch((error) => sendResponse({ ok: false, error: error instanceof Error ? error.message : String(error || "Native Messaging \u8C03\u7528\u5931\u8D25") }));
-    return true;
-  }
-});
+  })
+);
 chrome.runtime.onInstalled?.addListener?.(() => {
   initBilibiliNetRules();
   setTimeout(cleanupOrReplaceBrowserDefaultNewTabs, 200);

@@ -6,7 +6,6 @@ import {
   initHomeMusicService
 } from "./store";
 import { musicModuleState } from "./module-state";
-import { togetherPartyState } from "../chat/together-listen.store";
 import { t } from "../i18n";
 
 onMounted(() => {
@@ -17,11 +16,7 @@ onMounted(() => {
 });
 
 const isPartyOrConsoleActive = computed(() => {
-  return musicModuleState.visible || togetherPartyState.djModalOpen || (togetherPartyState.isActive && togetherPartyState.isJoined);
-});
-
-const isTogetherListening = computed(() => {
-  return togetherPartyState.isActive && togetherPartyState.isJoined;
+  return musicModuleState.visible;
 });
 
 const displayTitle = computed(() => {
@@ -63,12 +58,9 @@ function onCoverError() {
         <div class="degraded-badge-row">
           <span class="degraded-icon">🎧</span>
           <strong class="degraded-status">
-            {{ isTogetherListening ? t('home.music.togetherListening') : t('home.music.backgroundListening') }}
+            {{ t('home.music.backgroundListening') }}
           </strong>
-          <span v-if="isTogetherListening" class="degraded-host-tag">
-            DJ: {{ togetherPartyState.hostName }}
-          </span>
-          <span v-else class="degraded-host-tag">
+          <span class="degraded-host-tag">
             {{ t('home.music.workspaceReady') }}
           </span>
         </div>

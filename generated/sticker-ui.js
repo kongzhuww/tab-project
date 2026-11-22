@@ -1,9 +1,9 @@
-import { d as N, o as F, e as M, f as n, g as r, h as o, j as d, B as v, t as h, F as g, i as P, u as b, q as V, D as w, b as p, c as z } from "./chunks/vendor-vue-C-_ocEUS.js";
-import { _ as L, e as $ } from "./chunks/_plugin-vue_export-helper-CUD1GoS1.js";
-import { S as j } from "./chunks/StickerBoard-D_YCLRFN.js";
-import { a as f } from "./chunks/stickers.service-BHqjZdvX.js";
-import { w as q } from "./chunks/InlineEditStatus.vue_vue_type_style_index_0_scoped_c63d0c6d_lang-Bk2ztKZ7.js";
-import { g as y, i as S, s as H } from "./chunks/quick-links-export.service-bmE4-0fH.js";
+import { d as N, o as F, e as M, f as n, g as r, h as o, j as d, B as v, t as h, F as g, i as P, u as b, q as V, D as w, b as p, c as z } from "./chunks/vendor-vue-_upDT3S_.js";
+import { _ as L, e as $ } from "./chunks/_plugin-vue_export-helper-DtNgUcga.js";
+import { S as j } from "./chunks/StickerBoard-CoEBwyRr.js";
+import { a as f } from "./chunks/stickers.service-BwfsLlup.js";
+import { w as q } from "./chunks/InlineEditStatus.vue_vue_type_style_index_0_scoped_c63d0c6d_lang-D41c1nko.js";
+import { g as y, i as S, s as H } from "./chunks/quick-links-export.service-BSSTNgxD.js";
 const Q = { class: "sticker-app" }, U = {
   key: 0,
   class: "sticker-side-nav"
@@ -19,7 +19,7 @@ const Q = { class: "sticker-app" }, U = {
 }, R = ["title", "onClick"], X = ["src"], Y = ["hidden"], Z = /* @__PURE__ */ N({
   __name: "StickerStandalone",
   setup(et) {
-    const C = w(() => import("./chunks/SettingsDialog-Bop3AG7S.js")), B = w(() => import("./chunks/AppPromptModal-K1q5dpLz.js")), m = document.body.dataset.mode === "sidepanel", l = p([]), i = p("等待扫描"), u = p(""), _ = p(!1);
+    const C = w(() => import("./chunks/SettingsDialog-oeAnMYp2.js")), B = w(() => import("./chunks/AppPromptModal-Cy4fFeAF.js")), m = document.body.dataset.mode === "sidepanel", l = p([]), i = p("等待扫描"), u = p(""), _ = p(!1);
     let k = 0;
     function a(s, e = !1) {
       u.value = s, _.value = e, clearTimeout(k), k = window.setTimeout(() => {

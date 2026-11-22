@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount } from "vue";
 import ModuleSettingsPanel from "../components/ModuleSettingsPanel.vue";
-import { loadEndpoint, saveEndpoint as persistEndpoint } from "./settings";
+import { loadEndpoint, saveEndpoint as persistEndpoint, probeNeteaseEndpoint } from "./settings";
 
 const props = defineProps<{
   anchor: HTMLElement | null;
@@ -54,16 +54,14 @@ async function testConnection() {
   testStatus.value = null;
   const start = Date.now();
   try {
-    const url = new URL(target + "/toplist");
-    const resp = await fetch(url.toString(), {
-      headers: { Accept: "application/json" },
-      signal: AbortSignal.timeout(6000)
-    });
+    const result = await probeNeteaseEndpoint(target);
     const ms = Date.now() - start;
-    if (resp.ok) {
+    if (result.ok) {
       testStatus.value = { ok: true, msg: `✓ 节点连通正常！响应耗时 ${ms}ms` };
+    } else if (typeof result.status === "number") {
+      testStatus.value = { ok: false, msg: `✕ 节点返回 HTTP ${result.status}，请核对服务是否正常` };
     } else {
-      testStatus.value = { ok: false, msg: `✕ 节点返回 HTTP ${resp.status}，请核对服务是否正常` };
+      testStatus.value = { ok: false, msg: `✕ 连接失败: ${result.error || "网络请求超时或受阻"}` };
     }
   } catch (err: any) {
     testStatus.value = { ok: false, msg: `✕ 连接失败: ${err?.message || "网络请求超时或受阻"}` };

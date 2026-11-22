@@ -1,4 +1,5 @@
 import { extractSyncPayload, readSyncSettings } from './sync.service';
+import { SYNC_CONNECTION_GROUPS, canonicalJson } from './sync-schema';
 import { credentialForEncryptedBackup } from './webdav-legacy-credential';
 import type { WebDavConfig } from './webdav.service';
 declare const chrome: any;
@@ -6,14 +7,8 @@ const BASELINE_KEY = 'webdavAutoBaselineV1';
 export const AUTO_ENABLED_KEY = 'webdavAutoEnabledV1';
 export const AUTO_SESSION_KEY = 'webdavAutoAttemptedV1';
 export interface SyncBaseline { configHash: string; localHash: string; etag: string; fileUrl: string }
-function canonical(value: unknown): string {
-  if (value === null || typeof value !== 'object') return JSON.stringify(value) ?? 'null';
-  if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`;
-  const obj = value as Record<string, unknown>;
-  return `{${Object.keys(obj).sort().filter(key => obj[key] !== undefined).map(key => `${JSON.stringify(key)}:${canonical(obj[key])}`).join(',')}}`;
-}
 async function digest(value: unknown): Promise<string> {
-  const data = new TextEncoder().encode(canonical(value));
+  const data = new TextEncoder().encode(canonicalJson(value));
   const bytes = new Uint8Array(await crypto.subtle.digest('SHA-256', data));
   return Array.from(bytes, byte => byte.toString(16).padStart(2,'0')).join('');
 }
@@ -42,13 +37,12 @@ export async function setAutoSyncEnabled(enabled: boolean): Promise<void> {
   if (typeof chrome !== 'undefined' && chrome.storage?.session) await chrome.storage.session.remove(AUTO_SESSION_KEY);
 }
 export function connectionConflict(local: Record<string, unknown>, remote: Record<string, unknown>, localCredential: unknown, remoteCredential: unknown): boolean {
-  const groups = [['ghUser','ghToken'], ['todoistToken','todoistActiveProjectIdV1'], ['lw_private_chat_v1'], ['googleCalendarSessionTokenV1'], ['lw_webdav_config']];
-  for (const keys of groups) {
+  for (const keys of SYNC_CONNECTION_GROUPS) {
     if (keys.some(key => local[key] !== undefined && local[key] !== null && local[key] !== '')) {
-      if (canonical(keys.map(key => local[key] ?? null)) !== canonical(keys.map(key => remote[key] ?? null))) return true;
+      if (canonicalJson(keys.map(key => local[key] ?? null)) !== canonicalJson(keys.map(key => remote[key] ?? null))) return true;
     }
   }
-  return Boolean(localCredential && canonical(localCredential) !== canonical(remoteCredential || null));
+  return Boolean(localCredential && canonicalJson(localCredential) !== canonicalJson(remoteCredential || null));
 }
 /** Conservative: missing/emptied cloud content requires human confirmation. */
 export function hasPotentialDataLoss(local: unknown, remote: unknown): boolean {
@@ -56,8 +50,8 @@ export function hasPotentialDataLoss(local: unknown, remote: unknown): boolean {
   if (local === undefined || local === null || local === '') return true;
   if (Array.isArray(remote)) {
     if (!Array.isArray(local)) return true;
-    const values = new Set(local.map(canonical));
-    return remote.some(item => !values.has(canonical(item)));
+    const values = new Set(local.map((item) => canonicalJson(item)));
+    return remote.some(item => !values.has(canonicalJson(item)));
   }
   if (typeof remote === 'object') {
     if (!local || typeof local !== 'object' || Array.isArray(local)) return true;

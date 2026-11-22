@@ -1,7 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { computeConfigDiff } from "../src/services/sync-diff.ts";
-import { getLocalDeviceInfo, saveLocalDeviceInfo } from "../src/services/device-identity.ts";
+import { loadTsModule } from "./helpers/load-ts.mjs";
+
+const { computeConfigDiff, compareLocalAndRemote } = await loadTsModule("src/services/sync-diff.ts");
+const { getLocalDeviceInfo, saveLocalDeviceInfo } = await loadTsModule("src/services/device-identity.ts");
 
 test("computeConfigDiff accurately catches quickLinks added and removed", () => {
   const prev = {
@@ -79,4 +81,23 @@ test("device-identity generates and stores device info in memory/localStorage", 
   await saveLocalDeviceInfo({ ...info, deviceName: "Kongzhu MacBook Pro" });
   const updated = await getLocalDeviceInfo();
   assert.equal(updated.deviceName, "Kongzhu MacBook Pro");
+});
+
+test("compareLocalAndRemote reports backpack prompt and article differences", () => {
+  const local = {
+    logicweaver_prompt_backpack_v1: [{ id: "p1", title: "Local edited" }],
+    logicweaver_saved_articles_v1: []
+  };
+  const remote = {
+    logicweaver_prompt_backpack_v1: [{ id: "p1", title: "Cloud original" }, { id: "p2", title: "Cloud only" }],
+    logicweaver_saved_articles_v1: [{ id: "a1", title: "Saved article" }]
+  };
+  const summaries = compareLocalAndRemote(local, remote);
+  const promptDiff = summaries.find(s => s.category === "backpack" && s.categoryLabel === "提示词背包");
+  const articleDiff = summaries.find(s => s.category === "backpack" && s.categoryLabel === "收藏文章");
+  assert.ok(promptDiff);
+  assert.match(promptDiff.text, /仅云端 1 条/);
+  assert.match(promptDiff.text, /内容差异 1 条/);
+  assert.ok(articleDiff);
+  assert.match(articleDiff.text, /仅云端 1 篇/);
 });

@@ -23,6 +23,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, watch } from "vue";
+import { sendRuntimeMessage } from "./core/runtime-protocol";
 import AppLauncher from "./layout/AppLauncher.vue";
 import AppWorkspaces from "./layout/AppWorkspaces.vue";
 import MacDock from "./dock/MacDock.vue";
@@ -196,16 +197,10 @@ onMounted(() => {
         }
       }).catch(() => {});
     }, 8000);
-    if (typeof chrome !== "undefined" && chrome?.runtime?.sendMessage) {
-      setTimeout(() => {
-        try {
-          // 历史兼容命名 cleanupNativeTabs 指浏览器自带默认空白标签页（edge://newtab / chrome://newtab），不代表 Native Host 功能仍存在
-          chrome.runtime.sendMessage({ type: "cleanupNativeTabs" }, () => {
-            void chrome.runtime?.lastError;
-          });
-        } catch {}
-      }, 400);
-    }
+    setTimeout(() => {
+      // 历史兼容命名 cleanupNativeTabs 指浏览器自带默认空白标签页（edge://newtab / chrome://newtab），不代表 Native Host 功能仍存在
+      void sendRuntimeMessage({ type: "cleanupNativeTabs" });
+    }, 400);
   } catch (err) {
     console.warn("[App] Runtime start error:", err);
   }

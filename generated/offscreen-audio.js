@@ -13,6 +13,40 @@ function playbackDeadline(parent, ms) {
 }
 
 // src/services/bilibili.service.ts
+function extractReplyEmotes(content) {
+  const emotes = {};
+  if (content?.emote && typeof content.emote === "object") {
+    for (const [key, val] of Object.entries(content.emote)) {
+      const u = val?.url || val?.gif_url;
+      if (typeof u === "string" && u) {
+        emotes[key] = u.replace(/^http:/i, "https:");
+      }
+    }
+  }
+  return emotes;
+}
+function extractReplyMentions(content) {
+  const mentions = {};
+  if (content?.at_name_to_mid && typeof content.at_name_to_mid === "object") {
+    for (const [name, mid] of Object.entries(content.at_name_to_mid)) {
+      const cleanName = String(name || "").trim();
+      const cleanMid = mid !== void 0 && mid !== null ? String(mid).trim() : "";
+      if (cleanName && /^\d+$/.test(cleanMid)) {
+        mentions[cleanName] = cleanMid;
+      }
+    }
+  }
+  if (Array.isArray(content?.members)) {
+    for (const m of content.members) {
+      const cleanName = String(m?.uname || "").trim();
+      const cleanMid = m?.mid !== void 0 && m?.mid !== null ? String(m.mid).trim() : "";
+      if (cleanName && /^\d+$/.test(cleanMid) && !mentions[cleanName]) {
+        mentions[cleanName] = cleanMid;
+      }
+    }
+  }
+  return mentions;
+}
 function parseBiliCommentPictures(pictures) {
   if (!Array.isArray(pictures)) return [];
   return pictures.flatMap((picture) => {
@@ -1345,15 +1379,8 @@ var BilibiliService = class _BilibiliService {
     const pageObj = data?.page || {};
     const total = Number(pageObj.count || 0);
     const parseComment = (r, isTop = false) => {
-      const emotes = {};
-      if (r.content?.emote && typeof r.content.emote === "object") {
-        for (const [key, val] of Object.entries(r.content.emote)) {
-          const u = val?.url;
-          if (typeof u === "string" && u) {
-            emotes[key] = u.replace(/^http:/, "https:");
-          }
-        }
-      }
+      const emotes = extractReplyEmotes(r.content);
+      const mentions = extractReplyMentions(r.content);
       const subReplies = Array.isArray(r.replies) ? r.replies.map((sub) => ({
         rpid: sub.rpid,
         mid: Number(sub.mid || 0),
@@ -1362,7 +1389,9 @@ var BilibiliService = class _BilibiliService {
         message: String(sub.content?.message || ""),
         timeText: new Date(Number(sub.ctime || 0) * 1e3).toLocaleString(),
         like: Number(sub.like || 0),
-        pictures: parseBiliCommentPictures(sub.content?.pictures)
+        pictures: parseBiliCommentPictures(sub.content?.pictures),
+        emotes: extractReplyEmotes(sub.content),
+        mentions: extractReplyMentions(sub.content)
       })) : [];
       return {
         rpid: r.rpid,
@@ -1376,6 +1405,7 @@ var BilibiliService = class _BilibiliService {
         isTop,
         pictures: parseBiliCommentPictures(r.content?.pictures),
         emotes,
+        mentions,
         replies: subReplies
       };
     };
@@ -1404,28 +1434,18 @@ var BilibiliService = class _BilibiliService {
     const repliesRaw = data?.replies || [];
     const pageObj = data?.page || {};
     const total = Number(pageObj.count || 0);
-    const replies = repliesRaw.map((r) => {
-      const emotes = {};
-      if (r.content?.emote && typeof r.content.emote === "object") {
-        for (const [key, val] of Object.entries(r.content.emote)) {
-          const u = val?.url;
-          if (typeof u === "string" && u) {
-            emotes[key] = u.replace(/^http:/, "https:");
-          }
-        }
-      }
-      return {
-        rpid: r.rpid,
-        mid: Number(r.mid || 0),
-        uname: String(r.member?.uname || "B\u7AD9\u7528\u6237"),
-        avatar: String(r.member?.avatar || "").replace(/^http:/, "https:"),
-        message: String(r.content?.message || ""),
-        timeText: new Date(Number(r.ctime || 0) * 1e3).toLocaleString(),
-        like: Number(r.like || 0),
-        pictures: parseBiliCommentPictures(r.content?.pictures),
-        emotes
-      };
-    });
+    const replies = repliesRaw.map((r) => ({
+      rpid: r.rpid,
+      mid: Number(r.mid || 0),
+      uname: String(r.member?.uname || "B\u7AD9\u7528\u6237"),
+      avatar: String(r.member?.avatar || "").replace(/^http:/, "https:"),
+      message: String(r.content?.message || ""),
+      timeText: new Date(Number(r.ctime || 0) * 1e3).toLocaleString(),
+      like: Number(r.like || 0),
+      pictures: parseBiliCommentPictures(r.content?.pictures),
+      emotes: extractReplyEmotes(r.content),
+      mentions: extractReplyMentions(r.content)
+    }));
     return {
       replies,
       total,

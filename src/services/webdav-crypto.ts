@@ -4,13 +4,30 @@ const MAX_BYTES = 20 * 1024 * 1024;
 const AAD = new TextEncoder().encode('tab-project-webdav-encrypted:v1');
 export interface EncryptedBackup { kind: typeof FORMAT; version: 1; kdf: 'PBKDF2-SHA-256'; iterations: number; cipher: 'AES-256-GCM'; salt: string; iv: string; ciphertext: string }
 function encode(bytes: Uint8Array): string {
-  let result = ''; for (let i = 0; i < bytes.length; i += 8192) result += String.fromCharCode(...bytes.subarray(i, i + 8192));
-  return btoa(result);
+  const parts: string[] = [];
+  for (let i = 0; i < bytes.length; i += 8192) {
+    const end = Math.min(i + 8192, bytes.length);
+    let chunk = '';
+    for (let j = i; j < end; j++) chunk += String.fromCharCode(bytes[j]);
+    parts.push(chunk);
+  }
+  return btoa(parts.join(''));
 }
 function decode(value: unknown, limit: number): Uint8Array {
-  if (typeof value !== 'string' || value.length > Math.ceil(limit / 3) * 4 + 4 || !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(value)) throw new Error('加密备份格式无效');
-  let binary: string; try { binary = atob(value); } catch { throw new Error('加密备份格式无效'); }
-  return Uint8Array.from(binary, char => char.charCodeAt(0));
+  // Avoid grouped base64 repetition `(?:[...]{4})*`, whose backtracking overflows V8's RegExp stack on multi-MB backups.
+  if (
+    typeof value !== 'string' ||
+    value.length > Math.ceil(limit / 3) * 4 + 4 ||
+    value.length % 4 !== 0 ||
+    !/^[A-Za-z0-9+/]*={0,2}$/.test(value)
+  ) {
+    throw new Error('加密备份格式无效');
+  }
+  let binary: string;
+  try { binary = atob(value); } catch { throw new Error('加密备份格式无效'); }
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes;
 }
 async function keyFor(password: string, salt: Uint8Array): Promise<CryptoKey> {
   const material = await crypto.subtle.importKey('raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveKey']);

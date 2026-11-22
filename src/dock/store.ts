@@ -347,7 +347,7 @@ export const macDockController: MacDockController = {
       }
 
       // 桌面级轻量浮层工具窗口，绝不退出当前全屏卡片，允许在 B站收藏夹、GitHub 等任意视图中就地打开伴随！
-      const keepCurrentViewTools = ["todoist", "music", "siren", "wallpaper", "stickers", "sync", "chat", "multica"];
+      const keepCurrentViewTools = ["todoist", "music", "siren", "wallpaper", "stickers", "sync", "multica"];
       if (!keepCurrentViewTools.includes(id) && typeof window !== "undefined") {
         const win = window as any;
         if (typeof win.exitFullscreenCard === "function") {

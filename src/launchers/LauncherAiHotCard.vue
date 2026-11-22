@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from "vue";
 import { aihotViewerController } from "../viewers/store";
+import { aiHotService } from "../services/aihot.service";
 import { t, currentLanguage } from "../i18n";
 
 interface AiHotNewsItem {
@@ -203,12 +204,7 @@ async function fetchNews(force = false) {
 
   // 2. 异步网络拉取最新当天精选
   try {
-    const r = await fetch("https://aihot.news/api/v1/items?mode=selected&window=24h&limit=24", {
-      headers: { Accept: "application/json" },
-      signal: AbortSignal.timeout(5000)
-    });
-    const j = await r.json();
-    const fresh = Array.isArray(j) ? j : j.items || j.data || j.results || [];
+    const fresh = await aiHotService.fetchQuickSelectedItems(24, AbortSignal.timeout(5000));
     if (fresh.length) {
       newsPool.value = fresh;
       pageOffset.value = 0;

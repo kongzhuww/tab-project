@@ -1,10 +1,11 @@
+import { hasExtensionLocalStorage, readExtensionStorage, writeExtensionStorage } from "../core/storage-repo";
 import type { WebDavConfig } from "../services/webdav.service";
 export const WEBDAV_SETTINGS_KEYS = ["webdavUrl", "webdavUsername", "webdavPassword", "webdavFilename"] as const;
 export type WebDavSettings = Record<typeof WEBDAV_SETTINGS_KEYS[number], string>;
 const DEFAULTS: WebDavSettings = { webdavUrl: "https://dav.jianguoyun.com/dav/LogicWeaver/", webdavUsername: "", webdavPassword: "", webdavFilename: "logicweaver-settings.json" };
 export async function loadWebDavSettings(): Promise<WebDavSettings> {
-  const stored = typeof chrome !== "undefined" && chrome.storage?.local
-    ? await chrome.storage.local.get([...WEBDAV_SETTINGS_KEYS])
+  const stored = hasExtensionLocalStorage()
+    ? await readExtensionStorage([...WEBDAV_SETTINGS_KEYS])
     : Object.fromEntries(WEBDAV_SETTINGS_KEYS.map(key => [key, localStorage.getItem(key)]));
   return Object.fromEntries(WEBDAV_SETTINGS_KEYS.map(key => [key, typeof stored[key] === "string" ? stored[key] : DEFAULTS[key]])) as WebDavSettings;
 }
@@ -19,9 +20,14 @@ export async function saveWebDavSettings(draft: WebDavSettings, initial: WebDavS
     if (draft[key] !== initial[key]) payload[key] = key === "webdavPassword" ? draft[key] : draft[key].trim();
   }
   if (!Object.keys(payload).length) return;
-  if (typeof chrome !== "undefined" && chrome.storage?.local) await chrome.storage.local.set(payload);
+  if (hasExtensionLocalStorage()) await writeExtensionStorage(payload);
   else for (const [key, value] of Object.entries(payload)) localStorage.setItem(key, value);
 }
 export function toWebDavConfig(settings: WebDavSettings): WebDavConfig {
-  return { url: settings.webdavUrl || DEFAULTS.webdavUrl, username: settings.webdavUsername, password: settings.webdavPassword, filename: settings.webdavFilename || DEFAULTS.webdavFilename };
+  return {
+    url: settings.webdavUrl.trim() || DEFAULTS.webdavUrl,
+    username: settings.webdavUsername.trim(),
+    password: settings.webdavPassword,
+    filename: settings.webdavFilename.trim() || DEFAULTS.webdavFilename
+  };
 }

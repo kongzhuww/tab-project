@@ -1,13 +1,16 @@
 /**
- * LogicWeaver 统一全局核心样式总入口 (Vite 统一编译与极速压缩)
+ * LogicWeaver 统一全局核心样式总入口 (CSS Cascade Layers 治理版本)
+ * 层级顺序：base -> themes -> components -> layout -> utilities
  */
-@import "../styles/newtab.css";
-@import "../styles/sidebar-features.css";
-@import "../styles/newtab-themes.css";
-@import "../styles/newtab-components.css";
-@import "../styles/newtab-windows.css";
-@import "../styles/newtab-calendar.css";
-@import "../styles/newtab-workspaces.css";
-@import "../styles/newtab-integrations.css";
-@import "../styles/newtab-layout.css";
-@import "../styles/newtab-ai.css";
+@layer base, themes, components, layout, utilities;
+
+@import "../styles/newtab.css" layer(base);
+@import "../styles/sidebar-features.css" layer(base);
+@import "../styles/newtab-themes.css" layer(themes);
+@import "../styles/newtab-components.css" layer(components);
+@import "../styles/newtab-windows.css" layer(components);
+@import "../styles/newtab-calendar.css" layer(components);
+@import "../styles/newtab-workspaces.css" layer(components);
+@import "../styles/newtab-integrations.css" layer(components);
+@import "../styles/newtab-layout.css" layer(layout);
+@import "../styles/newtab-ai.css" layer(layout);

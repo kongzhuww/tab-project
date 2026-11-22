@@ -1,3 +1,5 @@
+import { canonicalJson } from './sync-schema';
+
 /**
  * Three-way merge for individually identified sync records.
  * Missing records are not deletion evidence: only an explicit tombstone is.
@@ -21,14 +23,8 @@ export interface RecordMergeResult<T> {
   conflicts: RecordConflict<T>[];
 }
 
-function canonical(value: unknown): string {
-  if (value === null || typeof value !== 'object') return JSON.stringify(value) ?? 'null';
-  if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`;
-  const record = value as Record<string, unknown>;
-  return `{${Object.keys(record).sort().filter(key => record[key] !== undefined).map(key => `${JSON.stringify(key)}:${canonical(record[key])}`).join(',')}}`;
-}
 function equal<T>(a?: SyncRecord<T>, b?: SyncRecord<T>): boolean {
-  return a === undefined ? b === undefined : b !== undefined && canonical(a) === canonical(b);
+  return a === undefined ? b === undefined : b !== undefined && canonicalJson(a) === canonicalJson(b);
 }
 function valid<T>(record: SyncRecord<T>): boolean {
   return !!record && typeof record.id === 'string' && record.id.length > 0 && record.id.length <= 512
@@ -71,4 +67,80 @@ export function mergeSyncRecords<T>(
     conflicts.push({id, reason:'concurrent-change', local:l, remote:r});
   }
   return {records:conflicts.length ? [] : records, conflicts};
+}
+
+export interface IdentifiableRecord {
+  id: string;
+  updatedAt?: number;
+  deletedAt?: number;
+  deviceId?: string;
+  [key: string]: unknown;
+}
+
+export interface TombstoneMergeResult<T extends IdentifiableRecord> {
+  ok: boolean;
+  items: T[];
+  tombstones: SyncRecord<T>[];
+  conflicts: RecordConflict<T>[];
+}
+
+export function toSyncRecordsWithTombstones<T extends IdentifiableRecord>(
+  items: readonly T[] | undefined,
+  deletedItems?: readonly { id: string; deletedAt: number; updatedAt?: number; deviceId?: string }[]
+): SyncRecord<T>[] {
+  const byId = new Map<string, SyncRecord<T>>();
+  for (const item of items || []) {
+    if (!item || typeof item.id !== "string" || !item.id) continue;
+    const isDeleted = typeof item.deletedAt === "number" && Number.isFinite(item.deletedAt);
+    byId.set(item.id, {
+      id: item.id,
+      modifiedAt: typeof item.updatedAt === "number" ? item.updatedAt : (isDeleted ? item.deletedAt! : 0),
+      deviceId: typeof item.deviceId === "string" && item.deviceId ? item.deviceId : "local",
+      deletedAt: isDeleted ? item.deletedAt : undefined,
+      value: isDeleted ? undefined : ({ ...item } as T),
+    });
+  }
+  for (const tomb of deletedItems || []) {
+    if (!tomb || typeof tomb.id !== "string" || !tomb.id) continue;
+    if (byId.has(tomb.id)) continue;
+    byId.set(tomb.id, {
+      id: tomb.id,
+      modifiedAt: tomb.updatedAt ?? tomb.deletedAt,
+      deviceId: typeof tomb.deviceId === "string" && tomb.deviceId ? tomb.deviceId : "local",
+      deletedAt: tomb.deletedAt,
+    });
+  }
+  return Array.from(byId.values());
+}
+
+/**
+ * 基于 `mergeSyncRecords` 的带墓碑记录三向合并适配器：
+ * - 已删除条目转为 `deletedAt` 墓碑，避免触发 `missing-record` 误报冲突。
+ * - 支持按 `purgeDeletedBefore` 过期清理已同步的旧墓碑。
+ */
+export function mergeIdentifiableWithTombstones<T extends IdentifiableRecord>(
+  base: readonly SyncRecord<T>[],
+  local: readonly SyncRecord<T>[],
+  remote: readonly SyncRecord<T>[],
+  options?: { purgeDeletedBefore?: number }
+): TombstoneMergeResult<T> {
+  const merged = mergeSyncRecords(base, local, remote);
+  if (merged.conflicts.length > 0) {
+    return { ok: false, items: [], tombstones: [], conflicts: merged.conflicts };
+  }
+  const items: T[] = [];
+  const tombstones: SyncRecord<T>[] = [];
+  const cutoff = options?.purgeDeletedBefore;
+  for (const record of merged.records) {
+    if (typeof record.deletedAt === "number") {
+      if (typeof cutoff !== "number" || record.deletedAt >= cutoff) {
+        tombstones.push(record);
+      }
+      continue;
+    }
+    if (record.value !== undefined) {
+      items.push(record.value);
+    }
+  }
+  return { ok: true, items, tombstones, conflicts: [] };
 }

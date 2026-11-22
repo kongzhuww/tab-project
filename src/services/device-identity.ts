@@ -1,4 +1,10 @@
-declare const chrome: any;
+import {
+  hasExtensionLocalStorage,
+  readExtensionStorage,
+  readLocalMirrorJson,
+  writeExtensionStorage,
+  writeLocalMirrorJson
+} from "../core/storage-repo";
 
 export interface DeviceInfo {
   deviceId: string;
@@ -27,23 +33,17 @@ function generateDefaultName(os: string): string {
 
 export async function getLocalDeviceInfo(): Promise<DeviceInfo> {
   const os = detectOS();
-  if (typeof chrome !== "undefined" && chrome.storage?.local) {
-    const res = await new Promise<any>((resolve) => {
-      chrome.storage.local.get([DEVICE_STORAGE_KEY], (items: any) => resolve(items || {}));
-    });
-    if (res[DEVICE_STORAGE_KEY]?.deviceId && res[DEVICE_STORAGE_KEY]?.deviceName) {
-      return res[DEVICE_STORAGE_KEY];
-    }
+  if (hasExtensionLocalStorage()) {
+    try {
+      const res = await readExtensionStorage([DEVICE_STORAGE_KEY]);
+      const stored = res[DEVICE_STORAGE_KEY] as DeviceInfo | undefined;
+      if (stored?.deviceId && stored?.deviceName) return stored;
+    } catch {}
   }
 
-  if (typeof localStorage !== "undefined") {
-    const raw = localStorage.getItem(DEVICE_STORAGE_KEY);
-    if (raw) {
-      try {
-        const parsed = JSON.parse(raw);
-        if (parsed.deviceId && parsed.deviceName) return parsed;
-      } catch {}
-    }
+  const mirrored = readLocalMirrorJson<DeviceInfo>(DEVICE_STORAGE_KEY);
+  if (mirrored && typeof mirrored === "object" && mirrored.deviceId && mirrored.deviceName) {
+    return mirrored;
   }
 
   const newDevice: DeviceInfo = {
@@ -63,14 +63,8 @@ export async function saveLocalDeviceInfo(info: DeviceInfo): Promise<void> {
     os: info.os || detectOS()
   };
 
-  if (typeof chrome !== "undefined" && chrome.storage?.local) {
-    await new Promise<void>((resolve) => {
-      chrome.storage.local.set({ [DEVICE_STORAGE_KEY]: safeInfo }, () => resolve());
-    });
+  if (hasExtensionLocalStorage()) {
+    try { await writeExtensionStorage({ [DEVICE_STORAGE_KEY]: safeInfo }); } catch {}
   }
-  if (typeof localStorage !== "undefined") {
-    try {
-      localStorage.setItem(DEVICE_STORAGE_KEY, JSON.stringify(safeInfo));
-    } catch {}
-  }
+  writeLocalMirrorJson(DEVICE_STORAGE_KEY, safeInfo);
 }

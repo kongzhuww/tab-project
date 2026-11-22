@@ -32,10 +32,18 @@ export interface BiliMiniPlayerComment {
   likeCount: number;
   replyCount?: number;
   emotes?: Record<string, string>;
+  mentions?: Record<string, string>;
   pictures: string[];
   isUp?: boolean;
   isTop?: boolean;
-  replies?: Array<{ id: string | number; userName: string; message: string; pictures: string[]; emotes?: Record<string, string> }>;
+  replies?: Array<{
+    id: string | number;
+    userName: string;
+    message: string;
+    pictures: string[];
+    emotes?: Record<string, string>;
+    mentions?: Record<string, string>;
+  }>;
   subRepliesExpanded?: boolean;
   subRepliesLoading?: boolean;
   subRepliesHasMore?: boolean;
@@ -665,6 +673,7 @@ export const biliMiniPlayerController = {
           likeCount: c.like || 0,
           replyCount: c.rcount || 0,
           emotes: c.emotes,
+          mentions: c.mentions,
           pictures: c.pictures || [],
           isUp,
           isTop: Boolean(c.isTop),
@@ -673,7 +682,8 @@ export const biliMiniPlayerController = {
             userName: r.uname,
             message: r.message,
             pictures: r.pictures || [],
-            emotes: r.emotes
+            emotes: r.emotes,
+            mentions: r.mentions
           }))
         };
       });
@@ -735,7 +745,8 @@ export const biliMiniPlayerController = {
         userName: r.uname,
         message: r.message,
         pictures: r.pictures || [],
-        emotes: r.emotes
+        emotes: r.emotes,
+        mentions: r.mentions
       }));
 
       // 合并并去重

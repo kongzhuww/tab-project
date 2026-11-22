@@ -71,6 +71,7 @@ import type { CommandRegistry } from "./commands";
 import type { FeatureRegistry } from "./features";
 
 declare global {
+  var chrome: any;
   interface Window {
     LogicWeaverWeatherService?: typeof weatherService;
     LogicWeaverSearchService?: typeof searchService;

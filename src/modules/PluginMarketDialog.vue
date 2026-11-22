@@ -6,7 +6,6 @@ import {
   PLUGIN_CATALOG,
   type PluginCategory
 } from "./market-store";
-import ChatPrivateSetup from "../chat/ChatPrivateSetup.vue";
 import { t } from "../i18n";
 
 const state = pluginMarketController.state;
@@ -213,7 +212,6 @@ function handleKeydown(e: KeyboardEvent) {
 
               <p class="pm-card-desc">{{ getItemDesc(item.id, item.desc) }}</p>
               <p v-if="item.devNotice" class="pm-core-tip">{{ getItemDevNotice(item.id, item.devNotice) }}</p>
-              <details v-if="item.id === 'chat' && pluginMarketController.isInstalled(item.id)"><summary>{{ t('market.chatSetupSummary') }}</summary><ChatPrivateSetup /></details>
 
               <div class="pm-card-tags">
                 <span v-for="tag in getItemTags(item.id, item.tags)" :key="tag" class="pm-card-tag">

@@ -6,7 +6,9 @@ export interface BiliRadioTapeState {
   loading: boolean;
   playing: boolean;
   mode: "order" | "one" | "shuffle";
+  bvid?: string;
   title: string;
+  author?: string;
   coverUrl?: string;
   seriesName: string;
   trackIndex: number;
@@ -33,7 +35,9 @@ const initialState = (): BiliRadioTapeState => ({
   loading: false,
   playing: false,
   mode: (savedMode === "order" || savedMode === "one" || savedMode === "shuffle") ? savedMode : "order",
+  bvid: "",
   title: "B站电台",
+  author: "",
   coverUrl: "",
   seriesName: "SoundTrack",
   trackIndex: 1,
@@ -107,7 +111,7 @@ export const radioTapeController: RadioTapeController = {
     const player = (window as any).LogicWeaverBiliRadioPlayer;
     if (player) {
       const s = typeof player.getState === "function" ? player.getState() : null;
-      if (!s?.active && !s?.playing) {
+      if (!s?.active && !s?.playing && !s?.track && !radioTapeState.active) {
         if (typeof (window as any).playBiliRadioQueue === "function") {
           (window as any).playBiliRadioQueue(0);
           return;

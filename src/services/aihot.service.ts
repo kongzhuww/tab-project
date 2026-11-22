@@ -189,6 +189,11 @@ export class AiHotService {
       feedArticles => aihotFeedController.updateState({ feedArticles }));
   }
 
+  public async fetchQuickSelectedItems(limit = 24, signal?: AbortSignal): Promise<any[]> {
+    const { fetchAiHotQuickSelectedItems } = await import("./aihot-quick");
+    return fetchAiHotQuickSelectedItems(limit, signal, DEFAULT_AIHOT_API);
+  }
+
   private parseLeaderboardHtml(html: string): AiHotLeaderboardItem[] {
     const modern = parseModernLeaderboard(html);
     if (modern.length) return modern;

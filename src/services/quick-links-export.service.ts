@@ -1,3 +1,5 @@
+import { sendRuntimeMessage } from "../core/runtime-protocol";
+
 declare const chrome: any;
 
 // Historical type name reused by the current sidepanel/sticker tools; no Popup page is required.
@@ -73,8 +75,8 @@ async function directSaveBookmark(tab: PopupTab, targetPage: string = "常用网
 
 export async function saveQuickLink(tab: PopupTab, targetPage: string = "常用网站"): Promise<SaveResult> {
   try {
-    const result = await chrome.runtime.sendMessage({ type: "bookmarkCurrentPage", tab, targetPage });
-    if (result?.ok) return result;
+    const result = await sendRuntimeMessage({ type: "bookmarkCurrentPage", tab: tab as Record<string, unknown>, targetPage });
+    if (result?.ok) return { ok: true, existed: result.existed, error: result.error };
   } catch { /* Service worker may be unavailable; fallback to direct save. */ }
   return directSaveBookmark(tab, targetPage);
 }

@@ -3,7 +3,7 @@ import { computed, onMounted, onUnmounted, reactive, ref, watch } from "vue";
 import AppWindowFrame from "../core/AppWindowFrame.vue";
 import { windowManagerController } from "../core/window-manager.store";
 import { syncModuleState } from "./module-state";
-import { webDavService } from "../services/webdav.service";
+import { formatBackpackOverwritePrompt, webDavService } from "../services/webdav.service";
 import BackupEncryptionSettings from './BackupEncryptionSettings.vue';
 import { syncService } from "../services/sync.service";
 import { loadWebDavSettings, saveWebDavSettings, toWebDavConfig, WEBDAV_SETTINGS_KEYS, type WebDavSettings } from "./settings";
@@ -118,10 +118,16 @@ async function confirmOperation() {
       machine.send({ type: "SET_MESSAGE", message: "连接配置已被其他页面修改，已重新读取。请核对目标并重新确认操作。" });
       return;
     }
-    const result = op === "cloud-push" ? await syncService.pushConfig()
+    let result = op === "cloud-push" ? await syncService.pushConfig()
       : op === "cloud-pull" ? await syncService.pullConfig()
       : op === "webdav-push" ? await webDavService.pushCurrentConfig(toWebDavConfig(stored!))
       : await webDavService.pullCurrentConfig(toWebDavConfig(stored!));
+
+    if (op === "webdav-push" && !result.ok && "missingCloudBackpack" in result && result.missingCloudBackpack) {
+      if (confirm(formatBackpackOverwritePrompt(result.backpackDiff))) {
+        result = await webDavService.pushCurrentConfig(toWebDavConfig(stored!), { allowBackpackOverwrite: true });
+      }
+    }
 
     if (!result.ok) {
       const errorMsg = result.error || '同步失败，请检查连接或实际写入结果。未自动重试。';

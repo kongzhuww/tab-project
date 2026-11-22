@@ -1,4 +1,10 @@
 import { reactive, computed } from "vue";
+import {
+  hasExtensionLocalStorage,
+  readExtensionStorage,
+  readLocalMirrorJson,
+  writeLocalMirrorJson,
+} from "../core/storage-repo";
 import type { PromptCategory, SavedArticleItem, ArticleExportData } from "./types";
 import { ARTICLE_REVISION_KEY, parseBackpackRevision, StaleBackpackError, writeBackpackIfCurrent, type RevisionLocks } from './revision-guard';
 import {
@@ -44,12 +50,9 @@ let writeQueue: Promise<unknown> = Promise.resolve();
 
 function loadFromLocalStorage(): { articles: SavedArticleItem[]; categories: PromptCategory[] } | null {
   try {
-    if (typeof localStorage === "undefined") return null;
-    const rawArticles = localStorage.getItem(ARTICLES_STORAGE_KEY);
-    const rawCategories = localStorage.getItem(ARTICLE_CATEGORIES_KEY);
-    if (!rawArticles && !rawCategories) return null;
-    const parsedArticles = rawArticles ? JSON.parse(rawArticles) : [];
-    const parsedCategories = rawCategories ? JSON.parse(rawCategories) : null;
+    const parsedArticles = readLocalMirrorJson<unknown>(ARTICLES_STORAGE_KEY);
+    const parsedCategories = readLocalMirrorJson<unknown>(ARTICLE_CATEGORIES_KEY);
+    if (parsedArticles === undefined && parsedCategories === undefined) return null;
     return {
       articles: Array.isArray(parsedArticles) ? parsedArticles : [],
       categories: Array.isArray(parsedCategories) && parsedCategories.length ? parsedCategories : DEFAULT_ARTICLE_CATEGORIES
@@ -60,13 +63,8 @@ function loadFromLocalStorage(): { articles: SavedArticleItem[]; categories: Pro
 }
 
 function persistToLocalStorage(articles: SavedArticleItem[], categories: PromptCategory[]): void {
-  try {
-    if (typeof localStorage === "undefined") return;
-    localStorage.setItem(ARTICLES_STORAGE_KEY, JSON.stringify(articles));
-    localStorage.setItem(ARTICLE_CATEGORIES_KEY, JSON.stringify(categories));
-  } catch (err) {
-    console.warn("[ArticleService] persistToLocalStorage failed", err);
-  }
+  writeLocalMirrorJson(ARTICLES_STORAGE_KEY, articles);
+  writeLocalMirrorJson(ARTICLE_CATEGORIES_KEY, categories);
 }
 
 export const articleService = {
@@ -88,8 +86,8 @@ export const articleService = {
 
     // 2. chrome.storage.local 校准
     try {
-      if (typeof chrome !== "undefined" && chrome.storage?.local) {
-        const stored = await chrome.storage.local.get([ARTICLES_STORAGE_KEY, ARTICLE_CATEGORIES_KEY, ARTICLE_REVISION_KEY]);
+      if (hasExtensionLocalStorage()) {
+        const stored = await readExtensionStorage([ARTICLES_STORAGE_KEY, ARTICLE_CATEGORIES_KEY, ARTICLE_REVISION_KEY]);
         storedRevision = parseBackpackRevision(stored?.[ARTICLE_REVISION_KEY]);
         if (stored?.[ARTICLES_STORAGE_KEY] && Array.isArray(stored[ARTICLES_STORAGE_KEY])) {
           articleState.articles = stored[ARTICLES_STORAGE_KEY];

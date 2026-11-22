@@ -19,6 +19,7 @@ import { scanStickerDirectory, supportedStickerFileName, findStickerNode, collec
 import { hasStickerReadPermission, requestStickerWritePermission, readStickerOriginal, writeStickerOriginal, deleteStickerOriginal } from "../stickers/original-files";
 import { withStickersWrite } from "../stickers/module-state";
 import { ReadSessionSlot } from "../core/read-session";
+import { sendRuntimeMessage } from "../core/runtime-protocol";
 import { appDialog, appDialogState } from "../core/app-dialog.store";
 import { LIBRARY_CHANGE_KEY, projectLibraryTree,
   cloneLibraryIndex, addVirtualGroup, editVirtualGroup, assignLibraryImage,
@@ -829,16 +830,11 @@ export class StickersService {
 
     if (typeof chrome !== "undefined" && chrome?.runtime?.sendMessage) {
       try {
-        const res = await new Promise<any>((resolve) => {
-          chrome.runtime.sendMessage(
-            {
-              type: "saveToFavorites",
-              url: param.url,
-              dataUrl: finalDataUrl
-            },
-            (reply: { ok?: boolean; error?: string } | undefined) => resolve(reply)
-          );
-        });
+        const res = await sendRuntimeMessage({
+          type: "saveToFavorites",
+          url: param.url,
+          dataUrl: finalDataUrl
+        }, { throwOnError: true });
         return { ok: Boolean(res?.ok), error: res?.error };
       } catch (err: any) {
         console.warn("[saveImageToDiskSafe] 写入异常:", err);

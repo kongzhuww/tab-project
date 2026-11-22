@@ -127,12 +127,12 @@
               />
               <div class="bili-theater-comment-main">
                 <div class="bili-theater-comment-user">{{ c.userName }} <small v-if="c.level">LV{{ c.level }}</small></div>
-                <div class="bili-theater-comment-text"><BiliRichText :text="c.message" /></div>
+                <div class="bili-theater-comment-text"><BiliRichText :text="c.message" :emotes="c.emotes" :mentions="c.mentions" /></div>
                 <div v-if="c.pictures?.length" class="bili-comment-picture-grid"><a v-for="picture in c.pictures" :key="picture" :href="picture" target="_blank" rel="noreferrer"><img :src="picture" alt="评论图片" loading="lazy" referrerpolicy="no-referrer" /></a></div>
                 <div class="bili-theater-comment-meta muted small"><span>{{ c.timeStr || '' }}</span><span v-if="c.likeCount">👍 {{ c.likeCount }}</span><span v-if="c.replyCount">💬 {{ c.replyCount }}</span></div>
                 <div v-if="c.replies?.length" class="bili-comment-sub-list">
                   <div v-for="reply in c.replies" :key="reply.id" class="bili-comment-sub-item">
-                    <strong class="bili-comment-sub-uname">{{ reply.userName }}:</strong> <BiliRichText :text="reply.message" />
+                    <strong class="bili-comment-sub-uname">{{ reply.userName }}:</strong> <BiliRichText :text="reply.message" :emotes="reply.emotes" :mentions="reply.mentions" />
                   </div>
                   <!-- 原地展开 / 点击查看楼中楼控制条 -->
                   <div class="bili-comment-sub-more">

@@ -61,21 +61,6 @@ export const PLUGIN_CATALOG: readonly PluginMarketItem[] = [
     builtIn: true
   },
   {
-    id: "chat",
-    title: "海狸聊天室",
-    version: "v1.0.0",
-    kind: "module",
-    category: "communication",
-    categoryLabel: "独立模块 · 实时交流",
-    emoji: "💬",
-    desc: "实验性自托管私有聊天室，默认关闭。需先手动启用，再配置自己的服务器和专属邀请；支持文字、受限图片与分享卡片。",
-    author: "tab-project Lab",
-    tags: ["实验性", "默认关闭", "自托管"],
-    builtIn: true,
-    isDev: true,
-    devNotice: "实验性组件，仍需人工与双端验收；未启用时不自动连接，不读取房间或补发消息。"
-  },
-  {
     id: "music",
     title: "网易云模块",
     version: "v2.0.1",
@@ -171,7 +156,7 @@ function loadInstalledIds(): string[] {
       if (!Array.isArray(parsed) || !parsed.every(id => typeof id === "string")) {
         throw new Error("Invalid enabled module preference");
       }
-      return Array.from(new Set(parsed as string[])).filter(id => id !== "daily-youtube");
+      return Array.from(new Set(parsed as string[])).filter(id => id !== "daily-youtube" && id !== "chat");
     }
   } catch {
     installedReadFailed = true;

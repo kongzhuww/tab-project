@@ -1,4 +1,5 @@
 import { NATIVE_HOST_NAME } from '../native-bridge/installer';
+import { sendRuntimeMessage } from '../core/runtime-protocol';
 
 declare const chrome: any;
 
@@ -217,11 +218,14 @@ async function sendNative<T>(payload: Record<string, unknown>): Promise<T> {
     if (typeof chrome.runtime?.sendNativeMessage === 'function') {
       response = await chrome.runtime.sendNativeMessage(NATIVE_HOST_NAME, envelope);
     } else if (typeof chrome.runtime?.sendMessage === 'function') {
-      const proxy = await chrome.runtime.sendMessage({
-        type: 'native-bridge:send',
-        hostName: NATIVE_HOST_NAME,
-        payload: envelope,
-      });
+      const proxy = await sendRuntimeMessage(
+        {
+          type: 'native-bridge:send',
+          hostName: NATIVE_HOST_NAME,
+          payload: envelope,
+        },
+        { throwOnError: true }
+      );
       if (!proxy?.ok) {
         throw new Error(proxy?.error || 'UNSUPPORTED_CONTEXT');
       }

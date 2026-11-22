@@ -8,9 +8,7 @@ test('global settings no longer exposes directory categories or sticker settings
   const store = await read('settings/store.ts');
   assert.doesNotMatch(settings, /StorageSettings|requestedStorageTarget|id: "storage"/);
   assert.doesNotMatch(store, /StorageSettingsTarget|requestedStorageTarget|"bili-cache"|"stickers"/);
-  for (const file of ['chat/ChatStickerPicker.vue', 'stickers/StickerBoard.vue']) {
-    assert.doesNotMatch(await read(file), /settingsController|图库设置/);
-  }
+  assert.doesNotMatch(await read('stickers/StickerBoard.vue'), /settingsController|图库设置/);
 });
 
 test('cache page opens its own inline settings and preserves the directory implementation', async () => {

@@ -26,7 +26,7 @@
 
 > **Core Concept**: `tab-project` is a desktop Chromium New Tab workspace extension built with **Vue 3, TypeScript, Rust WebAssembly, and Manifest V3** (for Chrome & Edge). It unifies quick-access sites, bookmark kanban boards, aggregated search, Todoist, GitHub, Bilibili tools & audio radio, music playback, and local-first AI workflows into one adaptive interface.
 
-> **Repository Version**: **1.0.27**, featuring the redesigned 2×7 Bilibili radio cards and playlist manager, per-workspace wallpapers, the Site Finder digital employee, RSS channels, and sub-view refresh persistence. Store editions are updated after platform review and may lag behind `main`. See [CHANGELOG.md](CHANGELOG.md).
+> **Repository Version**: **1.0.28**, featuring the redesigned Bilibili radio cover stage with folder persistence, Bilibili comment emotes and clickable `@` mentions, storage/sync structural optimizations, backpack reader styling fixes, and full removal of the Beaver Chatroom module. Store editions are updated after platform review and may lag behind `main`. See [CHANGELOG.md](CHANGELOG.md).
 
 ## Feedback & Updates
 
@@ -43,7 +43,7 @@ When filing an issue, include your extension version, browser version, and repro
 | **Live Wallpapers & Workshop** | Pure-browser Wallpaper Engine runtime (OPFS instant boot, Steam Workshop `431960` scanning, 4K Video / Web / Scene playback, 128-band logarithmic audio visualizer), 5 high-refresh/Retina cooling safeguards, and **per-workspace custom wallpapers** | Available by default; links directly to local Steam Workshop or custom folders |
 | **Quick Sites & Bookmark Board** | Multi-group site shelves, `2×2` large folders, drag-and-drop reordering, organizer assistant, flat/nested bookmark view, and Rust/Worker fuzzy pinyin search | Available by default; requires `bookmarks` permission and only edits items upon user action |
 | **Quick Search & Home** | Unified search across history, bookmarks, and saved sites (`/bm`, `/sites` filters + GitHub, Bilibili, NetEase, Qichacha); 3D clock, color presets, motto wheel switcher, and Open-Meteo weather | Available by default; weather uses read-only requests to Open-Meteo |
-| **Bilibili Workspace & Radio** | Favorites organizer with top global search bar, personalized feed, following groups; **compact 2×7 radio grid** (`♥` likes, custom playlist management & delete, dashed-arrow queue drag-and-drop, Offscreen playback & refresh restore prompt); floating player (danmaku, playback speed, comments/sub-replies viewer, subtitle modal) and local video cache | Public browsing needs no login; personal favorites/following require signing into Bilibili in the same browser; preserves active sub-view on refresh |
+| **Bilibili Workspace & Radio** | Favorites organizer with top global search bar, personalized feed, following groups; **radio cover stage** (large cover, `♥` likes, previous/next switching directly within the active Bilibili favorites folder, Offscreen playback & refresh restore prompt); floating player (danmaku, playback speed, comments/sub-replies with **image emotes & clickable `@` mentions**, subtitle modal) and local video cache | Public browsing needs no login; personal favorites/following require signing into Bilibili in the same browser; preserves active sub-view on refresh |
 | **GitHub Workspace** | Starred repository Lists, Topic kanban drag-and-drop sync, cached PRs & recent repos, Markdown README reader, and linked repository Todoist tasks | Public browsing works unauthenticated; private data & actions require a personal GitHub Token |
 | **Todoist Kanban** | Local-first caching, ordered Today queue, calendar sidebar, attachment image viewer, and GitHub-linked tasks | Requires a Todoist API Token in settings |
 | **Music Workspace** | Dual separated queues for NetEase Cloud (browser session login) and Monster Siren Records (built-in), 3D spinning player, lyrics, and tab-close audio controls | Monster Siren works immediately; NetEase requires browser login |
@@ -55,9 +55,8 @@ When filing an issue, include your extension version, browser version, and repro
 
 | Service | Summary | Requirements |
 | :--- | :--- | :--- |
-| **WebDAV Cloud Sync** | Client-side encrypted backup and smart diff/merge for quick sites, settings, library, and radio series | Bring your own HTTPS WebDAV endpoint, credentials, and backup passphrase |
-| **Beaver Chatroom** | Self-hosted private rooms, resource card sharing, and listen-together rooms | Disabled by default; requires a self-hosted server ([Server Guide](server/private-chat/README.md)) |
-| **Sticker Directory** | Chat picker & local folder mounting via File System Access API | Opt-in local directory access from chat/library |
+| **WebDAV Cloud Sync** | Client-side encrypted backup and smart diff/merge for quick sites, settings, and AI library | Bring your own HTTPS WebDAV endpoint, credentials, and backup passphrase |
+| **Sticker Directory** | Sticker library management & local folder mounting via File System Access API | Opt-in local directory access from the AI library |
 
 > **Themes & Layout**: Unified `light`, `dark`, and warm-paper (`lonetrail`) themes plus independent startup animations (`endfield` / `rhinelab`). Trigger the non-intrusive overlay sidebar anytime with `Alt+W`.
 
@@ -65,6 +64,9 @@ When filing an issue, include your extension version, browser version, and repro
 
 ## Recent Highlights
 
+- **v1.0.28**:
+  - Revamped Bilibili radio into a cover stage (`♥` likes and previous/next controls within the active favorites folder), removed local custom playlist/queue UI, persisted the selected favorites folder across pauses, and added Bilibili comment emotes + clickable blue `@` mentions.
+  - Uninstalled and removed Beaver Chatroom (`src/chat/`, UI hooks, sync keys, and `lw_private_chat_v1` cleanup), fixed Backpack article reader CSS scoping, modularized storage/sync/settings components, and added Chrome Web Store Service Account CI publishing.
 - **v1.0.27**:
   - Revamped Bilibili radio into compact 2×7 cards with `♥` favorites, custom playlist popover & delete support, dashed-arrow drag cue, favorites hero search bar, and removed legacy tape bar, subscription sidebar entry, and newspaper mode.
   - Added sub-view refresh persistence across Bilibili, GitHub, Agent, and AIHOT; cached GitHub PRs/recent repos and Todoist views; enabled mouse-wheel zoom on Agent library images via `FloatingImageViewer`; added the Site Finder employee and AIHOT RSS channels.

@@ -1140,7 +1140,7 @@ onUnmounted(() => {
                   <span class="bili-comment-time">{{ c.timeStr }}</span>
                 </div>
                 <div class="bili-comment-text">
-                  <BiliRichText :text="c.message" :emotes="c.emotes" />
+                  <BiliRichText :text="c.message" :emotes="c.emotes" :mentions="c.mentions" />
                 </div>
                 <div v-if="c.pictures.length" class="bili-mini-comment-pictures">
                   <button
@@ -1161,7 +1161,7 @@ onUnmounted(() => {
                 <div v-if="c.replies?.length" class="bili-comment-sub-list">
                   <div v-for="sub in c.replies" :key="sub.id" class="bili-comment-sub-item">
                     <strong class="bili-comment-sub-uname">{{ sub.userName }}:</strong>
-                    <BiliRichText :text="sub.message" :emotes="sub.emotes" />
+                    <BiliRichText :text="sub.message" :emotes="sub.emotes" :mentions="sub.mentions" />
                     <div v-if="sub.pictures.length" class="bili-mini-comment-pictures">
                       <button
                         v-for="(picture, index) in sub.pictures"

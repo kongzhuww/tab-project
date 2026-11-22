@@ -527,13 +527,20 @@ export async function loadOrganizer(forceReload = false): Promise<void> {
     cachedCollapsedGroups = await bilibiliService.treeManager.loadCollapsedGroups();
     biliFavoritesState.collapsedGroups = Array.from(cachedCollapsedGroups);
 
-    // 默认高亮文件夹选择
+    // 默认高亮文件夹选择（优先恢复上次选中的收藏夹）
     let activeId = biliFavoritesState.activeFolderId;
+    if (!activeId) {
+      try {
+        if (typeof localStorage !== "undefined") {
+          activeId = localStorage.getItem("bili_organizer_active_folder_id") || "";
+        }
+      } catch {}
+    }
     if (!activeId || !cachedRawFolders.some((f) => String(f.id || f.fid) === String(activeId))) {
       const defaultFolder = created.find((f) => /默认/.test(f.title)) || created[0] || cachedRawFolders[0];
       activeId = defaultFolder ? String(defaultFolder.id || defaultFolder.fid) : "";
-      biliFavoritesState.activeFolderId = activeId;
     }
+    biliFavoritesState.activeFolderId = activeId;
 
     org.folders = bilibiliService.treeManager.flattenTree(
       currentTree,
@@ -638,6 +645,11 @@ export const biliFavoritesController = {
     }
 
     biliFavoritesState.activeFolderId = idStr;
+    try {
+      if (typeof localStorage !== "undefined" && idStr) {
+        localStorage.setItem("bili_organizer_active_folder_id", idStr);
+      }
+    } catch {}
     org.folders.forEach((f) => {
       f.selected = f.id === idStr;
     });

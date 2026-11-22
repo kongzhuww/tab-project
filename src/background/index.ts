@@ -12,8 +12,10 @@
 
 import { initBilibiliNetRules, removeLegacyGlobalNetRule } from "./dnr";
 import { removeRetiredYouTubeStorage } from "../core/removed-youtube";
+import { removeRetiredChatStorage } from "../core/removed-chat";
 
 void removeRetiredYouTubeStorage().catch(error => console.warn("旧 YouTube 数据清理失败", error));
+void removeRetiredChatStorage().catch(error => console.warn("旧聊天室数据清理失败", error));
 import {
   initNotificationListeners,
   flashBadge
@@ -32,6 +34,7 @@ import { initWebSideDrawer, toggleWebSideDrawer } from "./web-side-drawer";
 import { initAiScheduler } from "./ai-scheduler";
 import { initEmployeeWorker } from "./employee-worker";
 import { saveContextSticker } from "./context-sticker";
+import { createRuntimeMessageRouter } from "../core/runtime-protocol";
 
 declare const chrome: any;
 
@@ -347,179 +350,172 @@ async function ensureOffscreenAudioDocument(): Promise<void> {
   await creatingOffscreenAudio;
 }
 
-// 2. 统一全局消息分发路由
-chrome.runtime.onMessage.addListener((message: any, sender: any, sendResponse: (res: any) => void) => {
-  // 0. Offscreen 后台音频桥接（跨刷新不断声）
-  if (message?.type === "audio-bg:get-state") {
-    (async () => {
-      if (!(await hasOffscreenAudioDocument())) {
-        return { ok: true, music: null, bili: null };
-      }
-      return new Promise((resolve) => {
-        chrome.runtime.sendMessage({ type: "offscreen-audio:get-state" }, (reply: any) => {
-          if (chrome.runtime?.lastError || !reply?.ok) {
-            resolve({ ok: true, music: null, bili: null });
-            return;
-          }
-          resolve(reply);
-        });
-      });
-    })()
-      .then(sendResponse)
-      .catch(() => sendResponse({ ok: true, music: null, bili: null }));
-    return true;
-  }
+// 2. 统一全局消息分发路由（表驱动协议分发）
+const handleCleanupDefaultTabs = async () => {
+  await cleanupOrReplaceBrowserDefaultNewTabs();
+  return { ok: true };
+};
 
-  if (message?.type === "audio-bg:command") {
-    (async () => {
-      await ensureOffscreenAudioDocument();
-      return new Promise((resolve) => {
-        chrome.runtime.sendMessage(
-          {
-            type: "offscreen-audio:command",
-            target: message.target,
-            action: message.action,
-            payload: message.payload,
-          },
-          (reply: any) => {
-            if (chrome.runtime?.lastError) {
-              resolve({ ok: false });
+chrome.runtime.onMessage.addListener(
+  createRuntimeMessageRouter({
+    // 0. Offscreen 后台音频桥接（跨刷新不断声）
+    "audio-bg:get-state": async () => {
+      try {
+        if (!(await hasOffscreenAudioDocument())) {
+          return { ok: true, music: null, bili: null };
+        }
+        return await new Promise((resolve) => {
+          chrome.runtime.sendMessage({ type: "offscreen-audio:get-state" }, (reply: any) => {
+            if (chrome.runtime?.lastError || !reply?.ok) {
+              resolve({ ok: true, music: null, bili: null });
               return;
             }
-            resolve(reply || { ok: true });
-          }
-        );
-      });
-    })()
-      .then(sendResponse)
-      .catch(() => sendResponse({ ok: false }));
-    return true;
-  }
-  // A. 新标签页智能单例去重
-  if (message?.type === "routeNewTab") {
-    routeNewTab(sendResponse, sender.tab?.id);
-    return true;
-  }
+            resolve(reply);
+          });
+        });
+      } catch {
+        return { ok: true, music: null, bili: null };
+      }
+    },
 
-  // C. 核心：保存图片直入「新标签页/收藏夹」
-  if (message?.type === "saveToFavorites") {
-    saveImageToFavoritesFolder(message).then(sendResponse);
-    return true;
-  }
+    "audio-bg:command": async (message) => {
+      try {
+        await ensureOffscreenAudioDocument();
+        return await new Promise((resolve) => {
+          chrome.runtime.sendMessage(
+            {
+              type: "offscreen-audio:command",
+              target: message.target,
+              action: message.action,
+              payload: message.payload,
+            },
+            (reply: any) => {
+              if (chrome.runtime?.lastError) {
+                resolve({ ok: false });
+                return;
+              }
+              resolve(reply || { ok: true });
+            }
+          );
+        });
+      } catch {
+        return { ok: false };
+      }
+    },
 
-  // D. 核心：下载 B 站视频直落「新标签页/缓存视频」
-  if (message?.type === "downloadBiliVideo") {
-    (async () => {
+    // A. 新标签页智能单例去重
+    routeNewTab: (_message, sender, sendResponse) => {
+      routeNewTab(sendResponse, sender.tab?.id);
+      return true;
+    },
+
+    // C. 保存图片直入「新标签页/收藏夹」
+    saveToFavorites: (message) => saveImageToFavoritesFolder(message),
+
+    // D. 下载 B 站视频直落「新标签页/缓存视频」
+    downloadBiliVideo: async (message) => {
       try {
         const { url, fileName } = message;
         if (!url || !fileName) throw new Error("缺少下载参数");
-
         // Never modify browser-wide UA/Referer for a download. Existing extension-scoped
         // Bilibili rules cover the fetch fallback; abort if legacy rule cleanup fails.
         await removeLegacyGlobalNetRule();
-
         const downloadUrl = mediaUrl(url);
         const downloadId = await chrome.downloads.download({
-          url: downloadUrl, filename: fileName, saveAs: false, conflictAction: "uniquify"
+          url: downloadUrl,
+          filename: fileName,
+          saveAs: false,
+          conflictAction: "uniquify",
         });
         // Accepted by the download manager, not completion. Never buffer videos in this worker.
-
         flashBadge("DL", "#10b981");
         return { ok: true, downloadId };
       } catch (err: any) {
         flashBadge("ERR", "#ef4444");
         return { ok: false, error: err?.message || "视频下载失败" };
       }
-    })().then(sendResponse);
-    return true;
-  }
-  // E. 快捷将当前页面收藏为书签
-  if (message?.type === "bookmarkCurrentPage") {
-    (async () => {
-      let targetTab = message?.tab;
-      const targetPage = message?.targetPage || "常用网站";
-      if (!targetTab || !targetTab.url) {
-        try {
-          const tabs = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
-          if (tabs && tabs.length && tabs[0]?.url) targetTab = tabs[0];
-        } catch {}
-      }
-      if (!targetTab || !targetTab.url) {
-        try {
-          const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
-          if (tabs && tabs.length && tabs[0]?.url) targetTab = tabs[0];
-        } catch {}
-      }
-      return bookmarkCurrentTab(targetTab, targetPage);
-    })()
-      .then(sendResponse)
-      .catch((err) => {
-        sendResponse({ ok: false, error: err?.message || "保存失败" });
-      });
-    return true;
-  }
+    },
 
-// F. 社群与通知手动立即抓取（已清理废弃第三方订阅管道）
-
-  // I. 网络图片跨域搜索代理与图标提取
-  if (message?.type === "searchWebImages") {
-    return handleSearchWebImages(message, sendResponse);
-  }
-  if (message?.type === "fetchSiteImages") {
-    return handleFetchSiteImages(message, sendResponse);
-  }
-
-  // J. 清理重启扩展时残留的浏览器默认空白标签页（如 edge://newtab / chrome://newtab）
-  // 历史兼容命名 cleanupNativeTabs 指的是浏览器厂商自带的默认空白标签页，不代表当前 Native Host 功能仍存在
-  if (message?.type === "cleanupNativeTabs" || message?.type === "cleanupBrowserDefaultTabs") {
-    cleanupOrReplaceBrowserDefaultNewTabs().then(() => sendResponse({ ok: true }));
-    return true;
-  }
-
-  // K. 图片复制跨域代理：从 background 拉取图片并以 base64 格式返回，彻底消除前端 CORS 与防盗链限制
-  if (message?.type === "fetchImageForClipboard") {
-    const rawUrl = String(message?.url || "").trim();
-    if (!rawUrl) {
-      sendResponse({ ok: false, error: "图片链接为空" });
-      return false;
-    }
-    (async () => {
-      let release: (() => void) | undefined;
+    // E. 快捷将当前页面收藏为书签
+    bookmarkCurrentPage: async (message) => {
       try {
-        release = acquireImageSlot();
-        const buffer = await fetchImageBytes(cleanBiliImageUrl(rawUrl));
-        const magic = detectImageFormatByMagic(new Uint8Array(buffer));
-        const mime = magic.ext === "jpg" ? "image/jpeg" : "image/" + magic.ext;
-        await validateImagePixels(buffer, mime);
-        const dataUrl = magic.isAvif ? await convertAvifToPngDataUrl(buffer) : `data:${mime};base64,${bufferToBase64(buffer)}`;
-        sendResponse({ ok: true, dataUrl, isPng: magic.isAvif || magic.ext === "png" });
-      } catch (error) {
-        sendResponse({ ok: false, error: error instanceof Error ? error.message : "图片读取失败" });
-      } finally { release?.(); }
-    })();
-    return true;
-  }
+        let targetTab = message?.tab;
+        const targetPage = message?.targetPage || "常用网站";
+        if (!targetTab || !targetTab.url) {
+          try {
+            const tabs = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+            if (tabs && tabs.length && tabs[0]?.url) targetTab = tabs[0];
+          } catch {}
+        }
+        if (!targetTab || !targetTab.url) {
+          try {
+            const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+            if (tabs && tabs.length && tabs[0]?.url) targetTab = tabs[0];
+          } catch {}
+        }
+        return await bookmarkCurrentTab(targetTab, targetPage);
+      } catch (err: any) {
+        return { ok: false, error: err?.message || "保存失败" };
+      }
+    },
 
-  // L. 本机 Native Messaging 代理（供扩展页面在未直接暴露 sendNativeMessage 时走后台 Service Worker 调用）
-  if (message?.type === "native-bridge:send") {
-    const hostName = typeof message?.hostName === "string" ? message.hostName : "";
-    const payload = message?.payload;
-    if (!hostName || !payload || typeof payload !== "object") {
-      sendResponse({ ok: false, error: "无效的 Native Messaging 请求" });
-      return false;
-    }
-    if (typeof chrome.runtime?.sendNativeMessage !== "function") {
-      sendResponse({ ok: false, error: "UNSUPPORTED_CONTEXT" });
-      return false;
-    }
-    chrome.runtime.sendNativeMessage(hostName, payload)
-      .then((response: unknown) => sendResponse({ ok: true, response }))
-      .catch((error: unknown) => sendResponse({ ok: false, error: error instanceof Error ? error.message : String(error || "Native Messaging 调用失败") }));
-    return true;
-  }
+    // I. 网络图片跨域搜索代理与图标提取
+    searchWebImages: (message, _sender, sendResponse) => handleSearchWebImages(message, sendResponse),
+    fetchSiteImages: (message, _sender, sendResponse) => handleFetchSiteImages(message, sendResponse),
 
+    // J. 清理重启扩展时残留的浏览器默认空白标签页（历史兼容命名 cleanupNativeTabs）
+    cleanupNativeTabs: handleCleanupDefaultTabs,
+    cleanupBrowserDefaultTabs: handleCleanupDefaultTabs,
 
-});
+    // K. 图片复制跨域代理
+    fetchImageForClipboard: (message, _sender, sendResponse) => {
+      const rawUrl = String(message?.url || "").trim();
+      if (!rawUrl) {
+        sendResponse({ ok: false, error: "图片链接为空" });
+        return false;
+      }
+      return (async () => {
+        let release: (() => void) | undefined;
+        try {
+          release = acquireImageSlot();
+          const buffer = await fetchImageBytes(cleanBiliImageUrl(rawUrl));
+          const magic = detectImageFormatByMagic(new Uint8Array(buffer));
+          const mime = magic.ext === "jpg" ? "image/jpeg" : "image/" + magic.ext;
+          await validateImagePixels(buffer, mime);
+          const dataUrl = magic.isAvif
+            ? await convertAvifToPngDataUrl(buffer)
+            : `data:${mime};base64,${bufferToBase64(buffer)}`;
+          return { ok: true, dataUrl, isPng: magic.isAvif || magic.ext === "png" };
+        } catch (error) {
+          return { ok: false, error: error instanceof Error ? error.message : "图片读取失败" };
+        } finally {
+          release?.();
+        }
+      })();
+    },
+
+    // L. 本机 Native Messaging 代理
+    "native-bridge:send": (message, _sender, sendResponse) => {
+      const hostName = typeof message?.hostName === "string" ? message.hostName : "";
+      const payload = message?.payload;
+      if (!hostName || !payload || typeof payload !== "object") {
+        sendResponse({ ok: false, error: "无效的 Native Messaging 请求" });
+        return false;
+      }
+      if (typeof chrome.runtime?.sendNativeMessage !== "function") {
+        sendResponse({ ok: false, error: "UNSUPPORTED_CONTEXT" });
+        return false;
+      }
+      return chrome.runtime
+        .sendNativeMessage(hostName, payload)
+        .then((response: unknown) => ({ ok: true, response }))
+        .catch((error: unknown) => ({
+          ok: false,
+          error: error instanceof Error ? error.message : String(error || "Native Messaging 调用失败"),
+        }));
+    },
+  })
+);
 
 // 3. 安装与启动生命周期初始化
 

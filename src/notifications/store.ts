@@ -1,7 +1,7 @@
 import { reactive, readonly } from "vue";
 import { safeTarget, biliVideoTargetFromText, type NotificationLevel, type NotificationTarget } from "./history-contract";
 
-export type NotificationAppType = "chat" | "bili" | "phone" | "fetch" | string;
+export type NotificationAppType = "bili" | "phone" | "fetch" | string;
 
 export interface NotificationOptions {
   id?: string;
@@ -60,11 +60,10 @@ function shouldArchive(options: NotificationOptions, text: string): boolean {
   if (options.level === "warning" || options.level === "error" || /失败|错误|异常|未确认|未获确认|未保存|无法|不可用|拒绝|超时|警告|到期|时间已到/.test(text)) return true;
   if (/复制成功|已复制|保存成功|已保存|设置成功|已更新设置|配置已更新|已设为|已取消|已切换/.test(text)) return false;
   if (/^(正在|开始读取|加载中|同步中)/.test(text)) return false;
-  return options.appType === "chat" || options.appType === "bili" || /提醒|任务已创建|任务完成|已完成任务|任务结果|下载完成|新消息|新私信|新回复|新提及|有可用更新/.test(text);
+  return options.appType === "bili" || /提醒|任务已创建|任务完成|已完成任务|任务结果|下载完成|新消息|新私信|新回复|新提及|有可用更新/.test(text);
 }
 
 const APP_DEFAULTS: Record<string, { name: string; icon: string; action: string }> = {
-  chat: { name: "海狸聊天室", icon: "assets/icon-48.png", action: "查看消息" },
   bili: { name: "哔哩哔哩", icon: "assets/bilibili.svg", action: "查看消息" },
   phone: { name: "手机文件", icon: "assets/nav-traffic.svg", action: "复制文件" },
   fetch: { name: "LogicWeaver", icon: "assets/icon-48.png", action: "" }

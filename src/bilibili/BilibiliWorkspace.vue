@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import { onImeEnter } from "../core/ime-keyboard";
 import { biliFavoritesController, biliFavoritesState, favoriteGridColumns, type BiliOrganizerFolderView, type BiliOrganizerVideoView } from "./bili-favorites-store";
 import { biliMiniPlayerController, biliMiniPlayerState } from "./mini-player-store";
 import { subtitleModalController } from "./subtitle-modal-store";
@@ -10,7 +9,8 @@ import BiliSubscriptionPlayer from "./BiliSubscriptionPlayer.vue";
 import BiliOrganizerDialogs from "./BiliOrganizerDialogs.vue";
 import BiliCacheSettingsView from "./BiliCacheSettingsView.vue";
 import BiliUpGroupManager from "./BiliUpGroupManager.vue";
-import { radioTapeState } from "./radio-tape-store";
+import { radioTapeController, radioTapeState } from "./radio-tape-store";
+import { biliRadioPlayer } from "./radio-player";
 import { biliRadioController, LIKED_SERIES_ID, LIKED_SERIES_NAME } from "./radio-store";
 import { parseDurationToSeconds } from "./channel-format";
 import { onFollowingGroupsWheel } from "./horizontal-wheel";
@@ -19,129 +19,12 @@ import { bilibiliChannelService } from "../services/bilibili-channel.service";
 import { useContextMenu } from "../sdk/interactions";
 import { notifications } from "../sdk/notifications";
 import { appDialog } from "../core/app-dialog.store";
-import { chatService } from "../chat/chat.service";
-import ChatShareMenu from "../chat/ChatShareMenu.vue";
-import type { ChatShareTarget } from "../chat/private-chat-client";
-import { chatModuleState } from "../chat/chat-state";
 import { t } from "../i18n";
 import { workspaceSearchRequests, consumeWorkspaceSearch } from "../search/workspace-search";
 import { useWorkspaceWallpaper } from "../wallpaper/workspace-wallpaper";
 import WorkspaceWallpaperLayer from "../wallpaper/WorkspaceWallpaperLayer.vue";
 
 const { style: biliWallpaperStyle, media: biliWallpaperMedia } = useWorkspaceWallpaper('bilibili');
-const isSeriesNameError = ref(false);
-
-function handleSaveSeries() {
-  const name = biliFavoritesState.radioSeriesName?.trim();
-  if (!name) {
-    isSeriesNameError.value = true;
-    const seriesInput = document.getElementById("bili-radio-name") as HTMLInputElement | null;
-    if (seriesInput) {
-      seriesInput.focus();
-    }
-    notifications.fetch(t("bili.radioAppName"), t("bili.radioNameEmpty"));
-    return;
-  }
-  isSeriesNameError.value = false;
-  dispatch("radio-save", { name });
-}
-
-async function handleRenameCurrentSeries() {
-  const seriesInput = document.getElementById("bili-radio-name") as HTMLInputElement | null;
-  if (seriesInput) {
-    seriesInput.focus();
-    seriesInput.select();
-    notifications.fetch(t("bili.radioAppName"), t("bili.radioInputFocused"));
-  }
-}
-
-function handleShareCurrentSeries() {
-  const currentName = biliFavoritesState.radioSeriesName?.trim();
-  let series = biliFavoritesState.radioSeries.find((s) => s.name === currentName);
-  if (!series && biliFavoritesState.radioQueue.length) {
-    series = {
-      id: `series_${Date.now()}`,
-      name: currentName || t("bili.radioUntitled"),
-      count: biliFavoritesState.radioQueue.length,
-      items: biliFavoritesState.radioQueue
-    };
-  }
-  if (!series || !series.items?.length) {
-    notifications.fetch(t("bili.radioAppName"), t("bili.radioNoTracks"));
-    return;
-  }
-  chatService.sendBiliSeriesShare(series);
-  chatModuleState.visible = true;
-  notifications.fetch(t("bili.radioAppName"), t("bili.radioSharedNotice", { name: series.name }));
-}
-
-const seriesMenuOpen = ref(false);
-const seriesMenuWrapEl = ref<HTMLElement | null>(null);
-const pendingDeleteSeriesId = ref<string | null>(null);
-let pendingDeleteTimer: ReturnType<typeof setTimeout> | null = null;
-
-function clearPendingSeriesDelete(): void {
-  pendingDeleteSeriesId.value = null;
-  if (pendingDeleteTimer) {
-    clearTimeout(pendingDeleteTimer);
-    pendingDeleteTimer = null;
-  }
-}
-
-function handleStartNewSeries(): void {
-  dispatch("radio-clear");
-  biliFavoritesState.radioSeriesName = "";
-  radioQueuePage.value = 1;
-  seriesMenuOpen.value = false;
-  clearPendingSeriesDelete();
-  notifications.fetch("哔哩哔哩电台", "已开启新歌单创作，请从左侧添加视频");
-  const seriesInput = document.getElementById("bili-radio-name") as HTMLInputElement | null;
-  seriesInput?.focus();
-}
-
-function handleSelectSeries(seriesId: string): void {
-  dispatch("radio-load-series", seriesId);
-  radioQueuePage.value = 1;
-  seriesMenuOpen.value = false;
-  clearPendingSeriesDelete();
-}
-
-function handleDeleteSeriesClick(seriesId: string): void {
-  if (pendingDeleteSeriesId.value !== seriesId) {
-    clearPendingSeriesDelete();
-    pendingDeleteSeriesId.value = seriesId;
-    pendingDeleteTimer = setTimeout(() => {
-      pendingDeleteSeriesId.value = null;
-      pendingDeleteTimer = null;
-    }, 3500);
-    return;
-  }
-  clearPendingSeriesDelete();
-  dispatch("radio-delete-series", seriesId);
-}
-
-watch(seriesMenuOpen, (open, _prev, cleanup) => {
-  if (!open || typeof document === "undefined") return;
-  const onDocPointerDown = (e: PointerEvent) => {
-    const target = e.target as Node | null;
-    if (seriesMenuWrapEl.value && target && !seriesMenuWrapEl.value.contains(target)) {
-      seriesMenuOpen.value = false;
-      clearPendingSeriesDelete();
-    }
-  };
-  const onDocKeyDown = (e: KeyboardEvent) => {
-    if (e.key === "Escape") {
-      seriesMenuOpen.value = false;
-      clearPendingSeriesDelete();
-    }
-  };
-  document.addEventListener("pointerdown", onDocPointerDown);
-  document.addEventListener("keydown", onDocKeyDown);
-  cleanup(() => {
-    document.removeEventListener("pointerdown", onDocPointerDown);
-    document.removeEventListener("keydown", onDocKeyDown);
-  });
-});
 
 function openUpPreview(
   event: MouseEvent,
@@ -765,62 +648,7 @@ async function runContextMenuAction(action: string): Promise<void> {
     }
     return;
   }
-  if (action === "share-chat") {
-    if (!video) return;
-    try {
-      const { chatService } = await import("../chat/chat.service");
-      const { windowManagerController } = await import("../core/window-manager.store");
-      chatService.sendBiliShare({
-        bvid: video.bvid || (video.aid ? `av${video.aid}` : ""),
-        aid: video.aid,
-        title: video.title,
-        cover: video.cover,
-        upName: video.author,
-        upMid: video.authorMid,
-        upFace: video.authorFace,
-        play: video.playCount
-      });
-      windowManagerController.open("chat");
-    } catch (e) {
-      console.warn("分享到聊天室失败", e);
-    }
-    return;
-  }
   if (video) dispatch("organizer-video-action", { id: video.id || "", video, action });
-}
-
-function handleShareSeriesToRoom(target: ChatShareTarget) {
-  const currentName = biliFavoritesState.radioSeriesName?.trim();
-  let series = biliFavoritesState.radioSeries.find((s) => s.name === currentName);
-  if (!series && biliFavoritesState.radioQueue.length) {
-    series = {
-      id: `series_${Date.now()}`,
-      name: currentName || "未命名电台系列",
-      count: biliFavoritesState.radioQueue.length,
-      items: biliFavoritesState.radioQueue
-    };
-  }
-  if (!series || !series.items?.length) {
-    notifications.fetch("哔哩哔哩电台", "当前没有可分享的系列曲目，请先添加曲目");
-    return;
-  }
-  chatService.sendBiliSeriesShare(series, target);
-}
-
-function handleShareVideoToRoom(target: ChatShareTarget) {
-  const { video } = contextMenu.value;
-  contextMenu.value.visible = false;
-  if (!video) return;
-  chatService.sendBiliShare({
-    bvid: video.bvid || (video.aid ? `av${video.aid}` : ""),
-    aid: video.aid,
-    title: video.title,
-    cover: video.cover,
-    upName: video.author,
-    upMid: video.authorMid,
-    upFace: video.authorFace,
-    play: video.playCount
-  }, target);
 }
 
 function onLayoutWheel(event: WheelEvent): void {
@@ -882,8 +710,8 @@ function onRadioVideoDragStart(event: DragEvent, video: { bvid: string; title: s
 }
 const RADIO_PAGE_SIZE = 14;
 const radioLibraryPage = ref(1);
-const radioQueuePage = ref(1);
-const isRadioQueueDragOver = ref(false);
+const selectedRadioStageBvid = ref("");
+const activeRadioSourceMode = ref<"folder" | "liked">("folder");
 
 const radioTotalPages = computed(() =>
   Math.max(1, Math.ceil(biliFavoritesState.radioVideos.length / RADIO_PAGE_SIZE))
@@ -894,31 +722,146 @@ const pagedRadioVideos = computed(() => {
   return biliFavoritesState.radioVideos.slice(start, start + RADIO_PAGE_SIZE);
 });
 
-const radioQueueTotalPages = computed(() =>
-  Math.max(1, Math.ceil(biliFavoritesState.radioQueue.length / RADIO_PAGE_SIZE))
-);
-const pagedRadioQueue = computed(() => {
-  const safePage = Math.min(radioQueuePage.value, radioQueueTotalPages.value);
-  const start = (safePage - 1) * RADIO_PAGE_SIZE;
-  return biliFavoritesState.radioQueue.map((item, idx) => ({ item, index: idx })).slice(start, start + RADIO_PAGE_SIZE);
-});
-
-const likedRadioCount = computed(() => {
+const likedRadioItems = computed(() => {
   const liked = biliFavoritesState.radioSeries.find(
     (s) => s.id === LIKED_SERIES_ID || s.name === LIKED_SERIES_NAME
   );
-  return liked?.items?.length || 0;
+  return liked?.items || [];
 });
 
-const radioQueueBvidSet = computed(
-  () => new Set(biliFavoritesState.radioQueue.map((item) => item.bvid))
+const likedRadioCount = computed(() => likedRadioItems.value.length);
+
+const activeRadioFolderName = computed(() => {
+  const folder = biliFavoritesState.radioFolders.find(
+    (f) => Number(f.id) === Number(biliFavoritesState.radioActiveFolderId)
+  );
+  return folder?.title || "当前收藏夹";
+});
+
+const activeRadioSourceLabel = computed(() =>
+  activeRadioSourceMode.value === "liked" ? LIKED_SERIES_NAME : activeRadioFolderName.value
 );
 
-const activeRadioSeries = computed(() => {
-  const name = biliFavoritesState.radioSeriesName?.trim();
-  if (!name) return null;
-  return biliFavoritesState.radioSeries.find((s) => s.name === name) || null;
+const radioCoverTrackList = computed(() => {
+  if (activeRadioSourceMode.value === "liked" && likedRadioItems.value.length > 0) {
+    return likedRadioItems.value;
+  }
+  return biliFavoritesState.radioVideos;
 });
+
+const featuredRadioTrack = computed(() => {
+  const list = radioCoverTrackList.value;
+  if (radioTapeState.active && radioTapeState.bvid) {
+    const matched = list.find((item) => item.bvid === radioTapeState.bvid)
+      || biliFavoritesState.radioVideos.find((item) => item.bvid === radioTapeState.bvid);
+    if (matched) return matched;
+    return {
+      bvid: radioTapeState.bvid,
+      title: radioTapeState.title || "B站电台",
+      cover: radioTapeState.coverUrl || "",
+      author: radioTapeState.author || radioTapeState.seriesName || "Bilibili",
+      duration: Number(radioTapeState.duration || 0),
+    };
+  }
+  if (selectedRadioStageBvid.value) {
+    const selected = list.find((item) => item.bvid === selectedRadioStageBvid.value);
+    if (selected) return selected;
+  }
+  return list[0] || null;
+});
+
+const isFeaturedTrackCurrent = computed(() =>
+  Boolean(radioTapeState.active && featuredRadioTrack.value?.bvid && radioTapeState.bvid === featuredRadioTrack.value.bvid)
+);
+
+const isFeaturedTrackPlaying = computed(() =>
+  Boolean(isFeaturedTrackCurrent.value && radioTapeState.playing)
+);
+
+const featuredFolderIndex = computed(() => {
+  const current = featuredRadioTrack.value;
+  if (!current) return -1;
+  return radioCoverTrackList.value.findIndex((item) => item.bvid === current.bvid);
+});
+
+const featuredTrackPositionText = computed(() => {
+  const total = radioCoverTrackList.value.length;
+  if (!total) return "";
+  const idx = featuredFolderIndex.value;
+  return idx >= 0 ? `${idx + 1} / ${total}` : `${total} 首`;
+});
+
+function playFromList(list: typeof biliFavoritesState.radioVideos, startIndex: number, shuffle = false, seriesTitle?: string): void {
+  if (!list.length) return;
+  const normalized = list.map((item) => ({ ...item, upper: item.author }));
+  let idx = Math.max(0, Math.min(normalized.length - 1, startIndex));
+  if (shuffle) {
+    for (let i = normalized.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [normalized[i], normalized[j]] = [normalized[j], normalized[i]];
+    }
+    idx = 0;
+  }
+  selectedRadioStageBvid.value = normalized[idx]?.bvid || "";
+  biliRadioPlayer.playQueue({
+    name: seriesTitle || activeRadioSourceLabel.value || "B站电台",
+    items: normalized,
+    startIndex: idx,
+  });
+}
+
+function selectRadioFolder(folderId: number): void {
+  activeRadioSourceMode.value = "folder";
+  selectedRadioStageBvid.value = "";
+  dispatch("radio-select-folder", folderId);
+}
+
+function playFolderTrack(video: { bvid: string; title: string; cover?: string; author?: string; duration?: number }): void {
+  activeRadioSourceMode.value = "folder";
+  selectedRadioStageBvid.value = video.bvid;
+  const idx = biliFavoritesState.radioVideos.findIndex((item) => item.bvid === video.bvid);
+  playFromList(biliFavoritesState.radioVideos, idx >= 0 ? idx : 0, false, activeRadioFolderName.value);
+}
+
+function openLikedRadioCollection(): void {
+  if (!likedRadioItems.value.length) {
+    notifications.fetch("哔哩哔哩电台", "还没有喜欢的曲目，点击视频旁的 ♡ 即可收藏");
+    return;
+  }
+  activeRadioSourceMode.value = "liked";
+  playFromList(likedRadioItems.value, 0, false, LIKED_SERIES_NAME);
+}
+
+function stepRadioFolderTrack(delta: -1 | 1): void {
+  const list = radioCoverTrackList.value;
+  if (!list.length) return;
+  const idx = featuredFolderIndex.value;
+  const nextIdx = idx >= 0 ? (idx + delta + list.length) % list.length : (delta > 0 ? 0 : list.length - 1);
+  playFromList(list, nextIdx, false, activeRadioSourceLabel.value);
+}
+
+function togglePlayFeaturedRadioTrack(): void {
+  const target = featuredRadioTrack.value;
+  if (!target) return;
+  if (isFeaturedTrackCurrent.value) {
+    radioTapeController.togglePlay();
+    return;
+  }
+  const list = radioCoverTrackList.value;
+  const idx = list.findIndex((item) => item.bvid === target.bvid);
+  if (idx >= 0) {
+    playFromList(list, idx, false, activeRadioSourceLabel.value);
+    return;
+  }
+  playFromList([target], 0, false, activeRadioSourceLabel.value);
+}
+
+function handleRadioPlayAction(shuffle = false): void {
+  const list = radioCoverTrackList.value;
+  if (!list.length) return;
+  const idx = featuredFolderIndex.value >= 0 ? featuredFolderIndex.value : 0;
+  playFromList(list, idx, shuffle, shuffle ? `${activeRadioSourceLabel.value} · 随机` : activeRadioSourceLabel.value);
+}
 
 function formatRadioDuration(sec?: number): string {
   const total = Math.max(0, Math.floor(Number(sec) || 0));
@@ -935,54 +878,6 @@ watch(
     else if (radioLibraryPage.value > radioTotalPages.value) radioLibraryPage.value = radioTotalPages.value;
   }
 );
-
-watch(
-  () => biliFavoritesState.radioQueue.length,
-  () => {
-    if (radioQueuePage.value > radioQueueTotalPages.value) radioQueuePage.value = radioQueueTotalPages.value;
-  }
-);
-
-function onRadioQueueDragOver(event: DragEvent): void {
-  isRadioQueueDragOver.value = true;
-  if (event.dataTransfer) event.dataTransfer.dropEffect = "copy";
-}
-
-function onRadioQueueDragLeave(event: DragEvent): void {
-  const current = event.currentTarget as HTMLElement | null;
-  const related = event.relatedTarget as Node | null;
-  if (!current || !related || !current.contains(related)) {
-    isRadioQueueDragOver.value = false;
-  }
-}
-
-function onRadioQueueDrop(event: DragEvent): void {
-  isRadioQueueDragOver.value = false;
-  const dt = event.dataTransfer;
-  if (!dt) return;
-  const raw = dt.getData("application/x-bili-cassette") || dt.getData("application/json");
-  let track: any = null;
-  if (raw) {
-    try { track = JSON.parse(raw); } catch {}
-  }
-  if (!track?.bvid) {
-    const text = dt.getData("text/plain") || dt.getData("text/uri-list") || "";
-    const match = text.match(/BV[0-9a-zA-Z]+/);
-    if (match) {
-      const fromLib = biliFavoritesState.radioVideos.find(v => v.bvid === match[0]);
-      track = fromLib ? { ...fromLib } : { bvid: match[0], title: match[0] };
-    }
-  }
-  if (track?.bvid) {
-    dispatch("radio-add", {
-      bvid: track.bvid,
-      title: track.title,
-      cover: track.cover,
-      author: track.author,
-      duration: track.duration,
-    });
-  }
-}
 </script>
 
 <template>
@@ -1524,7 +1419,7 @@ function onRadioQueueDrop(event: DragEvent): void {
                       <span>{{ radioTapeState.playing ? '正在播' : '已暂停' }} · {{ radioTapeState.title }}</span>
                     </span>
                   </div>
-                  <p>从左侧挑选收藏夹曲目，点击或拖拽装填进随身听连播队列，支持系列编排与跨刷新不断声</p>
+                  <p>直接选择左侧 B 站收藏夹与视频播放音频，支持封面舞台上下曲切换与跨刷新不断声</p>
                 </div>
               </div>
               <div class="fo-bili-actions">
@@ -1535,7 +1430,17 @@ function onRadioQueueDrop(event: DragEvent): void {
               <aside class="bili-radio-folders">
                 <p class="sw-title">收藏夹</p>
                 <div id="bili-radio-folders">
-                  <button v-for="folder in biliFavoritesState.radioFolders" :key="folder.id" type="button" class="bili-radio-folder" :class="{ on: folder.id === biliFavoritesState.radioActiveFolderId }" @click="dispatch('radio-select-folder', folder.id)"><span>{{ folder.title }}</span><span>{{ folder.count }}</span></button>
+                  <button
+                    v-for="folder in biliFavoritesState.radioFolders"
+                    :key="folder.id"
+                    type="button"
+                    class="bili-radio-folder"
+                    :class="{ on: activeRadioSourceMode === 'folder' && folder.id === biliFavoritesState.radioActiveFolderId }"
+                    @click="selectRadioFolder(folder.id)"
+                  >
+                    <span>{{ folder.title }}</span>
+                    <span>{{ folder.count }}</span>
+                  </button>
                   <p v-if="!biliFavoritesState.radioFolders.length" class="muted small">{{ biliFavoritesState.radioLoading ? '加载中…' : '暂无收藏夹' }}</p>
                 </div>
               </aside>
@@ -1554,11 +1459,9 @@ function onRadioQueueDrop(event: DragEvent): void {
                     v-for="video in pagedRadioVideos"
                     :key="video.bvid"
                     class="fo-bili-card bili-radio-card"
-                    :class="{ 'in-queue': radioQueueBvidSet.has(video.bvid) }"
-                    :title="`${video.title} (点击或拖入右侧队列，点击 ♥ 喜欢)`"
-                    draggable="true"
-                    @dragstart="onRadioVideoDragStart($event, video)"
-                    @click="dispatch('radio-add', { bvid: video.bvid, title: video.title, cover: video.cover, author: video.author, duration: video.duration })"
+                    :class="{ 'is-playing': featuredRadioTrack?.bvid === video.bvid && isFeaturedTrackCurrent }"
+                    :title="`${video.title} (点击直接播放，点击 ♥ 喜欢)`"
+                    @click="playFolderTrack(video)"
                   >
                     <div class="fo-bili-thumb">
                       <img v-if="video.cover" :src="video.cover" alt="" loading="lazy" referrerpolicy="no-referrer" />
@@ -1581,8 +1484,8 @@ function onRadioQueueDrop(event: DragEvent): void {
                       </div>
                       <div class="fo-bili-meta">
                         <span>{{ video.author || 'Bilibili' }}</span>
-                        <span v-if="radioQueueBvidSet.has(video.bvid)" class="bili-radio-in-queue-tag">✓ 已入队</span>
-                        <span v-else class="bili-radio-hint-add">+ 入队</span>
+                        <span v-if="featuredRadioTrack?.bvid === video.bvid && isFeaturedTrackCurrent" class="bili-radio-in-queue-tag">♪ 播放中</span>
+                        <span v-else class="bili-radio-hint-add">▶ 播放</span>
                       </div>
                     </div>
                   </article>
@@ -1594,148 +1497,118 @@ function onRadioQueueDrop(event: DragEvent): void {
                   <button
                     type="button"
                     class="bili-radio-liked-pill"
-                    title="一键载入「我喜欢的电台」到当前连播队列"
-                    @click="biliRadioController.openLikedSeries()"
+                    :class="{ active: activeRadioSourceMode === 'liked' }"
+                    title="播放「我喜欢的电台」中收藏的视频"
+                    @click="openLikedRadioCollection"
                   >
                     <span class="heart">♥</span>
                     <span>我喜欢的电台</span>
                     <small>{{ likedRadioCount }}</small>
                   </button>
-                  <input
-                    id="bili-radio-name"
-                    v-model="biliFavoritesState.radioSeriesName"
-                    maxlength="48"
-                    :class="{ 'has-error': isSeriesNameError }"
-                    :placeholder="isSeriesNameError ? '⚠️ 请输入歌单名称' : '歌单名称（可选）'"
-                    autocomplete="off"
-                    @input="isSeriesNameError = false"
-                    @keydown="onImeEnter($event, handleSaveSeries)"
-                  />
-                  <div class="bili-radio-btn-group">
-                    <button
-                      id="bili-radio-save"
-                      type="button"
-                      title="保存当前队列"
-                      @click="handleSaveSeries"
-                    >
-                      💾 保存
-                    </button>
-                    <button
-                      v-if="activeRadioSeries"
-                      type="button"
-                      class="bili-radio-del-btn"
-                      :class="{ confirming: pendingDeleteSeriesId === activeRadioSeries.id }"
-                      :title="pendingDeleteSeriesId === activeRadioSeries.id ? '再次点击确认删除当前歌单' : `删除歌单「${activeRadioSeries.name}」`"
-                      @click="handleDeleteSeriesClick(activeRadioSeries.id)"
-                    >
-                      {{ pendingDeleteSeriesId === activeRadioSeries.id ? '确认删除?' : '🗑️' }}
-                    </button>
-                    <ChatShareMenu
-                      id="bili-radio-share"
-                      compact
-                      label="🚀 分享"
-                      :visible="true"
-                      @select="handleShareSeriesToRoom"
+                  <span class="bili-radio-folder-chip" :title="activeRadioSourceLabel">
+                    📂 {{ activeRadioSourceLabel }}（{{ radioCoverTrackList.length }}）
+                  </span>
+                </div>
+                <div class="bili-radio-cover-stage" aria-label="电台封面播放器">
+                  <template v-if="featuredRadioTrack">
+                    <div
+                      v-if="featuredRadioTrack.cover"
+                      class="bili-radio-stage-backdrop"
+                      :style="{ backgroundImage: `url('${featuredRadioTrack.cover}')` }"
                     />
-                  </div>
-                  <div ref="seriesMenuWrapEl" class="bili-radio-series-dropdown-wrap">
-                    <button
-                      type="button"
-                      class="bili-radio-series-trigger"
-                      :aria-expanded="seriesMenuOpen"
-                      title="切换或删除已保存的歌单"
-                      @click="seriesMenuOpen = !seriesMenuOpen"
-                    >
-                      <span>{{ biliFavoritesState.radioSeries.length ? `📚 歌单 (${biliFavoritesState.radioSeries.length})` : '📚 暂无歌单' }}</span>
-                      <span class="caret">▾</span>
-                    </button>
-                    <div v-if="seriesMenuOpen" class="bili-radio-series-popover" role="menu">
-                      <button type="button" class="bili-radio-series-new" @click="handleStartNewSeries">
-                        ＋ 新建空白歌单
+                    <div class="bili-radio-stage-body">
+                      <button
+                        type="button"
+                        class="bili-radio-stage-cover-btn"
+                        :class="{ playing: isFeaturedTrackPlaying }"
+                        :title="isFeaturedTrackPlaying ? '暂停播放' : '点击播放当前封面曲目'"
+                        @click="togglePlayFeaturedRadioTrack"
+                      >
+                        <img
+                          v-if="featuredRadioTrack.cover"
+                          :src="featuredRadioTrack.cover"
+                          :alt="featuredRadioTrack.title"
+                          referrerpolicy="no-referrer"
+                        />
+                        <span v-else class="bili-radio-cover-ph bili-radio-stage-ph">📻</span>
+                        <span class="bili-radio-stage-cover-overlay">
+                          <span class="bili-radio-stage-play-pill">
+                            {{ isFeaturedTrackCurrent && radioTapeState.loading ? '读取音轨…' : isFeaturedTrackPlaying ? '⏸ 暂停' : '▶ 播放' }}
+                          </span>
+                        </span>
+                        <span v-if="isFeaturedTrackPlaying" class="bili-radio-stage-live-badge">♪ 播放中</span>
+                        <span v-else-if="formatRadioDuration(featuredRadioTrack.duration)" class="fo-bili-duration">{{ formatRadioDuration(featuredRadioTrack.duration) }}</span>
                       </button>
-                      <div v-if="biliFavoritesState.radioSeries.length" class="bili-radio-series-list">
-                        <div
-                          v-for="series in biliFavoritesState.radioSeries"
-                          :key="series.id"
-                          class="bili-radio-series-item"
-                          :class="{ active: activeRadioSeries?.id === series.id }"
-                        >
-                          <button
-                            type="button"
-                            class="bili-radio-series-pick"
-                            @click="handleSelectSeries(series.id)"
-                          >
-                            <span class="name">{{ series.name }}</span>
-                            <small>{{ series.count }}首</small>
-                          </button>
-                          <button
-                            type="button"
-                            class="bili-radio-series-del"
-                            :class="{ confirming: pendingDeleteSeriesId === series.id }"
-                            :title="pendingDeleteSeriesId === series.id ? '再次点击确认删除' : `删除歌单「${series.name}」`"
-                            @click.stop="handleDeleteSeriesClick(series.id)"
-                          >
-                            {{ pendingDeleteSeriesId === series.id ? '确认?' : '🗑️' }}
-                          </button>
+
+                      <div class="bili-radio-stage-meta">
+                        <h4 class="bili-radio-stage-title" :title="featuredRadioTrack.title">{{ featuredRadioTrack.title }}</h4>
+                        <div class="bili-radio-stage-sub">
+                          <span>{{ featuredRadioTrack.author || 'Bilibili' }}</span>
+                          <span class="dot">·</span>
+                          <span>{{ activeRadioSourceLabel }}</span>
+                          <span v-if="featuredTrackPositionText" class="count-pill">{{ featuredTrackPositionText }}</span>
+                        </div>
+                        <div v-if="isFeaturedTrackCurrent" class="bili-radio-stage-progress">
+                          <div class="bili-radio-stage-bar">
+                            <span :style="{ width: `${radioTapeState.progressPercent || 0}%` }" />
+                          </div>
+                          <div class="bili-radio-stage-time">
+                            <span>{{ radioTapeState.formattedCurrent }}</span>
+                            <span>{{ radioTapeState.formattedDuration }}</span>
+                          </div>
                         </div>
                       </div>
-                      <p v-else class="muted small bili-radio-series-empty">还没有保存过歌单</p>
-                    </div>
-                  </div>
-                  <div v-if="radioQueueTotalPages > 1" class="bili-radio-lib-pager">
-                    <button type="button" :disabled="radioQueuePage <= 1" aria-label="队列上一页" @click="radioQueuePage--">‹</button>
-                    <span>{{ radioQueuePage }} / {{ radioQueueTotalPages }}</span>
-                    <button type="button" :disabled="radioQueuePage >= radioQueueTotalPages" aria-label="队列下一页" @click="radioQueuePage++">›</button>
-                  </div>
-                </div>
-                <div
-                  id="bili-radio-queue"
-                  class="bili-radio-queue two-col bili-radio-card-grid"
-                  :class="{ over: isRadioQueueDragOver }"
-                  aria-label="电台播放队列"
-                  @dragover.prevent="onRadioQueueDragOver"
-                  @dragleave="onRadioQueueDragLeave"
-                  @drop.prevent="onRadioQueueDrop"
-                >
-                  <article
-                    v-for="{ item, index } in pagedRadioQueue"
-                    :key="`${item.bvid}-${index}`"
-                    class="fo-bili-card bili-radio-card bili-radio-queue-card"
-                    :class="{ 'is-playing': radioTapeState.active && radioTapeState.trackIndex === index + 1 }"
-                    title="点击立即从该曲目开始播放"
-                    @click="dispatch('radio-play-index', index)"
-                  >
-                    <div class="fo-bili-thumb">
-                      <img v-if="item.cover" :src="item.cover" alt="" loading="lazy" referrerpolicy="no-referrer" />
-                      <span v-else class="bili-radio-cover-ph"></span>
-                      <span class="bili-radio-queue-badge">{{ radioTapeState.active && radioTapeState.trackIndex === index + 1 ? '♪ 播放中' : `#${index + 1}` }}</span>
-                      <button type="button" class="bili-radio-card-remove" :aria-label="`移除 ${item.title}`" title="从队列移除" @click.stop="dispatch('radio-remove', { index })">×</button>
-                      <span v-if="formatRadioDuration(item.duration)" class="fo-bili-duration">{{ formatRadioDuration(item.duration) }}</span>
-                    </div>
-                    <div class="bili-radio-card-body">
-                      <div class="fo-bili-title-row">
-                        <span class="fo-title-link fo-bili-title">{{ item.title }}</span>
+
+                      <div class="bili-radio-stage-controls" role="group" aria-label="封面播放器控制">
                         <button
                           type="button"
-                          class="fo-card-more bili-radio-like-btn"
-                          :class="{ liked: biliRadioController.isLiked(item.bvid) }"
-                          :title="biliRadioController.isLiked(item.bvid) ? '取消喜欢' : '添加到我喜欢的电台'"
-                          @click.stop="void biliRadioController.toggleLike(item)"
+                          class="bili-radio-ctrl-btn"
+                          :disabled="radioCoverTrackList.length <= 1"
+                          title="文件夹上一首"
+                          aria-label="文件夹上一首"
+                          @click="stepRadioFolderTrack(-1)"
                         >
-                          {{ biliRadioController.isLiked(item.bvid) ? '♥' : '♡' }}
+                          ⏮
+                        </button>
+                        <button
+                          type="button"
+                          class="bili-radio-ctrl-btn primary"
+                          :title="isFeaturedTrackPlaying ? '暂停' : '播放'"
+                          :aria-label="isFeaturedTrackPlaying ? '暂停' : '播放'"
+                          @click="togglePlayFeaturedRadioTrack"
+                        >
+                          {{ isFeaturedTrackPlaying ? '⏸' : '▶' }}
+                        </button>
+                        <button
+                          type="button"
+                          class="bili-radio-ctrl-btn"
+                          :disabled="radioCoverTrackList.length <= 1"
+                          title="文件夹下一首"
+                          aria-label="文件夹下一首"
+                          @click="stepRadioFolderTrack(1)"
+                        >
+                          ⏭
+                        </button>
+                        <button
+                          type="button"
+                          class="bili-radio-ctrl-btn like"
+                          :class="{ liked: biliRadioController.isLiked(featuredRadioTrack.bvid) }"
+                          :title="biliRadioController.isLiked(featuredRadioTrack.bvid) ? '取消喜欢' : '添加到我喜欢的电台'"
+                          :aria-label="biliRadioController.isLiked(featuredRadioTrack.bvid) ? '取消喜欢' : '喜欢'"
+                          @click="void biliRadioController.toggleLike(featuredRadioTrack)"
+                        >
+                          {{ biliRadioController.isLiked(featuredRadioTrack.bvid) ? '♥' : '♡' }}
                         </button>
                       </div>
-                      <div class="fo-bili-meta">
-                        <span>{{ item.author || 'Bilibili' }}</span>
-                      </div>
                     </div>
-                  </article>
-                  <p v-if="!biliFavoritesState.radioQueue.length" class="muted small bili-radio-queue-empty">点击或直接从左侧拖入视频到此处，即可连播。</p>
+                  </template>
+                  <p v-else class="muted small bili-radio-queue-empty">
+                    {{ biliFavoritesState.radioLoading ? '正在读取收藏夹封面…' : '选择左侧 B 站收藏夹，即可显示封面并直接连播。' }}
+                  </p>
                 </div>
                 <div class="bili-radio-actions">
-                  <button id="bili-radio-play" type="button" :disabled="!biliFavoritesState.radioQueue.length" @click="dispatch('radio-play')">▶ 按顺序播放</button>
-                  <button id="bili-radio-shuffle" type="button" :disabled="!biliFavoritesState.radioQueue.length" @click="dispatch('radio-shuffle')">🔀 随机播放</button>
-                  <button id="bili-radio-clear" type="button" @click="radioQueuePage = 1; dispatch('radio-clear')">清空编辑区</button>
+                  <button id="bili-radio-play" type="button" :disabled="!radioCoverTrackList.length" @click="handleRadioPlayAction(false)">▶ 顺序播放</button>
+                  <button id="bili-radio-shuffle" type="button" :disabled="!radioCoverTrackList.length" @click="handleRadioPlayAction(true)">🔀 随机播放</button>
                 </div>
               </section>
             </div>
@@ -1760,12 +1633,6 @@ function onRadioQueueDrop(event: DragEvent): void {
       @click.stop
     >
       <div class="fo-context-header" :title="contextMenu.video.title">{{ contextMenu.video.title }}</div>
-      <ChatShareMenu
-        label="💬 发送到聊天室"
-        match-menu-item
-        :visible="contextMenu.visible"
-        @select="handleShareVideoToRoom"
-      />
       <div class="fo-context-divider"></div>
       <button type="button" class="fo-context-item" @click="runContextMenuAction('play')">
         <span class="fo-context-icon">▶</span> 小窗播放视频

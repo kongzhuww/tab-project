@@ -231,13 +231,22 @@ test('backpack restore updates revision and writes both categories atomically', 
   assert.equal(local.logicweaver_prompt_backpack_revision_v1,5); assert.equal(local.logicweaver_saved_articles_revision_v1,7);
 }));
 
-test('upload does not replace cloud backpack with an empty local list', async () => {
+test('upload does not replace cloud backpack with an empty local list unless explicitly confirmed', async () => {
   reset(); await webdavVault.remember('independent-password',true);
   const cloud = {formatVersion:2,credentialsIncluded:true,settings:{showWeather:true,logicweaver_saved_articles_v1:[{id:'cloud',title:'Cloud'}]}};
   const url='https://dav.example.test/folder/backup.json'; const body=JSON.stringify(await encryptBackup(cloud,'independent-password'));
   files.set(url,{body,etag:'"cloud"'}); local.logicweaver_saved_articles_v1=[];
-  const result=await webDavService.pushCurrentConfig(config); assert.equal(result.ok,false); assert.match(result.error,/缺少云端已有的背包内容/);
+  const blocked=await webDavService.pushCurrentConfig(config);
+  assert.equal(blocked.ok,false);
+  assert.equal(blocked.missingCloudBackpack,true);
+  assert.deepEqual(blocked.backpackDiff,{localPrompts:0,cloudPrompts:0,localArticles:0,cloudArticles:1});
+  assert.match(blocked.error,/缺少云端已有的背包内容/);
   assert.equal(files.get(url).body,body); assert.equal(requests.filter(r=>r.method==='PUT').length,0);
+
+  const forced=await webDavService.pushCurrentConfig(config,{allowBackpackOverwrite:true});
+  assert.equal(forced.ok,true,forced.error);
+  const updated=await decryptBackup(JSON.parse(files.get(url).body),'independent-password');
+  assert.deepEqual(updated.settings.logicweaver_saved_articles_v1,[]);
 });
 
 test('explicitly empty quick links are not resurrected from a stale local mirror', async () => {
@@ -334,4 +343,14 @@ test('restore keeps existing local accounts and Multica connection', async () =>
   const result = await webDavService.pullCurrentConfig(config,{merge:true});
   assert.equal(result.ok,true,result.error); assert.equal(result.credentialResult,'kept');
   assert.equal(local.ghUser,'bob'); assert.equal(local.ghToken,'bob-secret'); assert.equal(local.todoistToken,'local-todo'); assert.equal(local.multicaCredentialV1.token,'local-multica');
+});
+
+test('multi-megabyte encrypted backup roundtrips without RegExp stack overflow', async () => {
+  reset(); await webdavVault.remember('independent-password',true);
+  local.quickLinks = Array.from({length: 25000}, (_, i) => ({id:`site-${i}`,url:`https://example.com/${i}`,title:`Site ${i}`}));
+  const pushed = await webDavService.pushCurrentConfig(config);
+  assert.equal(pushed.ok,true,pushed.error);
+  const pulled = await webDavService.download(config);
+  assert.equal(pulled.ok,true,pulled.error);
+  assert.equal(pulled.data.settings.quickLinks.length,25000);
 });

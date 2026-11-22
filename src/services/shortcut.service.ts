@@ -8,6 +8,7 @@ import { bookmarkPanelController } from "../bookmarks/panel-store";
 import { settingsController } from "../settings/store";
 import { navWheelRuntime } from "../nav-wheel/runtime";
 import { fullscreenCardsController } from "../core/fullscreen-cards.store";
+import { readExtensionStorage } from "../core/storage-repo";
 
 import { getDockModule } from "../modules/registry";
 import { DEFAULT_TOOL_SHORTCUTS, isShortcutToolAvailable, parseShortcutEvent, shortcutCaptureState } from "./shortcut-catalog";
@@ -46,7 +47,7 @@ export class ShortcutService {
     }
     // Public legacy API stays available, without adding the settings domain to startup imports.
     const { optionsService, SHORTCUT_STORAGE_KEY } = await import("./options.service");
-    const stored = await chrome.storage.local.get(SHORTCUT_STORAGE_KEY);
+    const stored = await readExtensionStorage(SHORTCUT_STORAGE_KEY);
     const baseline = stored[SHORTCUT_STORAGE_KEY];
     const desired = { ...(baseline || {}), [toolId]: shortcut };
     const version = this.shortcutReadVersion;
@@ -80,7 +81,7 @@ export class ShortcutService {
         this.storageListenerBound = true;
       }
       const version = ++this.shortcutReadVersion;
-      const stored = await chrome.storage.local.get("customShortcuts");
+      const stored = await readExtensionStorage("customShortcuts");
       if (version === this.shortcutReadVersion) this.applyShortcutOverrides(stored?.customShortcuts);
     } catch {
       // Preserve current runtime dispatch when a read fails; never persist fallback defaults.

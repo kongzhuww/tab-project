@@ -5,7 +5,25 @@ import { notificationController } from "../notifications/store";
 
 const SERIES_KEY = "biliRadioSeriesV1";
 const SERIES_BACKUP_KEY = "lw_backup_bili_radio_series";
+const RADIO_ACTIVE_FOLDER_KEY = "bili_radio_active_folder_id";
 const DEFAULT_SERIES_ID = "default-series";
+
+function readSavedRadioFolderId(): number {
+  try {
+    if (typeof localStorage === "undefined") return 0;
+    const raw = Number(localStorage.getItem(RADIO_ACTIVE_FOLDER_KEY) || 0);
+    return Number.isFinite(raw) && raw > 0 ? raw : 0;
+  } catch {
+    return 0;
+  }
+}
+
+function saveRadioFolderId(id: number): void {
+  try {
+    if (typeof localStorage === "undefined" || !id) return;
+    localStorage.setItem(RADIO_ACTIVE_FOLDER_KEY, String(id));
+  } catch {}
+}
 export const LIKED_SERIES_ID = "liked-radio-series";
 export const LIKED_SERIES_NAME = "我喜欢的电台";
 type RadioTrack = (typeof biliFavoritesState.radioQueue)[number];
@@ -135,7 +153,9 @@ export const biliRadioController = {
 
   async init(): Promise<void> {
     await this.ensureSeriesLoaded();
-    await this.refresh();
+    if (!biliFavoritesState.radioFolders.length || !biliFavoritesState.radioVideos.length) {
+      await this.refresh();
+    }
   },
 
   /** CLI repair is storage-only: no login, seed injection or inferred remote folder. */
@@ -165,8 +185,11 @@ export const biliRadioController = {
       biliFavoritesState.radioFolders = folders.map((folder) => ({
         id: Number(folder.id), title: folder.title || "收藏夹", count: Number(folder.media_count || 0)
       }));
-      const first = biliFavoritesState.radioFolders[0];
-      if (first) await this.selectFolder(first.id);
+      const preferredId = Number(biliFavoritesState.radioActiveFolderId || 0) || readSavedRadioFolderId();
+      const target = (preferredId
+        ? biliFavoritesState.radioFolders.find((f) => Number(f.id) === preferredId)
+        : undefined) || biliFavoritesState.radioFolders[0];
+      if (target) await this.selectFolder(target.id);
       else {
         biliFavoritesState.radioActiveFolderId = 0;
         biliFavoritesState.radioVideos = [];
@@ -216,6 +239,7 @@ export const biliRadioController = {
 
     const currentRequest = ++requestId;
     biliFavoritesState.radioActiveFolderId = targetId;
+    saveRadioFolderId(targetId);
     biliFavoritesState.radioLoading = true;
     biliFavoritesState.radioError = "";
     try {

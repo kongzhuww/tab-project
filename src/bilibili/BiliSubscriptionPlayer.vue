@@ -5,17 +5,12 @@ import { biliFavoritesController, biliFavoritesState } from "./bili-favorites-st
 import { bilibiliService } from "../services/bilibili.service";
 import { attachBiliPlaybackSync, detachBiliPlaybackSync } from "./playback-sync";
 import BiliRichText from "./BiliRichText.vue";
+import { extractBiliCommentEmotes, extractBiliCommentMentions } from "./rich-text";
 import { subscriptionSubtitleFollow } from "./subtitle-follow";
 import BiliSubscriptionDanmaku from "./BiliSubscriptionDanmaku.vue";
 import { parseCommentEmotePackages, type CommentEmotePackage } from "./comment-emotes";
 import { imageViewerController } from "../viewers/image-viewer-store";
 import BiliSubscriptionTranscript from "./BiliSubscriptionTranscript.vue";
-
-interface CommentToken {
-  type: "text" | "emote";
-  text: string;
-  url?: string;
-}
 
 interface CommentEntry {
   id: string | number;
@@ -23,12 +18,19 @@ interface CommentEntry {
   avatar: string;
   level: number;
   message: string;
-  tokens: CommentToken[];
+  emotes?: Record<string, string>;
+  mentions?: Record<string, string>;
   timeStr: string;
   likeCount: number;
   replyCount: number;
   pictures: string[];
-  replies: Array<{ id: string | number; userName: string; message: string }>;
+  replies: Array<{
+    id: string | number;
+    userName: string;
+    message: string;
+    emotes?: Record<string, string>;
+    mentions?: Record<string, string>;
+  }>;
   subRepliesExpanded?: boolean;
   subRepliesLoading?: boolean;
   subRepliesHasMore?: boolean;
@@ -116,35 +118,6 @@ function openLightbox(sources: string[], index: number) {
   if (src) imageViewerController.open(src, current.value?.title ? `${current.value.title} · 评论图片` : "评论图片");
 }
 
-// 文本分词（将 [doge] 等表情转换为 token）
-function parseCommentTokens(message: string, emoteMap: Map<string, string>): CommentToken[] {
-  if (!message) return [];
-  if (!emoteMap || emoteMap.size === 0) {
-    return [{ type: "text", text: message }];
-  }
-  const regex = /\[([^\]]+)\]/g;
-  const tokens: CommentToken[] = [];
-  let lastIndex = 0;
-  let match: RegExpExecArray | null;
-  while ((match = regex.exec(message)) !== null) {
-    if (match.index > lastIndex) {
-      tokens.push({ type: "text", text: message.slice(lastIndex, match.index) });
-    }
-    const tokenStr = match[0];
-    const emoteUrl = emoteMap.get(tokenStr);
-    if (emoteUrl) {
-      tokens.push({ type: "emote", text: tokenStr, url: emoteUrl });
-    } else {
-      tokens.push({ type: "text", text: tokenStr });
-    }
-    lastIndex = regex.lastIndex;
-  }
-  if (lastIndex < message.length) {
-    tokens.push({ type: "text", text: message.slice(lastIndex) });
-  }
-  return tokens;
-}
-
 // 格式化评论时间
 function formatCommentTime(ctime: number): string {
   if (!ctime) return "";
@@ -196,12 +169,8 @@ async function fetchComments(append = false) {
 
     const repliesList = Array.isArray(data.replies) ? data.replies : [];
     const entries: CommentEntry[] = repliesList.map((r: any) => {
-      const emoteMap = new Map<string, string>();
-      if (r.content?.emote) {
-        Object.entries(r.content.emote).forEach(([k, v]: [string, any]) => {
-          if (v?.url) emoteMap.set(k, String(v.url).replace(/^http:/, "https:"));
-        });
-      }
+      const emotes = extractBiliCommentEmotes(r.content);
+      const mentions = extractBiliCommentMentions(r.content);
       const message = String(r.content?.message || "");
       const pictures: string[] = Array.isArray(r.content?.pictures)
         ? r.content.pictures.map((p: any) => String(p?.img_src || p).replace(/^http:/, "https:")).filter(Boolean)
@@ -210,7 +179,9 @@ async function fetchComments(append = false) {
         ? r.replies.map((sub: any) => ({
             id: sub.rpid || Math.random(),
             userName: sub.member?.uname || "B站用户",
-            message: String(sub.content?.message || "")
+            message: String(sub.content?.message || ""),
+            emotes: extractBiliCommentEmotes(sub.content),
+            mentions: extractBiliCommentMentions(sub.content)
           }))
         : [];
 
@@ -220,7 +191,8 @@ async function fetchComments(append = false) {
         avatar: String(r.member?.avatar || "").replace(/^http:/, "https:"),
         level: Number(r.member?.level_info?.current_level || 0),
         message,
-        tokens: parseCommentTokens(message, emoteMap),
+        emotes,
+        mentions,
         timeStr: formatCommentTime(r.ctime),
         likeCount: Number(r.like || 0),
         replyCount: Number(r.rcount || 0),
@@ -261,7 +233,9 @@ async function expandSubReplies(rootRpid: string | number) {
     const newReplies = (res.replies || []).map(r => ({
       id: String(r.rpid),
       userName: r.uname,
-      message: r.message
+      message: r.message,
+      emotes: r.emotes,
+      mentions: r.mentions
     }));
 
     const existingIds = new Set((comment.replies || []).map(r => String(r.id)));
@@ -686,7 +660,7 @@ onUnmounted(() => {
                   <span class="bili-comment-time">{{ c.timeStr }}</span>
                 </div>
                 <div class="bili-comment-text">
-                  <BiliRichText :text="c.message" />
+                  <BiliRichText :text="c.message" :emotes="c.emotes" :mentions="c.mentions" />
                 </div>
                 <div v-if="c.pictures?.length" class="bili-comment-pictures">
                   <a v-for="(pic, pIdx) in c.pictures" :key="pIdx" class="bili-comment-pic-link" :href="pic" @click.stop.prevent="openLightbox(c.pictures, pIdx)">
@@ -700,7 +674,7 @@ onUnmounted(() => {
                 <div v-if="c.replies?.length" class="bili-comment-sub-list">
                   <div v-for="sub in c.replies" :key="sub.id" class="bili-comment-sub-item">
                     <span class="bili-comment-sub-uname">{{ sub.userName }}:</span>
-                    <BiliRichText :text="sub.message" />
+                    <BiliRichText :text="sub.message" :emotes="sub.emotes" :mentions="sub.mentions" />
                   </div>
                   <div class="bili-comment-sub-more">
                     <template v-if="!c.subRepliesExpanded && (c.replyCount || 0) > c.replies.length">

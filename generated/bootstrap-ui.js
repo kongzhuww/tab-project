@@ -1,17 +1,12 @@
-const e = chrome.runtime.getURL("newtab.html"), n = chrome.runtime.getURL("newtab-search.html");
-let a = !1;
-function t(r) {
-  a || (a = !0, location.replace(r));
+import { s as o } from "./chunks/runtime-protocol-C_r09aKr.js";
+const t = chrome.runtime.getURL("newtab.html"), c = chrome.runtime.getURL("newtab-search.html");
+let r = !1;
+function a(e) {
+  r || (r = !0, location.replace(e));
 }
-const c = setTimeout(() => t(e), 5e3);
-try {
-  chrome.runtime.sendMessage({ type: "routeNewTab" }, (r) => {
-    if (clearTimeout(c), chrome.runtime.lastError) {
-      t(e);
-      return;
-    }
-    t(r?.action === "open-search" ? n : e);
-  });
-} catch {
-  clearTimeout(c), t(e);
-}
+const n = setTimeout(() => a(t), 5e3);
+o({ type: "routeNewTab" }).then((e) => {
+  clearTimeout(n), a(e?.action === "open-search" ? c : t);
+}).catch(() => {
+  clearTimeout(n), a(t);
+});

@@ -6,12 +6,27 @@ import { encryptBackup, decryptBackup, isEncryptedBackup } from './webdav-crypto
 import { webdavVault } from './webdav-vault';
 import { credentialForEncryptedBackup, restoreEncryptedCredential, validMulticaCredential } from './webdav-legacy-credential';
 import { currentSnapshot, hasPotentialDataLoss, snapshotFingerprint, writeBaseline } from './webdav-baseline';
+import { SYNC_CONNECTION_GROUPS } from './sync-schema';
 
 export interface WebDavConfig {
   url: string;
   username: string;
   password: string;
   filename?: string;
+}
+
+export interface WebDavBackpackDiff {
+  localPrompts: number;
+  cloudPrompts: number;
+  localArticles: number;
+  cloudArticles: number;
+}
+
+export function formatBackpackOverwritePrompt(diff?: WebDavBackpackDiff): string {
+  const counts = diff
+    ? `\n（云端：提示词 ${diff.cloudPrompts} 条、文章 ${diff.cloudArticles} 篇；本机：提示词 ${diff.localPrompts} 条、文章 ${diff.localArticles} 篇）`
+    : "";
+  return `检测到云端备份中有本机缺少或已被修改的背包内容。${counts}\n\n• 若你是刚重装/换机想找回云端数据，请点「取消」，再通过「用云端覆盖本地」或导出备份。\n• 若你确认本机当前内容才是最新（含在本机编辑或删除的条目），点击「确定」将以本机状态上传覆盖云端。`;
 }
 
 export interface WebDavOperationResult {
@@ -22,6 +37,8 @@ export interface WebDavOperationResult {
   clientDevice?: string;
   error?: string;
   errorKind?: "policy" | "operation";
+  missingCloudBackpack?: boolean;
+  backpackDiff?: WebDavBackpackDiff;
   credentialResult?: 'restored' | 'kept';
   etag?: string;
   fileUrl?: string;
@@ -29,9 +46,8 @@ export interface WebDavOperationResult {
 }
 
 interface WebDavDownloadResult { ok: boolean; data?: any; error?: string; notFound?: boolean; encrypted?: boolean; fileUrl?: string; etag?: string | null }
-const CONNECTION_GROUPS = [['ghUser','ghToken'], ['todoistToken','todoistActiveProjectIdV1'], ['lw_private_chat_v1'], ['googleCalendarSessionTokenV1'], ['lw_webdav_config']];
 function preserveLocalConnections(local: Record<string, any>, merged: Record<string, any>): Record<string, any> {
-  for (const keys of CONNECTION_GROUPS) {
+  for (const keys of SYNC_CONNECTION_GROUPS) {
     if (!keys.some(key => local[key] !== undefined && local[key] !== null && local[key] !== '')) continue;
     for (const key of keys) { if (local[key] !== undefined) merged[key] = local[key]; else delete merged[key]; }
   }
@@ -303,7 +319,7 @@ export class WebDavService {
    * 一键将本机全部配置与常用网站清洗打包并推送到 WebDAV
    * 支持 mergeRemote: true 先拉取云端无损并集合并，再上传推送（双向安全合并上传）
    */
-  public async pushCurrentConfig(config: WebDavConfig, options: { mergeRemote?: boolean; migrateLegacy?: boolean; expectedRemoteEtag?: string; expectedRemoteUrl?: string; expectedLocalHash?: string; beforeAutoWrite?: () => Promise<void> } = {}): Promise<WebDavOperationResult> {
+  public async pushCurrentConfig(config: WebDavConfig, options: { mergeRemote?: boolean; migrateLegacy?: boolean; allowBackpackOverwrite?: boolean; expectedRemoteEtag?: string; expectedRemoteUrl?: string; expectedLocalHash?: string; beforeAutoWrite?: () => Promise<void> } = {}): Promise<WebDavOperationResult> {
     try {
       const passphrase = await webdavVault.get();
       if (!passphrase) return { ok:false, errorKind:'policy', error:'请先在设置 → 同步中设置备份加密口令' };
@@ -323,10 +339,22 @@ export class WebDavService {
       } else if (options.migrateLegacy) return { ok:false, error:'没有找到旧版明文备份，未上传' };
       if (options.migrateLegacy && remote.encrypted) return { ok:false, error:'云端备份已经加密，无需迁移；未上传' };
       let localSettings = await readSyncSettings();
-      if (remote.ok && remote.encrypted) {
+      if (remote.ok && remote.encrypted && !options.allowBackpackOverwrite) {
         const cloudSettings = isRecord(remote.data.settings) ? remote.data.settings : remote.data;
         if (BACKPACK_SYNC_KEYS.some(key => Array.isArray(cloudSettings[key]) && hasPotentialDataLoss(localSettings[key], cloudSettings[key]))) {
-          return { ok:false, errorKind:'policy', error:'本机缺少云端已有的背包内容；未上传，以免覆盖提示词或文章。请先分别导出备份并核对。' };
+          const countList = (obj: Record<string, any>, key: string) => Array.isArray(obj[key]) ? obj[key].length : 0;
+          return {
+            ok: false,
+            errorKind: 'policy',
+            missingCloudBackpack: true,
+            backpackDiff: {
+              localPrompts: countList(localSettings, 'logicweaver_prompt_backpack_v1'),
+              cloudPrompts: countList(cloudSettings, 'logicweaver_prompt_backpack_v1'),
+              localArticles: countList(localSettings, 'logicweaver_saved_articles_v1'),
+              cloudArticles: countList(cloudSettings, 'logicweaver_saved_articles_v1')
+            },
+            error: '本机缺少云端已有的背包内容；未上传，以免覆盖提示词或文章。请先分别导出备份并核对。'
+          };
         }
       }
       if ((options.mergeRemote || options.migrateLegacy) && remote.ok) localSettings = mergeProtectingConnections(localSettings, remote.data.settings || remote.data);

@@ -22,8 +22,7 @@ export const AVAILABLE_SHORTCUT_TOOLS: readonly ShortcutTool[] = [
   { id: "todoist", label: "todoist 任务看板", defaultKey: "Alt+D", group: "components", moduleId: "todoist" },
   { id: "todoist-new-task", label: "todoist 新建任务", defaultKey: "Alt+A", group: "components", moduleId: "todoist" },
   { id: "music", label: "网易云模块", defaultKey: "", group: "components", moduleId: "music" },
-  { id: "chat", label: "海狸聊天室（实验性）", defaultKey: "", group: "components", moduleId: "chat" },
-  { id: "stickers", label: "表情库", defaultKey: "", group: "components", moduleId: "stickers", enabledBy: "chat" }
+  { id: "stickers", label: "表情库", defaultKey: "", group: "components", moduleId: "stickers" }
 ];
 
 export const DEFAULT_TOOL_SHORTCUTS: Record<string, string> = Object.fromEntries(

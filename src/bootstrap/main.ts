@@ -1,3 +1,5 @@
+import { sendRuntimeMessage } from '../core/runtime-protocol';
+
 declare const chrome: any;
 
 const homeUrl = chrome.runtime.getURL('newtab.html');
@@ -12,13 +14,12 @@ function navigate(target: string): void {
 
 // Select the configured new-tab view without closing or reusing other tabs.
 const fallbackTimer = setTimeout(() => navigate(homeUrl), 5000);
-try {
-  chrome.runtime.sendMessage({ type: 'routeNewTab' }, (response: any) => {
+void sendRuntimeMessage({ type: 'routeNewTab' })
+  .then((response) => {
     clearTimeout(fallbackTimer);
-    if (chrome.runtime.lastError) { navigate(homeUrl); return; }
     navigate(response?.action === 'open-search' ? searchUrl : homeUrl);
+  })
+  .catch(() => {
+    clearTimeout(fallbackTimer);
+    navigate(homeUrl);
   });
-} catch {
-  clearTimeout(fallbackTimer);
-  navigate(homeUrl);
-}

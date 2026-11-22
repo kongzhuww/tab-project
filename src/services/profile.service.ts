@@ -4,6 +4,7 @@ import { biliMessagePanelController } from "../bilibili/message-panel-store";
 import { notificationHistoryController } from "../notifications/history-store";
 import { tabManagerController } from "../profile/tab-manager-store";
 import { notificationController } from "../notifications/store";
+import { hasExtensionLocalStorage, readExtensionStorage, writeExtensionStorage } from "../core/storage-repo";
 import { topProfileState, profileMenuState, profileMenuController } from "../profile/store";
 
 export const BILI_PROFILE_CACHE_KEY = "biliProfileCacheV1";
@@ -99,9 +100,7 @@ export class ProfileService {
   public async acknowledgeGitHubUpdate(item: GitHubUpdateItem): Promise<void> {
     if (!item?.repository || !item?.version) return;
     this.githubKnownVersions[item.repository] = item.version;
-    if (typeof chrome !== "undefined" && chrome?.storage?.local) {
-      await chrome.storage.local.set({ [GITHUB_UPDATE_KNOWN_KEY]: this.githubKnownVersions });
-    }
+    await writeExtensionStorage({ [GITHUB_UPDATE_KNOWN_KEY]: this.githubKnownVersions });
     this.notifyGitHubListeners();
   }
 
@@ -137,8 +136,8 @@ export class ProfileService {
       visible[kind] = Math.max(0, current - knownIds.length);
     });
 
-    if (changed && typeof chrome !== "undefined" && chrome?.storage?.local) {
-      chrome.storage.local.set({ [BILI_LOCAL_KNOWN_KEY]: this.locallyKnownIds }).catch(() => {});
+    if (changed) {
+      void writeExtensionStorage({ [BILI_LOCAL_KNOWN_KEY]: this.locallyKnownIds }).catch(() => {});
     }
     return visible;
   }
@@ -154,8 +153,8 @@ export class ProfileService {
       this.locallyKnownIds[kind].push(talkerId);
       updated = true;
     }
-    if (updated && typeof chrome !== "undefined" && chrome?.storage?.local) {
-      chrome.storage.local.set({ [BILI_LOCAL_KNOWN_KEY]: this.locallyKnownIds }).catch(() => {});
+    if (updated) {
+      void writeExtensionStorage({ [BILI_LOCAL_KNOWN_KEY]: this.locallyKnownIds }).catch(() => {});
     }
     this.applyBiliProfile(this.profile, this.unread);
   }
@@ -170,9 +169,7 @@ export class ProfileService {
       for (let i = 0; i < diff; i++) set.add(`__pad_${Date.now()}_${i}`);
     }
     this.locallyKnownIds[kind] = Array.from(set);
-    if (typeof chrome !== "undefined" && chrome?.storage?.local) {
-      chrome.storage.local.set({ [BILI_LOCAL_KNOWN_KEY]: this.locallyKnownIds }).catch(() => {});
-    }
+    void writeExtensionStorage({ [BILI_LOCAL_KNOWN_KEY]: this.locallyKnownIds }).catch(() => {});
     this.applyBiliProfile(this.profile, this.unread);
   }
 
@@ -261,9 +258,7 @@ export class ProfileService {
       };
 
       this.applyBiliProfile(profile, unread);
-      if (typeof chrome !== "undefined" && chrome?.storage?.local) {
-        await chrome.storage.local.set({ [BILI_PROFILE_CACHE_KEY]: { profile, unread, savedAt: Date.now() } });
-      }
+      await writeExtensionStorage({ [BILI_PROFILE_CACHE_KEY]: { profile, unread, savedAt: Date.now() } });
       this.checkAndNotifyBiliInteractions(unread);
     } catch {
       this.applyBiliProfile(null, {});
@@ -284,9 +279,7 @@ export class ProfileService {
 
     if (this.biliToastKnownCounts === null) {
       this.biliToastKnownCounts = { ...current };
-      if (typeof chrome !== "undefined" && chrome?.storage?.local) {
-        chrome.storage.local.set({ [BILI_TOAST_KNOWN_KEY]: this.biliToastKnownCounts }).catch(() => {});
-      }
+      void writeExtensionStorage({ [BILI_TOAST_KNOWN_KEY]: this.biliToastKnownCounts }).catch(() => {});
       return;
     }
 
@@ -297,9 +290,7 @@ export class ProfileService {
     const diffSystem = current.system - Number(this.biliToastKnownCounts.system || 0);
 
     this.biliToastKnownCounts = { ...current };
-    if (typeof chrome !== "undefined" && chrome?.storage?.local) {
-      chrome.storage.local.set({ [BILI_TOAST_KNOWN_KEY]: this.biliToastKnownCounts }).catch(() => {});
-    }
+    void writeExtensionStorage({ [BILI_TOAST_KNOWN_KEY]: this.biliToastKnownCounts }).catch(() => {});
 
     if (diffPrivate > 0) {
       notificationController.show({
@@ -387,8 +378,8 @@ export class ProfileService {
       }
     });
 
-    if (typeof chrome !== "undefined" && chrome?.storage?.local) {
-      chrome.storage.local.get([
+    if (hasExtensionLocalStorage()) {
+      void readExtensionStorage([
         BILI_PROFILE_CACHE_KEY,
         BILI_LOCAL_KNOWN_KEY,
         BILI_MESSAGE_USER_CACHE_KEY,

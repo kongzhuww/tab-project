@@ -13,11 +13,11 @@
 | :--- | :--- | :--- |
 | **新标签页主页 (SPA)** | `newtab.html` → `generated/vue-ui.js`<br>（由 `src/intro/main.ts` / `src/App.vue` 驱动） | 单根 Vue 3 SPA。集成首屏时钟、标语、天气、搜索、常用网站、底栏 Dock、全屏卡片与弹窗。 |
 | **首绘主题引导** | `newtab.html` (内联) / `src/theme/theme-init.ts` | 极速同步执行，首帧确定主题变量（Light / Lonetrail / Dark），彻底杜绝白屏/黑屏闪烁。 |
-| **后台服务 (Service Worker)** | `manifest.json` → `generated/background.js`<br>（源自 `src/background/index.ts`） | MV3 规范后台。负责扩展快捷键监听、侧边栏呼出、B站/YouTube 媒体跨域与防盗链代理、DNR 规则注入、受限下载流管理。 |
+| **后台服务 (Service Worker)** | `manifest.json` → `generated/background.js`<br>（源自 `src/background/index.ts`） | MV3 规范后台。负责扩展快捷键监听、侧边栏呼出、B站媒体跨域与防盗链代理、DNR 规则注入（含网站预览 frame 规则）、受限下载流管理。 |
 | **覆盖式侧边栏 (In-Page Overlay Sidebar)** | 动态注入 / `sidepanel.html` → `generated/sidepanel-ui.js`<br>（源自 `src/sidepanel/SidePanelApp.vue` / `src/sidepanel/in-page-drawer.ts`） | 覆盖式浮层侧边栏（不挤压网页宽度，不使用原生 `sidePanel` API），支持快捷键呼出（建议绑定 Alt+W），提供独立书签、小窗及便签导航。 |
 | **极速搜索独立页** | `newtab-search.html` → `generated/search-ui.js`<br>（源自 `src/search/SearchLauncher.vue`） | 轻量零干扰搜索页，支持多引擎秒切与本地优先联想。 |
-| **全屏卡片独立标签页** | `bilibili.html`、`github.html`、`aihot.html`、`youtube.html` | 均为产品的正式既有入口，由 Vue 构建 bundle 独立装配运行，不强行与主页合并。 |
-| **独立设置页** | `options.html` → `src/settings/SettingsView.vue` | 独立全功能选项页，复用主页设置组件。 |
+| **全屏卡片独立标签页** | `bilibili.html`、`github.html`、`aihot.html` | 均为产品的正式既有入口，由 Vue 构建 bundle 独立装配运行，不强行与主页合并。 |
+| **独立设置页** | `options.html` → `src/settings/SettingsView.vue` | 独立全功能选项页，复用主页设置、WebDAV 同步卡片 (`WebDavSyncCard.vue`) 与版本更新区块 (`SettingsReleaseSection.vue`)。 |
 | **壁纸沙箱** | `wallpaper-sandbox.html` → `src/wallpaper/sandbox.ts` | 隔离沙盒页面。运行纯前端 Wallpaper Engine 运行时（OPFS 私有缓存、Steam 创意工坊加载、128 位对数音频频谱律动与 5 项硬件降温守护）。 |
 | **汉化浮层 (Content Script)** | `src/localizer/main.ts` → `generated/page-localizer-ui.js` | 注入外部网页的 Shadow DOM 单词翻译与编辑浮层。 |
 
@@ -32,7 +32,7 @@
 | **天气** | `src/weather/WeatherWidget.vue` | 首屏气温与城市天气预报卡片。 |
 | **播放器** | `src/music/HomeMusicCard.vue` | 首屏 3D 旋转唱片与歌词卡片，随音乐/电台播放联动。 |
 | **搜索栏** | `src/search/SearchBox.vue`<br>`src/services/search.service.ts` | 聚合搜索：普通关键词统一匹配历史、常用网站与书签（按精准度去重排序）；支持 `/bm` 与 `/sites` 范围限定；支持 GitHub、B站、网易云、企查查多模式。 |
-| **常用网站** | `src/launchers/FavoriteSites.vue`<br>`src/launcher/LauncherMenus.vue` | 常用网站磁贴、大文件夹（2x2）与分组管理，支持内联非模态标题与 URL 实时修改。 |
+| **常用网站** | `src/launchers/FavoriteSites.vue`<br>`src/launcher/LauncherMenus.vue`<br>`src/launcher/WebSitePreviewModal.vue` | 常用网站磁贴、大文件夹（2x2）与分组管理，支持内联非模态标题与 URL 实时修改，及右键可拖拽/缩放网站实时预览小窗。 |
 
 ---
 
@@ -46,7 +46,6 @@
 | **b站插件** | `src/bilibili/BilibiliWorkspace.vue` | B站双栏收藏夹整理、AI 字幕提取、刹那观察室订阅视频、小窗播放与电台系列管理。电台优先抓取 DASH 纯音频流（M4A，~3MB），防盗链与 8 秒卡顿自动切备用 CDN 源。 |
 | **github插件** | `src/github/GitHubWorkspaceCard.vue`<br>`src/github/GitHubMyRepos.vue` | GitHub 工作区：Star 仓库深度检索、资源专区、开阔式 Markdown README 阅读与一键创建关联待办；**「我的仓库」** Todoist 风格看板（默认板块与 Topic 多列聚合、就地拖拽归类、重命名与远端 GitHub Topics 实时同步）。 |
 | **ai hot插件** | `src/aihot/AihotFeed.vue`<br>`src/viewers/AihotViewer.vue` | 每日精选 AI 资讯热榜与沉浸式阅读器。 |
-| **youtube插件** | `src/youtube/YouTubeCard.vue` | YouTube 频道订阅、个性推荐（紫色胶囊卡片）与视频播放。 |
 
 ---
 
@@ -56,15 +55,14 @@
 
 | 模块口令 | 对应源码文件 | 模组 ID | 状态与说明 |
 | :--- | :--- | :--- | :--- |
-| **海狸聊天室** | `src/chat/ChatDialog.vue`<br>`src/chat/SharedRoomNavigation.vue` | `chat` | 实验性，默认关闭（在商店手动开启）。自托管 HTTPS 增量同步私有聊天室，支持文字、卡片分享与受限图片消息，内置好友请求与活动感知。 |
 | **模块商店** | `src/modules/PluginMarketDialog.vue` | `market` | 内置模块启用与停用管理，支持标题栏拖拽与主题自适应。 |
 | **塞壬唱片** | `src/music/SirenWorkspaceDialog.vue` | `siren` | 塞壬唱片专辑音乐库浏览与播放。 |
 | **网易云模块** | `src/music/NeteaseWorkspaceDialog.vue` | `music` | 网易云官网会话直连登录、歌单浏览与播放。 |
-| **我的表情包 / 表情库** | `src/stickers/StickersDialog.vue`<br>`src/stickers/StickerBoard.vue` | `stickers` | 已从 Dock 和商店隐藏为辅助窗口，可在聊天室表情面板打开；支持本地磁盘目录挂载与内置表情库管理。 |
+| **我的表情包 / 表情库** | `src/stickers/StickersDialog.vue`<br>`src/stickers/StickerBoard.vue` | `stickers` | 已从 Dock 和商店隐藏为辅助窗口；支持本地磁盘目录挂载与内置表情库管理。 |
 | **同步模块** | `src/sync/SyncWorkspaceDialog.vue` | `sync` | WebDAV 云端备份与多端漫游窗口，支持配置与电台系列完整备份/恢复。 |
 | **日历模块** | `src/calendar/CalendarWorkspace.vue` | `calendar` | 独立日历视图，showInDock: false，辅助窗口形式注册。 |
 
-*(注：原 ArkPets 桌宠、监控模块、N8N 模块、Obsidian 笔记本、旧 QQ 模块均已彻底物理移除，严禁恢复)*
+*(注：原 ArkPets 桌宠、监控模块、N8N 模块、Obsidian 笔记本、旧 QQ 模块、海狸聊天室均已彻底物理移除，严禁恢复)*
 
 ---
 
@@ -81,7 +79,11 @@
 * **`bilibili.service.ts` / `bilibili-channel.service.ts`**：B站 API 门面、WBI 鉴权、DASH 纯音频获取与视频流分发。
 * **`todoist.service.ts`**：Todoist REST API 封装、结构化错误与限流冷却重试控制。
 * **`github.service.ts` / `my-repos-store.ts`**：GitHub Star 仓库同步、分类缓存、个人仓库读取与 GitHub Topics 远端实时同步更新。
-* **`webdav.service.ts` / `sync.service.ts`**：WebDAV 协议客户端、备份白名单与本地数据快照序列化。
+* **`src/services/webdav.service.ts` / `sync.service.ts` / `sync-schema.ts` / `sync-record-merge.ts`**：WebDAV 协议客户端、统一同步 Schema / 连接组事实源、本地数据快照序列化与带墓碑三向合并适配器。
+* **`src/core/storage-repo.ts`**：Promise 化扩展存储适配器（封装 `chrome.storage.local` 权威读写与 `localStorage` 回退）。
+* **`src/core/runtime-protocol.ts`**：强类型后台消息协议、`sendRuntimeMessage` 与表驱动 `createRuntimeMessageRouter` 分发器。
+* **`src/backpack/BackpackDialog.vue` / `BackpackArticleReaderDrawer.vue` / `backpack-helpers.ts` / `backpack-dialog.css`**：提示词与文章资料库，已拆分异步 Markdown 阅读抽屉与纯辅助函数。
+* **`src/assets/styles.css`**：通过 `@layer base, themes, components, layout, utilities;` 管理全站 CSS 层叠顺序。
 * **`launcher.service.ts`**：常用网站与大文件夹本地持久化存储（带内存镜像与快速检索）。
 * **`bookmarks.service.ts`**：Chrome 原生书签树遍历与 Web Worker 拼音/模糊全文分流搜索。
 * **`wallpaper.service.ts`**：壁纸运行时驱动服务、OPFS 活跃包持久化、多设备 WebDAV 同步，以及双向握手与硬件休眠控制。

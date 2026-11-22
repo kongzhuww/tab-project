@@ -223,7 +223,9 @@ function syncTape(): void {
   const currentLyricText = playbackError || cue?.content || (playing ? "♪ 伴奏播放中…" : track ? `已暂停 · 《${track.title}》` : "点击磁带继续播放");
   radioTapeController.update({
     active, loading, playing,
+    bvid: track?.bvid || "",
     title: track?.title || "B站电台",
+    author: track?.upper || track?.author || "",
     coverUrl: track?.cover || "",
     seriesName: name,
     trackIndex: index >= 0 ? index + 1 : 1,
@@ -315,6 +317,13 @@ export const biliRadioPlayer = {
     resolver = options.resolveTrack;
     queuePlayback = { isCurrent: options.isCurrent, autoplay: options.autoplay, onReady: options.onReady };
     if (canUseOffscreenAudio() && !options.resolveTrack && !options.onReady) {
+      const startIdx = Math.max(0, Math.min(items.length - 1, Number(options.startIndex) || 0));
+      index = items.length ? startIdx : -1;
+      track = items[startIdx] || null;
+      active = Boolean(items.length);
+      loading = Boolean(items.length);
+      playbackError = "";
+      syncTape();
       void sendAudioCommand("bili", "play-queue", {
         name,
         items,

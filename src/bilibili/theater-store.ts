@@ -18,7 +18,15 @@ export interface BiliCommentItem {
   level?: number;
   replyCount?: number;
   pictures?: string[];
-  replies?: Array<{ id: string | number; userName: string; message: string }>;
+  emotes?: Record<string, string>;
+  mentions?: Record<string, string>;
+  replies?: Array<{
+    id: string | number;
+    userName: string;
+    message: string;
+    emotes?: Record<string, string>;
+    mentions?: Record<string, string>;
+  }>;
   subRepliesExpanded?: boolean;
   subRepliesLoading?: boolean;
   subRepliesHasMore?: boolean;
@@ -333,7 +341,15 @@ export const biliTheaterController = {
         likeCount: c.like,
         replyCount: c.rcount,
         pictures: c.pictures || [],
-        replies: (c.replies || []).map((r: any) => ({ id: String(r.rpid), userName: r.uname, message: r.message }))
+        emotes: c.emotes,
+        mentions: c.mentions,
+        replies: (c.replies || []).map((r: any) => ({
+          id: String(r.rpid),
+          userName: r.uname,
+          message: r.message,
+          emotes: r.emotes,
+          mentions: r.mentions
+        }))
       }));
 
       if (reset) {
@@ -399,7 +415,9 @@ export const biliTheaterController = {
       const newReplies = (res.replies || []).map(r => ({
         id: String(r.rpid),
         userName: r.uname,
-        message: r.message
+        message: r.message,
+        emotes: r.emotes,
+        mentions: r.mentions
       }));
 
       const existingIds = new Set((comment.replies || []).map(r => String(r.id)));

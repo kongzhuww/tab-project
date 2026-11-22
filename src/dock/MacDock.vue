@@ -5,7 +5,6 @@ import { dockLifecycleController } from "./dock-lifecycle.store";
 import DockContextMenu, { type ContextTarget } from "./DockContextMenu.vue";
 import { getDockModule } from "../modules/registry";
 import { pluginMarketController } from "../modules/market-store";
-import { privateChatConfigured } from "../chat/private-chat-config";
 import { t } from "../i18n";
 import { settingsController } from "../settings/store";
 

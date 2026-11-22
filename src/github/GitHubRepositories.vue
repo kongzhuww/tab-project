@@ -9,9 +9,6 @@ import { githubRepositoryController as controller, githubRepositoryState as stat
 import { githubRepoDetailController } from "./repo-detail-store";
 import { gitHubService } from "../services/github.service";
 import { githubStatusState } from "./store";
-import ChatShareMenu from "../chat/ChatShareMenu.vue";
-import { chatService } from "../chat/chat.service";
-import type { ChatShareTarget } from "../chat/private-chat-client";
 import { githubTaskModalController } from "./github-task-modal-store";
 
 // 右键上下文菜单与分类选择器
@@ -118,24 +115,6 @@ async function copyUrl(): Promise<void> {
   if (url && props.active) {
     try { await navigator.clipboard.writeText(url); } catch (_) {}
   }
-}
-
-function shareToRoom(target: ChatShareTarget): void {
-  const repo = gitHubService.findRepository(contextMenuState.fullName);
-  closeContextMenu();
-  if (!repo) return;
-  chatService.sendGitHubShare({
-    fullName: repo.full_name,
-    name: repo.name,
-    owner: repo.owner?.login,
-    ownerAvatar: repo.owner?.avatar_url,
-    desc: repo.description || undefined,
-    language: repo.language || undefined,
-    stars: repo.stargazers_count,
-    category: (contextMenuState.folders && contextMenuState.folders.length ? contextMenuState.folders.join(", ") : "未分类"),
-    url: repo.html_url || `https://github.com/${repo.full_name}`,
-    updatedAt: repo.updated_at ? repo.updated_at.split("T")[0] : undefined
-  }, target);
 }
 
 function openCreateTask(): void {
@@ -359,12 +338,6 @@ const isLoading = computed(() => {
       <button class="fo-cover-menu-item" type="button" @mouseenter="activeSubMenu = null" @click="openCreateTask">
         创建任务
       </button>
-      <ChatShareMenu
-        label="💬 发送到聊天室"
-        :visible="contextMenuState.visible"
-        @open="activeSubMenu = null"
-        @select="shareToRoom"
-      />
       <button v-if="contextMenuState.hasRemark" class="fo-cover-menu-item" type="button" @mouseenter="activeSubMenu = null" @click="clearRemark">
         🗑️ 清除备注
       </button>
