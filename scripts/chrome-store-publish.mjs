@@ -1,7 +1,9 @@
 // No dependencies. Credentials are provided only to this process by Actions Secrets.
+import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
 
 const extensionId = process.env.CHROME_EXTENSION_ID?.trim() || 'hogpkihhicjhiakkgjkbchpdoicmbolj';
+const serviceAccountRaw = process.env.CHROME_SERVICE_ACCOUNT_JSON?.trim();
 const clientId = process.env.CHROME_CLIENT_ID?.trim();
 const clientSecret = process.env.CHROME_CLIENT_SECRET?.trim();
 const refreshToken = process.env.CHROME_REFRESH_TOKEN?.trim();
@@ -14,19 +16,21 @@ const summary = async (message) => {
   }
 };
 
+const useServiceAccount = Boolean(serviceAccountRaw);
+
 // Check if secrets are configured
-if (!clientId || !clientSecret || !refreshToken) {
+if (!useServiceAccount && (!clientId || !clientSecret || !refreshToken)) {
   const missing = [];
   if (!clientId) missing.push('CHROME_CLIENT_ID');
   if (!clientSecret) missing.push('CHROME_CLIENT_SECRET');
   if (!refreshToken) missing.push('CHROME_REFRESH_TOKEN');
 
-  const warning = `::warning::Missing Chrome Web Store credentials: ${missing.join(', ')}. Package upload skipped.`;
+  const warning = `::warning::Missing Chrome Web Store credentials (${missing.join(', ')} or CHROME_SERVICE_ACCOUNT_JSON). Package upload skipped.`;
   console.log(warning);
   await summary(
     '### ⚠️ Chrome 商店自动发布跳过\n\n' +
-    `检测到以下 GitHub Secrets 未配置：\`${missing.join(', ')}\`。\n\n` +
-    '如需启用 Chrome 网上应用店自动上传与发布，请参考文档在 GitHub 仓库 Settings → Secrets and variables → Actions 中配置 Google OAuth 凭据。'
+    `检测到以下 GitHub Secrets 未配置：\`${missing.join(', ')}\`（且未配置 \`CHROME_SERVICE_ACCOUNT_JSON\`）。\n\n` +
+    '如需启用 Chrome 网上应用店自动上传与发布，请在 GitHub 仓库 Settings → Secrets and variables → Actions 中配置 Google Service Account JSON 或 OAuth 凭据。'
   );
   process.exit(0);
 }
@@ -39,7 +43,64 @@ if (!tag || !/^v\d+\.\d+\.\d+(?:\.\d+)?$/.test(tag)) {
   throw new Error('Invalid or missing Release tag: ' + tag);
 }
 
-async function getAccessToken() {
+function base64UrlEncode(input) {
+  return Buffer.from(input).toString('base64url');
+}
+
+async function getServiceAccountAccessToken(rawJson) {
+  let sa;
+  try {
+    sa = JSON.parse(rawJson);
+  } catch {
+    throw new Error('CHROME_SERVICE_ACCOUNT_JSON is not valid JSON');
+  }
+  if (!sa || sa.type !== 'service_account' || typeof sa.client_email !== 'string' || typeof sa.private_key !== 'string') {
+    throw new Error('CHROME_SERVICE_ACCOUNT_JSON is missing required service_account fields');
+  }
+
+  const tokenUri = typeof sa.token_uri === 'string' && sa.token_uri.startsWith('https://')
+    ? sa.token_uri
+    : 'https://oauth2.googleapis.com/token';
+  const now = Math.floor(Date.now() / 1000);
+  const header = base64UrlEncode(JSON.stringify({ alg: 'RS256', typ: 'JWT' }));
+  const payload = base64UrlEncode(JSON.stringify({
+    iss: sa.client_email,
+    scope: 'https://www.googleapis.com/auth/chromewebstore',
+    aud: tokenUri,
+    iat: now,
+    exp: now + 3600,
+  }));
+  const unsigned = `${header}.${payload}`;
+  const signer = crypto.createSign('RSA-SHA256');
+  signer.update(unsigned);
+  signer.end();
+  const signature = signer.sign(sa.private_key).toString('base64url');
+  const assertion = `${unsigned}.${signature}`;
+
+  const response = await fetch(tokenUri, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+      assertion,
+    }),
+    signal: AbortSignal.timeout(60000),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    const desc = errorData.error_description || errorData.error || response.statusText;
+    throw new Error(`Google Service Account token exchange failed (HTTP ${response.status}): ${desc}`);
+  }
+
+  const data = await response.json();
+  if (!data.access_token) {
+    throw new Error('Google Service Account response did not contain an access_token');
+  }
+  return data.access_token;
+}
+
+async function getOAuthRefreshAccessToken() {
   const response = await fetch('https://oauth2.googleapis.com/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -120,8 +181,14 @@ try {
   console.log(`Reading release package from ${zipPath}...`);
   const zipBuffer = await fs.readFile(zipPath);
 
-  console.log('Exchanging refresh token for Google OAuth access token...');
-  const accessToken = await getAccessToken();
+  console.log(
+    useServiceAccount
+      ? 'Requesting Google access token via Service Account...'
+      : 'Exchanging refresh token for Google OAuth access token...'
+  );
+  const accessToken = useServiceAccount
+    ? await getServiceAccountAccessToken(serviceAccountRaw)
+    : await getOAuthRefreshAccessToken();
   console.log('Access token acquired successfully.');
 
   console.log(`Uploading package to Chrome Web Store (Extension ID: ${extensionId})...`);

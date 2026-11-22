@@ -7,6 +7,8 @@ on:
         required: true
         type: string
     secrets:
+      CHROME_SERVICE_ACCOUNT_JSON:
+        required: false
       CHROME_CLIENT_ID:
         required: false
       CHROME_CLIENT_SECRET:
@@ -72,6 +74,7 @@ jobs:
           '
       - name: Upload package and submit to Chrome Web Store
         env:
+          CHROME_SERVICE_ACCOUNT_JSON: ${{ secrets.CHROME_SERVICE_ACCOUNT_JSON }}
           CHROME_CLIENT_ID: ${{ secrets.CHROME_CLIENT_ID }}
           CHROME_CLIENT_SECRET: ${{ secrets.CHROME_CLIENT_SECRET }}
           CHROME_REFRESH_TOKEN: ${{ secrets.CHROME_REFRESH_TOKEN }}
